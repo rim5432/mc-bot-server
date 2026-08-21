@@ -9,9 +9,11 @@ import com.mcbot.mcbotserver.api.types.CellPos;
  *
  * <p>Contract: see boundaries.md decision 7 (Goal is a pure data
  * abstraction) and ADR-0004 D3 (SUCCESS is decided solely by evaluating
- * this predicate on the bot pose).
+ * this predicate on the bot pose). Sealed over the current algebra so
+ * consumers like PathingBehavior can switch exhaustively — a new goal
+ * variant is a compiler event, never a silent ClassCastException.
  */
-public interface Goal {
+public sealed interface Goal permits GoalBlock, GoalNear {
 
     /**
      * Arrival test.

@@ -139,11 +139,26 @@ public final class PathingBehavior implements Behavior {
             new Intent.Look(yaw, 0f)));
     }
 
+    /**
+     * The anchor cell to steer toward. Goal is sealed, so a new variant
+     * must edit this method's permits list first; the terminal throw
+     * turns any future miss into a crash-at-write-site instead of a
+     * silent wrong-direction walk (Java 17 has no exhaustive-switch
+     * patterns yet).
+     *
+     * @param directive the active mission's directive; never null
+     * @return the steering anchor cell; never null
+     */
     private CellPos nearestGoalCell(Directive directive) {
-        return directive.goal() instanceof com.mcbot.mcbotserver.api.goal.GoalBlock block
-            ? block.target()
-            : ((com.mcbot.mcbotserver.api.goal.GoalNear) directive.goal())
-                .center();
+        var goal = directive.goal();
+        if (goal instanceof com.mcbot.mcbotserver.api.goal.GoalBlock b) {
+            return b.target();
+        }
+        if (goal instanceof com.mcbot.mcbotserver.api.goal.GoalNear n) {
+            return n.center();
+        }
+        throw new IllegalStateException(
+            "unhandled goal variant: " + goal.getClass());
     }
 
     /**
