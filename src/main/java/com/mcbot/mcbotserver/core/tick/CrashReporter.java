@@ -29,12 +29,17 @@ public interface CrashReporter {
      */
     static CrashReporter consoleFallback() {
         return context -> {
-            System.err.println("[mcbot][CRASH] tick="
-                + context.tick() + " cause=" + context.causeSummary());
-            System.err.println(context.stackTrace());
-            // TODO adapter: append crash lines to the run-dir file as
-            //  well (ADR-0005 D4 fallback half); needs the runtime dir,
-            //  which only the adapter knows (Ref: workplan Stage 1).
+            try {
+                System.err.println("[mcbot][CRASH] tick="
+                    + context.tick() + " cause=" + context.causeSummary());
+                System.err.println(context.stackTrace());
+                // TODO adapter: append crash lines to the run-dir file
+                //  as well (ADR-0005 D4 fallback half); needs the
+                //  runtime dir, which only the adapter knows
+                //  (Ref: workplan Stage 1).
+            } catch (RuntimeException ignored) {
+                // Nothing left to fall back to; truly silent.
+            }
         };
     }
 }

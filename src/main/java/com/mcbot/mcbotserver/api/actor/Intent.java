@@ -32,4 +32,33 @@ public sealed interface Intent {
      */
     record Look(float yawDeg, float pitchDeg) implements Intent {
     }
+
+    /**
+     * Attack / interact press, resolved on the USE channel. Aiming is
+     * the ROT channel's job; this only carries the press semantics.
+     *
+     * @param pressing true to hold the action down this tick
+     */
+    record Use(boolean pressing) implements Intent {
+    }
+
+    /**
+     * Hotbar selection, resolved on the SLOT channel.
+     *
+     * @param slot hotbar index 0..8
+     */
+    record SelectSlot(int slot) implements Intent {
+
+        /**
+         * Creates a validated selection.
+         *
+         * @param slot must be within 0..8 inclusive
+         */
+        public SelectSlot {
+            if (slot < 0 || slot > 8) {
+                throw new IllegalArgumentException(
+                    "slot must be in 0..8, got " + slot);
+            }
+        }
+    }
 }

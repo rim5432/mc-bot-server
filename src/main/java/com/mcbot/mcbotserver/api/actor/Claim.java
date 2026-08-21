@@ -24,12 +24,16 @@ public record Claim(Channel channel, int priority, String holder,
                     Intent intent) {
 
     /**
-     * Creates a validated claim.
+     * Creates a validated claim. The intent variant must match the
+     * channel — a mismatched claim would explode later inside the
+     * adapter's exhaustive dispatch, and the sealed vocabulary exists
+     * precisely so that failure happens here instead.
      *
      * @param channel  must not be null
      * @param priority any int; bands live in the caller's convention
      * @param holder   must not be null or blank
-     * @param intent   must not be null
+     * @param intent   must not be null and must be the sealed variant
+     *                 matching {@code channel}
      */
     public Claim {
         if (channel == null) {
@@ -41,5 +45,27 @@ public record Claim(Channel channel, int priority, String holder,
         if (intent == null) {
             throw new IllegalArgumentException("intent must not be null");
         }
+        if (!matchesChannel(channel, intent)) {
+            throw new IllegalArgumentException(
+                "intent " + intent.getClass().getSimpleName()
+                    + " does not match channel " + channel);
+        }
+    }
+
+    /**
+     * Channel-to-variant pairing table; edit together with
+     * {@link Intent} and {@link Channel}.
+     *
+     * @param channel the contested channel; never null
+     * @param intent  the payload; never null
+     * @return true when the payload is legal for the channel
+     */
+    private static boolean matchesChannel(Channel channel, Intent intent) {
+        return switch (channel) {
+            case MOVE -> intent instanceof Intent.Move;
+            case ROT -> intent instanceof Intent.Look;
+            case USE -> intent instanceof Intent.Use;
+            case SLOT -> intent instanceof Intent.SelectSlot;
+        };
     }
 }

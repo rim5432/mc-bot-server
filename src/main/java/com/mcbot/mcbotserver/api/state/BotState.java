@@ -29,6 +29,7 @@ import java.util.Map;
  * @param currentTaskSummary one-line description of the active task or
  *                           "idle"; never null
  */
+// contract: see boundaries.md Boundary D protocol (state snapshot shape)
 public record BotState(
     CellPos pos,
     float yaw,

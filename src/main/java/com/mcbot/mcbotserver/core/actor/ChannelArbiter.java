@@ -50,6 +50,10 @@ public final class ChannelArbiter implements Actor {
     @Override
     public void clearAllIntents() {
         buffer.clear();
+        // Post-crash the body must be neutral, not "whatever pathing
+        // held last" — a stale incumbent would silently win the next
+        // equal-priority contest long after its owner died.
+        incumbents.clear();
     }
 
     /**

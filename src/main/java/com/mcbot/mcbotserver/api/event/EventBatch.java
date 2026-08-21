@@ -20,6 +20,7 @@ import java.util.List;
  * @param resetAt       monotonic bot-restart marker; changes when the
  *                      in-memory queue has been wiped
  */
+// contract: see boundaries.md Boundary D protocol (event stream shape)
 public record EventBatch(
     List<BotEvent> events,
     int droppedCount,

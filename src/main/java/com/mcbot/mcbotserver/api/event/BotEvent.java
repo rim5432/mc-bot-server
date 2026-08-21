@@ -34,7 +34,7 @@ public record BotEvent(
      *
      * @param kind   must not be null or blank
      * @param day    any non-negative value
-     * @param t      any non-negative value
+     * @param t      must be within 0..23999 inclusive
      * @param urgent freshness flag as defined above
      * @param attrs  must not be null
      * @param text   must not be null
@@ -42,6 +42,14 @@ public record BotEvent(
     public BotEvent {
         if (kind == null || kind.isBlank()) {
             throw new IllegalArgumentException("kind must not be blank");
+        }
+        if (day < 0) {
+            throw new IllegalArgumentException(
+                "day must not be negative");
+        }
+        if (t < 0 || t > 23999) {
+            throw new IllegalArgumentException(
+                "t must be in 0..23999, got " + t);
         }
         attrs = Map.copyOf(attrs);
         if (text == null) {

@@ -119,10 +119,39 @@ class PerceptionActionGateTest {
     void clearAllIntentsDropsWithoutResolving() {
         ChannelArbiter actor = new ChannelArbiter();
         actor.submit(new Claim(Channel.SLOT, 99, "equip",
-            new Intent.Look(0f, 0f)));
+            new Intent.SelectSlot(3)));
         actor.clearAllIntents();
         assertTrue(actor.flush().isEmpty(),
             "cleared claims must never win a flush");
+    }
+
+    /**
+     * G3 hardening: the sealed Intent vocabulary must pair with its
+     * channel at construction — mismatches die here, not inside the
+     * Stage 1 adapter's dispatch.
+     */
+    @Test
+    void mismatchedIntentChannelPairsAreRejected() {
+        ChannelArbiter actor = new ChannelArbiter();
+        org.junit.jupiter.api.Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> actor.submit(new Claim(Channel.SLOT, 1, "equip",
+                new Intent.Look(0f, 0f))));
+        org.junit.jupiter.api.Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> actor.submit(new Claim(Channel.USE, 1, "combat",
+                new Intent.Move(1, 0, false, false))));
+
+        // The legal pairings for the two channels added in this round.
+        actor.submit(new Claim(Channel.USE, 5, "combat",
+            new Intent.Use(true)));
+        actor.submit(new Claim(Channel.SLOT, 5, "equip",
+            new Intent.SelectSlot(2)));
+        var winners = actor.flush();
+        assertTrue(winners.get(Channel.USE).intent()
+            instanceof Intent.Use);
+        assertTrue(winners.get(Channel.SLOT).intent()
+            instanceof Intent.SelectSlot);
     }
 
     /** Decision 7: GoalBlock is exact; GoalNear is Chebyshev-inclusive. */
