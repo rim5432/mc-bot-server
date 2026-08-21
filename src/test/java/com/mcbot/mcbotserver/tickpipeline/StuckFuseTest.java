@@ -82,4 +82,36 @@ class StuckFuseTest {
         assertEquals("mover", winners.get(Channel.MOVE).holder());
         assertEquals("mover", winners.get(Channel.ROT).holder());
     }
+
+    /**
+     * Push-off recovery, stage-1 slice acceptance: an external shove
+     * inside the window is displacement, not stalling — the fuse must
+     * stay silent and the mover keeps claiming toward the goal.
+     */
+    @Test
+    void shoveInsideWindowDoesNotTripFuse() {
+        CellPos[] pose = {new CellPos(0, 64, 0)};
+        PathingBehavior mover = new PathingBehavior("mover",
+            () -> pose[0]);
+        ChannelArbiter actor = new ChannelArbiter();
+        Directive directive = Directive.of(
+            new GoalBlock(new CellPos(50, 64, 0)));
+
+        // Walk a little, get shoved back, walk again - repeatedly,
+        // across more than one full window of ticks.
+        for (int round = 0; round < 3; round++) {
+            int base = round * 2;
+            pose[0] = new CellPos(base, 64, 0);
+            assertEquals(ExecutionReport.Status.RUNNING,
+                mover.tick(WORLD, directive, actor).status());
+            pose[0] = new CellPos(base + 1, 64, 0);
+            assertEquals(ExecutionReport.Status.RUNNING,
+                mover.tick(WORLD, directive, actor).status());
+            // Shove back to the round's start before the next round.
+            pose[0] = new CellPos(base, 64, 0);
+            assertEquals(ExecutionReport.Status.RUNNING,
+                mover.tick(WORLD, directive, actor).status(),
+                "a shove is displacement, never STUCK");
+        }
+    }
 }
