@@ -196,8 +196,14 @@ public final class BotController {
     // invariant: see ADR-0005 D1 (single catch around all four stages)
     public void onTick(WorldView world) {
         if (crashed) {
-            MinimalReflex.tick(inLethalFluid, actor);
-            actor.flush();
+            // invariant: see ADR-0005 D3 (MinimalReflex may throw too;
+            // the same latch fires again and both channels re-report)
+            try {
+                MinimalReflex.tick(inLethalFluid, actor);
+                actor.flush();
+            } catch (RuntimeException e) {
+                handleCrash(e);
+            }
             return;
         }
         try {
@@ -221,7 +227,12 @@ public final class BotController {
             InterruptionContext ctx = new InterruptionContext(tickCounter,
                 pose, activeName(), "reflex-preempt:" + decision.ruleName(),
                 "");
-            arbiter.forcePauseAll(ctx);
+            String pausedTask = activeName();
+            if (arbiter.forcePauseAll(ctx)) {
+                emitMissionEvent(EventKind.TASK_PAUSED, day, tod,
+                    pausedTask, "paused by reflex "
+                        + decision.ruleName());
+            }
             actor.submit(new Claim(Channel.MOVE, decision.priority(),
                 "reflex:" + decision.ruleName(),
                 new Intent.Move(0, 0, false, false)));
@@ -231,7 +242,13 @@ public final class BotController {
 
         // Threat gone: hand control back through world revalidation.
         if (arbiter.paused() != null) {
-            arbiter.tryResume();
+            String resumingTask = arbiter.paused().displayName();
+            boolean resumed = arbiter.tryResume();
+            emitMissionEvent(resumed
+                    ? EventKind.TASK_RESUMED : EventKind.TASK_DROPPED,
+                day, tod, resumingTask,
+                resumed ? "world assumptions held"
+                    : "world assumptions invalidated; task dropped");
         }
 
         // Stage 2: arbiter picks or keeps the winner.
@@ -246,6 +263,18 @@ public final class BotController {
 
         // Stage 4: resolve contests, expire claims, emit intents.
         actor.flush();
+    }
+
+    private void emitMissionEvent(String kind, long day, long tod,
+                                  String taskName, String detail) {
+        boolean urgent = EventKind.TASK_PAUSED.equals(kind)
+            || EventKind.TASK_DROPPED.equals(kind);
+        try {
+            events.push(new BotEvent(kind, day, tod, urgent,
+                Map.of("task", taskName), taskName + ": " + detail));
+        } catch (RuntimeException ignored) {
+            // Reporting must never take the pipeline down with it.
+        }
     }
 
     private void consumeReport(Behavior behavior, ExecutionReport report,

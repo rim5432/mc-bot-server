@@ -6,7 +6,9 @@ import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.behavior.Behavior;
 import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
+import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventQueue;
+import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.api.process.Directive;
@@ -69,7 +71,7 @@ class TickPipelineGateTest {
     }
 
     /** Mission stub counting ticks for skip assertions. */
-    private static final class CountingMission implements BotProcess {
+    private static class CountingMission implements BotProcess {
         private int tickCalls;
 
         @Override
@@ -225,5 +227,93 @@ class TickPipelineGateTest {
             "healthy bot should walk toward its goal");
         assertFalse(actor.lastFlush.isEmpty(),
             "stage 4 must resolve claims every tick");
+    }
+
+    /**
+     * G4: the pause / resume / drop transitions are visible to the
+     * harness as TASK_* events — urgent for paused and dropped, since
+     * both mean "your mental model of the task is wrong".
+     */
+    @Test
+    void pauseResumeDropEmitLifecycleEvents() {
+        float[] health = {20f};
+        InMemoryEventQueue events =
+            new InMemoryEventQueue(() -> 2L, () -> 9000L);
+        SurvivalReflexLayer layer = new SurvivalReflexLayer(
+            (world, board) -> board.botHealth = health[0]);
+        layer.addRule(new FreezeOnLowHealthRule());
+        TaskArbiter arbiter = new TaskArbiter();
+        CountingMission mission = new CountingMission();
+        arbiter.register(mission);
+        arbiter.requestControl(mission);
+        RecordingActor actor = new RecordingActor();
+        PathingBehavior mover = new PathingBehavior("mover",
+            () -> new CellPos(0, 64, 0));
+        BotController controller = controller(health, layer, arbiter,
+            mover, actor, events);
+        MockWorldView world = new MockWorldView();
+
+        // Establish the mission as current before any threat exists.
+        controller.onTick(world);
+
+        health[0] = 3f;
+        controller.onTick(world);
+        assertEquals(List.of(EventKind.TASK_PAUSED), kindsOf(events),
+            "preemption must surface as TASK_PAUSED");
+
+        health[0] = 20f;
+        controller.onTick(world);
+        assertEquals(List.of(EventKind.TASK_PAUSED, EventKind.TASK_RESUMED),
+            kindsOf(events),
+            "clean revalidation must surface as TASK_RESUMED");
+    }
+
+    /**
+     * G4 drop path: a failed revalidation surfaces as an urgent
+     * TASK_DROPPED so the harness knows to replan.
+     */
+    @Test
+    void droppedMissionEmitsUrgentTaskDropped() {
+        float[] health = {20f};
+        InMemoryEventQueue events =
+            new InMemoryEventQueue(() -> 2L, () -> 9000L);
+        SurvivalReflexLayer layer = new SurvivalReflexLayer(
+            (world, board) -> board.botHealth = health[0]);
+        layer.addRule(new FreezeOnLowHealthRule());
+        TaskArbiter arbiter = new TaskArbiter();
+        CountingMission mission = new CountingMission() {
+            @Override
+            public boolean resume(
+                    com.mcbot.mcbotserver.api.interrupt.InterruptionContext
+                        c) {
+                return false;
+            }
+        };
+        arbiter.register(mission);
+        arbiter.requestControl(mission);
+        BotController controller = controller(health, layer, arbiter,
+            new PathingBehavior("mover", () -> new CellPos(0, 64, 0)),
+            new RecordingActor(), events);
+
+        controller.onTick(new MockWorldView());
+        health[0] = 3f;
+        controller.onTick(new MockWorldView());
+        health[0] = 20f;
+        controller.onTick(new MockWorldView());
+
+        List<String> kinds = kindsOf(events);
+        assertEquals(2, kinds.size());
+        assertEquals(EventKind.TASK_PAUSED, kinds.get(0));
+        assertEquals(EventKind.TASK_DROPPED, kinds.get(1));
+        BotEvent dropped = events.statusSnapshot(0).events().get(1);
+        assertTrue(dropped.urgent(),
+            "a dropped task is decision-critical: it will never finish");
+    }
+
+    private static List<String> kindsOf(InMemoryEventQueue events) {
+        return events.statusSnapshot(0).events().stream()
+            .map(BotEvent::kind)
+            .filter(k -> k.startsWith("TASK_"))
+            .toList();
     }
 }

@@ -29,6 +29,22 @@ public final class EventKind {
     public static final String TASK_FAILED = "TASK_FAILED";
 
     /**
+     * A running mission was parked by a reflex preemption; urgent —
+     * the harness's mental model ("task is running") is now wrong.
+     */
+    public static final String TASK_PAUSED = "TASK_PAUSED";
+
+    /** A parked mission revalidated cleanly and holds the body again. */
+    public static final String TASK_RESUMED = "TASK_RESUMED";
+
+    /**
+     * A parked mission failed world revalidation and was dropped;
+     * urgent — the task will never complete and the harness must
+     * replan.
+     */
+    public static final String TASK_DROPPED = "TASK_DROPPED";
+
+    /**
      * The tick pipeline caught a RuntimeException; carries the crash
      * summary per ADR-0005 D4 (primary channel).
      */
