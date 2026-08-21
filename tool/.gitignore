@@ -1,0 +1,7 @@
+# mcbot_tool runtime — never tracked
+.runtime/
+
+# python
+__pycache__/
+*.pyc
+*.pyo

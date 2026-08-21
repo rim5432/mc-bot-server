@@ -26,3 +26,9 @@ repo
 
 # stray wrapper extraction artifact at repo root only
 /META-INF/
+
+# tool runtime artifacts (locks, logs)
+tool/.runtime/
+
+# external harness runtime scratch
+.dsh-runtime/
