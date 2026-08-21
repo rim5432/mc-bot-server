@@ -23,3 +23,6 @@ run
 runs
 run-data
 repo
+
+# stray wrapper extraction artifact at repo root only
+/META-INF/
