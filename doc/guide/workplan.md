@@ -1,6 +1,6 @@
 ---
 title: Work Plan (effort-sized checklist)
-last_verified: 2026-08-21
+last_verified: 2026-08-22
 covers:
   - doc/architecture/boundaries.md
   - doc/decisions/0004-tick-pipeline-actor-channels.md
@@ -76,25 +76,45 @@ do not start an item before its blockers are checked.
 
 ## Stage 1 - vertical slice: walk to a block
 
-- [ ] L  Entity-binding spike: choose fake-player carrier; implement
+- [x] L  Entity-binding spike: choose fake-player carrier; implement
          WorldView+Actor adapters; physics stays engine-owned           [gate0]
-- [ ] M  GotoProcess state machine (IDLE/APPROACH/SUCCEEDED/FAILED)
+         OUTCOME: custom PathfinderMob carrier (BotBodyEntity), AI step
+         skipped so MoveControl cannot fight the binding for zza;
+         ServerPlayer parity deferred. Ratification at Stage 1 review.
+- [x] M  GotoProcess state machine (IDLE/APPROACH/SUCCEEDED/FAILED)
          consuming reports only                                         [spike]
-- [ ] S  GotoCommand + CommandQueue seam verbs (submit/cancel/status)
+- [x] S  GotoCommand + CommandQueue seam verbs (submit/cancel/status)
          + JSON codec                                                   [goto]
-- [ ] L  PathingBehavior straight-line mover: MOVE+ROT claims toward
+- [x] L  PathingBehavior straight-line mover: MOVE+ROT claims toward
          target, arrival via goal predicate                             [spike]
-- [ ] M  stuck fuse (displacement < eps over window -> STUCK) and
+- [x] M  stuck fuse (displacement < eps over window -> STUCK) and
          timeoutTicks enforcement                                       [mover]
-- [ ] S  push-off recovery: external displacement triggers re-path      [mover]
+- [x] S  push-off recovery: external displacement triggers re-path      [mover]
 - [ ] M  gametest suite on flat ground:
          walks-to-block / recovers-when-shoved / fails-cleanly-unwalkable [fuse]
-- [ ] S  real ThreatSensor (entity scan, bearing sector incl. behind,
+         BLOCKED on the structure-template question (AGENTS.md open
+         question: 1.20.1 ships no empty template). Interim acceptance
+         is the manual smoke path: runServer + /botspawn + /goto.
+- [x] S  real ThreatSensor (entity scan, bearing sector incl. behind,
          creeper fuse accessor) writing blackboard in-game              [binding]
+         NOTE: fuse accessor deferred - the sensor records type and
+         distance; swell-state refinement lands with the first rule
+         that needs it.
 
 **Stage gate** (the milestone): bot walks to the target block on flat
 ground; when shoved mid-path it re-walks; when the target is unreachable
 it reports FAILED with a reason - no hang, no silent stall.
+STATUS: logic complete and offline-gated (44 L1 tests); in-engine
+verification pending the gametest template resolution above.
+
+### Stage 1 follow-ups for the Stage 1 review
+
+1. Ratify the entity-binding carrier choice (PathfinderMob vs
+   ServerPlayer subclass) against real slice behavior.
+2. Ratify boundary-B vocabulary growth: BotProcess.onExecutionReport
+   default method + TerminalMission marker interface.
+3. Resolve the gametest structure-template question (empty template
+   source for MC 1.20.1) and unblock the three-scenario suite.
 
 ## Stage 2 backlog - unlocked only by the stage-1 gate
 
