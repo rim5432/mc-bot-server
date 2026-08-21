@@ -88,7 +88,9 @@ do not start an item before its blockers are checked.
 - [x] L  PathingBehavior straight-line mover: MOVE+ROT claims toward
          target, arrival via goal predicate                             [spike]
 - [x] M  stuck fuse (displacement < eps over window -> STUCK) and
-         timeoutTicks enforcement                                       [mover]
+         timeoutTicks enforcement (mission-side hard cutoff per
+         Stage 1 review: TIMEOUT is the mission giving up on its own
+         budget; STUCK stays behavior-side)                        [mission]
 - [x] S  push-off recovery: external displacement triggers re-path      [mover]
 - [ ] M  gametest suite on flat ground:
          walks-to-block / recovers-when-shoved / fails-cleanly-unwalkable [fuse]

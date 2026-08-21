@@ -101,6 +101,14 @@ EventBatch statusSnapshot(long sinceEventId);
   game-time stamp, an `urgent` flag, structured `attrs`, and a
   human-readable `text`. Unknown kinds get a `UNKNOWN` fallback
   that renders raw text to the harness.
+- Mission lifecycle is event-visible: `TASK_PAUSED` (reflex
+  preemption, urgent), `TASK_RESUMED` (clean revalidation),
+  `TASK_DROPPED` (failed revalidation, urgent), `TASK_CANCELLED`
+  (harness cancel). **Completion latency is one tick**: a behavior
+  reporting SUCCESS retires the mission on the NEXT pipeline tick,
+  so `TASK_COMPLETED` arrives on the tick after the goal predicate
+  passed. Harness reconnect logic must not treat that tick of
+  silence as a lost event.
 
 ### State snapshot
 
