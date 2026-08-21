@@ -1,6 +1,6 @@
 ---
 title: Architecture Overview
-last_verified: 2026-08-21
+last_verified: 2026-08-22
 covers:
   - src/main/java/com/mcbot/mcbotserver/McBotServer.java
   - src/main/templates/META-INF/mods.toml
@@ -66,9 +66,15 @@ fire, server rules) follow the same reflex pattern as separate guardians
 
 ## Current status
 
-Skeleton only: the entry class registers on the Forge event bus and logs
-server startup. Perception, actuation, and the external endpoint are not
-implemented yet.
+Stage 0 complete and review-hardened: the full four-tier pipeline
+(reflex -> arbiter -> behaviors -> actor flush) runs offline against
+mocks behind 44 layer-1 tests, with the boundary-D command / event /
+state channels frozen and gated. Stage 1's vertical slice is wired
+in-engine: a custom mob carrier (entity-binding spike, see workplan)
+receives Actor claims through the adapter package, `/botspawn`
+assembles a full pipeline around one body, and `/goto` drives it.
+Still missing: the in-engine gametest suite (blocked on the 1.20.1
+structure-template question) and the external harness transport.
 
 Related: [Boundary Contracts & Ledger](boundaries.md),
 [Work Plan](../guide/workplan.md),

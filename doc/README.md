@@ -8,7 +8,7 @@ Generated: 2026-08-22. Validate anytime with `python tool/mcbot_tool.py doc chec
 | Document | Title | Verified | Status |
 |---|---|---|---|
 | [boundaries.md](architecture/boundaries.md) | Boundary Contracts and Decision Ledger | 2026-08-21 | ok |
-| [overview.md](architecture/overview.md) | Architecture Overview | 2026-08-21 | **ROT** |
+| [overview.md](architecture/overview.md) | Architecture Overview | 2026-08-22 | ok |
 
 ## guide/
 
@@ -24,13 +24,13 @@ Generated: 2026-08-22. Validate anytime with `python tool/mcbot_tool.py doc chec
 | [baritone-notes.md](reference/baritone-notes.md) | Baritone Architecture Notes (Design Reference) | 2026-08-21 | ok |
 | [disclosure-patterns.md](reference/disclosure-patterns.md) | Numen Disclosure Pattern Notes (Design Reference) | 2026-08-21 | ok |
 | [numen-notes.md](reference/numen-notes.md) | Numen Architecture Notes (Design Reference) | 2026-08-21 | ok |
-| [toolchain.md](reference/toolchain.md) | Toolchain Reference | 2026-08-21 | **ROT** |
+| [toolchain.md](reference/toolchain.md) | Toolchain Reference | 2026-08-22 | ok |
 
 ## decisions/
 
 | Document | Title | Verified | Status |
 |---|---|---|---|
-| [0001-moddev-legacyforge.md](decisions/0001-moddev-legacyforge.md) | ADR-0001 Use moddev-legacyforge instead of ForgeGradle | 2026-08-21 | **ROT** |
+| [0001-moddev-legacyforge.md](decisions/0001-moddev-legacyforge.md) | ADR-0001 Use moddev-legacyforge instead of ForgeGradle | 2026-08-22 | ok |
 | [0002-capability-model-task-arbiter.md](decisions/0002-capability-model-task-arbiter.md) | ADR-0002 Capability model and TaskArbiter | 2026-08-21 | ok |
 | [0003-reflex-layer-preemption.md](decisions/0003-reflex-layer-preemption.md) | ADR-0003 ReflexLayer preemption semantics and interruption recovery | 2026-08-21 | ok |
 | [0004-tick-pipeline-actor-channels.md](decisions/0004-tick-pipeline-actor-channels.md) | ADR-0004 Tick pipeline, Actor channels, and execution feedback | 2026-08-21 | ok |

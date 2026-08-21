@@ -1,6 +1,6 @@
 ---
 title: Toolchain Reference
-last_verified: 2026-08-21
+last_verified: 2026-08-22
 covers:
   - gradle.properties
   - build.gradle
@@ -36,6 +36,10 @@ Do not hardcode versions into new docs; link here instead.
 - `gradle jar` produces `build/libs/mcbotserver-<version>.jar`, including
   the generated `META-INF/mods.toml` and the `reobfJar` remap step
   required by legacy Forge.
+- Test stack: JUnit 5.10.2 BOM plus gson 2.10.1 on the test
+  classpath (gson is also provided at runtime by MC itself); plain
+  JUnit runs need no Forge runtime, which is what keeps the api/core
+  gate runnable anywhere.
 
 ## Known constraints
 
