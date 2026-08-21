@@ -47,6 +47,7 @@ class ExceptionPolicyGateTest {
         private final com.mcbot.mcbotserver.core.actor.ChannelArbiter
             delegate = new com.mcbot.mcbotserver.core.actor.ChannelArbiter();
         final List<Claim> submitted = new ArrayList<>();
+        boolean throwOnFlush;
 
         @Override
         public void submit(Claim claim) {
@@ -56,6 +57,9 @@ class ExceptionPolicyGateTest {
 
         @Override
         public Map<Channel, Claim> flush() {
+            if (throwOnFlush) {
+                throw new IllegalStateException("flush boom");
+            }
             return delegate.flush();
         }
 
@@ -274,5 +278,33 @@ class ExceptionPolicyGateTest {
         assertTrue(h.fallbackCalls.get(0).causeSummary()
                 .contains("sensor boom"),
             "crash snapshot must name the original cause");
+    }
+
+    /**
+     * S2 gate: ADR-0005 D3's literal promise — if MinimalReflex itself
+     * throws while latched, the SAME latch fires again and both
+     * channels re-report, and the exception still never escapes to the
+     * caller (which would mean the MC main thread).
+     */
+    @Test
+    void minimalReflexThrowKeepsLatchedAndReReports() {
+        Harness h = new Harness(false);
+        h.arbiter.tick(new MockWorldView());
+        h.behavior.armed = true;
+        h.controller.onTick(new MockWorldView());
+        assertEquals(1, h.controller.crashCounter());
+
+        // Arm the actor so flush() throws inside the crashed-state path.
+        h.actor.throwOnFlush = true;
+        h.controller.onTick(new MockWorldView());
+
+        assertTrue(h.controller.isCrashed(),
+            "still latched; the floor is documentation");
+        assertEquals(2, h.controller.crashCounter(),
+            "the same D2 path fires again per ADR-0005 D3");
+        assertEquals(2, h.crashEvents().size(),
+            "primary channel re-reported");
+        assertEquals(2, h.fallbackCalls.size(),
+            "fallback channel re-reported");
     }
 }

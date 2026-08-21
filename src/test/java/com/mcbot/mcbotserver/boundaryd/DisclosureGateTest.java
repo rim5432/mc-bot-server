@@ -20,6 +20,7 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -109,6 +110,27 @@ class DisclosureGateTest {
             events.get(events.size() - 1).attrs().get("count"));
         assertEquals(2L, events.get(events.size() - 1).day(),
             "synthetic notice is stamped by the injected time source");
+    }
+
+    /**
+     * Invariant 1 hardening: the timestamp contract is enforced at
+     * construction — out-of-range time-of-day or a negative day can
+     * never enter the stream, so a Stage 2 adapter bug fails fast at
+     * the emit site instead of silently poisoning the protocol.
+     */
+    @Test
+    void eventsRejectOutOfRangeTimeStamps() {
+        assertThrows(IllegalArgumentException.class,
+            () -> new BotEvent("e", 1L, 24000L, false, Map.of(), "x"),
+            "t == 24000 must be rejected");
+        assertThrows(IllegalArgumentException.class,
+            () -> new BotEvent("e", 1L, -1L, false, Map.of(), "x"));
+        assertThrows(IllegalArgumentException.class,
+            () -> new BotEvent("e", -1L, 0L, false, Map.of(), "x"),
+            "negative day must be rejected");
+        // Boundary values stay legal.
+        new BotEvent("e", 0L, 0L, false, Map.of(), "midnight");
+        new BotEvent("e", 9L, 23999L, false, Map.of(), "last tick");
     }
 
     /**
