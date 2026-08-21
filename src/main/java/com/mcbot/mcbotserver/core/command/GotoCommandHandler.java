@@ -96,6 +96,18 @@ public final class GotoCommandHandler {
         });
     }
 
+    /**
+     * Retire finished missions from the tracking map. Terminal
+     * processes are tiny, but a long-running harness submits thousands
+     * of gotos — without this sweep the map grows forever.
+     *
+     * <p>Called once per server tick by the wiring (McBotServer), or
+     * directly by tests; safe to call at any cadence.
+     */
+    public void tick() {
+        missions.values().removeIf(m -> !m.isActive());
+    }
+
     private void onCancel(String taskId, String verb) {
         GotoProcess mission = missions.remove(taskId);
         if (mission == null) {

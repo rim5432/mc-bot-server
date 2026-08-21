@@ -62,7 +62,9 @@ class StateChannelGateTest {
         List<BotEvent> second = queue.statusSnapshot(1).events();
         assertEquals(1, second.size());
         assertEquals("state changed", second.get(0).text());
-        assertEquals("3,64,0", second.get(0).attrs().get("pos"));
+        assertEquals("3", second.get(0).attrs().get("posX"));
+        assertEquals("64", second.get(0).attrs().get("posY"));
+        assertEquals("0", second.get(0).attrs().get("posZ"));
         assertEquals("goto", second.get(0).attrs().get("task"));
     }
 

@@ -284,7 +284,7 @@ public final class BotController {
         BotProcess previous = previousCurrent;
         BotProcess now = arbiter.current();
         previousCurrent = now;
-        if (previous == null || previous == now || now == previous) {
+        if (previous == null || previous == now) {
             return;
         }
         if (!(previous instanceof com.mcbot.mcbotserver.core.process

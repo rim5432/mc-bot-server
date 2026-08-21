@@ -75,6 +75,12 @@ public final class TaskArbiter {
         if (world == null) {
             throw new IllegalArgumentException("world must not be null");
         }
+        if (paused != null && !paused.isActive()) {
+            // Defensive: a parked mission that died while parked must
+            // not haunt tryResume forever.
+            paused = null;
+            pauseContext = null;
+        }
         if (current != null && !current.isActive()) {
             retireCurrent();
         }

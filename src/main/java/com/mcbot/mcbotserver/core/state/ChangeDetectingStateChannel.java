@@ -85,8 +85,9 @@ public final class ChangeDetectingStateChannel implements StateChannel {
     private void pushStateEvent(BotState state, boolean first) {
         try {
             Map<String, String> attrs = new HashMap<>();
-            attrs.put("pos", state.pos().x() + "," + state.pos().y()
-                + "," + state.pos().z());
+            attrs.put("posX", String.valueOf(state.pos().x()));
+            attrs.put("posY", String.valueOf(state.pos().y()));
+            attrs.put("posZ", String.valueOf(state.pos().z()));
             attrs.put("dimension", state.dimension());
             attrs.put("task", state.currentTaskSummary());
             events.push(new BotEvent(EventKind.STATE_PUSH,

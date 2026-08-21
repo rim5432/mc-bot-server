@@ -65,6 +65,7 @@ public class McBotServer {
 
     private BotController activeController;
     private BindingWorldView activeView;
+    private GotoCommandHandler activeGotoHandler;
 
     public McBotServer() {
         IEventBus modBus =
@@ -97,6 +98,9 @@ public class McBotServer {
             return;
         }
         if (activeController != null && activeView != null) {
+            if (activeGotoHandler != null) {
+                activeGotoHandler.tick();
+            }
             activeController.onTick(activeView);
         }
     }
@@ -142,9 +146,12 @@ public class McBotServer {
                     clockOf(level), events,
                     CrashReporter.consoleFallback());
                 CommandBus bus = new CommandBus(events);
-                new GotoCommandHandler(arbiter, events,
+                GotoCommandHandler gotoHandler = new GotoCommandHandler(
+                    arbiter, events,
                     () -> level.getDayTime() / 24000L,
-                    () -> level.getDayTime() % 24000L).attach(bus);
+                    () -> level.getDayTime() % 24000L);
+                gotoHandler.attach(bus);
+                this.activeGotoHandler = gotoHandler;
 
                 this.activeController = controller;
                 this.activeView = view;
