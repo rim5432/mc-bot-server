@@ -17,12 +17,20 @@ import net.minecraft.world.level.Level;
  * — boundary A holds because every write below is an intent echo of an
  * Actor claim, never self-computed physics.
  *
- * <p>Why serverAiStep is overridden to nothing: Mob's AI step runs
- * MoveControl, which zeroes zza every tick and would silently cancel
- * the binding's inputs. Skipping it keeps LivingEntity's physics chain
- * (aiStep -> travel) intact while making the body fully input-driven —
- * the same trick Numen's InputDriver plays against the player tick,
- * documented in numen-notes.md section 4.
+ * <p>Why raw PathfinderMob does not fight our inputs today: with no
+ * registered goals and no navigation target, the default MoveControl
+ * stays in its WAITING operation forever, and {@code tick()} under
+ * WAITING neither reads nor writes zza. {@code customServerAiStep} is
+ * therefore purely our write point, not a shield.
+ *
+ * <p>Stage 2 landmine (do not re-learn this the hard way): the moment
+ * anything calls {@code navigation.moveTo(...)} or
+ * {@code moveControl.setWantedPos(...)}, MoveControl flips to MOVE_TO
+ * and starts writing zza itself, silently clobbering the binding's
+ * drive every tick. Mitigations at that point: pin the navigator shut
+ * after each of our writes, derive from LivingEntity instead of Mob,
+ * or revisit the ServerPlayer path. Until then, keep this class
+ * goal-free.
  *
  * <p>Implementation note: constructed and ticked by the server only.
  */
