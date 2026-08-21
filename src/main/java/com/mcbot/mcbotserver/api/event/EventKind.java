@@ -28,6 +28,12 @@ public final class EventKind {
     /** An accepted task failed during execution (async execution error). */
     public static final String TASK_FAILED = "TASK_FAILED";
 
+    /**
+     * The tick pipeline caught a RuntimeException; carries the crash
+     * summary per ADR-0005 D4 (primary channel).
+     */
+    public static final String BOT_CRASHED = "BOT_CRASHED";
+
     private EventKind() {
     }
 }
