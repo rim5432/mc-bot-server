@@ -13,45 +13,49 @@ Ordered by dependency, sized by relative effort: S < M < L < XL.
 No item depends on anything below it. Check items off in place;
 do not start an item before its blockers are checked.
 
-## Stage 0 - contracts skeleton (all offline, mocks only)
+## Stage 0 - contracts skeleton (all offline, mocks only) — DONE 2026-08-21
 
-- [ ] S  core/api package layout + build wiring (zero MC imports enforced)
-- [ ] S  CommandChannel interface (boundary D command side):
+- [x] S  core/api package layout + build wiring (zero MC imports enforced)
+- [x] S  CommandChannel interface (boundary D command side):
          `submit(BotCommand) -> SubmitResult` (sealed `Ok(taskId) | Rejected(reason)`)
          + `cancel(taskId) -> boolean`. Sync error path for structural
          failures; well-formed commands get a taskId, result arrives
          via the event stream. See boundaries.md Boundary D protocol.    [dep: pkg]
-- [ ] M  EventQueue + EventBatch + BotEvent (boundary D event side):
+- [x] M  EventQueue + EventBatch + BotEvent (boundary D event side):
          polled `statusSnapshot(sinceEventId) -> EventBatch`,
          DEFAULT_CAP=200 backpressure, `droppedCount` + synthetic
          `EVENT_DROPPED` on overflow, `sinceEventId` cursor, `resetAt`
          for bot-restart detection, multi-holder lock reserved
          (single-holder reference impl in Stage 0).                    [dep: pkg]
-- [ ] S  BotState interface + STATE_PUSH event (boundary D state side):
+- [x] S  BotState interface + STATE_PUSH event (boundary D state side):
          model-relevant categorical fields only (pose, inventory
          counts, selected slot, effect types + amplifiers, current
          task summary). NO durability, NO enchantment, NO effect
          remaining ticks. The "what's in / what's out" rule is
          documented in the interface Javadoc, not in an ADR.            [dep: pkg]
-- [ ] M  WorldView interface + reserved primitives (BlockSnapshot,
+- [x] M  WorldView interface + reserved primitives (BlockSnapshot,
          EntitySnapshot, CollisionShape stubs) + MockWorldView
          + `isLoaded(pos): boolean` + `ViewMode{SNAPSHOT, LIVE}`
          parameter (per decision 17 / 17a / 17b)                          [dep: pkg]
-- [ ] S  Actor interface: Channel enum, Claim record, conflict resolver [dep: pkg]
-- [ ] S  Goal algebra minimal: Goal predicate + GoalBlock + GoalNear    [dep: pkg]
-- [ ] S  BotProcess contract + TaskArbiter (bands, DEFER,
+- [x] S  Actor interface: Channel enum, Claim record, conflict resolver [dep: pkg]
+- [x] S  Goal algebra minimal: Goal predicate + GoalBlock + GoalNear    [dep: pkg]
+- [x] S  BotProcess contract + TaskArbiter (bands, DEFER,
          winner-take-all, fresh-intent-first)                           [dep: goal]
-- [ ] S  ReflexRule dynamic priority fn + ThreatBlackboard +
+- [x] S  ReflexRule dynamic priority fn + ThreatBlackboard +
          SurvivalReflexLayer shell                                      [dep: arbiter]
-- [ ] S  Minimal reflex rule FREEZE_ON_LOW_HEALTH + offline test proving
+- [x] S  Minimal reflex rule FREEZE_ON_LOW_HEALTH + offline test proving
          full chain: sensor -> blackboard -> rule -> preempt ->
          resume -> world-assumption check                               [dep: reflex]
-- [ ] M  ExecutionReport + PathingBehavior shell emitting STUCK from a
+- [x] M  ExecutionReport + PathingBehavior shell emitting STUCK from a
          displacement window (pure function over mock poses)            [dep: actor]
-- [ ] M  BotController tick ordering (reflex -> arbiter -> behaviors ->
+- [x] M  BotController tick ordering (reflex -> arbiter -> behaviors ->
          flush) + server-tick END binding thin adapter
          + exception latch + crashed state machine + MinimalReflex +
          dual-channel crash report (per ADR-0005)                         [dep: all above]
+         NOTE: pipeline, latch and reporting are done and gated; the
+         Forge-side subscription wiring itself is deferred to the
+         Stage 1 entity-binding spike (ADR-0004 D5 keeps the adapter
+         as the only MC-aware seam; tests drive onTick directly).
 
 **Stage gate**:
 - ordering test proves a non-null reflex skips mission for that tick
