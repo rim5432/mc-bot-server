@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.api.process;
 
+import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
 import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
 import com.mcbot.mcbotserver.api.world.WorldView;
 
@@ -71,6 +72,22 @@ public interface BotProcess {
      * to release resources; must not throw.
      */
     void onContextInvalidated();
+
+    /**
+     * Execution feedback from the behavior tier, closing boundary B's
+     * request/response loop. Processes consume reports to drive their
+     * own state machines; they still read zero world state.
+     *
+     * <p>Contract: see ADR-0004 D3 and boundaries.md section B. Default
+     * no-op so existing processes stay source-compatible; Stage 1
+     * review owns ratifying this vocabulary growth (workplan
+     * follow-up).
+     *
+     * @param report the behavior's verdict for the latest tick; never
+     *               null
+     */
+    default void onExecutionReport(ExecutionReport report) {
+    }
 
     /**
      * Stable identity for diagnostics, snapshots and interruption

@@ -10,6 +10,7 @@ import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.event.EventQueue;
 import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
+import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.WorldView;
@@ -101,6 +102,7 @@ public final class BotController {
     private boolean crashed;
     private int crashCounter;
     private boolean inLethalFluid;
+    private BotProcess previousCurrent;
 
     /**
      * Assembles the pipeline. All collaborators stay plain constructor
@@ -232,6 +234,9 @@ public final class BotController {
                 emitMissionEvent(EventKind.TASK_PAUSED, day, tod,
                     pausedTask, "paused by reflex "
                         + decision.ruleName());
+                // The body has no current mission while parked; the
+                // transition detector must not fire on stale state.
+                previousCurrent = null;
             }
             actor.submit(new Claim(Channel.MOVE, decision.priority(),
                 "reflex:" + decision.ruleName(),
@@ -255,14 +260,50 @@ public final class BotController {
         arbiter.tick(world);
         Directive directive = arbiter.lastDirective();
 
-        // Stage 3: behaviors claim channels per directive.
+        // Stage 3: behaviors claim channels per directive; reports flow
+        // back into the running mission (boundary B response half).
         for (Behavior behavior : behaviors) {
             ExecutionReport report = behavior.tick(world, directive, actor);
-            consumeReport(behavior, report, day, tod);
+            BotProcess running = arbiter.current();
+            if (directive != null && running != null) {
+                running.onExecutionReport(report);
+            }
         }
 
         // Stage 4: resolve contests, expire claims, emit intents.
         actor.flush();
+        emitMissionTransition(day, tod);
+    }
+
+    /**
+     * Detect a mission hand-off and emit its completion event. The
+     * pipeline stays generic: any process implementing TerminalMission
+     * gets TASK_COMPLETED / TASK_FAILED; anything else ends silently.
+     */
+    private void emitMissionTransition(long day, long tod) {
+        BotProcess previous = previousCurrent;
+        BotProcess now = arbiter.current();
+        previousCurrent = now;
+        if (previous == null || previous == now || now == previous) {
+            return;
+        }
+        if (!(previous instanceof com.mcbot.mcbotserver.core.process
+                .TerminalMission mission)) {
+            return;
+        }
+        if (mission.missionSucceeded()) {
+            emitMissionEvent(EventKind.TASK_COMPLETED, day, tod,
+                previous.displayName(), "goal reached");
+        } else if (previous.isActive()) {
+            // Swapped out while still active (preemption path already
+            // reported); nothing terminal to announce.
+            return;
+        } else {
+            String reason = mission.failureReasonOrNull();
+            emitMissionEvent(EventKind.TASK_FAILED, day, tod,
+                previous.displayName(),
+                "failed: " + (reason != null ? reason : "unknown"));
+        }
     }
 
     private void emitMissionEvent(String kind, long day, long tod,
@@ -274,23 +315,6 @@ public final class BotController {
                 Map.of("task", taskName), taskName + ": " + detail));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down with it.
-        }
-    }
-
-    private void consumeReport(Behavior behavior, ExecutionReport report,
-                               long day, long tod) {
-        if (report.status() == ExecutionReport.Status.SUCCESS) {
-            events.push(new BotEvent(EventKind.TASK_COMPLETED, day, tod,
-                false, Map.of("behavior", behavior.name()),
-                behavior.name() + " reached its goal"));
-        } else if (report.status() == ExecutionReport.Status.FAILED
-            || report.status() == ExecutionReport.Status.STUCK) {
-            events.push(new BotEvent(EventKind.TASK_FAILED, day, tod,
-                report.status() == ExecutionReport.Status.FAILED,
-                Map.of("behavior", behavior.name(),
-                    "reason", String.valueOf(report.reason())),
-                behavior.name() + " " + report.status()
-                    + ": " + report.reason()));
         }
     }
 

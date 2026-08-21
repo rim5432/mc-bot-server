@@ -52,9 +52,24 @@ public final class CommandBus implements CommandChannel {
     }
 
     private final Map<String, Handler> handlers = new HashMap<>();
+    private final Map<String, String> taskVerbs = new HashMap<>();
     private final Set<String> activeTasks = new HashSet<>();
     private final EventQueue events;
     private long taskSequence;
+    private CancelListener cancelListener;
+
+    /** Hook for verb owners to react to harness cancellation. */
+    @FunctionalInterface
+    public interface CancelListener {
+
+        /**
+         * Called after a successful cancel, before the method returns.
+         *
+         * @param taskId the cancelled id; never null
+         * @param verb   the verb it was submitted under; never null
+         */
+        void onCancelled(String taskId, String verb);
+    }
 
     /**
      * Creates a bus reporting lifecycle over the given stream.
@@ -84,6 +99,20 @@ public final class CommandBus implements CommandChannel {
         handlers.put(verb, handler);
     }
 
+    /**
+     * Install the single cancellation hook. Verb owners route by the
+     * verb argument; replacing an existing listener is a wiring bug.
+     *
+     * @param listener the hook; must not be null
+     */
+    public void setCancelListener(CancelListener listener) {
+        if (listener == null) {
+            throw new IllegalArgumentException(
+                "listener must not be null");
+        }
+        this.cancelListener = listener;
+    }
+
     @Override
     public SubmitResult submit(BotCommand command) {
         if (command == null) {
@@ -100,13 +129,19 @@ public final class CommandBus implements CommandChannel {
         }
         String taskId = nextTaskId();
         activeTasks.add(taskId);
+        taskVerbs.put(taskId, command.verb());
         handler.execute(command, taskId);
         return new SubmitResult.Ok(taskId);
     }
 
     @Override
     public boolean cancel(String taskId) {
-        return activeTasks.remove(taskId);
+        String verb = taskVerbs.get(taskId);
+        boolean removed = activeTasks.remove(taskId);
+        if (removed && cancelListener != null && verb != null) {
+            cancelListener.onCancelled(taskId, verb);
+        }
+        return removed;
     }
 
     /**

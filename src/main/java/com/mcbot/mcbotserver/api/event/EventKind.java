@@ -44,6 +44,9 @@ public final class EventKind {
      */
     public static final String TASK_DROPPED = "TASK_DROPPED";
 
+    /** The harness cancelled a still-running task via cancel(). */
+    public static final String TASK_CANCELLED = "TASK_CANCELLED";
+
     /**
      * The tick pipeline caught a RuntimeException; carries the crash
      * summary per ADR-0005 D4 (primary channel).
