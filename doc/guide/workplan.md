@@ -141,8 +141,18 @@ test count when red).
          immediate re-request). AStarPathFinder grew the wall-clock
          overload checked every 64 expansions. McBotServer and all
          gametests run this path.
-- [ ] L  DefendProcess planner + CombatDirective + CombatBehavior
+- [x] L  DefendProcess planner + CombatDirective + CombatBehavior
          micro-execution skeleton
+         SHIPPED 2026-08-22: combat rides the frozen four channels -
+         Overrides.combat carries sealed CombatOrder(Attack(targetId));
+         DefendProcess scans, engages the nearest hostile at standoff
+         range (GoalNear r=2 so plans never route INTO the target),
+         and owns terminal verdicts via scans/leash/timeout ONLY
+         (locomotion reports are execution weather, never the fight's
+         verdict). CombatBehavior aims and paces swings; BindingActor
+         resolves USE presses as reach+cone melee. Reflex supremacy
+         kept per decision 9. Verified by CombatSkeletonGateTest and
+         gametest defendsbyKillingZombie (4/4 in-engine).
 - [x] S  rule-table JSON loading through Registry + Codec + ReloadListener
          SHIPPED 2026-08-22 (gson instead of Codec - pure-Java parser
          stays offline-testable per boundaries.md decision 5):

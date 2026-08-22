@@ -375,7 +375,7 @@ BotState getState();
 | ConstraintGuardian generalization interface | second concrete guardian need appears |
 | Memory / waypoints / persistence | first cross-session task requirement |
 | Inventory / crafting skills | after the locomotion slice passes acceptance |
-| CombatBehavior micro-algorithms | never architected - implementation freedom inside boundary B |
+| CombatBehavior micro-algorithms | never architected - implementation freedom inside boundary B. OPERATIONALIZED 2026-08-22: melee rides USE ("act with main hand"); the adapter resolves a press as reach+cone against living hostiles (cone, not ray-clip - EntitySnapshot granularity is block-level). DefendProcess verdicts come from scans/leash/timeout only; locomotion reports never decide a fight. pausedReflexes stays deferred - freeze outranking combat is correct survival behavior. |
 | Fake-player carrier choice | spike opens at entity-binding start |
 
 ## Explicitly excluded (do not resurrect)
