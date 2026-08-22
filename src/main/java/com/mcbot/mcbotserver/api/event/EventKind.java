@@ -16,6 +16,22 @@ public final class EventKind {
     /** Synthetic event inserted when the queue had to drop entries. */
     public static final String EVENT_DROPPED = "EVENT_DROPPED";
 
+    /**
+     * Synthetic event inserted at the head of a polled page when the
+     * caller's {@code sinceEventId} is older than the queue's oldest
+     * retained entry — the harness is behind, the gap between the two
+     * cursors was lost to queue rotation. Distinct from EVENT_DROPPED:
+     * that one fires at push time when the queue overflows; this one
+     * fires at poll time when the caller finally notices the loss.
+     * Carries attrs {@code count} (the number of lost events),
+     * {@code since} (the caller's stale cursor), and {@code oldest}
+     * (the id of the first entry the page actually contains). The
+     * event is urgent because the harness's mental model of "what has
+     * happened to the bot" is now wrong and must be reconciled via
+     * {@code getState()} before it consumes the page.
+     */
+    public static final String EVENT_GAP = "EVENT_GAP";
+
     /** State snapshot pushed on transition; carries model-relevant fields. */
     public static final String STATE_PUSH = "STATE_PUSH";
 

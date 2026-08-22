@@ -181,6 +181,58 @@ EventBatch statusSnapshot(long sinceEventId);
   passed. Harness reconnect logic must not treat that tick of
   silence as a lost event.
 
+#### Behind-consumer recovery contract
+
+Events answer "what happened". State answers "what is". A consumer
+whose `sinceEventId` is older than the queue's oldest retained
+entry needs the second one first — the events between its cursor
+and the queue head are gone, by design (queue rotation), and no
+amount of re-polling will recover them. Per-consumer queues would
+fix the symptom but not the cause: the cause is that the
+consumer's mental model of the bot has drifted, and the
+restoration primitive for that is `getState()`, not event replay.
+
+When the queue detects a stale cursor it inserts a synthetic
+`EVENT_GAP` at the head of the polled page:
+
+- **Kind**: `EVENT_GAP` — distinct from `EVENT_DROPPED` (push-time
+  overflow) so the harness can tell "I personally fell behind"
+  from "the queue was saturated". They are different operational
+  problems; conflating them loses the diagnostic.
+- **Attrs**: `count` (number of events lost between the caller's
+  cursor and the page head), `since` (the caller's stale cursor),
+  `oldest` (the id of the first real event the page contains, or
+  `lastEventId + 1` if the queue is empty and everything was
+  lost). Stable keys; the harness can map them.
+- **`urgent: true`** — the gate (harness's `shouldDrain`
+  short-circuit) opens the moment the page is delivered, the same
+  way it does for `TASK_PAUSED` and `TASK_DROPPED`. The harness
+  treats the gap as a critical-update signal, not background.
+- **Position**: head of the page, before any real event with
+  id >= `oldest`. The first thing the harness sees after it
+  hands the page to the consumer loop.
+- **Empty-queue case**: if the queue is empty and the caller's
+  cursor is stale, `EVENT_GAP` still fires (with `oldest =
+  lastEventId + 1` and `count = lastEventId - sinceEventId`). The
+  harness sees "behind, and the bot did not produce anything
+  new" — distinct from "fresh poll, the bot is idle".
+
+The harness's recovery sequence on `EVENT_GAP` is fixed and is
+the contract, not a recommendation:
+
+1. Call `getState()` to read the current pose, inventory,
+   selected slot, active effects, and current task summary.
+2. Reset the event cursor to `oldest` from the gap's attrs
+   (NOT to `sinceEventId + 1` — that range is gone, polling it
+   would just produce another gap).
+3. Resume the normal `statusSnapshot(latestEventId)` loop.
+
+The bot never tries to be clever about this. It does not
+"remember" the lost events, it does not offer a backfill, and
+it does not block on the harness's recovery. The gap is a
+one-shot notice on the page where the loss would otherwise be
+invisible.
+
 ### State snapshot
 
 ```java

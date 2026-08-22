@@ -23,6 +23,16 @@ import java.util.function.LongSupplier;
  * synthetic EVENT_DROPPED entry appended to that page — by mechanism,
  * not by producer diligence.
  *
+ * <p>Behind-consumer recovery: when a caller polls with a
+ * {@code sinceEventId} older than the oldest retained entry, the page
+ * is preceded by a synthetic EVENT_GAP entry carrying the size of the
+ * lost range, the caller's stale cursor, and the oldest id the page
+ * actually contains. The gap event is urgent so the harness short-
+ * circuits its {@code shouldDrain} gate and reconciles via
+ * {@code getState()} before consuming the page — events answer
+ * "what happened", state answers "what is", and a behind consumer
+ * needs the second one first.
+ *
  * <p>Why a time-source injection: every event must carry a game-time
  * stamp, but the queue does not own a clock; the bot supplies its
  * world-time accessors at construction.
@@ -30,7 +40,7 @@ import java.util.function.LongSupplier;
  * <p>Implementation note: single-threaded by policy; every method runs
  * on the server tick thread, no synchronization is added deliberately.
  */
-// contract: see boundaries.md Boundary D protocol (invariants 1-4)
+// contract: see boundaries.md Boundary D protocol (invariants 1-4, gap recovery)
 public final class InMemoryEventQueue implements EventQueue {
 
     /** Queue capacity before oldest-entry eviction kicks in. */
@@ -78,6 +88,36 @@ public final class InMemoryEventQueue implements EventQueue {
     @Override
     public EventBatch statusSnapshot(long sinceEventId) {
         List<BotEvent> page = new ArrayList<>();
+        // Behind-consumer detection: if sinceEventId is older than
+        // the oldest retained entry, the range between them was lost
+        // to rotation. Surface it as a synthetic EVENT_GAP at the
+        // head of the page so the harness sees the loss at the same
+        // point it would have seen the lost events, not in some
+        // later reconciliation step. Empty queue + stale cursor is
+        // the worst case (everything was lost) - we still emit the
+        // gap so the harness can tell "behind and the world moved on"
+        // from "the bot is genuinely idle".
+        if (sinceEventId >= 0 && sinceEventId < lastEventId) {
+            long oldestId = entries.isEmpty()
+                ? lastEventId + 1L     // everything past sinceEventId was lost
+                : entries.peekFirst().id();
+            if (sinceEventId < oldestId - 1) {
+                long gap = oldestId - sinceEventId - 1;
+                java.util.Map<String, String> gapAttrs =
+                    new java.util.LinkedHashMap<>();
+                gapAttrs.put("count", String.valueOf(gap));
+                gapAttrs.put("since", String.valueOf(sinceEventId));
+                gapAttrs.put("oldest", String.valueOf(oldestId));
+                page.add(new BotEvent(EventKind.EVENT_GAP,
+                    daySupplier.getAsLong(),
+                    timeOfDaySupplier.getAsLong(),
+                    true, java.util.Map.copyOf(gapAttrs),
+                    "events between since=" + sinceEventId
+                        + " and oldest=" + oldestId
+                        + " were lost; call getState() and re-poll from "
+                        + oldestId));
+            }
+        }
         for (Entry e : entries) {
             if (e.id() > sinceEventId) {
                 page.add(e.event());
