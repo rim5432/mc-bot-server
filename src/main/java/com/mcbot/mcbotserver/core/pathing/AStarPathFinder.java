@@ -117,9 +117,27 @@ public final class AStarPathFinder {
      */
     public PathResult compute(WorldView world, CellPos start,
                               Goal goal) {
+        return compute(world, start, goal, heuristic);
+    }
+
+    /**
+     * Search with a call-specific heuristic - goals move between
+     * calls, so callers supply an estimator aimed at the current goal
+     * instead of rebuilding the finder.
+     *
+     * @param world     read-only perception; never null
+     * @param start     search origin; never null
+     * @param goal      arrival predicate; never null
+     * @param heuristic cost-to-go for THIS search; must be admissible
+     *                  for optimality; never null
+     * @return see {@link #compute(WorldView, CellPos, Goal)}
+     */
+    public PathResult compute(WorldView world, CellPos start,
+                              Goal goal, Heuristic heuristic) {
         Objects.requireNonNull(world, "world");
         Objects.requireNonNull(start, "start");
         Objects.requireNonNull(goal, "goal");
+        Objects.requireNonNull(heuristic, "heuristic");
 
         var open = new PriorityQueue<Node>();
         Map<CellPos, Double> gScore = new HashMap<>();

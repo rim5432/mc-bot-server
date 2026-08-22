@@ -24,15 +24,14 @@ import com.mcbot.mcbotserver.api.world.WorldView;
 // contract: see boundaries.md decision 18 (GotoCommand minimal semantics)
 public final class GotoProcess implements BotProcess, TerminalMission {
 
-    /** Why this mission left the FAILED state's door. */
-    public enum FailureReason {
+    /** Failure reason: mover fuse tripped with no recovery route. */
+    public static final String REASON_STUCK = "STUCK";
 
-        /** The mover reported no displacement over its fuse window. */
-        STUCK,
+    /** Failure reason: mission outlived its tick budget. */
+    public static final String REASON_TIMEOUT = "TIMEOUT";
 
-        /** The mission outlived its tick budget. */
-        TIMEOUT
-    }
+    /** Failure reason: planner found no route to the goal. */
+    public static final String REASON_NO_PATH = "NO_PATH";
 
     private final String taskId;
     private final Goal goal;
@@ -41,7 +40,7 @@ public final class GotoProcess implements BotProcess, TerminalMission {
     private long ticksInMission;
     private boolean active = true;
     private boolean succeeded;
-    private FailureReason failure;
+    private String failure;
 
     /**
      * Creates a goto mission.
@@ -83,7 +82,7 @@ public final class GotoProcess implements BotProcess, TerminalMission {
     public Directive onTick(WorldView world) {
         ticksInMission++;
         if (ticksInMission >= timeoutTicks) {
-            fail(FailureReason.TIMEOUT);
+            fail(REASON_TIMEOUT);
             return Directive.of(goal);
         }
         return Directive.of(goal);
@@ -102,9 +101,10 @@ public final class GotoProcess implements BotProcess, TerminalMission {
                 succeeded = true;
                 active = false;
             }
-            case STUCK -> fail(FailureReason.STUCK);
+            case STUCK -> fail(REASON_STUCK);
+            case FAILED -> fail(reasonOrUnknown(report));
             default -> {
-                // RUNNING and FAILED stay the mover's concern this tick.
+                // RUNNING stays the mover's concern this tick.
             }
         }
     }
@@ -123,7 +123,7 @@ public final class GotoProcess implements BotProcess, TerminalMission {
 
     @Override
     public void onContextInvalidated() {
-        fail(FailureReason.STUCK);
+        fail(REASON_STUCK);
     }
 
     @Override
@@ -140,16 +140,11 @@ public final class GotoProcess implements BotProcess, TerminalMission {
         return succeeded;
     }
 
-    /**
-     * Terminal state query for the command layer's completion events.
-     *
-     * @return the failure cause; null while running or when succeeded
-     */
-    public FailureReason failure() {
-        return failure;
+    private static String reasonOrUnknown(ExecutionReport report) {
+        return report.reason() != null ? report.reason() : "UNKNOWN";
     }
 
-    private void fail(FailureReason reason) {
+    private void fail(String reason) {
         if (active) {
             failure = reason;
             active = false;
@@ -171,6 +166,6 @@ public final class GotoProcess implements BotProcess, TerminalMission {
 
     @Override
     public String failureReasonOrNull() {
-        return failure != null ? failure.name() : null;
+        return failure;
     }
 }

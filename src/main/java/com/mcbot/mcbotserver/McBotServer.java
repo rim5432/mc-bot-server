@@ -149,7 +149,8 @@ public class McBotServer {
                 reflex.addRule(new FreezeOnLowHealthRule());
 
                 Behavior mover = new PathingBehavior("mover",
-                    () -> finePoseOf(body));
+                    () -> finePoseOf(body),
+                    com.mcbot.mcbotserver.core.pathing.BasicMoves::from);
 
                 BotController controller = new BotController(reflex,
                     arbiter, java.util.List.of(mover), actor,

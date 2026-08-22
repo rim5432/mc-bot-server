@@ -16,6 +16,7 @@ import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.WorldView;
 import com.mcbot.mcbotserver.core.actor.ChannelArbiter;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
+import com.mcbot.mcbotserver.core.pathing.BasicMoves;
 import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.core.reflex.FreezeOnLowHealthRule;
@@ -148,10 +149,10 @@ class TickPipelineGateTest {
         arbiter.register(mission);
         arbiter.requestControl(mission);
         RecordingActor actor = new RecordingActor();
-        PathingBehavior mover = new PathingBehavior("mover", () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5));
+        PathingBehavior mover = new PathingBehavior("mover", () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5), BasicMoves::from);
         BotController controller = controller(health, layer, arbiter,
             mover, actor, new InMemoryEventQueue(() -> 1L, () -> 0L));
-        MockWorldView world = new MockWorldView();
+        MockWorldView world = flooredWorld();
 
         controller.onTick(world);
         assertEquals(1, mission.tickCalls);
@@ -195,6 +196,21 @@ class TickPipelineGateTest {
     }
 
     /**
+     * Walkable strip so planner-based mover tests can find routes.
+     */
+    private static MockWorldView flooredWorld() {
+        MockWorldView world = new MockWorldView();
+        for (int x = 0; x <= 60; x++) {
+            for (int z = -2; z <= 12; z++) {
+                world.putBlock(new com.mcbot.mcbotserver.api.world
+                    .BlockSnapshot(new CellPos(x, 63, z),
+                        "minecraft:smooth_stone"));
+            }
+        }
+        return world;
+    }
+
+    /**
      * Silent reflex -> full pipeline: mission ticks, mover claims MOVE
      * toward the goal, nothing pauses.
      */
@@ -209,11 +225,11 @@ class TickPipelineGateTest {
         arbiter.register(mission);
         arbiter.requestControl(mission);
         RecordingActor actor = new RecordingActor();
-        PathingBehavior mover = new PathingBehavior("mover", () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5));
+        PathingBehavior mover = new PathingBehavior("mover", () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5), BasicMoves::from);
         BotController controller = controller(health, layer, arbiter,
             mover, actor, new InMemoryEventQueue(() -> 1L, () -> 0L));
 
-        controller.onTick(new MockWorldView());
+        controller.onTick(flooredWorld());
 
         assertFalse(controller.isCrashed());
         assertEquals(1, mission.tickCalls);
@@ -245,10 +261,10 @@ class TickPipelineGateTest {
         arbiter.register(mission);
         arbiter.requestControl(mission);
         RecordingActor actor = new RecordingActor();
-        PathingBehavior mover = new PathingBehavior("mover", () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5));
+        PathingBehavior mover = new PathingBehavior("mover", () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5), BasicMoves::from);
         BotController controller = controller(health, layer, arbiter,
             mover, actor, events);
-        MockWorldView world = new MockWorldView();
+        MockWorldView world = flooredWorld();
 
         // Establish the mission as current before any threat exists.
         controller.onTick(world);
@@ -289,14 +305,14 @@ class TickPipelineGateTest {
         arbiter.register(mission);
         arbiter.requestControl(mission);
         BotController controller = controller(health, layer, arbiter,
-            new PathingBehavior("mover", () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5)),
+            new PathingBehavior("mover", () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5), BasicMoves::from),
             new RecordingActor(), events);
 
-        controller.onTick(new MockWorldView());
+        controller.onTick(flooredWorld());
         health[0] = 3f;
-        controller.onTick(new MockWorldView());
+        controller.onTick(flooredWorld());
         health[0] = 20f;
-        controller.onTick(new MockWorldView());
+        controller.onTick(flooredWorld());
 
         List<String> kinds = kindsOf(events);
         assertEquals(2, kinds.size());

@@ -139,12 +139,12 @@ public final class BotSliceGameTests {
     public static void failsCleanlyWhenUnwalkable(GameTestHelper helper) {
         BlockPos start = new BlockPos(3, WALK_Y, 8);
         Rig rig = rig(helper, start);
+        // Floating goal five above the walk plane: no move in the
+        // stage-2 vocabulary lands there (drops need support below,
+        // climbs need a step chain), so the island drains to NO_PATH.
         GotoProcess mission = submitGoto(rig,
-            localToCell(helper, new BlockPos(13, WALK_Y, 8)));
+            localToCell(helper, new BlockPos(13, WALK_Y + 5, 8)));
 
-        // Corridor rails plus a sealed end wall: the target cell is
-        // unreachable, so the mover stalls against the wall face and
-        // the displacement fuse must trip into a clean failure.
         for (int x = 3; x <= 14; x++) {
             for (int y = 1; y <= 3; y++) {
                 helper.setBlock(new BlockPos(x, FLOOR_Y + y, 7),
@@ -153,21 +153,15 @@ public final class BotSliceGameTests {
                     Blocks.SMOOTH_STONE);
             }
         }
-        for (int z = 6; z <= 10; z++) {
-            for (int y = 1; y <= 3; y++) {
-                helper.setBlock(new BlockPos(11, FLOOR_Y + y, z),
-                    Blocks.SMOOTH_STONE);
-            }
-        }
 
         helper.startSequence()
             .thenWaitUntil(driveUntil(rig, () ->
-                check(!mission.isActive(), "waiting for the fuse")))
-            .thenExecuteFor(3, driveOnly(rig))
-            .thenExecuteAfter(0, () -> {
+                check(!mission.isActive(), "waiting for the failure")))
+            .thenExecuteFor(6, driveOnly(rig))
+            .thenExecute(() -> {
                 check(!mission.missionSucceeded(), "cannot succeed");
-                checkEquals("STUCK", mission.failureReasonOrNull(),
-                    "a walled-in walk must fail as STUCK");
+                checkEquals("NO_PATH", mission.failureReasonOrNull(),
+                    "a walled-in goal must fail as NO_PATH at planning");
                 assertEventSeen(rig.events(), EventKind.TASK_FAILED);
                 rig.body().discard();
             })
@@ -235,6 +229,7 @@ public final class BotSliceGameTests {
         InMemoryEventQueue events = new InMemoryEventQueue(
             () -> level.getDayTime() / 24000L,
             () -> level.getDayTime() % 24000L);
+
         TaskArbiter arbiter = new TaskArbiter();
         BindingWorldView view = new BindingWorldView(level);
         BindingActor actor = new BindingActor(body);
@@ -244,7 +239,8 @@ public final class BotSliceGameTests {
         reflex.addRule(new FreezeOnLowHealthRule());
 
         Behavior mover = new PathingBehavior("mover",
-            () -> finePoseOf(body));
+            () -> finePoseOf(body),
+            com.mcbot.mcbotserver.core.pathing.BasicMoves::from);
 
         BotController controller = new BotController(reflex, arbiter,
             List.of(mover), actor,

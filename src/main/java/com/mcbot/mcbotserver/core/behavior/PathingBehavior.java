@@ -6,50 +6,75 @@ import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.behavior.Behavior;
 import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
+import com.mcbot.mcbotserver.api.goal.Goal;
+import com.mcbot.mcbotserver.api.goal.GoalBlock;
+import com.mcbot.mcbotserver.api.goal.GoalNear;
+import com.mcbot.mcbotserver.api.pathing.Heuristic;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.api.world.WorldView;
+import com.mcbot.mcbotserver.core.pathing.AStarPathFinder;
+import com.mcbot.mcbotserver.core.pathing.MoveGraph;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
+import java.util.List;
 
 /**
- * Stage-0 mover shell: walk straight at the goal, declare arrival by
- * the goal predicate, fuse on a displacement window.
+ * Waypoint follower over the A* move graph: plans through the finder,
+ * steers toward the next waypoint, and replans when the plan runs out,
+ * drifts away, or the progress fuse fires.
  *
- * <p>Contract: see ADR-0004 D3/D4 — SUCCESS comes only from the Goal
- * predicate; STUCK is declared here because this behavior owns motion
- * history; timeoutTicks enforcement arrives with GotoCommand in
- * Stage 1. Path search is intentionally absent (straight-line slice);
- * A* replaces the guts in Stage 2 without touching callers.
+ * <p>Contract: see boundaries.md decisions 7/8 and ADR-0004 D3/D4 -
+ * SUCCESS comes only from the goal predicate evaluated on the bot cell;
+ * STUCK is declared here (this behavior owns motion history) but only
+ * when a recovery replan also failed - a frozen body with a fresh,
+ * usable route stays silent and simply waits out the replan cooldown
+ * with claims flowing. Replan triggers: plan exhausted, body drifted
+ * beyond {@value #REPLAN_DISTANCE} of the active waypoint, or
+ * {@value #STUCK_WINDOW} ticks without displacement.
  *
- * <p>Stuck rule: while motion is intended, if the pose moves less than
- * {@value #STUCK_EPSILON} blocks across any pair inside the last
- * {@value #STUCK_WINDOW} poses, the fuse trips once and re-arms after
- * real movement resumes.
+ * <p>Progress tracking is a plain per-tick delta counter, immune to
+ * replanning: clearing a motion window on every plan once created a
+ * livelock where a frozen body never accumulated enough window to trip
+ * the fuse (three debug rounds; do not regress).
  *
- * <p>Implementation note: runs on the server tick thread only.
+ * <p>Implementation note: runs on the server tick thread only; the
+ * Stage 2 async replan worker will own threading around the same
+ * finder.
  */
-// contract: see ADR-0004 D3 (stuck detection lives inside behaviors)
+// contract: see ADR-0004 D3 + numen-notes.md section 18 (replan ladder)
 public final class PathingBehavior implements Behavior {
 
-    /** Fuse window length in ticks. */
+    /** Ticks without displacement before the progress fuse fires. */
     public static final int STUCK_WINDOW = 20;
 
-    /** Displacement below this counts as "not moving", in blocks. */
+    /** Per-tick displacement above this counts as progress. */
     public static final double STUCK_EPSILON = 0.01;
+
+    /** Horizontal reach that counts as "waypoint touched". */
+    public static final double WAYPOINT_REACH = 0.8;
+
+    /** Drift from the active waypoint that forces a fresh plan. */
+    public static final double REPLAN_DISTANCE = 3.0;
+
+    /** Minimum ticks between deliberate replans. */
+    public static final int REPLAN_COOLDOWN = 10;
 
     private final String name;
     private final PoseSource poseSource;
-    private final Deque<Vec3> recentPoses = new ArrayDeque<>();
+    private final MoveGraph graph;
+    private List<CellPos> waypoints = List.of();
+    private int waypointIndex;
     private boolean stuckLatched;
+    private boolean neverPlanned = true;
+    private int ticksSincePlan = REPLAN_COOLDOWN;
+    private int ticksSinceProgress;
+    private Vec3 lastProgressPose;
 
     /**
      * Fine-grained body position. Doubles are load-bearing here: the
      * stuck fuse measures sub-cell motion, and a block-cell source
-     * reads zero while a slowly accelerating body crosses its own cell
-     * (the false-trip bug that shipped this record).
+     * reads zero while a slowly accelerating body crosses its own cell.
      */
     @FunctionalInterface
     public interface PoseSource {
@@ -63,22 +88,21 @@ public final class PathingBehavior implements Behavior {
     }
 
     /**
-     * Creates a mover over a pose source.
+     * Creates a follower over one move graph.
      *
      * @param name       stable identity for claims and diagnostics;
      *                   never null or blank
      * @param poseSource body position accessor; never null
+     * @param graph      edge supplier for planning; never null
      */
-    public PathingBehavior(String name, PoseSource poseSource) {
+    public PathingBehavior(String name, PoseSource poseSource,
+                           MoveGraph graph) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("name must not be blank");
         }
-        if (poseSource == null) {
-            throw new IllegalArgumentException(
-                "poseSource must not be null");
-        }
         this.name = name;
         this.poseSource = poseSource;
+        this.graph = graph;
     }
 
     @Override
@@ -93,90 +117,144 @@ public final class PathingBehavior implements Behavior {
             return ExecutionReport.running();
         }
         Vec3 pose = poseSource.get();
-        recordPose(pose);
+        ticksSincePlan++;
 
-        CellPos cell = new CellPos(
-            (int) Math.floor(pose.x()),
-            (int) Math.floor(pose.y()),
-            (int) Math.floor(pose.z()));
-        if (directive.goal().isInGoal(cell)) {
+        // Progress tracking: per-tick delta against the last recorded
+        // pose, immune to replanning. Only real displacement resets the
+        // counter - a fresh plan around an immovable body must not.
+        if (lastProgressPose == null
+            || pose.distanceTo(lastProgressPose) > STUCK_EPSILON) {
+            ticksSinceProgress = 0;
+            lastProgressPose = pose;
             stuckLatched = false;
+        } else {
+            ticksSinceProgress++;
+        }
+
+        CellPos cell = floorOf(pose);
+        if (directive.goal().isInGoal(cell)) {
+            resetPlan();
             return ExecutionReport.success();
         }
 
-        double moved = windowDisplacement();
-        if (!stuckLatched && moved < STUCK_EPSILON
-            && recentPoses.size() >= STUCK_WINDOW) {
-            stuckLatched = true;
-            return ExecutionReport.stuck(
-                "displacement < " + STUCK_EPSILON + " over "
-                    + STUCK_WINDOW + " ticks");
-        }
-        if (moved > STUCK_EPSILON) {
-            stuckLatched = false;
+        boolean fuseCondition = !stuckLatched
+            && ticksSinceProgress >= STUCK_WINDOW;
+        boolean offPath = waypointIndex < waypoints.size()
+            && distanceToWaypoint(pose,
+                waypoints.get(waypointIndex)) > REPLAN_DISTANCE;
+        boolean exhausted = waypointIndex >= waypoints.size();
+
+        if ((fuseCondition || offPath || exhausted)
+            && (neverPlanned || ticksSincePlan >= REPLAN_COOLDOWN)) {
+            neverPlanned = false;
+            ticksSincePlan = 0;
+            plan(world, cell, directive.goal());
         }
 
-        submitMotionClaims(directive, pose, actor);
+        if (waypoints.isEmpty()) {
+            // Definitive no-path right now: fail cleanly; the mission
+            // process owns the terminal transition from here. A fuse
+            // -triggered failure reports STUCK (physically immovable),
+            // a planning-side one reports NO_PATH.
+            if (fuseCondition) {
+                stuckLatched = true;
+                return ExecutionReport.failed("STUCK");
+            }
+            return ExecutionReport.failed("NO_PATH");
+        }
+        if (fuseCondition && !stuckLatched) {
+            // Fresh-plan grace expired while the body stayed frozen and
+            // the replan cooldown is still blocking the next attempt.
+            // Report once, latch, keep claims flowing; movement or a
+            // later successful plan clears the latch.
+            stuckLatched = true;
+            return ExecutionReport.stuck(
+                "frozen between replan cooldowns");
+        }
+
+        advanceReachedWaypoints(pose);
+        if (waypointIndex >= waypoints.size()) {
+            return ExecutionReport.running();
+        }
+        steerTowardCurrentWaypoint(pose, actor);
         return ExecutionReport.running();
     }
 
-    private void recordPose(Vec3 pose) {
-        if (recentPoses.size() >= STUCK_WINDOW) {
-            recentPoses.pollFirst();
+    private void plan(WorldView world, CellPos start, Goal goal) {
+        CellPos anchor = anchorCell(goal);
+        var finder = new AStarPathFinder(graph,
+            Heuristic.euclideanTo(anchor),
+            AStarPathFinder.DEFAULT_NODE_BUDGET);
+        var result = finder.compute(world, start, goal,
+            Heuristic.euclideanTo(anchor));
+        if (!result.reachedGoal() && result.waypoints().isEmpty()) {
+            waypoints = List.of();
+            waypointIndex = 0;
+            return;
         }
-        recentPoses.addLast(pose);
+        // Skip index 0: it is the cell we are standing in.
+        waypoints = result.waypoints();
+        waypointIndex = waypoints.size() > 1 ? 1 : 0;
     }
 
-    private double windowDisplacement() {
-        if (recentPoses.isEmpty()) {
-            return Double.MAX_VALUE;
-        }
-        Vec3 oldest = recentPoses.peekFirst();
-        return poseSource.get().distanceTo(oldest);
+    private void resetPlan() {
+        waypoints = List.of();
+        waypointIndex = 0;
+        neverPlanned = true;
+        ticksSincePlan = REPLAN_COOLDOWN;
     }
 
-    private void submitMotionClaims(Directive directive, Vec3 pose,
-                                    Actor actor) {
-        CellPos target = nearestGoalCell(directive);
-        double dx = target.x() + 0.5 - pose.x();
-        double dz = target.z() + 0.5 - pose.z();
+    private void advanceReachedWaypoints(Vec3 pose) {
+        while (waypointIndex < waypoints.size()) {
+            CellPos wp = waypoints.get(waypointIndex);
+            boolean sameCell = floorOf(pose).equals(wp);
+            double horizontal = Math.hypot(
+                pose.x() - (wp.x() + 0.5), pose.z() - (wp.z() + 0.5));
+            if (sameCell || horizontal <= WAYPOINT_REACH) {
+                waypointIndex++;
+            } else {
+                break;
+            }
+        }
+    }
+
+    private double distanceToWaypoint(Vec3 pose, CellPos wp) {
+        return Math.hypot(pose.x() - (wp.x() + 0.5),
+            pose.z() - (wp.z() + 0.5));
+    }
+
+    private void steerTowardCurrentWaypoint(Vec3 pose, Actor actor) {
+        CellPos wp = waypoints.get(Math.min(waypointIndex,
+            waypoints.size() - 1));
+        double dx = wp.x() + 0.5 - pose.x();
+        double dz = wp.z() + 0.5 - pose.z();
         float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
-        int movePriority = 10;
-
-        actor.submit(new Claim(Channel.MOVE, movePriority, name,
+        actor.submit(new Claim(Channel.MOVE, 10, name,
             new Intent.Move(1.0, 0, false, false)));
-        actor.submit(new Claim(Channel.ROT, movePriority, name,
+        actor.submit(new Claim(Channel.ROT, 10, name,
             new Intent.Look(yaw, 0f)));
     }
 
+    private static CellPos floorOf(Vec3 pose) {
+        return new CellPos((int) Math.floor(pose.x()),
+            (int) Math.floor(pose.y()), (int) Math.floor(pose.z()));
+    }
+
     /**
-     * The anchor cell to steer toward. Goal is sealed, so a new variant
-     * must edit this method's permits list first; the terminal throw
-     * turns any future miss into a crash-at-write-site instead of a
-     * silent wrong-direction walk (Java 17 has no exhaustive-switch
-     * patterns yet).
+     * The steering anchor of the CURRENT plan's terminal waypoint.
+     * Exhaustive over the sealed goal algebra.
      *
-     * @param directive the active mission's directive; never null
-     * @return the steering anchor cell; never null
+     * @param goal the mission goal; never null
+     * @return anchor cell; never null
      */
-    private CellPos nearestGoalCell(Directive directive) {
-        var goal = directive.goal();
-        if (goal instanceof com.mcbot.mcbotserver.api.goal.GoalBlock b) {
+    private static CellPos anchorCell(Goal goal) {
+        if (goal instanceof GoalBlock b) {
             return b.target();
         }
-        if (goal instanceof com.mcbot.mcbotserver.api.goal.GoalNear n) {
+        if (goal instanceof GoalNear n) {
             return n.center();
         }
         throw new IllegalStateException(
             "unhandled goal variant: " + goal.getClass());
-    }
-
-    /**
-     * Test hook: how far the body traveled inside the current window.
-     *
-     * @return distance between oldest buffered pose and now
-     */
-    double currentWindowDisplacement() {
-        return windowDisplacement();
     }
 }
