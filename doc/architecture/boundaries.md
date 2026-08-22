@@ -52,26 +52,97 @@ summary; the command channel carries the verbs the harness issues.
 
 ```java
 sealed interface SubmitResult {
-    record Ok(String taskId)       implements SubmitResult {}
-    record Rejected(String reason) implements SubmitResult {}  // structural, sync
+    record Ok(String taskId, boolean idempotencyReplay)
+                                            implements SubmitResult {}
+    record Rejected(String reason)         implements SubmitResult {}  // structural, sync
 }
 
-SubmitResult submit(BotCommand command);
+SubmitResult submit(BotCommand command);                       // idempotencyKey=null (fallback dedupe by verb+args)
+SubmitResult submit(BotCommand command, String idempotencyKey); // null = fallback; non-null = explicit key
 boolean       cancel(String taskId);
 ```
 
 - `submit()` is **synchronous from the harness's perspective**: it
-  returns either `Ok(taskId)` for a well-formed command the bot has
-  accepted, or `Rejected(reason)` for a command with a structural
-  error (unknown verb, malformed payload, validation failure).
-  Structural errors are the caller's fault and the harness must see
-  them now, not after polling.
+  returns either `Ok(taskId, replay)` for a well-formed command the
+  bot has accepted, or `Rejected(reason)` for a command with a
+  structural error (unknown verb, malformed payload, validation
+  failure). Structural errors are the caller's fault and the harness
+  must see them now, not after polling.
 - `cancel()` is synchronous: returns `true` if the task was found
   and cancellation was issued, `false` if the task was already
   terminal or unknown.
 - All task execution feedback (running, completed, failed, stuck,
   timed out, rejected for execution reasons) flows through the
   event stream, not the command channel.
+
+#### Idempotency key (C scheme: verb+args fallback OR client-supplied key)
+
+LLM harnesses retry on timeout by default — a `submit` that does
+not return in time is *re-sent*, not *re-thought*. Without a
+dedupe key, a retried command spawns a duplicate mission: two
+`Goto` tasks, two terminal events, two `taskId`s. The harness
+sees a successful `Ok` for both but only the first one moves
+the bot; the second is pure noise. Idempotency is therefore not
+a "nice to have", it is a contract requirement forced by the
+LLM driver's actual behaviour.
+
+The seam carries a single optional `idempotencyKey` argument on
+`submit(BotCommand, String)`:
+
+- **Explicit key** (`idempotencyKey != null`): the client
+  (LLM harness) supplies a stable per-attempt identifier
+  (UUID, monotonic counter, or content hash). Two `submit`
+  calls with the same key collapse to the first one — the
+  second returns `Ok(originalTaskId, replay=true)` without
+  re-executing. The harness sees `replay=true` and knows
+  this `Ok` carries no new execution, only a deduped
+  pointer. Explicit keys survive across the LLM driver's
+  full retry budget.
+- **Fallback key** (`idempotencyKey == null`): the bot
+  derives a dedupe key from `verb + canonical(args)`. Two
+  structurally identical commands submitted in the same
+  dedupe window collapse the same way. This is the "harness
+  responsibility = 0" path for callers that do not
+  implement retry-with-key; the cost is that any two
+  same-verb-same-args submits in the window are also
+  collapsed, which is the right behaviour for "harness
+  re-sent the same command" and the wrong behaviour for
+  "harness intentionally issued two same-verb-same-args
+  tasks" — that is the harness's signal to use an
+  explicit key.
+- **Dedupe window**: the cache lives in the
+  `CommandChannel` implementation and is keyed on the
+  effective idempotency key. A cached `taskId` is
+  retained until the task reaches a terminal state
+  (`TASK_COMPLETED` / `TASK_FAILED` / `TASK_CANCELLED` /
+  `TASK_REJECTED`); replay inside the same window is the
+  common LLM-retry case. When the task ends, the entry is
+  evicted and the next submit with the same key is a
+  fresh acceptance — the harness's retry is no longer
+  "the same request", it is "a new request carrying the
+  same key". This is the LLM-friendly behaviour: a
+  harness that retries after a long timeout should not
+  get an opaque error, it should get a working mission
+  that the bot will execute. The window does NOT span
+  bot restarts; `resetAt` already wipes the in-memory
+  queue and the cache follows.
+- **What the bot does NOT do**: it does not invent a key on
+  the harness's behalf when the harness is the dedupe
+  author. It does not interpret the key as LLM intent.
+  The bot is still harness-blind (invariant 6); the key
+  is opaque to it.
+
+**Rationale for C (both fallback and explicit)**: LLM
+harness retry is real, but the harness's ability to mint
+a stable per-attempt key varies. The MCP-driven harness
+mints a UUID per `tools/call`; the in-process test rig
+just calls `submit` twice. Forcing one shape would
+penalise the other. C is the same answer as
+[Stripe's idempotency-keys design](https://stripe.com/docs/api/idempotent_requests)
+and HTTP's `Idempotency-Key` header: a client-supplied
+header when the client has one, a content-hash fallback
+when it does not. The two paths converge in the cache
+and the same `Ok(taskId, replay)` answer.
 
 ### Event stream
 

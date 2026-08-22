@@ -14,14 +14,44 @@ public interface CommandChannel {
 
     /**
      * Validate a command structurally and accept it for asynchronous
-     * execution.
+     * execution, with an explicit idempotency key.
+     *
+     * <p>Contract: see boundaries.md Boundary D protocol - idempotency
+     * key section. {@code idempotencyKey} is the harness-side dedupe
+     * signal: when non-null, two submits with the same key collapse to
+     * the first one and the second returns
+     * {@link SubmitResult.Ok#idempotencyReplay()} = {@code true}. When
+     * null, the implementation MAY apply a fallback dedupe by
+     * {@code verb + canonical(args)}; whether it does is the
+     * implementation's choice, but the contract is that the seam
+     * accepts a null key as "no explicit preference".
+     *
+     * @param command        the harness-issued command; must not be null
+     * @param idempotencyKey optional dedupe key; may be null
+     * @return {@link SubmitResult.Ok} with a task id when the command
+     *         is well-formed (the same id on a deduped replay);
+     *         {@link SubmitResult.Rejected} with the structural cause
+     *         otherwise — never null
+     */
+    SubmitResult submit(BotCommand command, String idempotencyKey);
+
+    /**
+     * Convenience for callers that do not carry an explicit
+     * idempotency key. Equivalent to {@code submit(command, null)};
+     * the implementation decides whether to apply a fallback dedupe.
+     *
+     * <p>Default method: implementations override the two-argument
+     * form. The default does not double-dispatch into the override
+     * (the override is the source of truth) - this default is the
+     * safety net for harness-side code that does not care about
+     * idempotency.
      *
      * @param command the harness-issued command; must not be null
-     * @return {@link SubmitResult.Ok} with a fresh task id when the
-     *         command is well-formed; {@link SubmitResult.Rejected} with
-     *         the structural cause otherwise — never null
+     * @return never null
      */
-    SubmitResult submit(BotCommand command);
+    default SubmitResult submit(BotCommand command) {
+        return submit(command, null);
+    }
 
     /**
      * Request cancellation of a previously accepted task.

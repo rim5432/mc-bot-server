@@ -155,7 +155,7 @@ test count when red).
 ### Stage 2 review-driven hardening (post Stage 2 first-batch)
 
 - [x] S  Reflex anti-oscillation: double threshold + hold window
-         SHIPPED 2026-08-22: new api.reflex.ReflexHysteresis
+         DRAFT — pending review & build/test (2026-08-22): new api.reflex.ReflexHysteresis
          interface (trigger / release / signalValue / minHoldTicks)
          with default minHoldTicks=0 so non-hysteretic rules opt in
          by choice. FreezeOnLowHealthRule implements it with
@@ -190,4 +190,92 @@ test count when red).
          FAILED still 0.0; constructor rejects NaN and out-of-range
          values. AStarGateTest grew two new cases
          (lowConfidencePartialCollapsesToFailed, pathResultConfidenceIsValidated).
+- [x] S  Idempotency key on submit (boundary D command channel)
+         DRAFT — pending review & build/test (2026-08-22): C-scheme
+         dedupe (explicit idempotencyKey OR verb+args fallback hash)
+         added on CommandChannel.submit(BotCommand, String). Old
+         submit(BotCommand) preserved as a default delegate so all
+         existing callers keep working. SubmitResult.Ok gained an
+         idempotencyReplay boolean; fresh() and replay() factories
+         name the two states. CommandBus owns the dedupe cache
+         (effective key -> taskId) and a reverse index (taskId ->
+         effective key) for O(1) cancel/finishTask eviction;
+         canonicalArgs sorts the args TreeMap to neutralise the
+         caller's Map.copyOf insertion order. boundaries.md
+         Boundary D protocol carries the full contract including
+         the dedupe-window semantics (cache evicted on terminal
+         state, retry after terminate is a fresh acceptance not
+         an error). NOT YET exercised by build / test (build is
+         blocked by the parallel-session combat compilation pass;
+         the change is review-validated only).
+- [x] S  Behind-consumer recovery: EVENT_GAP + state resync contract
+         DRAFT — pending review & build/test (2026-08-22): events
+         answer "what happened", state answers "what is". A
+         consumer whose sinceEventId is older than the queue's
+         oldest retained entry needs the second one first - the
+         events between its cursor and the queue head are gone, by
+         design (queue rotation), and no amount of re-polling
+         recovers them. New EventKind.EVENT_GAP constant;
+         InMemoryEventQueue.statusSnapshot detects a stale cursor
+         and prepends a synthetic EVENT_GAP at the head of the page
+         carrying attrs {count, since, oldest} and urgent=true.
+         Distinct from EVENT_DROPPED (push-time overflow): that one
+         fires at push time when the queue overflows; this one
+         fires at poll time when the caller finally notices the
+         loss. Empty-queue + stale cursor is the worst case and
+         still emits the gap (with oldest past the last seen id)
+         so the harness can tell "behind, bot is now silent" from
+         "fresh poll, bot idle". The recovery sequence is fixed and
+         lives in boundaries.md: on EVENT_GAP the harness calls
+         getState() first, resets the cursor to the gap's oldest,
+         and resumes the normal poll loop. New gate test
+         GapEventGateTest (6 cases): stale cursor with overflow,
+         zero-gap boundary, fresh poll from cursor 0, gap +
+         EVENT_DROPPED coexist, fully evicted worst case, cursor
+         at lastEventId (empty page). NOT YET exercised by build /
+         test (build is blocked by the parallel-session combat
+         compilation pass; the change is review-validated only).
+- [x] M  Shape-vs-traits split: geometry derived, traits registered
+         DRAFT — pending review & build/test (2026-08-22): new
+         api.world.CollisionShape now carries a cell-local Box
+         (0..1) and the derived predicates passable() and
+         walkableTop(). passable = EMPTY or PARTIAL with top below
+         STEP_HEIGHT (0.625); walkableTop = FULL_CUBE or PARTIAL
+         with top >= STEP_HEIGHT and below a jump. BasicMoves
+         .passable / supported / standable now read the shape,
+         never the block id. New api.world.BlockTraits record
+         (climbable / liquid / damaging) plus BlockTraitsRegistry
+         interface and core.world.MapBlockTraitsRegistry
+         implementation: state-aware keys (stone_slab[type=bottom]
+         != stone_slab[type=top]) with a bare-id fallback,
+         defaults for unknown ids, mutable-then-seal for build
+         time. WorldView gained getCollisionShape(pos, mode) and
+         getBlockTraits(pos, mode) as default methods (safe
+         defaults = full cube / no traits). MockWorldView grew
+         putShape / putTraits / setTraitsRegistry for offline
+         test setup. boundaries.md decision 19 + 19a pin the
+         discipline: every new Movement must answer "can its
+         full physical precondition be derived from CollisionShape
+         plus the small traits registry" before it lands. Four
+         new gate tests: CollisionShapeGateTest (8 cases
+         covering all boundary shapes - empty / full / lower
+         slab / upper slab / fence / thin plate / box range
+         validation / canonical factories), BlockTraitsRegistry
+         GateTest (10 cases covering exact / state-aware / bare
+         fallback / unknown-defaults / seal / blank-rejection /
+         entries view), MockWorldViewShapeGateTest (9 cases for
+         the offline injection surface), BasicMovesShapeGateTest
+         (6 cases proving the move predicates answer from shape
+         not id, including the same geometry under three
+         different block ids returning the same answer). Gauntlet
+         gametest (a corridor with bottom-slab / upper / stairs /
+         fence / ladder / water / lava sections, end to end) is
+         NOT yet written - the BotBodyEntity + adapter is still
+         being debugged by the parallel combat pass and the
+         gauntlet needs the shape-bearing adapter to land before
+         its source has anything to bind to. Pinned as a workplan
+         follow-up for Stage 2 closeout. NOT YET exercised by
+         build / test (build is blocked by the parallel-session
+         combat compilation pass; the change is review-validated
+         only).
 

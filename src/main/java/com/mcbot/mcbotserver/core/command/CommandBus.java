@@ -54,6 +54,21 @@ public final class CommandBus implements CommandChannel {
     private final Map<String, Handler> handlers = new HashMap<>();
     private final Map<String, String> taskVerbs = new HashMap<>();
     private final Set<String> activeTasks = new HashSet<>();
+    // Idempotency cache: maps the effective dedupe key (explicit
+    // idempotencyKey from the harness, or the verb+args fallback hash
+    // when the harness passed null) to the taskId the first submit
+    // produced. Lives until the task reaches a terminal state; the
+    // dedupe window is therefore "while the task is live". Two submits
+    // with the same key inside the window collapse to the first. When
+    // the task ends (cancel or finishTask), the entry is evicted and
+    // the next submit with the same key is a fresh acceptance - the
+    // LLM-friendly behaviour, see boundaries.md idempotency key
+    // section.
+    private final Map<String, String> idempotencyCache = new HashMap<>();
+    // Reverse index: taskId -> effective idempotency key. Lets
+    // cancel() and finishTask() drop the cache entry in O(1) when the
+    // task leaves the live set, without scanning the whole cache.
+    private final Map<String, String> taskIdToIdempotencyKey = new HashMap<>();
     private final EventQueue events;
     private long taskSequence;
     private CancelListener cancelListener;
@@ -114,7 +129,7 @@ public final class CommandBus implements CommandChannel {
     }
 
     @Override
-    public SubmitResult submit(BotCommand command) {
+    public SubmitResult submit(BotCommand command, String idempotencyKey) {
         if (command == null) {
             return new SubmitResult.Rejected("null command");
         }
@@ -127,19 +142,97 @@ public final class CommandBus implements CommandChannel {
         if (reason != null) {
             return new SubmitResult.Rejected(reason);
         }
+        // C-scheme dedupe: explicit key wins; null falls back to a
+        // verb+args hash so the harness can stay dumb and still get
+        // retry protection. The cache lives in this bus only;
+        // a bot restart wipes it alongside the event queue (the
+        // resetAt contract covers both).
+        String effectiveKey = idempotencyKey != null
+            ? idempotencyKey
+            : "auto:" + command.verb() + ":" + canonicalArgs(command.args());
+        String cachedTaskId = idempotencyCache.get(effectiveKey);
+        if (cachedTaskId != null) {
+            return new SubmitResult.Ok(cachedTaskId, true);
+        }
         String taskId = nextTaskId();
         activeTasks.add(taskId);
         taskVerbs.put(taskId, command.verb());
+        idempotencyCache.put(effectiveKey, taskId);
+        taskIdToIdempotencyKey.put(taskId, effectiveKey);
         handler.execute(command, taskId);
-        return new SubmitResult.Ok(taskId);
+        return new SubmitResult.Ok(taskId, false);
+    }
+
+    /**
+     * Canonical form of the args map for fallback dedupe. The order
+     * matters because two equal-by-content maps with different
+     * iteration order would otherwise hash to different keys and
+     * the same logical command would slip past the dedupe.
+     *
+     * <p>Why the sort is required: the args map arrives via
+     * {@link BotCommand}, whose canonical constructor runs
+     * {@code args = Map.copyOf(args)}. {@code Map.copyOf} returns
+     * an immutable map that preserves the caller's insertion
+     * order (it is not a HashMap and not a sorted view). Two
+     * callers passing the same logical args in different
+     * literal order - {@code Map.of("x", "1", "y", "2")} vs
+     * {@code Map.of("y", "2", "x", "1")} - get equal maps with
+     * different iteration orders, and the dedupe would treat
+     * them as different commands. Sorting by key with a
+     * {@code TreeMap} is the cheapest way to make the
+     * canonicalisation indifferent to the caller's key order.
+     *
+     * <p>Why a sort and not a hash: the cache key needs to be
+     * stable across the dedupe window (which can outlive a
+     * single process if the bot migrates state in some future
+     * build). A 32-bit hash would be sufficient within a single
+     * JVM but would couple dedupe to the hash function; a
+     * collision would silently merge two distinct commands.
+     * Keeping the canonical form as readable text means a
+     * debug log of the cache can be grepped for the args that
+     * produced a given key. The verb-level prefix in
+     * {@link #submit} keeps this string from colliding with a
+     * future verb whose id happens to start with the same
+     * characters.
+     *
+     * @param args command args; never null
+     * @return stable string for hashing; empty args yield
+     *         {@code "{}"} (the distinct empty-args case)
+     */
+    private static String canonicalArgs(
+            java.util.Map<String, String> args) {
+        if (args.isEmpty()) {
+            return "{}";
+        }
+        java.util.TreeMap<String, String> sorted =
+            new java.util.TreeMap<>(args);
+        StringBuilder sb = new StringBuilder("{");
+        boolean first = true;
+        for (java.util.Map.Entry<String, String> e : sorted.entrySet()) {
+            if (!first) {
+                sb.append(',');
+            }
+            sb.append(e.getKey()).append('=').append(e.getValue());
+            first = false;
+        }
+        return sb.append('}').toString();
     }
 
     @Override
     public boolean cancel(String taskId) {
         String verb = taskVerbs.get(taskId);
         boolean removed = activeTasks.remove(taskId);
-        if (removed && cancelListener != null && verb != null) {
-            cancelListener.onCancelled(taskId, verb);
+        if (removed) {
+            // Idempotency window ends with the task - any retry
+            // that arrives after cancel will be a fresh submit,
+            // not a deduped replay of the cancelled one.
+            String idemKey = taskIdToIdempotencyKey.remove(taskId);
+            if (idemKey != null) {
+                idempotencyCache.remove(idemKey, taskId);
+            }
+            if (cancelListener != null && verb != null) {
+                cancelListener.onCancelled(taskId, verb);
+            }
         }
         return removed;
     }
@@ -158,6 +251,13 @@ public final class CommandBus implements CommandChannel {
     public void finishTask(String taskId, String kind, long day, long t,
                            String text) {
         activeTasks.remove(taskId);
+        // Terminal state closes the dedupe window the same way cancel
+        // does. A retry that arrives after the task finished must see
+        // a fresh taskId, not a replay of one that no longer exists.
+        String idemKey = taskIdToIdempotencyKey.remove(taskId);
+        if (idemKey != null) {
+            idempotencyCache.remove(idemKey, taskId);
+        }
         events.push(new BotEvent(kind, day, t, true,
             Map.of("taskId", taskId), text));
     }
