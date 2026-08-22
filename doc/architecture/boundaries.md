@@ -340,7 +340,11 @@ BotState getState();
 10. Scenario combinations become rule-table data; mechanisms written once;
     no per-mob processes.
 11. DefendProcess is a light planner; CombatBehavior owns micro-execution;
-    reflex rules use dynamic priority functions.
+    reflex rules use dynamic priority functions. "Light planner" includes
+    the decision NOT to fight: hostiles whose tactics structurally defeat
+    melee (rangedTypes data) are refused at engage time
+    (`TASK_FAILED(attrs.reason=ENGAGEMENT_REFUSED, attrs.threatType)`),
+    never chased to timeout.
 12. InterruptionContext: preemption carries a snapshot; resume validates
     world assumptions first.
 13. Behavior.tick() returns ExecutionReport (RUNNING / SUCCESS / FAILED /

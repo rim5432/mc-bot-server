@@ -55,19 +55,30 @@ depth pending - [GAP] vocabulary absent, reopen-triggered -
 ### Combat (boundary B planner/executor split)
 - [SHIPPED skeleton] DefendProcess engages nearest hostile at
   standoff range; CombatBehavior aims and paces swings; USE channel
-  resolves reach+cone melee with a line-of-sight clip (no hitting
-  through terrain)
-- KNOWN DEGRADATIONS in complex terrain, accepted for v1:
-  (a) across open gaps the cone+reach resolver still connects at up
-  to REACH - long but honest, since LOS is clear; (b) vertical
-  offsets are handled by the 3D chebyshev standoff and aim pitch,
-  but partial-cover stalls burn to TIMEOUT rather than repositioning
-  (micro-repositioning is implementation freedom inside boundary B,
-  deferred with the other micro-algorithms); (c) kiting ranged mobs
-  defeat melee by design until the ranged GAP closes
+  resolves melee with vanilla-aligned reach (eye to bounding-box
+  SURFACE, 3.0), a line-of-sight clip, and lava-opaque rays
+
+#### Structural mismatches (v1 honest limits)
+
+| Our capability | Enemy type | Interaction | Intent |
+|---|---|---|---|
+| Melee-only | Melee (zombie, spider) | standoff -> kill | v1 core |
+| Melee-only | Explosive (creeper) | standoff -> trade hits | accepted risk |
+| Melee-only | Ranged (skeleton, stray, pillager, witch) | ENGAGEMENT_REFUSED at engage tick - never chased | refusal IS the feature |
+| Unarmed | any hostile | no USE window -> timeout | pre-check belongs to driver |
+
+Ranged hostiles are NOT a future-ranged GAP: even with a bow, the
+"should we engage at all" decision must exist. v1 answers it with an
+honest refusal + attrs.threatType; the harness meta-strategy (refusal
+lists per type after post-engagement health accounting) is S-F
+driver work. Grass/thin-collider occlusion over-blocking is a known
+micro-algorithm GAP. Kiting that drags the body past leash 12 ends
+as LOST_TARGET by design - the bot never fights on enemy terms it
+cannot answer.
+
 - [GAP] Loadout selection, ranged, multi-target, retreat-choreography
   - micro-algorithms are implementation freedom INSIDE boundary B;
-  none may add a fifth Actor channel (decision 14 frozen)
+    none may add a fifth Actor channel (decision 14 frozen)
 - [EXCLUDED] PvP griefing behaviors; non-hostile entity aggression
 
 ### Task tier (orchestration)
