@@ -69,6 +69,18 @@ public final class MockWorldView implements WorldView {
     }
 
     /**
+     * Remove every entity with the given id - the offline stand-in for
+     * death and despawning.
+     *
+     * @param id entity identity; must not be null
+     * @return this mock, for fluent test setup
+     */
+    public MockWorldView removeEntity(String id) {
+        entities.removeIf(e -> e.id().equals(id));
+        return this;
+    }
+
+    /**
      * Mark a cell's chunk as unloaded; reads there return unknown/null.
      *
      * @param pos any cell inside the unloaded chunk; must not be null
