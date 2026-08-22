@@ -210,4 +210,43 @@ class PathingBehaviorFrameGateTest {
         assertTrue(indexAfter >= indexBefore,
             "waypoint index must not regress on a Y-only jump");
     }
+
+    /**
+     * GoalBlock.isInGoal is 3D cell equality: the goal predicate
+     * treats a body one cell above the target as NOT at the goal.
+     * If a future "fix" relaxed the predicate to "same XZ is
+     * enough", the success verdict would fire when the body is
+     * still climbing/falling to the actual Y, and the arrival
+     * semantics in the S-B boundary would silently drift. This
+     * test pins the 3D cell-equality contract.
+     */
+    @Test
+    void goalBlockIsInGoalIs3DCellEquality() {
+        com.mcbot.mcbotserver.api.goal.GoalBlock goal =
+            new com.mcbot.mcbotserver.api.goal.GoalBlock(
+                new CellPos(5, 64, 0));
+
+        // Same cell: true.
+        assertTrue(goal.isInGoal(new CellPos(5, 64, 0)),
+            "same cell must satisfy the goal predicate");
+
+        // Different Y: false (the cell equality is 3D, not 2.5D).
+        // If someone "fixes" isInGoal to ignore Y so the bot
+        // claims success while still climbing/falling, the
+        // S-B arrival semantic silently breaks.
+        assertFalse(goal.isInGoal(new CellPos(5, 65, 0)),
+            "Y+1 must NOT satisfy the goal: isInGoal is 3D, not 2.5D");
+        assertFalse(goal.isInGoal(new CellPos(5, 63, 0)),
+            "Y-1 must NOT satisfy the goal: isInGoal is 3D, not 2.5D");
+
+        // Different X or Z: false.
+        assertFalse(goal.isInGoal(new CellPos(4, 64, 0)),
+            "X-1 must NOT satisfy the goal");
+        assertFalse(goal.isInGoal(new CellPos(6, 64, 0)),
+            "X+1 must NOT satisfy the goal");
+        assertFalse(goal.isInGoal(new CellPos(5, 64, 1)),
+            "Z+1 must NOT satisfy the goal");
+        assertFalse(goal.isInGoal(new CellPos(5, 64, -1)),
+            "Z-1 must NOT satisfy the goal");
+    }
 }

@@ -121,6 +121,15 @@ public final class BotSliceGameTests {
         GotoProcess mission = submitGoto(rig, goalCell);
         int startAbsX = helper.absolutePos(start).getX();
 
+        // Pre-shove body X. Used by the post-shove displacement
+        // assertion to confirm the test landed in branch 1 of
+        // issue 0001 §3 (offPath fires because XZ drift > 3.0),
+        // not branch 2 (XZ drift 0.8~3.0, offPath would NOT fire
+        // and the test would silently regress to limbo). The 3.5
+        // margin is REPLAN_DISTANCE 3.0 plus 0.5 to absorb friction
+        // and tick-order variance.
+        double[] xAtShove = {0.0};
+
         helper.startSequence()
             .thenWaitUntil(driveUntil(rig,
                 () -> check(rig.body().getBlockX()
@@ -130,6 +139,7 @@ public final class BotSliceGameTests {
                 // Strong horizontal knockback in -X. The body is
                 // mid-path, so the planner must re-route after
                 // the shove lands.
+                xAtShove[0] = rig.body().getX();
                 rig.body().setDeltaMovement(
                     new net.minecraft.world.phys.Vec3(
                         -1.5, 0.0, 0.0));
@@ -137,12 +147,29 @@ public final class BotSliceGameTests {
             .thenExecuteFor(5, () -> {
                 // 5 vanilla physics ticks without pipeline
                 // intervention - MC integrates the impulse, body
-                // moves ~7.5 blocks in -X. The planner's next
-                // pipeline tick sees the new cell.
+                // moves ~3.14 cells in -X with default friction.
+                // The planner's next pipeline tick sees the new
+                // cell.
             })
             .thenExecute(() -> {
-                // Sanity: the body actually displaced. A teleport
-                // would leave XZ unchanged; physics must move it.
+                // Sanity 1 (catch 1 follow-up): the body must
+                // actually displace > 3.5 cells in -X. With the
+                // current 1.5 m/tick impulse and 5-tick
+                // integration, the integrated displacement is
+                // approximately 3.14 cells; the 3.5 floor
+                // catches any change in friction, slip, or
+                // tick-internal damping that would land the
+                // body in 0.8~3.0 branch 2 instead of branch 1.
+                double dx = xAtShove[0] - rig.body().getX();
+                check(dx > 3.5,
+                    "shove must displace the body > 3.5 cells in -X "
+                    + "so the test stays in branch 1 (offPath fires), "
+                    + "not branch 2 (silent limbo). Got dx=" + dx
+                    + " - if friction or impulse changed, retune "
+                    + "the 1.5 m/tick impulse or extend the "
+                    + "vanilla-tick window; do not relax the 3.5 "
+                    + "margin silently.");
+                // Sanity 2: direction.
                 check(rig.body().getBlockX() < startAbsX,
                     "shove must have displaced the body in -X; "
                     + "X now " + rig.body().getBlockX()
