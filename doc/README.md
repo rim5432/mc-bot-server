@@ -7,14 +7,14 @@ Generated: 2026-08-22. Validate anytime with `python tool/mcbot_tool.py doc chec
 
 | Document | Title | Verified | Status |
 |---|---|---|---|
-| [boundaries.md](architecture/boundaries.md) | Boundary Contracts and Decision Ledger | 2026-08-21 | ok |
+| [boundaries.md](architecture/boundaries.md) | Boundary Contracts and Decision Ledger | 2026-08-22 | ok |
 | [overview.md](architecture/overview.md) | Architecture Overview | 2026-08-22 | ok |
 
 ## guide/
 
 | Document | Title | Verified | Status |
 |---|---|---|---|
-| [build-and-run.md](guide/build-and-run.md) | Build & Run Guide | 2026-08-21 | ok |
+| [build-and-run.md](guide/build-and-run.md) | Build & Run Guide | 2026-08-22 | ok |
 | [workplan.md](guide/workplan.md) | Work Plan (effort-sized checklist) | 2026-08-22 | ok |
 
 ## reference/

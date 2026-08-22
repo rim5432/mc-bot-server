@@ -1,6 +1,6 @@
 ---
 title: Build & Run Guide
-last_verified: 2026-08-21
+last_verified: 2026-08-22
 covers:
   - tool/mcbot_tool.py
 ---
@@ -42,6 +42,33 @@ python tool\mcbot_tool.py log tail
 ```
 
 Do not pipe them through `| Out-String` in a foreground console.
+
+## Gametests
+
+```bash
+python tool/mcbot_tool.py build runGameTest   # runs the suite, auto-exits
+```
+
+Exit code = number of failed required tests (0 on green). The server
+runs headless and as fast as the CPU allows - a full boot plus suite is
+roughly 30-60s.
+
+**Structure templates**: MC 1.20.1 ships no empty template. The gametest
+framework resolves `mcbotserver:<name>` through StructureTemplateManager
+first, then falls back to `gameteststructures/<name>.snbt` relative to
+the server working directory (`run/`). Our template lives at repo-root
+`gameteststructures/empty16x8x16.snbt`; copy it to
+`run/gameteststructures/` once after a fresh clone:
+
+```powershell
+New-Item -ItemType Directory -Force run\gameteststructures | Out-Null
+Copy-Item gameteststructures\*.snbt run\gameteststructures\
+```
+
+SNBT gotcha: `size` must be an untyped list (`[16, 8, 16]`), not an
+IntArrayTag (`[I; 16, 8, 16]`) - StructureTemplate.load reads it with
+`getList("size", 3)` and silently gets ZERO from the typed form, which
+crashes every test with "Failed to load structure".
 
 ## First launch after a clean
 

@@ -92,11 +92,14 @@ do not start an item before its blockers are checked.
          Stage 1 review: TIMEOUT is the mission giving up on its own
          budget; STUCK stays behavior-side)                        [mission]
 - [x] S  push-off recovery: external displacement triggers re-path      [mover]
-- [ ] M  gametest suite on flat ground:
+- [x] M  gametest suite on flat ground:
          walks-to-block / recovers-when-shoved / fails-cleanly-unwalkable [fuse]
-         BLOCKED on the structure-template question (AGENTS.md open
-         question: 1.20.1 ships no empty template). Interim acceptance
-         is the manual smoke path: runServer + /botspawn + /goto.
+         RESOLVED: 1.20.1 ships no empty template; StructureUtils
+         falls back to `gameteststructures/<name>.snbt` relative to
+         the gameTestServer working dir (`run/`). Template lives at
+         repo-root `gameteststructures/empty16x8x16.snbt` and must be
+         copied to `run/gameteststructures/`. Suite:
+         gametest/BotSliceGameTests via `build runGameTest`.
 - [x] S  real ThreatSensor (entity scan, bearing sector incl. behind,
          creeper fuse accessor) writing blackboard in-game              [binding]
          NOTE: fuse accessor deferred - the sensor records type and
@@ -106,17 +109,17 @@ do not start an item before its blockers are checked.
 **Stage gate** (the milestone): bot walks to the target block on flat
 ground; when shoved mid-path it re-walks; when the target is unreachable
 it reports FAILED with a reason - no hang, no silent stall.
-STATUS: logic complete and offline-gated (44 L1 tests); in-engine
-verification pending the gametest template resolution above.
+STATUS: PASSED 2026-08-22 - all three scenarios green in-engine via
+`python tool/mcbot_tool.py build runGameTest` (exit code 3 = failed
+test count when red).
 
-### Stage 1 follow-ups for the Stage 1 review
+### Stage 1 review follow-ups
 
 1. Ratify the entity-binding carrier choice (PathfinderMob vs
    ServerPlayer subclass) against real slice behavior.
 2. Ratify boundary-B vocabulary growth: BotProcess.onExecutionReport
    default method + TerminalMission marker interface.
-3. Resolve the gametest structure-template question (empty template
-   source for MC 1.20.1) and unblock the three-scenario suite.
+3. RESOLVED: gametest template question - see the Stage 1 item above.
 
 ## Stage 2 backlog - unlocked only by the stage-1 gate
 
