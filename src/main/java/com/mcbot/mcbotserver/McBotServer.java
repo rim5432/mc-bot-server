@@ -111,18 +111,37 @@ public class McBotServer {
      * ADR-0004 D1: single tick entry on the server tick END phase.
      * World state is settled here; outputs apply during next tick's
      * physics (the documented one-tick latency).
+     *
+     * <p>The outer try-catch is the last-ditch seam: the in-pipeline
+     * try-catch in {@link BotController#onTick} is the primary
+     * defense (ADR-0005 D1), but it only wraps the four stages.
+     * A failure in the harness wrapping onTick itself -
+     * {@code GotoCommandHandler.tick}, an init NPE, a future seam
+     * we add here - would otherwise escape to the Forge bus and
+     * surface as a {@code ReportedException} on the MC main thread.
+     * Catching here and calling {@code emergencyLatch} keeps the
+     * contract from ADR-0005 D2 closed at the listener boundary.
      */
-    // contract: see ADR-0004 D1 (single tick entry, fixed order)
+    // contract: see ADR-0004 D1 + ADR-0005 D2 (single tick entry;
+    //          outer catch is the last-ditch seam for the harness
+    //          wrapping the four-stage pipeline)
     @SubscribeEvent
     public void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) {
             return;
         }
-        if (activeController != null && activeView != null) {
+        if (activeController == null || activeView == null) {
+            return;
+        }
+        try {
             if (activeGotoHandler != null) {
                 activeGotoHandler.tick();
             }
             activeController.onTick(activeView);
+        } catch (RuntimeException e) {
+            LOGGER.error("mcbotserver tick harness failed; "
+                + "emergency latching", e);
+            activeController.emergencyLatch(e);
         }
     }
 

@@ -5,3 +5,6 @@
 __pycache__/
 *.pyc
 *.pyo
+
+# one-shot patch scripts produced by the agent during development
+.tmp_*.py

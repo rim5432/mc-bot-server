@@ -172,6 +172,31 @@ public final class BotController {
     }
 
     /**
+     * Emergency latch from OUTSIDE the four-stage pipeline. Use this
+     * when an exception escapes through a different path - the tick
+     * harness wrapping onServerTick, for example - that would
+     * otherwise bypass ADR-0005 D2. Idempotent in latch state, but
+     * the counter still increments so a second outside failure is
+     * visible to the harness and the dual-channel report fires
+     * again.
+     *
+     * <p>Mirrors the latch + clear + dual-channel report of
+     * {@link #handleCrash} so outside-the-pipeline failures and
+     * in-pipeline failures reach the same observable state. The
+     * try-catch in {@link #onTick} is still the primary defense;
+     * this is the last-ditch seam for everything between the
+     * Forge listener entry and onTick itself.
+     *
+     * @param cause the exception that triggered the outside failure;
+     *              never null
+     */
+    // invariant: see ADR-0005 D2 (latch -> snapshot -> clear -> report)
+    public void emergencyLatch(RuntimeException cause) {
+        Objects.requireNonNull(cause, "cause");
+        handleCrash(cause);
+    }
+
+    /**
      * Harness reset: clears latch, counter and any parked mission
      * context; next tick runs the full pipeline (ADR-0005 5a).
      */

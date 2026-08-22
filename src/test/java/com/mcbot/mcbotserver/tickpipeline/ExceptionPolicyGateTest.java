@@ -307,4 +307,48 @@ class ExceptionPolicyGateTest {
         assertEquals(2, h.fallbackCalls.size(),
             "fallback channel re-reported");
     }
+
+    /**
+     * The outer try-catch seam: a RuntimeException that escapes the
+     * Forge listener's harness (e.g. GotoCommandHandler.tick, an
+     * init NPE, or a future seam between onServerTick and onTick)
+     * must reach the same observable state as an in-pipeline crash.
+     * Latch + clear + dual-channel report, counter monotonic.
+     */
+    @Test
+    void emergencyLatchFromOutsideMirrorsInPipelineCrash() {
+        Harness h = new Harness(false);
+        assertFalse(h.controller.isCrashed(),
+            "clean controller starts un-latched");
+        assertEquals(0, h.controller.crashCounter());
+
+        h.controller.emergencyLatch(
+            new IllegalStateException("harness-outer-failure"));
+
+        assertTrue(h.controller.isCrashed(),
+            "outside-the-pipeline latch still latches");
+        assertEquals(1, h.controller.crashCounter(),
+            "counter starts at 1 for the first outside failure");
+        assertEquals(1, h.crashEvents().size(),
+            "primary channel reports the outside failure");
+        assertEquals(1, h.fallbackCalls.size(),
+            "fallback channel reports the outside failure");
+        assertTrue(h.fallbackCalls.get(0).causeSummary()
+                .contains("harness-outer-failure"),
+            "snapshot must carry the original cause text");
+
+        // Idempotency: latch stays set, counter still increments, both
+        // channels re-report. A second outside failure is its own
+        // report-worthy event so pathological rates stay visible.
+        h.controller.emergencyLatch(
+            new IllegalStateException("second-outer-failure"));
+        assertTrue(h.controller.isCrashed(),
+            "still latched after a second outside failure");
+        assertEquals(2, h.controller.crashCounter(),
+            "counter is monotonic across outside failures");
+        assertEquals(2, h.crashEvents().size(),
+            "primary re-reports so harness can see the rate");
+        assertEquals(2, h.fallbackCalls.size(),
+            "fallback re-reports so harness can see the rate");
+    }
 }
