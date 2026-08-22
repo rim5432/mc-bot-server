@@ -151,3 +151,43 @@ test count when red).
          table shipped as a built-in datapack entry. Review NITs 1/2
          landed alongside (attrs.reason structured events;
          BlockSnapshot id-style Javadoc).
+
+### Stage 2 review-driven hardening (post Stage 2 first-batch)
+
+- [x] S  Reflex anti-oscillation: double threshold + hold window
+         SHIPPED 2026-08-22: new api.reflex.ReflexHysteresis
+         interface (trigger / release / signalValue / minHoldTicks)
+         with default minHoldTicks=0 so non-hysteretic rules opt in
+         by choice. FreezeOnLowHealthRule implements it with
+         trigger 10, release 15 (5-point deadband), hold 20 ticks.
+         SurvivalReflexLayer gained a per-rule state machine
+         (active / ticksSinceChange / lastPriority) and a decideHysteresis
+         scheduler. The 5-point deadband absorbs signal jitter
+         (9, 11, 9, 11, ... stays firing); the hold window gates
+         every flip so a clean threshold-crossing still waits 20
+         ticks before the decision changes. Held ticks re-use the
+         last positive priority so the arbiter sees a stable number
+         across the hold. replaceRules() clears the state map so a
+         same-name reload starts clean. New gate test
+         ReflexHysteresisGateTest (6 cases) + four pre-existing tests
+         drained the hold window where they previously expected
+         immediate silence after heal.
+- [x] S  Tick harness last-ditch seam: emergencyLatch + outer catch
+         SHIPPED 2026-08-22: BotController.emergencyLatch(cause)
+         public entry point that calls the same handleCrash path the
+         pipeline uses. McBotServer.onServerTick now wraps its body
+         in try-catch and calls emergencyLatch on RuntimeException -
+         ADR-0005 D2's contract is now closed at the listener
+         boundary. New ExceptionPolicyGateTest case proves the
+         outside-the-pipeline path mirrors the in-pipeline one.
+- [x] S  A* confidence gate: PARTIAL -> FAILED on low progress
+         SHIPPED 2026-08-22: PathResult gained reachabilityConfidence
+         in [0,1] (1 - bestH / startH, clamped). New constant
+         MIN_PARTIAL_CONFIDENCE = 0.10 collapses PARTIAL to FAILED
+         when the best-frontier ratio is below the floor - a
+         fractional-tick advance would otherwise hand the follower
+         a doomed prefix and loop it. Reached-goal still scores 1.0;
+         FAILED still 0.0; constructor rejects NaN and out-of-range
+         values. AStarGateTest grew two new cases
+         (lowConfidencePartialCollapsesToFailed, pathResultConfidenceIsValidated).
+
