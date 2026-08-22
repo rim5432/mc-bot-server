@@ -16,8 +16,12 @@ import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.api.world.WorldView;
 import com.mcbot.mcbotserver.core.pathing.AStarPathFinder;
 import com.mcbot.mcbotserver.core.pathing.MoveGraph;
+import com.mcbot.mcbotserver.core.pathing.PlanWorker;
+import com.mcbot.mcbotserver.core.world.SnapshotWorldView;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Waypoint follower over the A* move graph: plans through the finder,
@@ -38,9 +42,12 @@ import java.util.List;
  * livelock where a frozen body never accumulated enough window to trip
  * the fuse (three debug rounds; do not regress).
  *
- * <p>Implementation note: runs on the server tick thread only; the
- * Stage 2 async replan worker will own threading around the same
- * finder.
+ * <p>Implementation note: runs on the server tick thread only. With a
+ * {@link PlanWorker} injected, searches execute off-thread on an
+ * immutable {@link SnapshotWorldView} and are adopted only when still
+ * fresh (goal unchanged, start cell still ours) - the staleness guard
+ * of decision 17b. All behavior state stays tick-thread-local; the
+ * future is the sole cross-thread object.
  */
 // contract: see ADR-0004 D3 + numen-notes.md section 18 (replan ladder)
 public final class PathingBehavior implements Behavior {
@@ -60,9 +67,17 @@ public final class PathingBehavior implements Behavior {
     /** Minimum ticks between deliberate replans. */
     public static final int REPLAN_COOLDOWN = 10;
 
+    /**
+     * Soft wall-clock cap for one off-thread search. The node budget
+     * is the safety net; this is the CPU throttle the worker owns
+     * (numen-notes section 17).
+     */
+    public static final long PLAN_WALL_CLOCK_MS = 50;
+
     private final String name;
     private final PoseSource poseSource;
     private final MoveGraph graph;
+    private final PlanWorker worker;
     private List<CellPos> waypoints = List.of();
     private int waypointIndex;
     private boolean stuckLatched;
@@ -70,6 +85,12 @@ public final class PathingBehavior implements Behavior {
     private int ticksSincePlan = REPLAN_COOLDOWN;
     private int ticksSinceProgress;
     private Vec3 lastProgressPose;
+
+    // Async plan bookkeeping; all fields touched on the tick thread
+    // only - the future itself is the sole cross-thread object.
+    private CompletableFuture<AStarPathFinder.PathResult> pendingPlan;
+    private Goal pendingGoal;
+    private CellPos pendingStart;
 
     /**
      * Fine-grained body position. Doubles are load-bearing here: the
@@ -88,7 +109,9 @@ public final class PathingBehavior implements Behavior {
     }
 
     /**
-     * Creates a follower over one move graph.
+     * Creates a follower over one move graph, planning synchronously
+     * on the tick thread. Offline tests and tiny graphs only - real
+     * bots use the worker constructor.
      *
      * @param name       stable identity for claims and diagnostics;
      *                   never null or blank
@@ -97,12 +120,33 @@ public final class PathingBehavior implements Behavior {
      */
     public PathingBehavior(String name, PoseSource poseSource,
                            MoveGraph graph) {
+        this(name, poseSource, graph, null);
+    }
+
+    /**
+     * Creates a follower that plans off-thread through the given
+     * worker. Searches read an immutable snapshot captured here on the
+     * tick thread; results are adopted only when still fresh (goal
+     * unchanged, start cell still ours) - decision 17b's staleness
+     * guard.
+     *
+     * @param name       stable identity for claims and diagnostics;
+     *                   never null or blank
+     * @param poseSource body position accessor; never null
+     * @param graph      edge supplier for planning; never null
+     * @param worker     search executor; never null
+     */
+    public PathingBehavior(String name, PoseSource poseSource,
+                           MoveGraph graph, PlanWorker worker) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("name must not be blank");
         }
         this.name = name;
         this.poseSource = poseSource;
         this.graph = graph;
+        // Null is the deliberate synchronous-planning mode used by
+        // offline tests; see the two constructors above.
+        this.worker = worker;
     }
 
     @Override
@@ -137,6 +181,10 @@ public final class PathingBehavior implements Behavior {
             return ExecutionReport.success();
         }
 
+        // Adopt finished searches before trigger evaluation so a fresh
+        // route is usable in the same tick it arrived.
+        adoptCompletedPlan(directive.goal(), cell);
+
         boolean fuseCondition = !stuckLatched
             && ticksSinceProgress >= STUCK_WINDOW;
         boolean offPath = waypointIndex < waypoints.size()
@@ -148,10 +196,15 @@ public final class PathingBehavior implements Behavior {
             && (neverPlanned || ticksSincePlan >= REPLAN_COOLDOWN)) {
             neverPlanned = false;
             ticksSincePlan = 0;
-            plan(world, cell, directive.goal());
+            requestPlan(world, cell, directive.goal());
         }
 
         if (waypoints.isEmpty()) {
+            // A search still running is not an answer: report RUNNING
+            // rather than inventing NO_PATH for a question in flight.
+            if (planInFlight()) {
+                return ExecutionReport.running();
+            }
             // Definitive no-path right now: fail cleanly; the mission
             // process owns the terminal transition from here. A fuse
             // -triggered failure reports STUCK (physically immovable),
@@ -180,7 +233,72 @@ public final class PathingBehavior implements Behavior {
         return ExecutionReport.running();
     }
 
-    private void plan(WorldView world, CellPos start, Goal goal) {
+    private void requestPlan(WorldView world, CellPos start,
+                             Goal goal) {
+        if (worker == null) {
+            planSync(world, start, goal);
+            return;
+        }
+        // One search in flight at a time; the cooldown gate above
+        // spaces requests, this guard absorbs same-tick re-triggers.
+        if (planInFlight()) {
+            return;
+        }
+        pendingGoal = goal;
+        pendingStart = start;
+        CellPos anchor = anchorCell(goal);
+        var snapshot = SnapshotWorldView.capture(world, start, anchor);
+        pendingPlan = worker.submit(snapshot, graph, start, goal,
+            Heuristic.euclideanTo(anchor),
+            AStarPathFinder.DEFAULT_NODE_BUDGET, PLAN_WALL_CLOCK_MS);
+    }
+
+    /**
+     * Consume a finished off-thread search. Freshness is decided
+     * against the CURRENT directive and pose: a plan for an abandoned
+     * goal or from a cell we have left is stale and discarded whole -
+     * adopting it would steer toward where we no longer want to go.
+     */
+    private void adoptCompletedPlan(Goal currentGoal, CellPos cell) {
+        if (pendingPlan == null || !pendingPlan.isDone()) {
+            return;
+        }
+        AStarPathFinder.PathResult result;
+        try {
+            result = pendingPlan.join();
+        } catch (RuntimeException cancelled) {
+            result = AStarPathFinder.PathResult.failed(0);
+        }
+        pendingPlan = null;
+
+        boolean fresh = currentGoal.equals(pendingGoal)
+            && cell.equals(pendingStart);
+        pendingGoal = null;
+        pendingStart = null;
+        if (!fresh) {
+            // The discarded answer was for a question we no longer
+            // ask. Prime the ladder so THIS tick's trigger evaluation
+            // immediately requests a plan for the current goal - the
+            // cooldown guards executing routes, not unanswered goals,
+            // and reporting NO_PATH without asking would be a lie.
+            ticksSincePlan = REPLAN_COOLDOWN;
+            return;
+        }
+        if (!result.reachedGoal() && result.waypoints().isEmpty()) {
+            waypoints = List.of();
+            waypointIndex = 0;
+            return;
+        }
+        // Skip index 0: it is the cell we are standing in.
+        waypoints = result.waypoints();
+        waypointIndex = waypoints.size() > 1 ? 1 : 0;
+    }
+
+    private boolean planInFlight() {
+        return pendingPlan != null && !pendingPlan.isDone();
+    }
+
+    private void planSync(WorldView world, CellPos start, Goal goal) {
         CellPos anchor = anchorCell(goal);
         var finder = new AStarPathFinder(graph,
             Heuristic.euclideanTo(anchor),
@@ -202,6 +320,9 @@ public final class PathingBehavior implements Behavior {
         waypointIndex = 0;
         neverPlanned = true;
         ticksSincePlan = REPLAN_COOLDOWN;
+        pendingPlan = null;
+        pendingGoal = null;
+        pendingStart = null;
     }
 
     private void advanceReachedWaypoints(Vec3 pose) {

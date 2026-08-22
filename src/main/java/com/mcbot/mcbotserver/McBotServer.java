@@ -150,7 +150,8 @@ public class McBotServer {
 
                 Behavior mover = new PathingBehavior("mover",
                     () -> finePoseOf(body),
-                    com.mcbot.mcbotserver.core.pathing.BasicMoves::from);
+                    com.mcbot.mcbotserver.core.pathing.BasicMoves::from,
+                    new com.mcbot.mcbotserver.core.pathing.PlanWorker());
 
                 BotController controller = new BotController(reflex,
                     arbiter, java.util.List.of(mover), actor,

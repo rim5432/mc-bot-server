@@ -37,6 +37,13 @@ public final class AStarPathFinder {
     public static final int DEFAULT_NODE_BUDGET = 20_000;
 
     /**
+     * Wall-clock sentinel meaning "never cut on time" - the offline
+     * default, where the node budget alone bounds pathological
+     * searches.
+     */
+    public static final long NO_WALL_CLOCK_LIMIT = -1L;
+
+    /**
      * Search outcome: full success (goal reached), best partial (budget
      * exhausted with a usable prefix toward the goal), or total failure.
      */
@@ -134,6 +141,33 @@ public final class AStarPathFinder {
      */
     public PathResult compute(WorldView world, CellPos start,
                               Goal goal, Heuristic heuristic) {
+        return compute(world, start, goal, heuristic,
+            NO_WALL_CLOCK_LIMIT);
+    }
+
+    /**
+     * Search with both a call-specific heuristic and a wall-clock
+     * budget. The clock is checked every 64 expansions (numen-notes
+     * section 17): this is the CPU throttle the async worker owns,
+     * while the node budget stays the pure safety net.
+     *
+     * <p>Exhaustion semantics are shared: a cut by node budget or by
+     * clock yields the same best-partial-or-failure outcome - both
+     * mean "the search stopped early", never "there is no path".
+     *
+     * @param world             read-only perception; never null
+     * @param start             search origin; never null
+     * @param goal              arrival predicate; never null
+     * @param heuristic         cost-to-go for THIS search; must be
+     *                          admissible for optimality; never null
+     * @param wallClockBudgetMs soft time cap in milliseconds;
+     *                          positive to enable,
+     *                          {@link #NO_WALL_CLOCK_LIMIT} to disable
+     * @return see {@link #compute(WorldView, CellPos, Goal)}
+     */
+    public PathResult compute(WorldView world, CellPos start,
+                              Goal goal, Heuristic heuristic,
+                              long wallClockBudgetMs) {
         Objects.requireNonNull(world, "world");
         Objects.requireNonNull(start, "start");
         Objects.requireNonNull(goal, "goal");
@@ -147,12 +181,22 @@ public final class AStarPathFinder {
         gScore.put(start, 0.0);
         open.add(new Node(start, heuristic.estimate(start)));
 
+        boolean clockBounded = wallClockBudgetMs > 0;
+        long deadlineNanos = clockBounded
+            ? System.nanoTime() + wallClockBudgetMs * 1_000_000L
+            : Long.MAX_VALUE;
+
         int expanded = 0;
         CellPos bestPartial = null;
         double bestH = Double.MAX_VALUE;
-        boolean budgetCut = false;
+        boolean searchCut = false;
 
         while (!open.isEmpty() && expanded < nodeBudget) {
+            if (clockBounded && expanded % 64 == 0
+                && System.nanoTime() > deadlineNanos) {
+                searchCut = true;
+                break;
+            }
             Node current = open.poll();
             if (closed.putIfAbsent(current.pos(), Boolean.TRUE) != null) {
                 continue;
@@ -189,13 +233,13 @@ public final class AStarPathFinder {
                 }
             }
         }
-        budgetCut = expanded >= nodeBudget;
+        searchCut |= expanded >= nodeBudget;
 
-        // Best-partial is a BUDGET-EXHAUSTION outcome only: when the
-        // open set drains naturally there is definitively no path right
-        // now, and pretending otherwise would hand the executor a
-        // doomed prefix.
-        if (budgetCut && bestPartial != null
+        // Best-partial is an EXHAUSTION outcome only (node budget or
+        // wall clock): when the open set drains naturally there is
+        // definitively no path right now, and pretending otherwise
+        // would hand the executor a doomed prefix.
+        if (searchCut && bestPartial != null
             && !bestPartial.equals(start)) {
             return new PathResult(
                 reconstruct(cameFrom, bestPartial), expanded, false);
