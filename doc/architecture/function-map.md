@@ -1,6 +1,6 @@
 ---
 title: Functional Convergence Map (device-layer capability envelope)
-last_verified: 2026-08-22
+last_verified: 2026-08-23
 covers:
   - doc/guide/workplan.md
   - doc/architecture/boundaries.md
@@ -76,6 +76,19 @@ depth pending - [GAP] vocabulary absent, reopen-triggered -
   the seam already froze the six invariants
 - [DEFERRED] JsonlJournal replay across restarts (first cross-session
   requirement); idempotency-key persistence
+
+## Reflex-tick event semantics (harness contract)
+
+Reflex ticks may emit NON-reflex task events. When a freeze lands in
+the one-tick retirement lap (mission decided on tick N via reports,
+freeze fires on tick N+1 before retirement), the arbiter retires the
+decided mission and its verdict - TASK_COMPLETED or TASK_FAILED with
+attrs.reason - is emitted ON THE REFLEX TICK, immediately followed by
+the body-halt behavior. A harness therefore must NOT assume "events
+during a reflex tick are only reflex-related"; it should treat any
+TASK_* event as authoritative regardless of the bot's pause state.
+A live park always emits TASK_PAUSED and never a verdict; verdicts
+for parked missions can only arrive after TASK_RESUMED.
 
 ## Convergence criteria (definition of v1 done)
 
