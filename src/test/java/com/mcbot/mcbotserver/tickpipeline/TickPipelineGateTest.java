@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Stage-0 ordering gate: the fixed pipeline order holds end to end —
+ * Stage-0 ordering gate: the fixed pipeline order holds end to end ???
  * a non-null reflex skips the mission stage and halts the body through
  * the claim surface; a silent reflex lets arbiter and behaviors run.
  *
@@ -148,8 +148,7 @@ class TickPipelineGateTest {
         arbiter.register(mission);
         arbiter.requestControl(mission);
         RecordingActor actor = new RecordingActor();
-        PathingBehavior mover = new PathingBehavior("mover",
-            () -> new CellPos(0, 64, 0));
+        PathingBehavior mover = new PathingBehavior("mover", () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5));
         BotController controller = controller(health, layer, arbiter,
             mover, actor, new InMemoryEventQueue(() -> 1L, () -> 0L));
         MockWorldView world = new MockWorldView();
@@ -210,8 +209,7 @@ class TickPipelineGateTest {
         arbiter.register(mission);
         arbiter.requestControl(mission);
         RecordingActor actor = new RecordingActor();
-        PathingBehavior mover = new PathingBehavior("mover",
-            () -> new CellPos(0, 64, 0));
+        PathingBehavior mover = new PathingBehavior("mover", () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5));
         BotController controller = controller(health, layer, arbiter,
             mover, actor, new InMemoryEventQueue(() -> 1L, () -> 0L));
 
@@ -231,7 +229,7 @@ class TickPipelineGateTest {
 
     /**
      * G4: the pause / resume / drop transitions are visible to the
-     * harness as TASK_* events — urgent for paused and dropped, since
+     * harness as TASK_* events ??? urgent for paused and dropped, since
      * both mean "your mental model of the task is wrong".
      */
     @Test
@@ -247,8 +245,7 @@ class TickPipelineGateTest {
         arbiter.register(mission);
         arbiter.requestControl(mission);
         RecordingActor actor = new RecordingActor();
-        PathingBehavior mover = new PathingBehavior("mover",
-            () -> new CellPos(0, 64, 0));
+        PathingBehavior mover = new PathingBehavior("mover", () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5));
         BotController controller = controller(health, layer, arbiter,
             mover, actor, events);
         MockWorldView world = new MockWorldView();
@@ -292,7 +289,7 @@ class TickPipelineGateTest {
         arbiter.register(mission);
         arbiter.requestControl(mission);
         BotController controller = controller(health, layer, arbiter,
-            new PathingBehavior("mover", () -> new CellPos(0, 64, 0)),
+            new PathingBehavior("mover", () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5)),
             new RecordingActor(), events);
 
         controller.onTick(new MockWorldView());

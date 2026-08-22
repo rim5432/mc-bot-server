@@ -386,6 +386,8 @@ def run_gradle(
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
+            encoding="utf-8",
+            errors="replace",
             env=env,
         )
     except OSError as e:

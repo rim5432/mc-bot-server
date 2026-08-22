@@ -8,6 +8,7 @@ import com.mcbot.mcbotserver.api.behavior.Behavior;
 import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.api.world.WorldView;
 
 import java.util.ArrayDeque;
@@ -41,19 +42,24 @@ public final class PathingBehavior implements Behavior {
 
     private final String name;
     private final PoseSource poseSource;
-    private final Deque<CellPos> recentPoses = new ArrayDeque<>();
+    private final Deque<Vec3> recentPoses = new ArrayDeque<>();
     private boolean stuckLatched;
 
-    /** Where the body currently stands; wired by the controller. */
+    /**
+     * Fine-grained body position. Doubles are load-bearing here: the
+     * stuck fuse measures sub-cell motion, and a block-cell source
+     * reads zero while a slowly accelerating body crosses its own cell
+     * (the false-trip bug that shipped this record).
+     */
     @FunctionalInterface
     public interface PoseSource {
 
         /**
-         * Current block cell of the body.
+         * Current body position in world doubles.
          *
          * @return the pose; never null
          */
-        CellPos get();
+        Vec3 get();
     }
 
     /**
@@ -86,10 +92,14 @@ public final class PathingBehavior implements Behavior {
         if (directive == null) {
             return ExecutionReport.running();
         }
-        CellPos pose = poseSource.get();
+        Vec3 pose = poseSource.get();
         recordPose(pose);
 
-        if (directive.goal().isInGoal(pose)) {
+        CellPos cell = new CellPos(
+            (int) Math.floor(pose.x()),
+            (int) Math.floor(pose.y()),
+            (int) Math.floor(pose.z()));
+        if (directive.goal().isInGoal(cell)) {
             stuckLatched = false;
             return ExecutionReport.success();
         }
@@ -110,7 +120,7 @@ public final class PathingBehavior implements Behavior {
         return ExecutionReport.running();
     }
 
-    private void recordPose(CellPos pose) {
+    private void recordPose(Vec3 pose) {
         if (recentPoses.size() >= STUCK_WINDOW) {
             recentPoses.pollFirst();
         }
@@ -121,15 +131,15 @@ public final class PathingBehavior implements Behavior {
         if (recentPoses.isEmpty()) {
             return Double.MAX_VALUE;
         }
-        CellPos oldest = recentPoses.peekFirst();
+        Vec3 oldest = recentPoses.peekFirst();
         return poseSource.get().distanceTo(oldest);
     }
 
-    private void submitMotionClaims(Directive directive, CellPos pose,
+    private void submitMotionClaims(Directive directive, Vec3 pose,
                                     Actor actor) {
         CellPos target = nearestGoalCell(directive);
-        double dx = target.x() + 0.5 - (pose.x() + 0.5);
-        double dz = target.z() + 0.5 - (pose.z() + 0.5);
+        double dx = target.x() + 0.5 - pose.x();
+        double dz = target.z() + 0.5 - pose.z();
         float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
         int movePriority = 10;
 

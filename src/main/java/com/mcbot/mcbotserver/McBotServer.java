@@ -71,6 +71,11 @@ public class McBotServer {
         IEventBus modBus =
             FMLJavaModLoadingContext.get().getModEventBus();
         ENTITIES.register(modBus);
+        // EntityAttributeCreationEvent is a MOD-bus event; without this
+        // listener the body spawns with no attributes and vanilla
+        // logs "has no attributes" on every tick. addListener keeps
+        // the game-bus @SubscribeEvent methods out of mod-bus scan.
+        modBus.addListener(this::onAttributes);
         MinecraftForge.EVENT_BUS.register(this);
         LOGGER.info("McBotServer initializing — device layer for MC 1.20.1");
     }
@@ -78,7 +83,13 @@ public class McBotServer {
     /** Attribute wiring so the body can actually move and survive. */
     @SubscribeEvent
     public void onAttributes(EntityAttributeCreationEvent event) {
-        event.put(BOT_BODY.get(), Mob.createMobAttributes().build());
+        // createMobAttributes does NOT include MOVEMENT_SPEED - each
+        // mob type adds its own. Without it the binding's zza=1 drives
+        // a speed-0 body: gravity works, walking never starts.
+        event.put(BOT_BODY.get(), Mob.createMobAttributes()
+            .add(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED,
+                0.25)
+            .build());
     }
 
     @SubscribeEvent
@@ -138,7 +149,7 @@ public class McBotServer {
                 reflex.addRule(new FreezeOnLowHealthRule());
 
                 Behavior mover = new PathingBehavior("mover",
-                    () -> poseOf(body));
+                    () -> finePoseOf(body));
 
                 BotController controller = new BotController(reflex,
                     arbiter, java.util.List.of(mover), actor,
@@ -167,6 +178,12 @@ public class McBotServer {
     private static CellPos poseOf(BotBodyEntity body) {
         return new CellPos(body.getBlockX(), body.getBlockY(),
             body.getBlockZ());
+    }
+
+    private static com.mcbot.mcbotserver.api.types.Vec3 finePoseOf(
+            BotBodyEntity body) {
+        return new com.mcbot.mcbotserver.api.types.Vec3(body.getX(),
+            body.getY(), body.getZ());
     }
 
     private static BotController.GameClock clockOf(

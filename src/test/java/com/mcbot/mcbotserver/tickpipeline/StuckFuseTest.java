@@ -5,6 +5,7 @@ import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.core.actor.ChannelArbiter;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
@@ -30,7 +31,7 @@ class StuckFuseTest {
      */
     @Test
     void flatWindowTripsOnceThenReArms() {
-        CellPos[] pose = {new CellPos(0, 64, 0)};
+        Vec3[] pose = {new Vec3(0.5, 64, 0.5)};
         PathingBehavior mover = new PathingBehavior("mover",
             () -> pose[0]);
         ChannelArbiter actor = new ChannelArbiter();
@@ -52,7 +53,7 @@ class StuckFuseTest {
             "the fuse must not machine-gun STUCK every tick");
 
         // Real movement resumes: latch clears on the next tick.
-        pose[0] = new CellPos(10, 64, 0);
+        pose[0] = new Vec3(10.5, 64, 0.5);
         assertEquals(ExecutionReport.Status.RUNNING,
             mover.tick(WORLD, directive, actor).status());
         assertEquals(ExecutionReport.Status.RUNNING,
@@ -60,7 +61,7 @@ class StuckFuseTest {
             "moving bot must stay unstuck");
 
         // Arrival overrides everything: predicate decides SUCCESS.
-        pose[0] = new CellPos(50, 64, 0);
+        pose[0] = new Vec3(50.5, 64, 0.5);
         assertEquals(ExecutionReport.Status.SUCCESS,
             mover.tick(WORLD, directive, actor).status());
     }
@@ -70,7 +71,7 @@ class StuckFuseTest {
      */
     @Test
     void moverClaimsMoveAndRotChannels() {
-        CellPos[] pose = {new CellPos(0, 64, 0)};
+        Vec3[] pose = {new Vec3(0.5, 64, 0.5)};
         PathingBehavior mover = new PathingBehavior("mover",
             () -> pose[0]);
         ChannelArbiter actor = new ChannelArbiter();
@@ -85,12 +86,12 @@ class StuckFuseTest {
 
     /**
      * Push-off recovery, stage-1 slice acceptance: an external shove
-     * inside the window is displacement, not stalling — the fuse must
+     * inside the window is displacement, not stalling ??? the fuse must
      * stay silent and the mover keeps claiming toward the goal.
      */
     @Test
     void shoveInsideWindowDoesNotTripFuse() {
-        CellPos[] pose = {new CellPos(0, 64, 0)};
+        Vec3[] pose = {new Vec3(0.5, 64, 0.5)};
         PathingBehavior mover = new PathingBehavior("mover",
             () -> pose[0]);
         ChannelArbiter actor = new ChannelArbiter();
@@ -101,14 +102,14 @@ class StuckFuseTest {
         // across more than one full window of ticks.
         for (int round = 0; round < 3; round++) {
             int base = round * 2;
-            pose[0] = new CellPos(base, 64, 0);
+            pose[0] = new Vec3(base + 0.5, 64, 0.5);
             assertEquals(ExecutionReport.Status.RUNNING,
                 mover.tick(WORLD, directive, actor).status());
-            pose[0] = new CellPos(base + 1, 64, 0);
+            pose[0] = new Vec3(base + 1.5, 64, 0.5);
             assertEquals(ExecutionReport.Status.RUNNING,
                 mover.tick(WORLD, directive, actor).status());
             // Shove back to the round's start before the next round.
-            pose[0] = new CellPos(base, 64, 0);
+            pose[0] = new Vec3(base + 0.5, 64, 0.5);
             assertEquals(ExecutionReport.Status.RUNNING,
                 mover.tick(WORLD, directive, actor).status(),
                 "a shove is displacement, never STUCK");
