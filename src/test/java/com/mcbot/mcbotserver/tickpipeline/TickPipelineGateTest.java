@@ -491,4 +491,70 @@ class TickPipelineGateTest {
             .filter(k -> k.startsWith("TASK_"))
             .toList();
     }
+
+    /**
+     * Keepalive (issue 0001 fix 2) fires every
+     * {@code KEEPALIVE_INTERVAL} ticks with a snapshot of
+     * plan-progress state. Verified end-to-end: 20 ticks of silent
+     * pipeline produce exactly one KEEPALIVE on the event stream,
+     * carrying the documented attrs (pose, waypointIndex,
+     * ticksSinceProgress, ticksSincePlan, planAge, goalCell).
+     */
+    @Test
+    void keepaliveFiresOnInterval() {
+        float[] health = {20f};
+        InMemoryEventQueue events = new InMemoryEventQueue(
+            () -> 1L, () -> 0L);
+        SurvivalReflexLayer layer = new SurvivalReflexLayer(
+            (world, board) -> board.botHealth = health[0]);
+        layer.addRule(new FreezeOnLowHealthRule());
+        TaskArbiter arbiter = new TaskArbiter();
+        CountingMission mission = new CountingMission();
+        arbiter.register(mission);
+        arbiter.requestControl(mission);
+        RecordingActor actor = new RecordingActor();
+        PathingBehavior mover = new PathingBehavior("mover",
+            () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5),
+            BasicMoves::from);
+        BotController controller = controller(health, layer, arbiter,
+            mover, actor, events);
+
+        // Drive 20 ticks. The KEEPALIVE_INTERVAL is 20, so the
+        // emission point fires once on tick 20.
+        for (int i = 0; i < 20; i++) {
+            controller.onTick(flooredWorld());
+        }
+        List<BotEvent> keepalives = events.statusSnapshot(0).events().stream()
+            .filter(e -> EventKind.KEEPALIVE.equals(e.kind()))
+            .toList();
+        assertEquals(1, keepalives.size(),
+            "one keepalive per KEEPALIVE_INTERVAL window");
+        BotEvent k = keepalives.get(0);
+        assertEquals(false, k.urgent(),
+            "keepalive is informational, not urgent");
+        // Plan-progress attrs - the test pins the key set, not the
+        // order; the contract is the field names, not positions.
+        Map<String, String> a = k.attrs();
+        assertTrue(a.containsKey("pose"),
+            "keepalive carries pose: " + a.keySet());
+        assertTrue(a.containsKey("waypointIndex"),
+            "keepalive carries waypointIndex: " + a.keySet());
+        assertTrue(a.containsKey("ticksSinceProgress"),
+            "keepalive carries ticksSinceProgress: " + a.keySet());
+        assertTrue(a.containsKey("ticksSincePlan"),
+            "keepalive carries ticksSincePlan: " + a.keySet());
+        assertTrue(a.containsKey("planAge"),
+            "keepalive carries planAge: " + a.keySet());
+        assertTrue(a.containsKey("goalCell"),
+            "keepalive carries goalCell: " + a.keySet());
+
+        // Drive another full window; a second keepalive fires.
+        for (int i = 0; i < 20; i++) {
+            controller.onTick(flooredWorld());
+        }
+        assertEquals(2, events.statusSnapshot(0).events().stream()
+            .filter(e -> EventKind.KEEPALIVE.equals(e.kind()))
+            .count(),
+            "second keepalive fires on the next interval");
+    }
 }

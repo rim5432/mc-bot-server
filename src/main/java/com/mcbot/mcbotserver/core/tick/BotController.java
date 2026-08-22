@@ -9,11 +9,16 @@ import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
 import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.event.EventQueue;
+import com.mcbot.mcbotserver.api.goal.Goal;
+import com.mcbot.mcbotserver.api.goal.GoalBlock;
+import com.mcbot.mcbotserver.api.goal.GoalNear;
 import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
 import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.api.world.WorldView;
+import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.core.reflex.MinimalReflex;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
@@ -103,6 +108,16 @@ public final class BotController {
     private int crashCounter;
     private boolean inLethalFluid;
     private BotProcess previousCurrent;
+    private int ticksSinceKeepalive;
+
+    /**
+     * How often the keepalive event fires. Matches
+     * {@code PathingBehavior.STUCK_WINDOW} so a keepalive arrives
+     * on the same tick a STUCK would have, were it to fire. Issue
+     * 0001 fix 2: not a contract - the S-F verifier ignores unknown
+     * kinds, so this can be tuned later without breaking replay.
+     */
+    private static final int KEEPALIVE_INTERVAL = 20;
 
     /**
      * Assembles the pipeline. All collaborators stay plain constructor
@@ -311,6 +326,60 @@ public final class BotController {
         // Stage 4: resolve contests, expire claims, emit intents.
         actor.flush();
         emitMissionTransition(day, tod);
+
+        // Stage 5 (observability): periodic keepalive for harnesses
+        // that want to distinguish "alive and progressing" from
+        // "alive but the planner is silent". Zero behaviour change
+        // to stages 1-4 - this is a one-way read of plan-progress
+        // state pushed to the event stream. Issue 0001 fix 2.
+        if (++ticksSinceKeepalive >= KEEPALIVE_INTERVAL) {
+            ticksSinceKeepalive = 0;
+            emitKeepalive(pose, directive, day, tod);
+        }
+    }
+
+    /**
+     * Push one keepalive event with a snapshot of plan-progress
+     * state. Scans the behavior list for a {@link PathingBehavior}
+     * (v1 has at most one; if more plan reporters are added later,
+     * extract a small interface and merge their snapshots here).
+     */
+    private void emitKeepalive(CellPos pose, Directive directive,
+                               long day, long tod) {
+        CellPos goalCell = goalCellOf(directive);
+        Vec3 poseD = new Vec3(pose.x(), pose.y(), pose.z());
+        for (Behavior b : behaviors) {
+            if (b instanceof PathingBehavior pb) {
+                Map<String, String> attrs = pb.keepaliveAttrs(
+                    poseD, goalCell);
+                try {
+                    events.push(new BotEvent(EventKind.KEEPALIVE,
+                        day, tod, false, Map.copyOf(attrs),
+                        "keepalive at tick " + tickCounter));
+                } catch (RuntimeException ignored) {
+                    // Reporting must never take the pipeline down.
+                }
+                return;
+            }
+        }
+    }
+
+    /**
+     * Extract the active goal cell from a directive, or null if no
+     * directive. Sealed over the current goal algebra.
+     */
+    private static CellPos goalCellOf(Directive directive) {
+        if (directive == null) {
+            return null;
+        }
+        Goal g = directive.goal();
+        if (g instanceof GoalBlock b) {
+            return b.target();
+        }
+        if (g instanceof GoalNear n) {
+            return n.center();
+        }
+        return null;
     }
 
     /**

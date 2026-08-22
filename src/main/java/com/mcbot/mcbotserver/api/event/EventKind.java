@@ -69,6 +69,18 @@ public final class EventKind {
      */
     public static final String BOT_CRASHED = "BOT_CRASHED";
 
+    /**
+     * Periodic liveness ping emitted by the tick loop. Carries a
+     * snapshot of plan-progress state (pose, waypointIndex,
+     * ticksSinceProgress, ticksSincePlan, planAge, goalCell) so a
+     * harness replaying the event stream can distinguish "bot is
+     * alive and making progress" from "bot is alive but the
+     * planner is silent" (issue 0001 §4 / fix 2). Not urgent; the
+     * harness is expected to ignore-unknown on S-F verifier
+     * upgrade paths until the replay contract formally adopts it.
+     */
+    public static final String KEEPALIVE = "KEEPALIVE";
+
     private EventKind() {
     }
 }

@@ -52,19 +52,46 @@ import java.util.concurrent.CompletableFuture;
 // contract: see ADR-0004 D3 + numen-notes.md section 18 (replan ladder)
 public final class PathingBehavior implements Behavior {
 
-    /** Ticks without displacement before the progress fuse fires. */
+    /**
+     * Ticks without plan-progress before the progress fuse fires.
+     * Frame: time (ticks), no spatial frame.
+     */
     public static final int STUCK_WINDOW = 20;
 
-    /** Per-tick displacement above this counts as progress. */
+    /**
+     * Per-tick progress margin in metres, used by the motion-based
+     * progress check at line 170 (`pose.distanceTo(lastProgressPose)
+     * > STUCK_EPSILON`). Frame: 3D Euclidean (`Vec3.distanceTo`,
+     * which is {@code sqrt(dx^2+dy^2+dz^2)}). Will be redefined to
+     * a new-min margin in score units under fix 4; the Javadoc on
+     * the consumer will be updated in the same change.
+     */
     public static final double STUCK_EPSILON = 0.01;
 
-    /** Horizontal reach that counts as "waypoint touched". */
+    /**
+     * Horizontal reach that counts as "waypoint touched", in metres.
+     * Frame: XZ only (`Math.hypot(dx, dz)` in
+     * {@link #advanceReachedWaypoints} and {@link #distanceToWaypoint}).
+     * Y is intentionally ignored - a pose directly above a waypoint
+     * is treated as "not at the waypoint" for reach purposes; the
+     * goal predicate is the 3D cell-equality authority for arrival.
+     */
     public static final double WAYPOINT_REACH = 0.8;
 
-    /** Drift from the active waypoint that forces a fresh plan. */
+    /**
+     * Drift from the active waypoint that forces a fresh plan, in
+     * metres. Frame: XZ only (same {@code Math.hypot(dx, dz)} as
+     * {@code WAYPOINT_REACH}). Y drift is intentionally ignored;
+     * the three-branch failure mode documented in issue 0001 §3
+     * rides on this XZ-only choice. Pinned by
+     * {@code PathingBehaviorFrameGateTest.replanDistanceIsXZOnly}.
+     */
     public static final double REPLAN_DISTANCE = 3.0;
 
-    /** Minimum ticks between deliberate replans. */
+    /**
+     * Minimum ticks between deliberate replans. Frame: time (ticks),
+     * no spatial frame.
+     */
     public static final int REPLAN_COOLDOWN = 10;
 
     /**
@@ -84,6 +111,7 @@ public final class PathingBehavior implements Behavior {
     private boolean neverPlanned = true;
     private int ticksSincePlan = REPLAN_COOLDOWN;
     private int ticksSinceProgress;
+    private int ticksSinceAdoption;
     private Vec3 lastProgressPose;
 
     // Async plan bookkeeping; all fields touched on the tick thread
@@ -162,6 +190,7 @@ public final class PathingBehavior implements Behavior {
         }
         Vec3 pose = poseSource.get();
         ticksSincePlan++;
+        ticksSinceAdoption++;
 
         // Progress tracking: per-tick delta against the last recorded
         // pose, immune to replanning. Only real displacement resets the
@@ -292,6 +321,7 @@ public final class PathingBehavior implements Behavior {
         // Skip index 0: it is the cell we are standing in.
         waypoints = result.waypoints();
         waypointIndex = waypoints.size() > 1 ? 1 : 0;
+        ticksSinceAdoption = 0;
     }
 
     private boolean planInFlight() {
@@ -313,6 +343,7 @@ public final class PathingBehavior implements Behavior {
         // Skip index 0: it is the cell we are standing in.
         waypoints = result.waypoints();
         waypointIndex = waypoints.size() > 1 ? 1 : 0;
+        ticksSinceAdoption = 0;
     }
 
     private void resetPlan() {
@@ -323,6 +354,45 @@ public final class PathingBehavior implements Behavior {
         pendingPlan = null;
         pendingGoal = null;
         pendingStart = null;
+    }
+
+    /**
+     * Snapshot of the plan-progress state for the keepalive event
+     * (issue 0001 fix 2). The harness reads this on every KEEPALIVE
+     * emission to distinguish "alive and progressing" from "alive
+     * but the planner is silent". Zero behaviour change to the
+     * pipeline - the snapshot is read at the BotController emission
+     * point and never feeds back into PathingBehavior.
+     *
+     * <p>Why this method, not getters: a single {@code Map} return
+     * keeps the emission point in BotController free of cast /
+     * null-bridges per field. The map keys are stable strings; the
+     * caller copies them into a {@code BotEvent} attrs map.
+     *
+     * @param pose     the body's current pose (sampled by the caller
+     *                 in the same tick); never null
+     * @param goalCell the active goal cell (sampled by the caller
+     *                 from the directive); may be null if no
+     *                 directive is active this tick
+     * @return a fresh {@code LinkedHashMap} of attribute strings;
+     *         never null
+     */
+    public java.util.Map<String, String> keepaliveAttrs(
+        Vec3 pose, CellPos goalCell) {
+        java.util.Map<String, String> attrs =
+            new java.util.LinkedHashMap<>();
+        attrs.put("pose", pose.x() + "," + pose.y() + "," + pose.z());
+        attrs.put("waypointIndex", String.valueOf(waypointIndex));
+        attrs.put("waypointsTotal", String.valueOf(waypoints.size()));
+        attrs.put("ticksSinceProgress",
+            String.valueOf(ticksSinceProgress));
+        attrs.put("ticksSincePlan", String.valueOf(ticksSincePlan));
+        attrs.put("planAge", String.valueOf(ticksSinceAdoption));
+        if (goalCell != null) {
+            attrs.put("goalCell",
+                goalCell.x() + "," + goalCell.y() + "," + goalCell.z());
+        }
+        return attrs;
     }
 
     private void advanceReachedWaypoints(Vec3 pose) {

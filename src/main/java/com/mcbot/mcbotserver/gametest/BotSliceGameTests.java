@@ -100,6 +100,17 @@ public final class BotSliceGameTests {
 
     /**
      * Scenario 2: shoved mid-path, the bot re-walks to the same goal.
+     *
+     * <p>Issue 0001 fix 3: the shove is now a real vanilla-physics
+     * knockback (setDeltaMovement + 5 physics ticks of integration)
+     * rather than an admin teleport. The previous test verified
+     * "if a teleport returns the body to start, the planner
+     * replans" - that was trivially true and missed every
+     * interesting shove semantic (collision, gravity, friction).
+     * The new test gives the body a 1.5 m/tick X impulse, lets MC
+     * integrate it for 5 ticks, and verifies (a) the body
+     * actually displaced horizontally and (b) the planner re-routes
+     * to the original goal.
      */
     @GameTest(template = "empty16x8x16", timeoutTicks = TIMEOUT)
     public static void recoversWhenShoved(GameTestHelper helper) {
@@ -108,18 +119,34 @@ public final class BotSliceGameTests {
         CellPos goalCell = localToCell(helper,
             new BlockPos(13, WALK_Y, 8));
         GotoProcess mission = submitGoto(rig, goalCell);
+        int startAbsX = helper.absolutePos(start).getX();
 
         helper.startSequence()
             .thenWaitUntil(driveUntil(rig,
                 () -> check(rig.body().getBlockX()
-                    - helper.absolutePos(start).getX() >= 4,
+                    - startAbsX >= 4,
                     "waiting to pass mid-point")))
             .thenExecute(() -> {
-                var abs = helper.absolutePos(start);
-                rig.body().teleportTo(abs.getX() + 0.5, abs.getY(),
-                    abs.getZ() + 0.5);
+                // Strong horizontal knockback in -X. The body is
+                // mid-path, so the planner must re-route after
+                // the shove lands.
                 rig.body().setDeltaMovement(
-                    net.minecraft.world.phys.Vec3.ZERO);
+                    new net.minecraft.world.phys.Vec3(
+                        -1.5, 0.0, 0.0));
+            })
+            .thenExecuteFor(5, () -> {
+                // 5 vanilla physics ticks without pipeline
+                // intervention - MC integrates the impulse, body
+                // moves ~7.5 blocks in -X. The planner's next
+                // pipeline tick sees the new cell.
+            })
+            .thenExecute(() -> {
+                // Sanity: the body actually displaced. A teleport
+                // would leave XZ unchanged; physics must move it.
+                check(rig.body().getBlockX() < startAbsX,
+                    "shove must have displaced the body in -X; "
+                    + "X now " + rig.body().getBlockX()
+                    + ", start " + startAbsX);
             })
             .thenWaitUntil(driveUntil(rig,
                 () -> check(reached(rig.body(), goalCell),
