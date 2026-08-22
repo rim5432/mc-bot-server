@@ -426,6 +426,15 @@ class TickPipelineGateTest {
         assertEquals("NO_PATH",
             events.statusSnapshot(0).events().get(0).attrs()
                 .get("reason"));
+
+        // Exactly-once emission: drive five more healthy ticks - the
+        // retirement must not re-announce now that previousCurrent
+        // has latched onto null.
+        for (int i = 0; i < 5; i++) {
+            controller.onTick(flooredWorld());
+        }
+        assertEquals(1, kindsOf(events).size(),
+            "the verdict must be emitted exactly once, ever");
     }
 
     /**
@@ -467,6 +476,13 @@ class TickPipelineGateTest {
             "a decided mission must not be announced as paused");
         assertEquals(EventKind.TASK_COMPLETED, kinds.get(0),
             "the success verdict survives the freeze");
+
+        // Exactly-once emission across subsequent healthy ticks.
+        for (int i = 0; i < 5; i++) {
+            controller.onTick(flooredWorld());
+        }
+        assertEquals(1, kindsOf(events).size(),
+            "the verdict must be emitted exactly once, ever");
     }
 
     private static List<String> kindsOf(InMemoryEventQueue events) {

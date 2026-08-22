@@ -1,6 +1,6 @@
 ---
 title: Boundary Contracts and Decision Ledger
-last_verified: 2026-08-22
+last_verified: 2026-08-23
 covers:
   - doc/decisions/0002-capability-model-task-arbiter.md
   - doc/decisions/0003-reflex-layer-preemption.md
@@ -211,11 +211,19 @@ When the queue detects a stale cursor it inserts a synthetic
 - **Position**: head of the page, before any real event with
   id >= `oldest`. The first thing the harness sees after it
   hands the page to the consumer loop.
-- **Empty-queue case**: if the queue is empty and the caller's
-  cursor is stale, `EVENT_GAP` still fires (with `oldest =
-  lastEventId + 1` and `count = lastEventId - sinceEventId`). The
-  harness sees "behind, and the bot did not produce anything
-  new" — distinct from "fresh poll, the bot is idle".
+- **First-poll case** (cursor 0): the gap does **not** fire.
+  Cursor 0 is the "give me everything" sentinel; the lost-range
+  signal does not apply to a caller with no prior id. A harness
+  that crashed without persisting its cursor also gets the full
+  first-time page; the lost-range signal in that case is the
+  `resetAt` marker, not a gap.
+- **Empty-queue case** (post-`reset()` or all-rotated-out with a
+  non-zero cursor): the gap does **not** fire on an empty queue.
+  After a deliberate `reset()` the lost range is a wipe, not a
+  rotation overflow; the `resetAt` marker is the signal. A
+  rotation overflow that fully evicts the queue is so rare it is
+  not worth a false-positive gap; a harness noticing "no events
+  for a long time" should reconcile via `getState()`.
 
 The harness's recovery sequence on `EVENT_GAP` is fixed and is
 the contract, not a recommendation:
@@ -281,6 +289,16 @@ BotState getState();
    consumer-count awareness, no polling-interval awareness, no
    subscription model. The bot is a passive event producer; the
    harness is the active consumer.
+7. **Reflex ticks may emit non-reflex verdicts.** When a reflex
+   freeze lands in a mission's one-tick retirement lap, the decided
+   mission's `TASK_COMPLETED` / `TASK_FAILED(attrs.reason)` is
+   emitted on the reflex tick itself - possibly followed by other
+   tasks' `TASK_PAUSED`. Replay state machines must therefore treat
+   any `TASK_*` event as authoritative regardless of pause state;
+   the sequences `COMPLETED → PAUSED → RESUMED` and
+   `PAUSED → RESUMED → COMPLETED` are both legal. A live park never
+   emits a verdict for the parked task; parked-mission verdicts can
+   only arrive after `TASK_RESUMED` (or as `TASK_DROPPED`).
 
 ### Out of scope (by design)
 

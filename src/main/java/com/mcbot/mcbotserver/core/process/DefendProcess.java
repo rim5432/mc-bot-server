@@ -162,6 +162,12 @@ public final class DefendProcess implements BotProcess, TerminalMission {
         }
 
         // Target not re-seen this tick: grace, then declare it down.
+        // ORDER IS LOAD-BEARING: the seen-branch above resets
+        // ticksSinceSeen to zero BEFORE this check runs. resume()
+        // exploits that by spending all grace credit - a target still
+        // present resets the counter and the fight continues; an
+        // absent one trips 11 > 10 immediately. Reordering these two
+        // blocks would unconditionally kill every resumed fight.
         ticksSinceSeen++;
         if (ticksSinceSeen > TARGET_GRACE_TICKS) {
             succeed();

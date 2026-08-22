@@ -154,6 +154,30 @@ class CombatSkeletonGateTest {
     }
 
     /**
+     * Mirror case: the target is STILL THERE at reattach. The spent
+     * grace credit must be refilled by the scan (seen -> counter
+     * reset) - the fight continues normally instead of the first tick
+     * unconditionally declaring TARGET_DOWN.
+     */
+    @Test
+    void resumeWithTargetPresentContinuesTheFight() {
+        MockWorldView world = new MockWorldView();
+        world.addEntity(zombie("z1", new CellPos(2, 64, 0)));
+        DefendProcess defend = new DefendProcess("gt-def", 60, 400,
+            () -> new CellPos(0, 64, 0), HOSTILES);
+        defend.onTick(world);
+        defend.onLostControl(null);
+
+        assertTrue(defend.resume(null));
+        Directive directive = defend.onTick(world);
+
+        assertTrue(defend.isActive(),
+            "a still-present target keeps the engagement alive");
+        assertEquals("z1",
+            ((Attack) directive.overrides().combat()).targetId());
+    }
+
+    /**
      * Reports never decide the fight: neither a locomotion FAILED nor
      * a chase SUCCESS may flip terminal state - scans, leash, and
      * timeout own the verdict.
