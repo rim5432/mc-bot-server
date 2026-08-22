@@ -116,6 +116,7 @@ The doc/ hierarchy is the project memory. Every doc has front-matter
 | `doc/guide/build-and-run.md` | Build & run commands (operational) | Updated when the tool changes |
 | `doc/reference/{baritone,numen,disclosure-patterns}-notes.md` | Distilled design notes from external projects (Baritone, Numen) | **Read-only** — updates require a new doc + archive of the old one, not in-place edits |
 | `doc/reference/toolchain.md` | Build tooling reference | Updated when the tool changes |
+| `doc/architecture/issues/` | Per-issue review of macro-convergence rows in `function-map.md` and the affected ADRs / boundaries | Open files mutate freely; filenames start with `NNNN-` (4-digit zero-padded). On resolution, the body either migrates to `decisions/000N-...md` (this file keeps a 5-line pointer with `status: promoted-to-ADR`) or to `archive/` with `superseded_by:` set. Each issue MUST cross-reference a function-map row or boundary section in `covers:`. |
 
 **Doc workflow**: edit covered code → update
 the affected doc in the same change → `doc check` → `doc touch
