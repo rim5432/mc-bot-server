@@ -133,28 +133,25 @@ proposed in earlier review iterations and are wrong:
 | 5 | Freshness ±1 cell tolerance | 1 equality to Chebyshev-distance + 1 test | Chebyshev vs Euclidean; tolerance value |
 | 6 | Vertical gate (only evaluate offPath/fuse when `onGround`; landing edge fires one immediate evaluation) | trigger evaluation at `PathingBehavior.java:188-200`; needs `onGround` from `PoseSource` | whether `onGround` is reachable through the existing `PoseSource` interface — the largest hidden cost in the list, possibly a one-time interface change |
 
-### Ruling (a) — plan-progress score; criterion 3 requires arclength (criterion 3 in earlier drafts is FALSE on detour paths)
+### Ruling (a) — plan-progress score (Path A: per-cell + move-at-waypoint)
 
-A two-criterion `waypointIndex advanced OR goalDistance decreased`
-fails switchback: an A* result that loops around a wall has
-legitimate segments where the goal distance grows and the
-waypoint gap is too coarse for `waypointIndex` to advance on
-each tick. So far so good. But adding a third criterion of
-`currentWaypointDistance3D` with the rationale "along any legal
-path this strictly decreases" is **wrong**: a detour path may
-first move the body sideways AWAY from the current waypoint
-(door on the side, goal behind a wall) and the 3D distance
-INCREASES during that stretch. If the waypoint sample is
-sparse enough that the detour fits between two samples, then
-criterion 1 (index not advancing) is also false and criterion
-2 (goal distance increasing around the wall) is false. All
-three false on a legal path -> fuse accumulates -> spurious
-STUCK + wasted replan. Threshold for trouble: walk speed
-0.215 b/tick x 20 ticks = 4.3 cells, which is short enough
-that caves and mazes hit it routinely.
+**Verdict: Path A.** Step 2 of the PR plan confirmed the
+assumptions that make the simple "3D distance to current
+waypoint" criterion safe:
 
-The plan-progress score therefore has two mandatory criteria
-and one conditional:
+- `AStarPathFinder.reconstruct` (line 286-297) emits every
+  visited cell as a waypoint. No simplification, no collapse,
+  no LOS. Waypoint gap = 1 cell for every move in the v1
+  vocabulary (Walk, ClimbUp, Drop, Diagonal in
+  `BasicMoves.from`).
+- `PathingBehavior.steerTowardCurrentWaypoint` is
+  forward=1.0, strafe=0, jump=false. No away-from-waypoint
+  behavior, no obstacle avoidance, no strafe. The body moves
+  in a straight line toward the current waypoint; if MC
+  physics blocks it, the body stays still and the distance
+  to the current waypoint is monotonically non-decreasing.
+
+The plan-progress score therefore has three OR criteria:
 
 1. **`waypointIndex advanced` (mandatory).** Discrete, cheap,
    exact. Plan adopted -> lastIndex remembered -> thisIndex
@@ -163,43 +160,69 @@ and one conditional:
    signal when no active plan exists (between plan request and
    adoption, or after a plan is exhausted). Cannot be deleted
    even if the other two are stronger.
-3. **`arclengthProgress3D` (mandatory; replaces the broken
-   `currentWaypointDistance3D`).** Project the body's pose
-   onto the remaining path polyline; track the LATCHED MINIMUM
-   of "pose-to-polyline distance" — every step that decreases
-   the minimum advances progress, regardless of detour shape.
-   Sampling-density-independent: any legal path strictly
-   advances the latched minimum for almost every step (the
-   pose must be ON the polyline to have zero distance, and
-   moving along the path drives the projection forward).
+3. **`currentWaypointDistance3D` (mandatory under Path A).**
+   The Euclidean distance from the body's pose to the current
+   waypoint's centre, latched-min tracked. On a per-cell
+   plan with move-at-waypoint steering, this is monotonically
+   non-increasing along any legal move: the new waypoint
+   (after the bot reaches the current one) is closer than the
+   current waypoint is to the bot, by construction of A* with
+   an admissible heuristic.
+
+**Caveat: when this ruling breaks.** Criterion 3 holds iff
+waypoint gap <= 1 cell AND steering is move-at-waypoint. Both
+are pinned today by:
+
+- `BasicMoves` vocabulary inspection (per-cell gap);
+- `steerTowardCurrentWaypoint` code inspection (forward-only).
+
+If BasicMoves adds a long-range move (jumping, elytra boost,
+ender-pearl teleport) that produces a waypoint gap > 1 cell,
+or if A* introduces path simplification (string-pull, LOS
+collapse) that drops intermediate waypoints, criterion 3
+must be upgraded to **arclength progress** (Path B): project
+the pose onto the remaining path polyline, latched-min the
+projection distance. The Path A failure mode under those
+conditions is the detour bug: the body moves AWAY from the
+sparse waypoint (criterion 3 INCREASES), index doesn't
+advance between samples (criterion 1 false), goal distance
+grows around walls (criterion 2 false) — all three false on
+a legal path, fuse accumulates, spurious STUCK. **Any change
+to `BasicMoves.from` or `AStarPathFinder.reconstruct` is a
+hard re-test of PR-2's limbo and detour coverage.**
 
 `STUCK_EPSILON` semantic changes from "per-tick motion in
 metres" to **"new-min margin"** — a candidate new minimum must
 beat the latched minimum by at least `STUCK_EPSILON` (in
-metres, since arclength is in metres) to count as progress.
-Without this,原地振荡 micro-noise would刷出 0.001 m new minima
-and the fuse would never trip on a瀑布 column. The waterfall
+metres) to count as progress. Without this, 原地振荡
+micro-noise would刷出 0.001 m new minima and the fuse would
+never trip on a waterfall column. The waterfall
 characterization test in PR-1 exposes this immediately if the
 margin is left at zero.
 
-**Path A vs Path B (deferred to step 2 of the PR plan).**
-The choice between "criterion 3 = arclength progress with
-polyline projection" (Path B, always correct) and "criterion
-3 = 3D distance to current waypoint + caveat on sample density"
-(Path A, only correct if `PlanWorker` emits per-cell) is
-resolved by reading `PlanWorker`. The decision does not
-affect this ruling's text; both paths share the new-min
-margin and the subsumption argument.
+**Invariants on the plan-progress fuse (preserved from the
+motion-fuse rules — settled fact 2 in §2 documents compliance
+for the current code, PR-2 must keep it for the new fuse):**
 
-**Subsumption argument** (required in the PR description so
-reviewers do not re-litigate). Motion detection is implied by
-plan-progress in the legal "moving" case: any motion that
-moves the pose along the polyline projection either advances
-the index, decreases goal distance, or decreases arclength
-progress. The motion detector is strictly weaker for the
-"moving but not progressing" case (limbo body in free fall).
-Therefore `lastProgressPose` and the 3D motion check are safe
-to delete; the PR must confirm no other readers before
+1. External replan triggers (exhaustion, offPath, freshness
+   drop) MUST NOT clear the fuse accumulation. They reset
+   `ticksSincePlan` and trigger a new search, but the
+   progress accumulator survives. Otherwise a body that
+   re-routes every cooldown would never trip the fuse.
+2. Only real plan-progress (one of the three OR criteria) or
+   the fuse itself firing (status == STUCK) resets the
+   accumulator. No other event resets it.
+
+**Subsumption argument** (required in the PR description).
+Motion detection is implied by plan-progress in the legal
+"moving" case: any motion that crosses a cell boundary
+either advances the index (criterion 1) or shrinks the
+distance to the current waypoint (criterion 3). The motion
+detector is strictly weaker for the "moving but not
+progressing" case (limbo body in free fall — large 3D
+displacement, zero waypoint-progress). Therefore
+`lastProgressPose` and the 3D motion check are safe to
+delete; the PR must confirm no other readers before
 removing the field.
 
 ### Ruling (b) — fuse and gate are complementary, not redundant; order is 4 then 6
@@ -262,6 +285,30 @@ vertical drift.
 The limbo acceptance assertion is **form 1: `STUCK` event
 fires within K ticks of the last plan-progress tick**, with
 the following rationale and test-design constraints.
+
+**STUCK channel mapping (two paths, same trigger).** The
+current code reports the fuse verdict on two channels:
+
+- `ExecutionReport.stuck("frozen between replan cooldowns")`
+  (status `STUCK`, line 253 of `PathingBehavior.java`):
+  waypoints is non-empty and the fuse fired while a
+  fresh-plan grace was still in cooldown. The mission is
+  still running; the body just isn't making progress.
+- `ExecutionReport.failed("STUCK")` (status `FAILED`, reason
+  `"STUCK"`, line 243 of `PathingBehavior.java`): waypoints
+  is empty (plan exhausted) and the fuse fired. The mission
+  cannot proceed; this is the terminal STUCK-after-NO_PATH
+  outcome.
+
+These are NOT redundant: the first is the "stuck but still
+running" verdict, the second is the "stuck and no way to
+recover" verdict. The limbo characterization test pins
+status `STUCK` (form 1 covers the first path); the
+post-fix-4 assertion must also accept status `FAILED` with
+reason `"STUCK"` (form 1 covers both paths). PR-2's flip
+assertion therefore tests
+`r.status() == STUCK || (r.status() == FAILED && "STUCK".equals(r.reason()))`,
+not status alone.
 
 **Why form 1, not form 2 or form 3.** The hard test is
 regression-test validity: a useful assertion must fail when
