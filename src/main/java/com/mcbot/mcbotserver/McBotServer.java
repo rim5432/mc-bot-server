@@ -66,6 +66,8 @@ public class McBotServer {
     private BotController activeController;
     private BindingWorldView activeView;
     private GotoCommandHandler activeGotoHandler;
+    private final com.mcbot.mcbotserver.adapter.ReflexRuleReloader
+        ruleReloader = new com.mcbot.mcbotserver.adapter.ReflexRuleReloader();
 
     public McBotServer() {
         IEventBus modBus =
@@ -78,6 +80,14 @@ public class McBotServer {
         modBus.addListener(this::onAttributes);
         MinecraftForge.EVENT_BUS.register(this);
         LOGGER.info("McBotServer initializing — device layer for MC 1.20.1");
+    }
+
+    /** Datapack reloads rewrite the reflex rule table in place. */
+    @SubscribeEvent
+    public void onAddReloadListeners(
+            net.minecraftforge.event.AddReloadListenerEvent event) {
+        ruleReloader.bind(null);
+        event.addListener(ruleReloader);
     }
 
     /** Attribute wiring so the body can actually move and survive. */
@@ -147,6 +157,8 @@ public class McBotServer {
                     new LevelThreatSensor(view,
                         () -> poseOf(body)));
                 reflex.addRule(new FreezeOnLowHealthRule());
+                // Future /reload swaps follow the datapack table.
+                ruleReloader.bind(reflex);
 
                 Behavior mover = new PathingBehavior("mover",
                     () -> finePoseOf(body),

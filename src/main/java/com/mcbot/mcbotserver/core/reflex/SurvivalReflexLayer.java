@@ -60,6 +60,22 @@ public final class SurvivalReflexLayer {
     }
 
     /**
+     * Swap the whole rule table at once - the datapack reload path.
+     * The seam's promise made literal: running processes never see the
+     * rewrite; the next tick simply evaluates the new table.
+     *
+     * @param replacement rules to install from now on; never null;
+     *                    may be empty (layer then never fires)
+     */
+    public void replaceRules(List<ReflexRule> replacement) {
+        Objects.requireNonNull(replacement, "replacement");
+        // Copy: the caller's list stays mutable and none of our
+        // business; a single reference swap keeps tick reads atomic.
+        this.rules.clear();
+        this.rules.addAll(replacement);
+    }
+
+    /**
      * The shared blackboard, exposed for tests and diagnostics only.
      * Production code should treat it as layer-internal.
      *

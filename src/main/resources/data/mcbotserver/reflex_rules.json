@@ -1,0 +1,9 @@
+{
+  "rules": [
+    {
+      "type": "FREEZE_ON_LOW_HEALTH",
+      "threshold": 10.0,
+      "priority": 100
+    }
+  ]
+}

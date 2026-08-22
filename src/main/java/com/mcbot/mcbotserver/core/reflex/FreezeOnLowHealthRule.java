@@ -18,16 +18,62 @@ import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
 // contract: see boundaries.md decision 16 (minimal Phase-0 reflex)
 public final class FreezeOnLowHealthRule implements ReflexRule {
 
-    /** Health at or below which the rule fires. */
+    /** Health at or below which the rule fires (default table). */
     public static final float FREEZE_THRESHOLD = 10f;
 
     /** Flat firing priority; outside all task bands by convention. */
     public static final int FREEZE_PRIORITY = 100;
 
+    private final float threshold;
+    private final int priority;
+
+    /** Creates the rule with the default table's threshold/priority. */
+    public FreezeOnLowHealthRule() {
+        this(FREEZE_THRESHOLD, FREEZE_PRIORITY);
+    }
+
+    /**
+     * Creates a configured rule - the data-driven shape the rule-table
+     * JSON loader produces.
+     *
+     * @param threshold health at or below which the rule fires;
+     *                  in (0, 20]
+     * @param priority  flat firing priority; positive
+     */
+    public FreezeOnLowHealthRule(float threshold, int priority) {
+        if (threshold <= 0f || threshold > 20f) {
+            throw new IllegalArgumentException(
+                "threshold must be in (0, 20]");
+        }
+        if (priority <= 0) {
+            throw new IllegalArgumentException(
+                "priority must be positive");
+        }
+        this.threshold = threshold;
+        this.priority = priority;
+    }
+
     @Override
     public int computePriority(ThreatBlackboard board) {
-        return board.botHealth <= FREEZE_THRESHOLD
-            ? FREEZE_PRIORITY : -1;
+        return board.botHealth <= threshold ? priority : -1;
+    }
+
+    /**
+     * The configured firing threshold.
+     *
+     * @return health value this rule fires at or below
+     */
+    public float threshold() {
+        return threshold;
+    }
+
+    /**
+     * The configured flat priority.
+     *
+     * @return priority reported when the rule fires
+     */
+    public int priority() {
+        return priority;
     }
 
     @Override
