@@ -30,6 +30,12 @@ public final class TaskArbiter {
     private BotProcess current;
     private BotProcess paused;
     private InterruptionContext pauseContext;
+    /**
+     * Directive from the most recent {@link #tick}; consumed by the
+     * pipeline's behavior stage only. tryResume NEVER reads it - resume
+     * re-runs the mission's own onTick, which produces a fresh
+     * directive - so nulling it on park/retire loses nothing.
+     */
     private Directive lastDirective;
 
     /**
@@ -88,37 +94,63 @@ public final class TaskArbiter {
             current = selectWinner();
         }
         lastDirective = current != null ? current.onTick(world) : null;
+        if (current != null && !current.isActive()) {
+            // Deaths decided inside onTick (timeout, scan verdicts)
+            // retire immediately: post-tick() the current slot holds a
+            // live mission or nothing, and the transition emitter sees
+            // previous != now on THIS tick.
+            retireCurrent();
+        }
+    }
+
+    /**
+     * Outcome of {@link #forcePauseAll}: explicit so the caller never
+     * infers state from side effects.
+     */
+    public enum ParkResult {
+
+        /** A live mission was parked; TASK_PAUSED is owed. */
+        PARKED,
+
+        /**
+         * The seated mission was ALREADY terminal (retirement-lap
+         * corpse): retired, not parked - the transition emitter owes
+         * its verdict this very tick.
+         */
+        RETIRED_TERMINAL,
+
+        /** Nothing held the body. */
+        NO_CURRENT,
     }
 
     /**
      * Reflex-layer entry point: park whoever currently holds the body,
      * keeping their plan intact for resume.
      *
-     * <p>Preemption-vs-completion race semantics (the retirement lap):
-     * a mission that went terminal LAST tick still sits in
-     * {@code current} until this tick's stage 2 retires it. Freezing
-     * in that window must NOT park the corpse - parking would swallow
-     * its completion event behind a TASK_PAUSED and a silent cleanup.
-     * Terminal missions are retired instead, so the pipeline's
-     * transition detector can emit their verdict on this very tick;
-     * only live missions park (and return true).
+     * <p>Preemption-vs-completion semantics: a terminal mission is
+     * RETIRED, never parked - parking would swallow its verdict behind
+     * a lying TASK_PAUSED and a silent cleanup. Only live missions
+     * park. Window contract: after {@link #tick} returns, current is
+     * live or null EXCEPT when death came from stage-3 reports in that
+     * same tick; such a corpse survives until the next tick's head
+     * sweep BY DESIGN, and every reader between ticks must treat a
+     * non-active current as already-decided ({@link #forcePauseAll}
+     * does exactly that).
      *
      * @param context snapshot of the preemption moment; never null
-     * @return true when a LIVE running mission was actually parked
+     * @return the outcome; never null
      */
-    public boolean forcePauseAll(InterruptionContext context) {
+    public ParkResult forcePauseAll(InterruptionContext context) {
         if (context == null) {
             throw new IllegalArgumentException("context must not be null");
         }
         if (current == null) {
-            return false;
+            return ParkResult.NO_CURRENT;
         }
         if (!current.isActive()) {
-            // Already decided - retire, never park. The controller's
-            // transition emitter owns announcing the verdict.
             retireCurrent();
             lastDirective = null;
-            return false;
+            return ParkResult.RETIRED_TERMINAL;
         }
         current.onLostControl(context);
         pending.remove(current);
@@ -126,7 +158,7 @@ public final class TaskArbiter {
         pauseContext = context;
         current = null;
         lastDirective = null;
-        return true;
+        return ParkResult.PARKED;
     }
 
     /**

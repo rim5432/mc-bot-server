@@ -255,24 +255,31 @@ public final class BotController {
                 pose, activeName(), "reflex-preempt:" + decision.ruleName(),
                 "");
             String pausedTask = activeName();
-            boolean parked = arbiter.forcePauseAll(ctx);
-            if (parked) {
-                emitMissionEvent(EventKind.TASK_PAUSED, day, tod,
-                    pausedTask, "paused by reflex "
-                        + decision.ruleName());
-                // The body has no current mission while parked; the
-                // transition detector must not fire on stale state.
-                previousCurrent = null;
+            var result = arbiter.forcePauseAll(ctx);
+            boolean announceVerdict = false;
+            switch (result) {
+                case PARKED -> {
+                    emitMissionEvent(EventKind.TASK_PAUSED, day, tod,
+                        pausedTask, "paused by reflex "
+                            + decision.ruleName());
+                    // No current while parked: the transition detector
+                    // must not fire on stale state.
+                    previousCurrent = null;
+                }
+                case RETIRED_TERMINAL -> announceVerdict = true;
+                case NO_CURRENT -> {
+                }
             }
             actor.submit(new Claim(Channel.MOVE, decision.priority(),
                 "reflex:" + decision.ruleName(),
                 new Intent.Move(0, 0, false, false)));
             actor.flush();
-            // A mission caught terminal in its retirement lap was
-            // retired, not parked - its verdict must still be
-            // announced even though the reflex owns this tick. With a
-            // live park, previousCurrent is null and this is a no-op.
-            emitMissionTransition(day, tod);
+            if (announceVerdict) {
+                // Retirement-lap corpse: its verdict is announced here,
+                // on the reflex tick, explicitly per the ParkResult
+                // contract - not via any previousCurrent side effect.
+                emitMissionTransition(day, tod);
+            }
             return;
         }
 

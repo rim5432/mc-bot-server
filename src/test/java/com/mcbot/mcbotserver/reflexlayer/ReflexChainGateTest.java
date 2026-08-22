@@ -116,7 +116,7 @@ class ReflexChainGateTest {
         InterruptionContext ctx = new InterruptionContext(tick, POS,
             mission.displayName(), "reflex-preempt:" + decision.ruleName(),
             "");
-        assertTrue(arbiter.forcePauseAll(ctx));
+        assertEquals(TaskArbiter.ParkResult.PARKED, arbiter.forcePauseAll(ctx));
         assertEquals(1, mission.lostCalls);
         assertEquals("reflex-preempt:FREEZE_ON_LOW_HEALTH",
             mission.lostCause);
@@ -168,7 +168,7 @@ class ReflexChainGateTest {
         // Force the preemption path directly (any reflex cause).
         var ctx = new InterruptionContext(2L, POS, mission.displayName(),
             "reflex-preempt:FORCED", "");
-        assertTrue(arbiter.forcePauseAll(ctx));
+        assertEquals(TaskArbiter.ParkResult.PARKED, arbiter.forcePauseAll(ctx));
         assertFalse(arbiter.tryResume(),
             "failed revalidation must drop, not resume");
         assertEquals(1, mission.invalidatedCalls);

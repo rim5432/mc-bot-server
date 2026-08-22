@@ -206,7 +206,17 @@ public final class DefendProcess implements BotProcess, TerminalMission {
     @Override
     public boolean resume(
             com.mcbot.mcbotserver.api.interrupt.InterruptionContext c) {
-        return active;
+        if (!active) {
+            return false;
+        }
+        // Blind-trust guard: resume() has no world access, so instead
+        // of trusting the pre-pause target we spend ALL grace credit
+        // here - the very next onTick scan adjudicates. Target gone =>
+        // immediate TARGET_DOWN success; present => normal leash and
+        // refresh logic. Worst-case stale steering collapses from a
+        // full grace window to exactly one tick.
+        ticksSinceSeen = TARGET_GRACE_TICKS;
+        return true;
     }
 
     @Override

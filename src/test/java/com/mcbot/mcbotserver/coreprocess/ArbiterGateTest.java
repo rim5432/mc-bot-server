@@ -3,6 +3,7 @@ package com.mcbot.mcbotserver.core.process;
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
 import com.mcbot.mcbotserver.api.process.BotProcess;
+import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.WorldView;
@@ -135,7 +136,7 @@ class ArbiterGateTest {
         arbiter.tick(WORLD);
         assertEquals(1, mission.tickCalls);
 
-        assertTrue(arbiter.forcePauseAll(CTX));
+        assertEquals(TaskArbiter.ParkResult.PARKED, arbiter.forcePauseAll(CTX));
         assertEquals(1, mission.lostCalls);
         assertNull(arbiter.lastDirective(),
             "a parked body produces no directive");

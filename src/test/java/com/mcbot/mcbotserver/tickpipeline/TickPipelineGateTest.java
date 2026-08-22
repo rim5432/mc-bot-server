@@ -428,6 +428,47 @@ class TickPipelineGateTest {
                 .get("reason"));
     }
 
+    /**
+     * Mirror of the retirement-lap test for the SUCCESS path: a
+     * mission that completed via its goal predicate must surface
+     * TASK_COMPLETED - not PAUSED - when the freeze lands one tick
+     * later, proving both transition branches share the fix.
+     */
+    @Test
+    void reflexInRetirementLapEmitsCompletedNotPaused() {
+        float[] health = {20f};
+        InMemoryEventQueue events =
+            new InMemoryEventQueue(() -> 1L, () -> 0L);
+        SurvivalReflexLayer layer = new SurvivalReflexLayer(
+            (world, board) -> board.botHealth = health[0]);
+        layer.addRule(new FreezeOnLowHealthRule());
+        TaskArbiter arbiter = new TaskArbiter();
+        com.mcbot.mcbotserver.core.process.GotoProcess mission =
+            new com.mcbot.mcbotserver.core.process.GotoProcess(
+                "gt-lap-ok", new GoalBlock(new CellPos(0, 64, 0)),
+                50, 400);
+        arbiter.register(mission);
+        arbiter.requestControl(mission);
+        RecordingActor actor = new RecordingActor();
+        PathingBehavior mover = new PathingBehavior("mover", () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5), BasicMoves::from);
+        BotController controller = controller(health, layer, arbiter,
+            mover, actor, events);
+
+        // Tick 1: goal predicate passes immediately -> terminal.
+        controller.onTick(flooredWorld());
+        assertFalse(mission.isActive());
+
+        // Tick 2: freeze lands inside the retirement lap.
+        health[0] = 3f;
+        controller.onTick(flooredWorld());
+
+        List<String> kinds = kindsOf(events);
+        assertFalse(kinds.contains(EventKind.TASK_PAUSED),
+            "a decided mission must not be announced as paused");
+        assertEquals(EventKind.TASK_COMPLETED, kinds.get(0),
+            "the success verdict survives the freeze");
+    }
+
     private static List<String> kindsOf(InMemoryEventQueue events) {
         return events.statusSnapshot(0).events().stream()
             .map(BotEvent::kind)

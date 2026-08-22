@@ -125,6 +125,35 @@ class CombatSkeletonGateTest {
     }
 
     /**
+     * Resume after a freeze must NOT blindly trust the pre-pause
+     * target: grace credit is spent at resume, so the very next scan
+     * adjudicates - a vanished target ends the fight immediately
+     * instead of chasing a ghost until timeout.
+     */
+    @Test
+    void resumeSpendsGraceCreditForImmediateAdjudication() {
+        MockWorldView world = new MockWorldView();
+        world.addEntity(zombie("z1", new CellPos(2, 64, 0)));
+        DefendProcess defend = new DefendProcess("gt-def", 60, 400,
+            () -> new CellPos(0, 64, 0), HOSTILES);
+        defend.onTick(world);
+        assertTrue(defend.isActive());
+
+        // Frozen mid-fight; the target dies while we are parked.
+        defend.onLostControl(null);
+        world.removeEntity("z1");
+
+        assertTrue(defend.resume(null),
+            "an engaged mission mechanically reattaches");
+        defend.onTick(world);
+
+        assertFalse(defend.isActive(),
+            "the first post-resume scan must decide");
+        assertTrue(defend.missionSucceeded(),
+            "a target absent at reattach is TARGET_DOWN, not a chase");
+    }
+
+    /**
      * Reports never decide the fight: neither a locomotion FAILED nor
      * a chase SUCCESS may flip terminal state - scans, leash, and
      * timeout own the verdict.
