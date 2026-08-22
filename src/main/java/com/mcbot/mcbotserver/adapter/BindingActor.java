@@ -104,6 +104,31 @@ public final class BindingActor implements Actor {
     private static final double REACH = 3.5;
 
     /**
+     * Whether terrain blocks the swing line. A melee reach number
+     * alone lies around corners: distance and cone can be satisfied
+     * while a wall eats the line; the clip asks the real voxel grid.
+     *
+     * @param eye          the swing origin; never null
+     * @param targetCenter candidate mid-height position; never null
+     * @return true when solid terrain blocks the line before the
+     *         target (grazes at the hitbox face stay clear)
+     */
+    private boolean sightBlocked(net.minecraft.world.phys.Vec3 eye,
+                                 net.minecraft.world.phys.Vec3
+                                     targetCenter) {
+        var clip = body.level().clip(new net.minecraft.world.level
+            .ClipContext(eye, targetCenter,
+                net.minecraft.world.level.ClipContext.Block.COLLIDER,
+                net.minecraft.world.level.ClipContext.Fluid.NONE,
+                body));
+        if (clip.getType() == net.minecraft.world.phys.HitResult.Type.MISS) {
+            return false;
+        }
+        return eye.distanceTo(clip.getLocation())
+            < eye.distanceTo(targetCenter) - 0.35;
+    }
+
+    /**
      * Resolve one USE press as "act with main hand": always swing;
      * additionally hurt the nearest living hostile inside the reach
      * box and the aim cone (numen-notes fidelity note: native
@@ -130,14 +155,18 @@ public final class BindingActor implements Actor {
                     .contains(key.toString())) {
                 continue;
             }
-            var toTarget = e.position().add(0, e.getBbHeight() / 2, 0)
-                .subtract(eye);
+            var targetCenter = e.position()
+                .add(0, e.getBbHeight() / 2, 0);
+            var toTarget = targetCenter.subtract(eye);
             double dist = toTarget.length();
             if (dist > REACH) {
                 continue;
             }
             if (view.dot(toTarget.normalize())
                 < Math.cos(Math.toRadians(AIM_CONE_DEG))) {
+                continue;
+            }
+            if (sightBlocked(eye, targetCenter)) {
                 continue;
             }
             if (dist < bestDist) {

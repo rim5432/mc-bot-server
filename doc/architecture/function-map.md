@@ -55,7 +55,16 @@ depth pending - [GAP] vocabulary absent, reopen-triggered -
 ### Combat (boundary B planner/executor split)
 - [SHIPPED skeleton] DefendProcess engages nearest hostile at
   standoff range; CombatBehavior aims and paces swings; USE channel
-  resolves reach+cone melee
+  resolves reach+cone melee with a line-of-sight clip (no hitting
+  through terrain)
+- KNOWN DEGRADATIONS in complex terrain, accepted for v1:
+  (a) across open gaps the cone+reach resolver still connects at up
+  to REACH - long but honest, since LOS is clear; (b) vertical
+  offsets are handled by the 3D chebyshev standoff and aim pitch,
+  but partial-cover stalls burn to TIMEOUT rather than repositioning
+  (micro-repositioning is implementation freedom inside boundary B,
+  deferred with the other micro-algorithms); (c) kiting ranged mobs
+  defeat melee by design until the ranged GAP closes
 - [GAP] Loadout selection, ranged, multi-target, retreat-choreography
   - micro-algorithms are implementation freedom INSIDE boundary B;
   none may add a fifth Actor channel (decision 14 frozen)
