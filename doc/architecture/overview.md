@@ -1,6 +1,6 @@
 ---
 title: Architecture Overview
-last_verified: 2026-08-22
+last_verified: 2026-08-23
 covers:
   - src/main/java/com/mcbot/mcbotserver/McBotServer.java
   - src/main/templates/META-INF/mods.toml
@@ -66,16 +66,20 @@ fire, server rules) follow the same reflex pattern as separate guardians
 
 ## Current status
 
-Stage 2 complete (2026-08-22): all four tiers run offline behind the
-layer-1 gates AND in-engine via a four-scenario gametest suite -
-walks-to-block, shove-recovery, clean failure on unreachable goals,
-and a full combat engagement (defend planner -> standoff chase ->
-cone-resolved melee -> kill -> TASK_COMPLETED). A* pathfinding runs
-off-thread on immutable snapshots; the reflex rule table is
-datapack-driven. The capability envelope and its convergence
-criteria live in the [Functional Convergence Map](function-map.md);
-the remaining harness-side work is the transport choice for
-boundary D (MCP vs HTTP) plus the deferred rows in that map.
+Stage 2 complete (2026-08-22, hardened 2026-08-23): all four tiers
+run offline behind the layer-1 gates AND in-engine via a five-scenario
+gametest suite - walks-to-block, shove-recovery, clean failure on
+unreachable goals, a full combat engagement (defend planner ->
+standoff chase -> cone-resolved melee with line-of-sight and
+vanilla-aligned reach -> kill -> TASK_COMPLETED), and ranged-refusal
+(ENGAGEMENT_REFUSED with attrs.threatType instead of chasing
+unwinnable fights). A* pathfinding runs off-thread on immutable
+snapshots; the reflex rule table is datapack-driven; the event stream
+carries structured failure reasons plus periodic keepalive snapshots.
+The capability envelope and its convergence criteria live in the
+[Functional Convergence Map](function-map.md); the remaining harness-
+side work is the transport choice for boundary D (MCP vs HTTP) plus
+the deferred rows in that map.
 
 Related: [Boundary Contracts & Ledger](boundaries.md),
 [Work Plan](../guide/workplan.md),
