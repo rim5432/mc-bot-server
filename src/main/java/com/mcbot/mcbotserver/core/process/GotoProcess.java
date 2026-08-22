@@ -165,6 +165,11 @@ public final class GotoProcess implements BotProcess, TerminalMission {
     }
 
     @Override
+    public String missionTaskId() {
+        return taskId;
+    }
+
+    @Override
     public String failureReasonOrNull() {
         return failure;
     }

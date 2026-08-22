@@ -323,6 +323,46 @@ class TickPipelineGateTest {
             "a dropped task is decision-critical: it will never finish");
     }
 
+    /**
+     * Structured failure: the reason travels in event attrs (task,
+     * reason), never as text a harness must parse.
+     */
+    @Test
+    void failedMissionSurfacesReasonInEventAttrs() {
+        float[] health = {20f};
+        InMemoryEventQueue events =
+            new InMemoryEventQueue(() -> 1L, () -> 0L);
+        SurvivalReflexLayer layer = new SurvivalReflexLayer(
+            (world, board) -> board.botHealth = health[0]);
+        layer.addRule(new FreezeOnLowHealthRule());
+        TaskArbiter arbiter = new TaskArbiter();
+        com.mcbot.mcbotserver.core.process.GotoProcess mission =
+            new com.mcbot.mcbotserver.core.process.GotoProcess(
+                "gt-attrs",
+                new GoalBlock(new CellPos(5, 80, 5)), 50, 400);
+        arbiter.register(mission);
+        arbiter.requestControl(mission);
+        RecordingActor actor = new RecordingActor();
+        PathingBehavior mover = new PathingBehavior("mover", () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5), BasicMoves::from);
+        BotController controller = controller(health, layer, arbiter,
+            mover, actor, events);
+
+        for (int i = 0; i < 6; i++) {
+            controller.onTick(flooredWorld());
+        }
+
+        assertFalse(mission.isActive(), "unreachable goal must fail");
+        assertEquals("NO_PATH", mission.failureReasonOrNull());
+        BotEvent failed = events.statusSnapshot(0).events().stream()
+            .filter(e -> EventKind.TASK_FAILED.equals(e.kind()))
+            .findFirst().orElseThrow(
+                () -> new AssertionError("TASK_MISSING"));
+        assertEquals("gt-attrs", failed.attrs().get("task"),
+            "task identity must be structured");
+        assertEquals("NO_PATH", failed.attrs().get("reason"),
+            "reason must be structured, not embedded in text");
+    }
+
     private static List<String> kindsOf(InMemoryEventQueue events) {
         return events.statusSnapshot(0).events().stream()
             .map(BotEvent::kind)

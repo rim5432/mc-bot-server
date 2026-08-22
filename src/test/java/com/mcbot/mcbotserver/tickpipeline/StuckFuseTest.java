@@ -137,9 +137,6 @@ class StuckFuseTest {
         int stuckReports = 0;
         for (int i = 1; i <= 45; i++) {
             ExecutionReport r = mover.tick(world, directive, actor);
-            System.out.println("[dbg] t=" + i + " st=" + r.status()
-                + " reason=" + r.reason()
-                + " pos=" + pose[0]);
             if (r.status() == ExecutionReport.Status.FAILED
                 && "STUCK".equals(r.reason())) {
                 stuckReports++;

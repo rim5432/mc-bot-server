@@ -26,4 +26,12 @@ public interface TerminalMission {
      *         terminal
      */
     String failureReasonOrNull();
+
+    /**
+     * Boundary-D task identity for structured event attrs - the same
+     * id the harness received from submit, not the display name.
+     *
+     * @return task id; never null or blank
+     */
+    String missionTaskId();
 }

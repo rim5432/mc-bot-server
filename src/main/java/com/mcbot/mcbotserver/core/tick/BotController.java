@@ -293,26 +293,43 @@ public final class BotController {
         }
         if (mission.missionSucceeded()) {
             emitMissionEvent(EventKind.TASK_COMPLETED, day, tod,
-                previous.displayName(), "goal reached");
+                mission.missionTaskId(), "goal reached");
         } else if (previous.isActive()) {
             // Swapped out while still active (preemption path already
             // reported); nothing terminal to announce.
             return;
         } else {
             String reason = mission.failureReasonOrNull();
+            String shown = reason != null ? reason : "unknown";
+            var extra = reason == null
+                ? Map.<String, String>of()
+                : Map.of("reason", reason);
             emitMissionEvent(EventKind.TASK_FAILED, day, tod,
-                previous.displayName(),
-                "failed: " + (reason != null ? reason : "unknown"));
+                mission.missionTaskId(), "failed: " + shown, extra);
         }
     }
 
     private void emitMissionEvent(String kind, long day, long tod,
                                   String taskName, String detail) {
+        emitMissionEvent(kind, day, tod, taskName, detail, Map.of());
+    }
+
+    /**
+     * Push one mission lifecycle event. Structured fields land in
+     * attrs (task, reason); text stays human-readable summary only -
+     * harnesses must never parse it.
+     */
+    private void emitMissionEvent(String kind, long day, long tod,
+                                  String taskName, String detail,
+                                  Map<String, String> extraAttrs) {
         boolean urgent = EventKind.TASK_PAUSED.equals(kind)
             || EventKind.TASK_DROPPED.equals(kind);
         try {
+            var attrs = new java.util.LinkedHashMap<String, String>();
+            attrs.put("task", taskName);
+            attrs.putAll(extraAttrs);
             events.push(new BotEvent(kind, day, tod, urgent,
-                Map.of("task", taskName), taskName + ": " + detail));
+                Map.copyOf(attrs), taskName + ": " + detail));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down with it.
         }
