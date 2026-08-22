@@ -100,8 +100,27 @@ public final class BindingActor implements Actor {
     /** Damage per landed skeleton swing; zombie-scale for now. */
     public static final float MELEE_DAMAGE = 3f;
 
-    /** Swing reach beyond the behavior-side ATTACK_REACH guard. */
-    private static final double REACH = 3.5;
+    /**
+     * Swing reach measured EYE TO TARGET BOUNDING-BOX SURFACE,
+     * aligned with vanilla's player metric (~3.0) so the bot holds no
+     * hidden long-arm advantage. The old center-to-center 3.5 read
+     * ~0.4 blocks farther than vanilla on horizontal targets.
+     */
+    public static final double MELEE_REACH_SURFACE = 3.0;
+
+    /**
+     * Loose prefilter for the candidate net: bounding-box inflation
+     * before the exact surface-distance gate. Generous on purpose -
+     * the gate below is the authority.
+     */
+    private static final double CANDIDATE_NET = MELEE_REACH_SURFACE
+        + 1.5;
+
+    /**
+     * Slack for the line-of-sight clip: a hit point this close to the
+     * target counts as grazing the hitbox face, not as occlusion.
+     */
+    public static final double MELEE_CLIP_SLACK = 0.35;
 
     /**
      * Whether terrain blocks the swing line. A melee reach number
@@ -125,7 +144,33 @@ public final class BindingActor implements Actor {
             return false;
         }
         return eye.distanceTo(clip.getLocation())
-            < eye.distanceTo(targetCenter) - 0.35;
+            < eye.distanceTo(targetCenter) - MELEE_CLIP_SLACK;
+    }
+
+    /**
+     * Whether the swing line passes through lava. Water stays
+     * transparent by v1 semantics; lava is opaque because melee
+     * across it is impossible and pretending otherwise turns the bot
+     * into a sandbag swinging at the far shore.
+     *
+     * @param eye          the swing origin; never null
+     * @param targetCenter candidate mid-height position; never null
+     * @return true when any sampled point along the line sits in lava
+     */
+    private boolean lavaBetween(net.minecraft.world.phys.Vec3 eye,
+                                net.minecraft.world.phys.Vec3
+                                    targetCenter) {
+        var delta = targetCenter.subtract(eye);
+        int steps = (int) Math.ceil(delta.length() / 0.5);
+        for (int i = 1; i < steps; i++) {
+            var at = eye.add(delta.scale((double) i / steps));
+            if (body.level().getBlockState(
+                    net.minecraft.core.BlockPos.containing(at))
+                    .is(net.minecraft.world.level.block.Blocks.LAVA)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -142,7 +187,7 @@ public final class BindingActor implements Actor {
         body.swing(InteractionHand.MAIN_HAND);
         var view = body.getViewVector(1.0F).normalize();
         var eye = body.getEyePosition();
-        var box = body.getBoundingBox().inflate(REACH);
+        var box = body.getBoundingBox().inflate(CANDIDATE_NET);
         net.minecraft.world.entity.LivingEntity best = null;
         double bestDist = Double.MAX_VALUE;
         for (net.minecraft.world.entity.LivingEntity e : body.level()
@@ -155,22 +200,26 @@ public final class BindingActor implements Actor {
                     .contains(key.toString())) {
                 continue;
             }
-            var targetCenter = e.position()
+            // Vanilla-aligned reach: squared distance from the eye to
+            // the CLOSEST SURFACE of the target's bounding box - never
+            // center-to-center, which read ~0.4 blocks longer than a
+            // player could legitimately swing.
+            double surfDistSq = e.getBoundingBox().distanceToSqr(eye);
+            if (surfDistSq > MELEE_REACH_SURFACE * MELEE_REACH_SURFACE) {
+                continue;
+            }            var targetCenter = e.position()
                 .add(0, e.getBbHeight() / 2, 0);
             var toTarget = targetCenter.subtract(eye);
-            double dist = toTarget.length();
-            if (dist > REACH) {
-                continue;
-            }
             if (view.dot(toTarget.normalize())
                 < Math.cos(Math.toRadians(AIM_CONE_DEG))) {
                 continue;
             }
-            if (sightBlocked(eye, targetCenter)) {
+            if (sightBlocked(eye, targetCenter)
+                || lavaBetween(eye, targetCenter)) {
                 continue;
             }
-            if (dist < bestDist) {
-                bestDist = dist;
+            if (surfDistSq < bestDist) {
+                bestDist = surfDistSq;
                 best = e;
             }
         }

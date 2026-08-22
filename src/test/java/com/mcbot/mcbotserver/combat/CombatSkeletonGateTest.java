@@ -154,6 +154,57 @@ class CombatSkeletonGateTest {
     }
 
     /**
+     * Edge jitter must not starve the swing cadence: with the target
+     * oscillating just past the reach gate, the hold window bridges
+     * out-of-range ticks so cooldown expiries still fire; a target
+     * PERMANENTLY past the gate earns nothing.
+     */
+    @Test
+    void edgeJitterBridgedByHoldButPermanentEscapeIsNot() {
+        Vec3[] pose = {new Vec3(0.5, 64, 0.5)};
+        CombatBehavior combat = new CombatBehavior("combat",
+            () -> pose[0]);
+        RecordingActor actor = new RecordingActor();
+        Directive directive = fightOrder(new CellPos(2, 64, 0));
+
+        // Aim point sits at x=2.5, y=65: matching pose.y makes reach
+        // purely horizontal, so pose.x tunes it exactly.
+        // in-reach: x = 2.5 - 2.9 = -0.4; out: x = 2.5 - 3.15 = -0.65
+        Vec3 inReach = new Vec3(-0.4, 64.0 + 1.0, 0.5);
+        Vec3 outReach = new Vec3(-0.65, 64.0 + 1.0, 0.5);
+
+        int swings = 0;
+        for (int t = 0; t < 40; t++) {
+            pose[0] = (t % 10 < 2) ? inReach : outReach;
+            int before = actor.submitted.size();
+            combat.tick(emptyWorld(), directive, actor);
+            boolean pressed = actor.submitted.subList(before,
+                actor.submitted.size()).stream()
+                .anyMatch(c -> c.channel() == Channel.USE
+                    && ((com.mcbot.mcbotserver.api.actor.Intent.Use)
+                        c.intent()).pressing());
+            if (pressed) {
+                swings++;
+            }
+        }
+        assertTrue(swings >= 3,
+            "hold window must bridge edge jitter: got " + swings);
+
+        // Control: permanently outside earns nothing, hold expires.
+        RecordingActor farActor = new RecordingActor();
+        CombatBehavior idle = new CombatBehavior("combat",
+            () -> new Vec3(-0.65, 65.0, 0.5));
+        for (int t = 0; t < 40; t++) {
+            idle.tick(emptyWorld(), directive, farActor);
+        }
+        assertTrue(farActor.submitted.stream().noneMatch(
+                c -> c.channel() == Channel.USE
+                    && ((com.mcbot.mcbotserver.api.actor.Intent.Use)
+                        c.intent()).pressing()),
+            "a permanently escaped target gets no swings");
+    }
+
+    /**
      * Mirror case: the target is STILL THERE at reattach. The spent
      * grace credit must be refilled by the scan (seen -> counter
      * reset) - the fight continues normally instead of the first tick
