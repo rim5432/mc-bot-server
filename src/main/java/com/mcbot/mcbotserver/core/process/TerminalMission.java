@@ -34,4 +34,15 @@ public interface TerminalMission {
      * @return task id; never null or blank
      */
     String missionTaskId();
+
+    /**
+     * Structured verdict attributes beyond task and reason - e.g. a
+     * refused engagement's threat type. Merged into event attrs by
+     * the pipeline; empty by default.
+     *
+     * @return extra attrs for the terminal event; never null
+     */
+    default java.util.Map<String, String> verdictAttrs() {
+        return java.util.Map.of();
+    }
 }

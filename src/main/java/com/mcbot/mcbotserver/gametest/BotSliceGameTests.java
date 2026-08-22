@@ -263,7 +263,9 @@ public final class BotSliceGameTests {
         DefendProcess mission = new DefendProcess(taskId, 60,
             MISSION_BUDGET, () -> poseOf(rig.body()),
             com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor
-                .hostileTypes());
+                .hostileTypes(),
+            com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor
+                .rangedTypes());
         rig.arbiter().register(mission);
         rig.arbiter().requestControl(mission);
         return mission;
@@ -319,6 +321,56 @@ public final class BotSliceGameTests {
             clockOf(level), events, CrashReporter.consoleFallback());
 
         return new Rig(body, view, events, arbiter, controller);
+    }
+
+    /**
+     * Scenario 5: a ranged hostile is REFUSED, not chased. The planner
+     * sees the structural mismatch (melee-only vs kite-and-shoot) and
+     * fails the mission on the engage tick with a structured reason -
+     * before the body spends a single tick under fire.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = TIMEOUT)
+    public static void refusesRangedItCannotAnswer(GameTestHelper helper) {
+        Rig rig = rig(helper, new BlockPos(3, WALK_Y, 8));
+        var level = helper.getLevel();
+        net.minecraft.world.entity.monster.Skeleton skeleton =
+            net.minecraft.world.entity.EntityType.SKELETON.create(level);
+        check(skeleton != null, "skeleton creation failed");
+        var sAbs = helper.absolutePos(new BlockPos(7, WALK_Y, 8));
+        skeleton.moveTo(sAbs.getX() + 0.5, sAbs.getY(),
+            sAbs.getZ() + 0.5, 0f, 0f);
+        skeleton.setNoAi(true);
+        level.addFreshEntity(skeleton);
+
+        DefendProcess mission = submitDefend(rig);
+
+        helper.startSequence()
+            .thenWaitUntil(driveUntil(rig,
+                () -> check(!mission.isActive(),
+                    "waiting for the refusal")))
+            .thenExecuteFor(3, driveOnly(rig))
+            .thenExecuteAfter(0, () -> {
+                check(!mission.missionSucceeded(),
+                    "a refusal is a failure, not a success");
+                checkEquals(DefendProcess.REASON_REFUSED,
+                    mission.failureReasonOrNull(),
+                    "the refusal reason must be structured");
+                BotEvent failed = rig.events().statusSnapshot(0)
+                    .events().stream()
+                    .filter(e -> EventKind.TASK_FAILED.equals(e.kind()))
+                    .findFirst().orElse(null);
+                check(failed != null, "TASK_FAILED must be in stream");
+                checkEquals("ENGAGEMENT_REFUSED",
+                    failed.attrs().get("reason"),
+                    "refusal reason must be structured");
+                checkEquals("minecraft:skeleton",
+                    failed.attrs().get("threatType"),
+                    "the refused type must reach the harness");
+                checkEquals(20f, rig.body().getHealth(),
+                    "the body must refuse BEFORE taking arrows");
+                rig.body().discard();
+            })
+            .thenSucceed();
     }
 
     /**

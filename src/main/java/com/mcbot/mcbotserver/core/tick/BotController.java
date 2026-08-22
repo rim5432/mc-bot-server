@@ -400,7 +400,8 @@ public final class BotController {
         }
         if (mission.missionSucceeded()) {
             emitMissionEvent(EventKind.TASK_COMPLETED, day, tod,
-                mission.missionTaskId(), "goal reached");
+                mission.missionTaskId(), "goal reached",
+                mission.verdictAttrs());
         } else if (previous.isActive()) {
             // Swapped out while still active (preemption path already
             // reported); nothing terminal to announce.
@@ -408,9 +409,9 @@ public final class BotController {
         } else {
             String reason = mission.failureReasonOrNull();
             String shown = reason != null ? reason : "unknown";
-            var extra = reason == null
-                ? Map.<String, String>of()
-                : Map.of("reason", reason);
+            var extra = new java.util.LinkedHashMap<String, String>(
+                mission.verdictAttrs());
+            extra.put("reason", reason != null ? reason : "unknown");
             emitMissionEvent(EventKind.TASK_FAILED, day, tod,
                 mission.missionTaskId(), "failed: " + shown, extra);
         }

@@ -94,13 +94,12 @@ public final class TaskArbiter {
             current = selectWinner();
         }
         lastDirective = current != null ? current.onTick(world) : null;
-        if (current != null && !current.isActive()) {
-            // Deaths decided inside onTick (timeout, scan verdicts)
-            // retire immediately: post-tick() the current slot holds a
-            // live mission or nothing, and the transition emitter sees
-            // previous != now on THIS tick.
-            retireCurrent();
-        }
+        // Deliberately NO tail sweep here: a mission that died during
+        // its own onTick must survive until the NEXT tick's head
+        // sweep, so the pipeline's transition emitter sees
+        // previous != now and announces the verdict (one-tick latency,
+        // per boundary B). Retiring inside tick() would orphan the
+        // announcement - gametest scenario 5 proved exactly that.
     }
 
     /**

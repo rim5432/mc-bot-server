@@ -50,6 +50,25 @@ public final class LevelThreatSensor implements ThreatSensor {
         return HOSTILE_TYPES;
     }
 
+    private static final java.util.Set<String> RANGED_TYPES =
+        java.util.Set.of(
+            "minecraft:skeleton",
+            "minecraft:stray",
+            "minecraft:pillager",
+            "minecraft:witch");
+
+    /**
+     * Hostile types whose optimal tactics (kite and shoot) structurally
+     * defeat a melee-only bot: engaging them means eating fire without
+     * ever reaching standoff. The combat planner reads this set to
+     * REFUSE such engagements honestly instead of chasing to timeout.
+     *
+     * @return unmodifiable ranged hostile type ids; never null or empty
+     */
+    public static java.util.Set<String> rangedTypes() {
+        return RANGED_TYPES;
+    }
+
     private final com.mcbot.mcbotserver.adapter.BindingWorldView view;
     private final java.util.function.Supplier<CellPos> bodyPos;
 

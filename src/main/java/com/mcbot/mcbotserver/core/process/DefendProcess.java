@@ -72,11 +72,21 @@ public final class DefendProcess implements BotProcess, TerminalMission {
     /** Failure reason: reflex preemption invalidated the context. */
     public static final String REASON_PREEMPTED = "PREEMPTED";
 
+    /**
+     * Failure reason: the nearest hostile's tactics structurally
+     * defeat melee-only engagement (kite-and-shoot) - refusing is the
+     * honest move, chasing to timeout just bleeds. The refused type
+     * travels in event attrs as {@code threatType}.
+     */
+    public static final String REASON_REFUSED = "ENGAGEMENT_REFUSED";
+
     private final String taskId;
     private final int priority;
     private final long timeoutTicks;
     private final Supplier<CellPos> poseSource;
     private final Set<String> hostileTypes;
+    private final Set<String> rangedTypes;
+    private String lastRefusedType;
 
     private boolean active = true;
     private boolean succeeded;
@@ -88,7 +98,7 @@ public final class DefendProcess implements BotProcess, TerminalMission {
     private Directive lastDirective;
 
     /**
-     * Creates a defend mission.
+     * Creates a defend mission that engages every hostile type.
      *
      * @param taskId       boundary-D task id for tracing; never null
      * @param priority     band-legal priority per PriorityBands
@@ -101,6 +111,26 @@ public final class DefendProcess implements BotProcess, TerminalMission {
     public DefendProcess(String taskId, int priority, long timeoutTicks,
                          Supplier<CellPos> poseSource,
                          Set<String> hostileTypes) {
+        this(taskId, priority, timeoutTicks, poseSource, hostileTypes,
+            Set.of());
+    }
+
+    /**
+     * Creates a defend mission with an explicit ranged-refusal set.
+     *
+     * @param taskId       boundary-D task id for tracing; never null
+     * @param priority     band-legal priority per PriorityBands
+     * @param timeoutTicks tick budget; positive
+     * @param poseSource   body cell accessor; never null
+     * @param hostileTypes entity types worth engaging; never null
+     * @param rangedTypes  hostile types whose tactics defeat melee -
+     *                     these are REFUSED at engage time instead of
+     *                     chased; never null
+     */
+    public DefendProcess(String taskId, int priority, long timeoutTicks,
+                         Supplier<CellPos> poseSource,
+                         Set<String> hostileTypes,
+                         Set<String> rangedTypes) {
         if (taskId == null || taskId.isBlank()) {
             throw new IllegalArgumentException("taskId must not be blank");
         }
@@ -115,6 +145,8 @@ public final class DefendProcess implements BotProcess, TerminalMission {
             "poseSource");
         this.hostileTypes = Set.copyOf(Objects.requireNonNull(
             hostileTypes, "hostileTypes"));
+        this.rangedTypes = Set.copyOf(Objects.requireNonNull(
+            rangedTypes, "rangedTypes"));
     }
 
     @Override
@@ -145,6 +177,15 @@ public final class DefendProcess implements BotProcess, TerminalMission {
                 // Nothing to defend against: the mission's purpose is
                 // already fulfilled.
                 succeed();
+                return lastDirective;
+            }
+            if (rangedTypes.contains(nearest.type())) {
+                // Structural mismatch: melee-only cannot answer kite-
+                // and-shoot. Refusing NOW beats bleeding to leash or
+                // timeout - the harness sees the refusal and decides
+                // (retreat, reroute, or accept the exposure).
+                lastRefusedType = nearest.type();
+                fail(REASON_REFUSED);
                 return lastDirective;
             }
             engage(nearest);
@@ -251,6 +292,14 @@ public final class DefendProcess implements BotProcess, TerminalMission {
     @Override
     public String failureReasonOrNull() {
         return failure;
+    }
+
+    @Override
+    public java.util.Map<String, String> verdictAttrs() {
+        if (REASON_REFUSED.equals(failure) && lastRefusedType != null) {
+            return java.util.Map.of("threatType", lastRefusedType);
+        }
+        return java.util.Map.of();
     }
 
     @Override
