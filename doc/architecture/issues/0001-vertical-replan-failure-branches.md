@@ -4,8 +4,10 @@ last_verified: 2026-08-23
 covers:
   - doc/architecture/function-map.md
   - src/main/java/com/mcbot/mcbotserver/core/behavior/PathingBehavior.java
+  - src/main/java/com/mcbot/mcbotserver/McBotServer.java
   - src/main/java/com/mcbot/mcbotserver/gametest/BotSliceGameTests.java
   - src/test/java/com/mcbot/mcbotserver/tickpipeline/StuckFuseTest.java
+  - src/test/java/com/mcbot/mcbotserver/tickpipeline/VerticalGateTest.java
 status: open
 related:
   - doc/decisions/0004-tick-pipeline-actor-channels.md
@@ -71,6 +73,18 @@ it is replanning, but every plan is generated from a transient
 airborne cell and gets discarded by the freshness check. The
 mechanism is waste, not unawareness.
 
+**Resolved by fix 6 (PR-4, landed).** The vertical gate
+(`PathingBehavior.tick` evaluates replan triggers only when the
+body is in ground contact, and bypasses the replan cooldown on
+the landing edge) eliminates branch 3's wasted replan cycle:
+mid-air replan requests are suppressed entirely, and the
+landing tick gets an immediate replan so the post-landing pose
+is the basis for the next plan. Pinned by
+`VerticalGateTest.airborneTicksDoNotTripFuse`,
+`VerticalGateTest.landingEdgeBypassesReplanCooldown`,
+`VerticalGateTest.alwaysAirborneIsolatesTriggerEvaluation`, and
+`VerticalGateTest.steadyGroundedStillFiresFuseAt20`.
+
 ## 4. Root cause attribution
 
 Three structural problems, ordered by leverage:
@@ -131,7 +145,7 @@ proposed in earlier review iterations and are wrong:
 | 3 | Physicalised shove test | rewrite `recoversWhenShoved`, add 3-4 new tests | whether the gametest harness can run vanilla physics ticks for free |
 | 4 | Fuse quantity: motion -> plan-progress | rewrite progress-check block at `PathingBehavior.java:169-176`; new `planProgressScore(pose, waypoints, goal)`; redefine `STUCK_EPSILON` semantic (0.01 m cannot be reused — the new threshold is in score units) | (a) the three OR criteria for plan-progress (§Ruling a); (b) subsumption argument for deleting motion detection and the `lastProgressPose` field, included in PR description so reviewers do not re-litigate |
 | 5 | Freshness ±1 cell tolerance | 1 equality to Chebyshev-distance + 1 test | Chebyshev vs Euclidean; tolerance value |
-| 6 | Vertical gate (only evaluate offPath/fuse when `onGround`; landing edge fires one immediate evaluation) | trigger evaluation at `PathingBehavior.java:188-200`; needs `onGround` from `PoseSource` | whether `onGround` is reachable through the existing `PoseSource` interface — the largest hidden cost in the list, possibly a one-time interface change |
+| 6 | Vertical gate (only evaluate offPath/fuse when `onGround`; landing edge fires one immediate evaluation) | new `PathingBehavior.OnGroundSource` functional interface (`boolean isOnGround()`), 4-constructor overload set (5-arg primary, 4-/3-/2-arg delegators that wire `() -> true` for default-grounded offline tests), `wasOnGround` field, `tick` gate wrap; `McBotServer` and `BotSliceGameTests` pass `() -> body.onGround()` | resolved: a separate `OnGroundSource` interface (boolean) was cleaner than overloading `PoseSource` (Vec3) and avoided test-file churn (3-arg form keeps the `() -> true` default for offline rigs) |
 
 ### Ruling (a) — plan-progress score (Path A: per-cell + move-at-waypoint)
 
@@ -379,3 +393,55 @@ Severity is therefore a continuous quantity (silent window
 duration), not a binary. Reporting it as a single number hides
 the worst case; the right reporting is "max silent window in
 the task scenario envelope, with the scenario stated".
+
+## 9. PRs landed (the resolution chain)
+
+The fix list (§5) is a 6-item chain shipped in 4 PRs, each
+landing an independent commit on `master` with its own
+diff-review. The order below is the order of landing; each PR
+supplements the previous one and the next PR's review depends
+on the previous PR being present.
+
+| PR | Commit | Fixes | Behavior change? |
+|---|---|---|---|
+| 1 | `3b5854b` (+ `926c449` catches) | 1, 2, 3 | No (frame contract, keepalive, physicalised shove, limbo characterization) |
+| 2 | `5013f75` | 4 | Yes (motion detector removed; plan-progress fuse; STUCK_EPSILON semantic redefined to new-min margin) |
+| 3 | `7949e8a` | 5 | No (cell-equality to Chebyshev-1, same out-of-band semantics) |
+| 4 | (this PR) | 6 | Yes (vertical gate: airborne ticks skip trigger eval, landing edge bypasses replan cooldown) |
+
+**PR-2 is the only behavior-changing PR before PR-4** — it
+redefines "what the fuse measures" and removes the motion
+detector. PR-4 adds a second behavior change: the gate. The
+two compose: PR-2's plan-progress fuse fires correctly while
+the body is grounded; PR-4's gate prevents the fuse from
+firing (and from being wasted) while the body is in the air.
+
+PR-4 implementation notes (for reviewers):
+
+- `OnGroundSource` is a separate `boolean`-returning functional
+  interface nested in `PathingBehavior`; `PoseSource` (Vec3)
+  stays unchanged so the contract surface is minimally
+  enlarged. The 2-arg and 3-arg constructors wire
+  `() -> true` (always grounded), preserving the test rig's
+  contract: offline tests have stationary poses, so the default
+  is correct. Only the production wiring (`McBotServer`,
+  `BotSliceGameTests`) passes the real `() -> body.onGround()`.
+- The gate wraps the existing trigger-evaluation block; the
+  `adoptCompletedPlan` call stays outside the gate (a plan
+  that completes during flight is still adopted; freshness is
+  the cell-based guard regardless of ground state).
+- `landing` adds to the replan-cooldown gate (the OR clause
+  `neverPlanned || landing || ticksSincePlan >= REPLAN_COOLDOWN`).
+  The landing edge is the single tick where `onGround`
+  transitions false -> true; a bot that lands on the same
+  surface for 10 ticks is not in a landing edge after the
+  first.
+- The four new tests in `VerticalGateTest` are the regression
+  boundary: `airborneTicksDoNotTripFuse` (gate suppresses the
+  fuse), `landingEdgeBypassesReplanCooldown` (landing fires
+  the replan even with cooldown-rationed triggers), and
+  `alwaysAirborneIsolatesTriggerEvaluation` (50-tick
+  bookkeeping-only sanity), `steadyGroundedStillFiresFuseAt20`
+  (default-grounded bots still fire the fuse at the same
+  tick as the existing tests — the gate is invisible to
+  ground-only behavior).

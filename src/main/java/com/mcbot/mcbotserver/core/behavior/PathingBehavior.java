@@ -51,6 +51,19 @@ import java.util.concurrent.CompletableFuture;
  * 4.3 cells per 20 ticks of motion, zero waypoint-progress) and is
  * the root cause of the waterfall-column silent deadlock.
  *
+ * <p>Vertical gate (issue 0001 fix 6): trigger evaluation
+ * (plan-progress score, offPath, exhausted, fuse, replan request,
+ * STUCK report) runs only when the body is in ground contact.
+ * Airborne ticks skip all of it - a ballistic trajectory's drift
+ * and progress scores are meaningless for "should I replan?" because
+ * the active plan was authored for the take-off cell, not the
+ * landing cell, and re-evaluating mid-flight burns cooldown slots
+ * on snapshots the freshness check will discard. The landing edge
+ * ({@code onGround} transitions false -&gt; true) bypasses the
+ * replan cooldown: the moment of contact is when the new pose first
+ * matters, and a stale plan from before take-off must be replaced
+ * immediately rather than after the cooldown elapses.
+ *
  * <p>Implementation note: runs on the server tick thread only. With a
  * {@link PlanWorker} injected, searches execute off-thread on an
  * immutable {@link SnapshotWorldView} and are adopted only when still
@@ -134,6 +147,7 @@ public final class PathingBehavior implements Behavior {
 
     private final String name;
     private final PoseSource poseSource;
+    private final OnGroundSource onGroundSource;
     private final MoveGraph graph;
     private final PlanWorker worker;
     private List<CellPos> waypoints = List.of();
@@ -143,6 +157,12 @@ public final class PathingBehavior implements Behavior {
     private int ticksSincePlan = REPLAN_COOLDOWN;
     private int ticksSincePlanProgress;
     private int ticksSinceAdoption;
+    // Previous tick's onGround state, used to detect the landing
+    // edge (false -> true). Initialised to false so the first
+    // grounded tick is correctly classified as a "landing" - the
+    // edge is harmless then because neverPlanned short-circuits
+    // the replan gate anyway.
+    private boolean wasOnGround;
     // Plan-progress latches for issue 0001 §Ruling a. Initialised
     // to "no prior observation" sentinels so the first tick after
     // plan adoption counts as progress (criterion fires against
@@ -175,9 +195,32 @@ public final class PathingBehavior implements Behavior {
     }
 
     /**
+     * Body contact state accessor. Drives the vertical gate in
+     * {@link #tick} (issue 0001 fix 6): trigger evaluation is
+     * suppressed when the body is airborne and bypasses the replan
+     * cooldown on the landing edge.
+     *
+     * <p>For real entities the wiring is {@code () -> body.onGround()};
+     * for offline tests the two-argument and three-argument
+     * constructors use {@code () -> true} (always grounded), which
+     * is correct because the rig's pose is stationary.
+     */
+    @FunctionalInterface
+    public interface OnGroundSource {
+
+        /**
+         * Whether the body's feet are on a solid surface this tick.
+         *
+         * @return true iff the body is in ground contact
+         */
+        boolean isOnGround();
+    }
+
+    /**
      * Creates a follower over one move graph, planning synchronously
-     * on the tick thread. Offline tests and tiny graphs only - real
-     * bots use the worker constructor.
+     * on the tick thread, assuming the body is always grounded.
+     * Offline tests and tiny graphs only - real bots use the worker
+     * constructor (or the four-/five-argument variants below).
      *
      * @param name       stable identity for claims and diagnostics;
      *                   never null or blank
@@ -186,15 +229,14 @@ public final class PathingBehavior implements Behavior {
      */
     public PathingBehavior(String name, PoseSource poseSource,
                            MoveGraph graph) {
-        this(name, poseSource, graph, null);
+        this(name, poseSource, () -> true, graph, null);
     }
 
     /**
      * Creates a follower that plans off-thread through the given
-     * worker. Searches read an immutable snapshot captured here on the
-     * tick thread; results are adopted only when still fresh (goal
-     * unchanged, start cell still ours) - decision 17b's staleness
-     * guard.
+     * worker, assuming the body is always grounded. Offline tests
+     * and tiny graphs only - real bots use the five-argument
+     * constructor below.
      *
      * @param name       stable identity for claims and diagnostics;
      *                   never null or blank
@@ -204,14 +246,54 @@ public final class PathingBehavior implements Behavior {
      */
     public PathingBehavior(String name, PoseSource poseSource,
                            MoveGraph graph, PlanWorker worker) {
+        this(name, poseSource, () -> true, graph, worker);
+    }
+
+    /**
+     * Creates a follower over one move graph, planning synchronously
+     * on the tick thread, with an explicit ground-state accessor.
+     * Offline tests and tiny graphs only - real bots use the
+     * five-argument constructor.
+     *
+     * @param name            stable identity for claims and
+     *                        diagnostics; never null or blank
+     * @param poseSource      body position accessor; never null
+     * @param onGroundSource  body contact-state accessor; never null
+     * @param graph           edge supplier for planning; never null
+     */
+    public PathingBehavior(String name, PoseSource poseSource,
+                           OnGroundSource onGroundSource,
+                           MoveGraph graph) {
+        this(name, poseSource, onGroundSource, graph, null);
+    }
+
+    /**
+     * Creates a follower that plans off-thread through the given
+     * worker, with an explicit ground-state accessor. Searches
+     * read an immutable snapshot captured here on the tick thread;
+     * results are adopted only when still fresh (goal unchanged,
+     * start cell still ours) - decision 17b's staleness guard.
+     *
+     * @param name            stable identity for claims and
+     *                        diagnostics; never null or blank
+     * @param poseSource      body position accessor; never null
+     * @param onGroundSource  body contact-state accessor; never null
+     * @param graph           edge supplier for planning; never null
+     * @param worker          search executor; never null
+     */
+    public PathingBehavior(String name, PoseSource poseSource,
+                           OnGroundSource onGroundSource,
+                           MoveGraph graph, PlanWorker worker) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("name must not be blank");
         }
         this.name = name;
         this.poseSource = poseSource;
+        this.onGroundSource = onGroundSource;
         this.graph = graph;
         // Null is the deliberate synchronous-planning mode used by
-        // offline tests; see the two constructors above.
+        // offline tests; see the two-, three-, and four-argument
+        // constructors above.
         this.worker = worker;
     }
 
@@ -230,70 +312,102 @@ public final class PathingBehavior implements Behavior {
         ticksSincePlan++;
         ticksSinceAdoption++;
 
+        // Vertical gate (issue 0001 fix 6). Replan triggers fire only
+        // while the body is in ground contact; the landing edge
+        // (false -> true) bypasses the replan cooldown so the
+        // post-landing pose is the basis for the next plan, not a
+        // stale pre-take-off plan. Mid-air ticks still steer toward
+        // the current waypoint (the bot moves through the air on
+        // its trajectory), but they do not score progress, do not
+        // accumulate the fuse, and do not request replans - those
+        // would all be measured against a snapshot the freshness
+        // check will discard on landing.
+        boolean onGround = onGroundSource.isOnGround();
+        boolean landing = onGround && !wasOnGround;
+        wasOnGround = onGround;
+        boolean evaluateTriggers = onGround || landing;
+
         CellPos cell = floorOf(pose);
         if (directive.goal().isInGoal(cell)) {
             resetPlan();
             return ExecutionReport.success();
         }
 
-        // Adopt finished searches before trigger evaluation so a fresh
-        // route is usable in the same tick it arrived.
+        // Adopt finished searches before trigger evaluation so a
+        // fresh route is usable in the same tick it arrived.
+        // Adoption is not gated by the vertical gate: a plan that
+        // completes during flight is still adopted (the next
+        // ground tick immediately has a usable plan), and the
+        // freshness check is the cell-based guard regardless of
+        // ground state.
         adoptCompletedPlan(directive.goal(), cell);
 
-        // Plan-progress score (issue 0001 §Ruling a, Path A). Three
-        // OR criteria; any one counts as progress and resets the
-        // accumulator. External replan (exhaustion, offPath,
-        // freshness drop) MUST NOT clear the accumulator - only real
-        // plan-progress or the fuse itself does. The previous
-        // motion detector is gone: it was strictly weaker than
-        // plan-progress for the "moving but not progressing" case
-        // (limbo body in free fall - large per-tick 3D displacement,
-        // zero waypoint-progress).
-        if (updatePlanProgress(pose, directive.goal())) {
-            ticksSincePlanProgress = 0;
-            stuckLatched = false;
-        } else {
-            ticksSincePlanProgress++;
-        }
-
-        boolean fuseCondition = !stuckLatched
-            && ticksSincePlanProgress >= STUCK_WINDOW;
-        boolean offPath = waypointIndex < waypoints.size()
-            && distanceToWaypoint(pose,
-                waypoints.get(waypointIndex)) > REPLAN_DISTANCE;
-        boolean exhausted = waypointIndex >= waypoints.size();
-
-        if ((fuseCondition || offPath || exhausted)
-            && (neverPlanned || ticksSincePlan >= REPLAN_COOLDOWN)) {
-            neverPlanned = false;
-            ticksSincePlan = 0;
-            requestPlan(world, cell, directive.goal());
-        }
-
-        if (waypoints.isEmpty()) {
-            // A search still running is not an answer: report RUNNING
-            // rather than inventing NO_PATH for a question in flight.
-            if (planInFlight()) {
-                return ExecutionReport.running();
+        if (evaluateTriggers) {
+            // Plan-progress score (issue 0001 §Ruling a, Path A).
+            // Three OR criteria; any one counts as progress and
+            // resets the accumulator. External replan (exhaustion,
+            // offPath, freshness drop) MUST NOT clear the
+            // accumulator - only real plan-progress or the fuse
+            // itself does. The previous motion detector is gone:
+            // it was strictly weaker than plan-progress for the
+            // "moving but not progressing" case (limbo body in
+            // free fall - large per-tick 3D displacement, zero
+            // waypoint-progress).
+            if (updatePlanProgress(pose, directive.goal())) {
+                ticksSincePlanProgress = 0;
+                stuckLatched = false;
+            } else {
+                ticksSincePlanProgress++;
             }
-            // Definitive no-path right now: fail cleanly; the mission
-            // process owns the terminal transition from here. A fuse
-            // -triggered failure reports STUCK (physically immovable),
-            // a planning-side one reports NO_PATH.
-            if (fuseCondition) {
+
+            boolean fuseCondition = !stuckLatched
+                && ticksSincePlanProgress >= STUCK_WINDOW;
+            boolean offPath = waypointIndex < waypoints.size()
+                && distanceToWaypoint(pose,
+                    waypoints.get(waypointIndex)) > REPLAN_DISTANCE;
+            boolean exhausted = waypointIndex >= waypoints.size();
+
+            // Replan cooldown bypassed on the landing edge: contact
+            // is the first tick the body's pose is meaningful for
+            // pathing, and a stale plan from before take-off must
+            // be replaced immediately rather than after the
+            // cooldown elapses.
+            if ((fuseCondition || offPath || exhausted)
+                && (neverPlanned || landing
+                    || ticksSincePlan >= REPLAN_COOLDOWN)) {
+                neverPlanned = false;
+                ticksSincePlan = 0;
+                requestPlan(world, cell, directive.goal());
+            }
+
+            if (waypoints.isEmpty()) {
+                // A search still running is not an answer: report
+                // RUNNING rather than inventing NO_PATH for a
+                // question in flight.
+                if (planInFlight()) {
+                    return ExecutionReport.running();
+                }
+                // Definitive no-path right now: fail cleanly; the
+                // mission process owns the terminal transition
+                // from here. A fuse-triggered failure reports
+                // STUCK (physically immovable), a planning-side
+                // one reports NO_PATH.
+                if (fuseCondition) {
+                    stuckLatched = true;
+                    return ExecutionReport.failed("STUCK");
+                }
+                return ExecutionReport.failed("NO_PATH");
+            }
+            if (fuseCondition && !stuckLatched) {
+                // Fresh-plan grace expired while the body stayed
+                // frozen and the replan cooldown is still blocking
+                // the next attempt. Report once, latch, keep
+                // claims flowing; movement or a later successful
+                // plan clears the latch.
                 stuckLatched = true;
-                return ExecutionReport.failed("STUCK");
+                return ExecutionReport.stuck(
+                    "frozen between replan cooldowns");
             }
-            return ExecutionReport.failed("NO_PATH");
-        }
-        if (fuseCondition && !stuckLatched) {
-            // Fresh-plan grace expired while the body stayed frozen and
-            // the replan cooldown is still blocking the next attempt.
-            // Report once, latch, keep claims flowing; movement or a
-            // later successful plan clears the latch.
-            stuckLatched = true;
-            return ExecutionReport.stuck(
-                "frozen between replan cooldowns");
         }
 
         advanceReachedWaypoints(pose);

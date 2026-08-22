@@ -181,6 +181,7 @@ public class McBotServer {
 
                 Behavior mover = new PathingBehavior("mover",
                     () -> finePoseOf(body),
+                    () -> body.onGround(),
                     com.mcbot.mcbotserver.core.pathing.BasicMoves::from,
                     new com.mcbot.mcbotserver.core.pathing.PlanWorker());
 
