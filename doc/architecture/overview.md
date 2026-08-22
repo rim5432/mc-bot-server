@@ -66,15 +66,16 @@ fire, server rules) follow the same reflex pattern as separate guardians
 
 ## Current status
 
-Stage 0 complete and review-hardened: the full four-tier pipeline
-(reflex -> arbiter -> behaviors -> actor flush) runs offline against
-mocks behind 44 layer-1 tests, with the boundary-D command / event /
-state channels frozen and gated. Stage 1's vertical slice is wired
-in-engine: a custom mob carrier (entity-binding spike, see workplan)
-receives Actor claims through the adapter package, `/botspawn`
-assembles a full pipeline around one body, and `/goto` drives it.
-Still missing: the in-engine gametest suite (blocked on the 1.20.1
-structure-template question) and the external harness transport.
+Stage 2 complete (2026-08-22): all four tiers run offline behind the
+layer-1 gates AND in-engine via a four-scenario gametest suite -
+walks-to-block, shove-recovery, clean failure on unreachable goals,
+and a full combat engagement (defend planner -> standoff chase ->
+cone-resolved melee -> kill -> TASK_COMPLETED). A* pathfinding runs
+off-thread on immutable snapshots; the reflex rule table is
+datapack-driven. The capability envelope and its convergence
+criteria live in the [Functional Convergence Map](function-map.md);
+the remaining harness-side work is the transport choice for
+boundary D (MCP vs HTTP) plus the deferred rows in that map.
 
 Related: [Boundary Contracts & Ledger](boundaries.md),
 [Work Plan](../guide/workplan.md),

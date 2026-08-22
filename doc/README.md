@@ -8,6 +8,7 @@ Generated: 2026-08-22. Validate anytime with `python tool/mcbot_tool.py doc chec
 | Document | Title | Verified | Status |
 |---|---|---|---|
 | [boundaries.md](architecture/boundaries.md) | Boundary Contracts and Decision Ledger | 2026-08-22 | ok |
+| [function-map.md](architecture/function-map.md) | Functional Convergence Map (device-layer capability envelope) | 2026-08-22 | **ROT** |
 | [overview.md](architecture/overview.md) | Architecture Overview | 2026-08-22 | ok |
 
 ## guide/
