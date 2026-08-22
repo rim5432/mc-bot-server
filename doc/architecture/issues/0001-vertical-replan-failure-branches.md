@@ -8,7 +8,8 @@ covers:
   - src/main/java/com/mcbot/mcbotserver/gametest/BotSliceGameTests.java
   - src/test/java/com/mcbot/mcbotserver/tickpipeline/StuckFuseTest.java
   - src/test/java/com/mcbot/mcbotserver/tickpipeline/VerticalGateTest.java
-status: open
+status: resolved (2026-08-23; promotion-to-ADR vs archive deferred
+  to the next stage review)
 related:
   - doc/decisions/0004-tick-pipeline-actor-channels.md
   - src/main/java/com/mcbot/mcbotserver/api/types/Vec3.java
@@ -407,7 +408,21 @@ on the previous PR being present.
 | 1 | `3b5854b` (+ `926c449` catches) | 1, 2, 3 | No (frame contract, keepalive, physicalised shove, limbo characterization) |
 | 2 | `5013f75` | 4 | Yes (motion detector removed; plan-progress fuse; STUCK_EPSILON semantic redefined to new-min margin) |
 | 3 | `7949e8a` | 5 | No (cell-equality to Chebyshev-1, same out-of-band semantics) |
-| 4 | (this PR) | 6 | Yes (vertical gate: airborne ticks skip trigger eval, landing edge bypasses replan cooldown) |
+| 4 | `4c3f51f` | 6 | Yes (vertical gate: airborne ticks skip trigger eval, landing edge bypasses replan cooldown) |
+
+**Resolution (2026-08-23).** All four PRs are landed and the
+§7 test matrix is closed: keepalive emission is pinned in
+`TickPipelineGateTest`, the physicalised shove gametest is
+`BotSliceGameTests.recoversWhenShoved` (real knockback impulse,
+commit `db9eddf`), the limbo characterization lives in
+`LimboCharacterizationGateTest`, the vertical gate in
+`VerticalGateTest` (4 cases), and the freshness tolerance in
+`AdoptFreshnessGateTest`. The full offline suite runs green.
+The durable decisions worth keeping after migration are
+Ruling (a) with its Path-A caveat ("any change to
+`BasicMoves.from` or `AStarPathFinder.reconstruct` is a hard
+re-test"), Ruling (b)'s 4-then-6 ordering, and Ruling (c)'s
+general-correctness framing of the freshness tolerance.
 
 **PR-2 is the only behavior-changing PR before PR-4** — it
 redefines "what the fuse measures" and removes the motion

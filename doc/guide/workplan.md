@@ -165,7 +165,8 @@ test count when red).
 ### Stage 2 review-driven hardening (post Stage 2 first-batch)
 
 - [x] S  Reflex anti-oscillation: double threshold + hold window
-         DRAFT — pending review & build/test (2026-08-22): new api.reflex.ReflexHysteresis
+         SHIPPED 2026-08-23 (build/test green; ReflexHysteresisGateTest
+         6 cases pass): new api.reflex.ReflexHysteresis
          interface (trigger / release / signalValue / minHoldTicks)
          with default minHoldTicks=0 so non-hysteretic rules opt in
          by choice. FreezeOnLowHealthRule implements it with
@@ -250,7 +251,10 @@ test count when red).
          and DisclosureGateTest (6 cases, including the
          post-reset polling invariant).
 - [x] M  Shape-vs-traits split: geometry derived, traits registered
-         DRAFT — pending review & build/test (2026-08-22): new
+         SHIPPED 2026-08-23 (offline half; build/test green -
+         CollisionShapeGateTest 8, BlockTraitsRegistryGateTest
+         10, MockWorldViewShapeGateTest 9, BasicMovesShapeGateTest
+         6, of which 5 cases stay @Disabled under issue 0002): new
          api.world.CollisionShape now carries a cell-local Box
          (0..1) and the derived predicates passable() and
          walkableTop(). passable = EMPTY or PARTIAL with top below
@@ -281,15 +285,28 @@ test count when red).
          the offline injection surface), BasicMovesShapeGateTest
          (6 cases proving the move predicates answer from shape
          not id, including the same geometry under three
-         different block ids returning the same answer). Gauntlet
-         gametest (a corridor with bottom-slab / upper / stairs /
-         fence / ladder / water / lava sections, end to end) is
-         NOT yet written - the BotBodyEntity + adapter is still
-         being debugged by the parallel combat pass and the
-         gauntlet needs the shape-bearing adapter to land before
-         its source has anything to bind to. Pinned as a workplan
-         follow-up for Stage 2 closeout. NOT YET exercised by
-         build / test (build is blocked by the parallel-session
-         combat compilation pass; the change is review-validated
-         only).
+         different block ids returning the same answer). The
+         gauntlet gametest (a corridor with bottom-slab / upper /
+         stairs / fence / ladder / water / lava sections, end to
+         end) is the remaining open piece, carried as a Stage 2
+         closeout follow-up; its five shape-semantics cases wait
+         on issue 0002 (fence + slab default traits), the rest of
+         the offline suite runs green.
+
+### Stage 2 closeout follow-ups
+
+1. Issue 0002 shape-contract decision: the five disabled
+   world/collision cases exposed three conflicts between the
+   tests and the current CollisionShape contract - walkableTop's
+   code threshold (0.625) contradicts its own Javadoc ("a
+   half-slab top at y=0.5 is the threshold"); the fence cases
+   need a Box with maxY=1.5, which Box validation ([0,1]) and
+   the enabled boxRejectsOutOfRangeBounds case both reject; and
+   passable()'s pure-Y rule cannot return true for a fence under
+   any Y representation. Fixing this amends boundary vocabulary
+   (decision 19 discipline), so it waits for stage review per
+   the AGENTS.md stop rule.
+2. Gauntlet gametest (shape-bearing corridor end to end) -
+   blocked on follow-up 1: its fence/slab sections assert the
+   exact semantics issue 0002 must settle first.
 

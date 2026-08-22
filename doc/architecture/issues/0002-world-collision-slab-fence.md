@@ -1,5 +1,5 @@
 ---
-title: 5 world/collision tests red - CollisionShape / BasicMoves fence + slab defaults missing
+title: 5 disabled world/collision tests - shape-predicate contract conflicts (walkableTop threshold, Box Y range, fence passability)
 last_verified: 2026-08-23
 covers:
   - src/main/java/com/mcbot/mcbotserver/api/world/CollisionShape.java
@@ -56,26 +56,50 @@ PR-2 baseline (per the PR-2 pre-flight checklist item 5).
     within step-up reach).
   - Actual: returns false.
 
-## 3. Hypothesis (not yet verified)
+## 3. Verified findings (2026-08-23 closeout audit)
 
-The most likely cause is `MapBlockTraitsRegistry` / the
-collision-shape adapter returning conservative default
-shapes for unknown blocks, so fence and the slab variants
-fall through to the "blocking" default rather than the
-shape-correct values the gate expects. Per the function-map
-caption on `BlockTraits`, the registry is the source of
-truth for non-geometric block properties (climbable,
-liquid, damaging), but `CollisionShape` (geometric) is
-populated by the adapter per AGENTS.md §2.1. The shape
-defaults for fence / slab in the adapter are the
-suspected gap.
+The original hypothesis (registry / adapter returning
+conservative default shapes) was WRONG: all five cases build
+their shapes directly via `CollisionShape.partial(...)` /
+`MockWorldView.putShape(...)` - no registry or adapter is
+involved. The gap is in the derived predicates' semantics
+and in two of the test setups. Four findings, verified by
+reading `CollisionShape`, `BasicMoves`, and both gate tests:
 
-Verification path:
-1. Read `BlockTraitsRegistry` + `MapBlockTraitsRegistry` and
-   the shape-emission site in the adapter.
-2. Read the 5 tests' setups to see what block IDs they use
-   and what shape the registry returns for them.
-3. Trace the discrepancy.
+1. **`walkableTop()` contradicts its own Javadoc.** The code
+   requires `box.maxY >= STEP_HEIGHT` (0.625); the Javadoc
+   says "a half-slab top at y=0.5 is the threshold". A bottom
+   slab (maxY=0.5) therefore answers false while
+   `lowerSlabIsStandable` and `walkAcrossLowerSlabIsViable`
+   require true (`BasicMoves.Walk` viability bottoms out at
+   `supported -> walkableTop(cell below)`). The enabled
+   pressure-plate cases pin top=0.1 -> false, so whatever
+   threshold is chosen must land in (0.1, 0.5].
+2. **The fence cases are unconstructible under the current
+   Box contract.** Both build `Box(0.4,0,0.4,0.6,1.5,0.6)`;
+   Box validation throws on maxY > 1, and the ENABLED
+   `boxRejectsOutOfRangeBounds` case pins exactly that. The
+   two fence cases contradict another test in the same gate.
+   Either Box's Y range grows past 1 (a decision-19 vocabulary
+   amendment, and the range test changes with it) or a fence
+   gets a two-cell representation (cell above carries the
+   upper post half as its own partial shape).
+3. **`passable()`'s pure-Y rule cannot answer fences.**
+   `passable == EMPTY || box.maxY < STEP_HEIGHT` is false for
+   any fence representation with a tall box, but the required
+   answer is true (the body sweeps around the thin post).
+   Answering it needs horizontal-extent reasoning - footprint
+   vs body width - which neither predicate models today.
+4. **`climbOntoUpperSlabFailsWhenDestinationHeadIsBlocked`
+   has a setup bug independent of the contract.** It installs
+   the upper slab at `(1, FLOOR_Y, 0)` and climbs to
+   `(1, BODY_Y+1, 0)`, whose supporting cell `(1, BODY_Y, 0)`
+   is air - unsupported by construction. Per its own comment
+   ("the cell below the destination foot is the upper slab")
+   the slab belongs at `(1, BODY_Y, 0)`. With that coordinate
+   the case passes under today's predicates (upper slab:
+   maxY=1.0 >= 0.625, minY=0.5 < 0.625). Re-derive the setup
+   when re-enabling; do not carry the current coordinates.
 
 ## 4. Out of scope for issue 0001 / PR-2
 
@@ -86,29 +110,22 @@ and `BotController` is independent of `CollisionShape` and
 in the PR-2 commit with `@Disabled("see issue 0002")` and
 re-enabled in the issue 0002 fix.
 
-## 5. Resolution direction (proposed, not adopted)
+## 5. Resolution direction (updated by the closeout audit)
 
-Add fence + upper-slab + lower-slab to the shape-emission
-table in the adapter (or the MapBlockTraitsRegistry for
-the non-geometric half). Each entry sets:
+The fix is a contract amendment, not a default-value patch,
+so it waits for stage review per the AGENTS.md stop rule
+(§0.4): it changes boundary vocabulary covered by decision
+19. The workplan's "Stage 2 closeout follow-ups" item 1
+carries the scheduling. Scope when picked up:
 
-- `passable()` (cell body volume clear),
-- `walkableTop()` (cell above has a top within step-up reach),
-- `stepHeight()` (the y of the top, for standability),
-- `bounds` (the AABB used by sweep / clip).
-
-The three test pairs collapse to two contract points:
-
-- Fence: `passable == true` for the body sweep (the body
-  walks through the fence's open top half when stepping),
-  `walkableTop == false` (the post at cell.y is too thin to
-  step on).
-- Lower slab: `passable == true` (body walks over the half-
-  height obstacle), `walkableTop == true` (top sits at y=0.5
-  within step reach).
-- Upper slab: same as full block — `passable == false`,
-  `walkableTop == true`.
-
-A follow-up ADR (or a follow-up issue) is the right home
-for the exact shape contract; this issue records the
-finding.
+- Pick the walkableTop threshold from (0.1, 0.5] and make
+  code and Javadoc agree; re-derive `STEP_HEIGHT`'s role
+  (step-up reach vs standability floor are different
+  quantities and today share one constant).
+- Decide fence representation: Box Y range past 1, or
+  two-cell post. Whichever wins, `passable()` needs a
+  footprint-vs-body-width rule to answer fences true - pure-Y
+  cannot.
+- Fix the climb case's coordinates per finding 4, then
+  re-enable cases one finding at a time; each re-enable is
+  its own commit.
