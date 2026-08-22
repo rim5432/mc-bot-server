@@ -142,24 +142,27 @@ public final class BotSliceGameTests {
                 xAtShove[0] = rig.body().getX();
                 rig.body().setDeltaMovement(
                     new net.minecraft.world.phys.Vec3(
-                        -1.5, 0.0, 0.0));
+                        -1.8, 0.0, 0.0));
             })
             .thenExecuteFor(5, () -> {
                 // 5 vanilla physics ticks without pipeline
                 // intervention - MC integrates the impulse, body
-                // moves ~3.14 cells in -X with default friction.
+                // moves ~4.06 cells in -X with default ground
+                // friction (sum of the geometric decay series:
+                // 1.8 * (1 + 0.588 + 0.346 + 0.203 + 0.119)).
                 // The planner's next pipeline tick sees the new
                 // cell.
             })
             .thenExecute(() -> {
                 // Sanity 1 (catch 1 follow-up): the body must
-                // actually displace > 3.5 cells in -X. With the
-                // current 1.5 m/tick impulse and 5-tick
-                // integration, the integrated displacement is
-                // approximately 3.14 cells; the 3.5 floor
-                // catches any change in friction, slip, or
-                // tick-internal damping that would land the
-                // body in 0.8~3.0 branch 2 instead of branch 1.
+                // actually displace > 3.5 cells in -X so the test
+                // stays in branch 1 of issue 0001 §3 (offPath fires
+                // because XZ drift > 3.0), not branch 2 (0.8~3.0,
+                // where offPath would NOT fire and the test would
+                // silently regress to limbo). The previous 1.5
+                // impulse integrated to only ~3.3-3.4 cells -
+                // below its own 3.5 floor, i.e. unpassable as
+                // written.
                 double dx = xAtShove[0] - rig.body().getX();
                 check(dx > 3.5,
                     "shove must displace the body > 3.5 cells in -X "
