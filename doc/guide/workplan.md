@@ -1,6 +1,6 @@
 ---
 title: Work Plan (effort-sized checklist)
-last_verified: 2026-08-22
+last_verified: 2026-08-23
 covers:
   - doc/architecture/boundaries.md
   - doc/decisions/0004-tick-pipeline-actor-channels.md
@@ -219,32 +219,30 @@ test count when red).
          blocked by the parallel-session combat compilation pass;
          the change is review-validated only).
 - [x] S  Behind-consumer recovery: EVENT_GAP + state resync contract
-         DRAFT — pending review & build/test (2026-08-22): events
-         answer "what happened", state answers "what is". A
-         consumer whose sinceEventId is older than the queue's
-         oldest retained entry needs the second one first - the
-         events between its cursor and the queue head are gone, by
-         design (queue rotation), and no amount of re-polling
-         recovers them. New EventKind.EVENT_GAP constant;
-         InMemoryEventQueue.statusSnapshot detects a stale cursor
-         and prepends a synthetic EVENT_GAP at the head of the page
-         carrying attrs {count, since, oldest} and urgent=true.
-         Distinct from EVENT_DROPPED (push-time overflow): that one
-         fires at push time when the queue overflows; this one
-         fires at poll time when the caller finally notices the
-         loss. Empty-queue + stale cursor is the worst case and
-         still emits the gap (with oldest past the last seen id)
-         so the harness can tell "behind, bot is now silent" from
-         "fresh poll, bot idle". The recovery sequence is fixed and
-         lives in boundaries.md: on EVENT_GAP the harness calls
-         getState() first, resets the cursor to the gap's oldest,
-         and resumes the normal poll loop. New gate test
-         GapEventGateTest (6 cases): stale cursor with overflow,
-         zero-gap boundary, fresh poll from cursor 0, gap +
-         EVENT_DROPPED coexist, fully evicted worst case, cursor
-         at lastEventId (empty page). NOT YET exercised by build /
-         test (build is blocked by the parallel-session combat
-         compilation pass; the change is review-validated only).
+         SHIPPED 2026-08-23 (build/test green; 6 gap cases +
+         6 disclosure cases all pass): events answer "what
+         happened", state answers "what is". A consumer whose
+         sinceEventId is older than the queue's oldest retained
+         entry needs the second one first - the events between
+         its cursor and the queue head are gone, by design
+         (queue rotation), and no amount of re-polling recovers
+         them. New EventKind.EVENT_GAP constant;
+         InMemoryEventQueue.statusSnapshot detects a stale
+         cursor and prepends a synthetic EVENT_GAP at the head
+         of the page carrying attrs {count, since, oldest} and
+         urgent=true. Distinct from EVENT_DROPPED (push-time
+         overflow): that one fires at push time when the queue
+         overflows; this one fires at poll time when the caller
+         finally notices the loss. Two non-firing cases (since=0
+         "first poll, no gap"; empty queue after reset() "use
+         resetAt, not gap") are explicit per boundaries.md
+         Behind-consumer recovery contract. The recovery
+         sequence is fixed and lives in boundaries.md: on
+         EVENT_GAP the harness calls getState() first, resets
+         the cursor to the gap's oldest, and resumes the normal
+         poll loop. New gate tests GapEventGateTest (6 cases)
+         and DisclosureGateTest (6 cases, including the
+         post-reset polling invariant).
 - [x] M  Shape-vs-traits split: geometry derived, traits registered
          DRAFT — pending review & build/test (2026-08-22): new
          api.world.CollisionShape now carries a cell-local Box

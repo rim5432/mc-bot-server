@@ -112,15 +112,15 @@ proposed in earlier review iterations and are wrong:
   drift but an **architecture contract gap**. A convention that
   is undocumented, unasserted, and untested is not a convention
   but a coincidence. The fix is to pin the contract in Javadoc
-  + add a test that fails if a future change silently flips a
+  AND add a test that fails if a future change silently flips a
   constant to a different frame.
 - "missing vertical state machine" — proposed as a complete
   repair. The diagnosis ("Y axis is a control illusion") is
   correct for airborne states only, but a full state machine
   (grounded / falling / in-fluid / on-ladder) is over-repair
-  for v1 (see §6 for unlock conditions). Plan-progress fuse +
-  vertical gate cover the same failure modes at a fraction of
-  the cost.
+  for v1 (see §6 for unlock conditions). Plan-progress fuse
+  AND vertical gate cover the same failure modes at a fraction
+  of the cost.
 
 ## 5. Fix list (scope is "decision points", not lines of code)
 
@@ -133,21 +133,74 @@ proposed in earlier review iterations and are wrong:
 | 5 | Freshness ±1 cell tolerance | 1 equality to Chebyshev-distance + 1 test | Chebyshev vs Euclidean; tolerance value |
 | 6 | Vertical gate (only evaluate offPath/fuse when `onGround`; landing edge fires one immediate evaluation) | trigger evaluation at `PathingBehavior.java:188-200`; needs `onGround` from `PoseSource` | whether `onGround` is reachable through the existing `PoseSource` interface — the largest hidden cost in the list, possibly a one-time interface change |
 
-### Ruling (a) — three OR criteria for plan-progress
+### Ruling (a) — plan-progress score; criterion 3 requires arclength (criterion 3 in earlier drafts is FALSE on detour paths)
 
 A two-criterion `waypointIndex advanced OR goalDistance decreased`
 fails switchback: an A* result that loops around a wall has
 legitimate segments where the goal distance grows and the
 waypoint gap is too coarse for `waypointIndex` to advance on
-each tick. The third criterion is `currentWaypointDistance3D`:
-along any legal path this strictly decreases for almost every
-step; on a limbo body all three are simultaneously false (no
-index advance, no goal closure, no waypoint closure) and the
-fuse accumulates cleanly. The PR must include a subsumption
-argument: motion detection is implied by plan-progress for the
-legal "moving" case and strictly weaker for the "moving but
-not progressing" case. Confirm `lastProgressPose` has no other
-readers before deleting the field together with the check.
+each tick. So far so good. But adding a third criterion of
+`currentWaypointDistance3D` with the rationale "along any legal
+path this strictly decreases" is **wrong**: a detour path may
+first move the body sideways AWAY from the current waypoint
+(door on the side, goal behind a wall) and the 3D distance
+INCREASES during that stretch. If the waypoint sample is
+sparse enough that the detour fits between two samples, then
+criterion 1 (index not advancing) is also false and criterion
+2 (goal distance increasing around the wall) is false. All
+three false on a legal path -> fuse accumulates -> spurious
+STUCK + wasted replan. Threshold for trouble: walk speed
+0.215 b/tick x 20 ticks = 4.3 cells, which is short enough
+that caves and mazes hit it routinely.
+
+The plan-progress score therefore has two mandatory criteria
+and one conditional:
+
+1. **`waypointIndex advanced` (mandatory).** Discrete, cheap,
+   exact. Plan adopted -> lastIndex remembered -> thisIndex
+   increased -> progress = true.
+2. **`goalDistance decreased` (mandatory).** The only progress
+   signal when no active plan exists (between plan request and
+   adoption, or after a plan is exhausted). Cannot be deleted
+   even if the other two are stronger.
+3. **`arclengthProgress3D` (mandatory; replaces the broken
+   `currentWaypointDistance3D`).** Project the body's pose
+   onto the remaining path polyline; track the LATCHED MINIMUM
+   of "pose-to-polyline distance" — every step that decreases
+   the minimum advances progress, regardless of detour shape.
+   Sampling-density-independent: any legal path strictly
+   advances the latched minimum for almost every step (the
+   pose must be ON the polyline to have zero distance, and
+   moving along the path drives the projection forward).
+
+`STUCK_EPSILON` semantic changes from "per-tick motion in
+metres" to **"new-min margin"** — a candidate new minimum must
+beat the latched minimum by at least `STUCK_EPSILON` (in
+metres, since arclength is in metres) to count as progress.
+Without this,原地振荡 micro-noise would刷出 0.001 m new minima
+and the fuse would never trip on a瀑布 column. The waterfall
+characterization test in PR-1 exposes this immediately if the
+margin is left at zero.
+
+**Path A vs Path B (deferred to step 2 of the PR plan).**
+The choice between "criterion 3 = arclength progress with
+polyline projection" (Path B, always correct) and "criterion
+3 = 3D distance to current waypoint + caveat on sample density"
+(Path A, only correct if `PlanWorker` emits per-cell) is
+resolved by reading `PlanWorker`. The decision does not
+affect this ruling's text; both paths share the new-min
+margin and the subsumption argument.
+
+**Subsumption argument** (required in the PR description so
+reviewers do not re-litigate). Motion detection is implied by
+plan-progress in the legal "moving" case: any motion that
+moves the pose along the polyline projection either advances
+the index, decreases goal distance, or decreases arclength
+progress. The motion detector is strictly weaker for the
+"moving but not progressing" case (limbo body in free fall).
+Therefore `lastProgressPose` and the 3D motion check are safe
+to delete; the PR must confirm no other readers before
+removing the field.
 
 ### Ruling (b) — fuse and gate are complementary, not redundant; order is 4 then 6
 
@@ -164,10 +217,11 @@ failure modes and must be implemented in order.
 Branch 3 makes the freshness bug visible because airborne
 motion crosses a cell every 1-2 ticks. On flat ground at
 walking speed (0.215 b/tick) the same bug fires when A* takes
->=5 ticks, which is the wide-search case — not a vertical
-scenario at all. The fix should be justified and reviewed on
-its general merits ("the equality check is wrong; a tolerance
-is the contract"), not as a workaround for vertical drift.
+5 ticks or more, which is the wide-search case — not a
+vertical scenario at all. The fix should be justified and
+reviewed on its general merits ("the equality check is wrong;
+a tolerance is the contract"), not as a workaround for
+vertical drift.
 
 ## 6. Explicit non-goals + boundaries
 
@@ -199,30 +253,54 @@ is the contract"), not as a workaround for vertical drift.
 | Scenario | Existing | Required |
 |---|---|---|
 | XZ shove (current `recoversWhenShoved`) | covers teleport-not-shove | rewrite: replace `setPos + ZERO` with `setDeltaMovement(knockback)` + 5 vanilla physics ticks |
-| Vertical shove (slime block launch, ender pearl) | none | new test; assert replan within 20 ticks (post-fix 4) |
+| Vertical shove (slime block launch, ender pearl) | none | new test; assert STUCK within 20 ticks AND a replan is requested (post-fix 4). Replan adoption is async, so the assertion targets the request, not the adoption. |
 | 0.8 ~ 3.0 limbo (cliff fall with XZ held at 1.5 from last waypoint) | none | new test; assert **STUCK event fires within N ticks** (assertion form: event occurrence, not recovery success — see review note) |
 | Fall fuse (drop on solid, body goes static) | covered by `recoversWhenShoved` indirectly | explicit test: fuse fires within 20 ticks of landing |
 | Freshness ±1 cell (A* takes 5 ticks while body walks 1 cell) | none | new test: plan adopted with start cell offset by Chebyshev 1 |
 | keepalive emission | none | new test: keepalive emitted every N ticks with pose/waypointIndex/ticksSinceProgress/ticksSincePlan/planAge/goalCell |
 
-The limbo acceptance assertion needs user review. Candidate
-formulations:
+The limbo acceptance assertion is **form 1: `STUCK` event
+fires within K ticks of the last plan-progress tick**, with
+the following rationale and test-design constraints.
 
-1. `STUCK` event fires within K ticks of limbo entry (K=20
-   with fix 4; before fix 4, K=infinity).
-2. `STUCK` event fires within K ticks OR the body has left
-   the 0.8~3.0 band (lands or drifts out).
-3. `STUCK` event is followed by either NO_PATH (current cell
-   has no path) or a fresh plan from a non-airborne cell
-   (recovered after landing).
+**Why form 1, not form 2 or form 3.** The hard test is
+regression-test validity: a useful assertion must fail when
+the fix is reverted. Form 2 mixes an external condition
+(landing or XZ-drift-out-of-band) into the SUT boundary —
+when fix 4 is reverted, the waterfall body eventually falls
+into the same offPath or motion-fuse兜底 path that a
+fall-and-land body takes, so the "or leaves band" branch
+still passes and the test stays green. Form 2 cannot detect
+the disappearance of fix 4. Form 3 couples to downstream
+products (NO_PATH vs. path-back) that are non-deterministic
+across geometry snapshots. Form 1 is the only one whose
+revert detection is sound: a waterfall body in pre-fix-4
+never fires STUCK; the same body in post-fix-4 fires STUCK
+within 20 ticks of entry. Assertion form 1 also keeps the
+SUT boundary clean: the assertion talks about event
+occurrence, not recovery.
 
-The reviewer's intuition is that the assertion should be
-"event fires" (form 1) rather than "recovery succeeds" (form
-3), because recovery from limbo inherently involves the body
-leaving the limbo state, which is the test's *exit condition*
-not its *assertion*. Form 2 mixes an external condition
-(landing) with the system-under-test, which obscures the
-boundary. **Pending user confirmation.**
+**Constraint 1: scenario must be continuous vertical motion
+(waterfall column or scripted pose driver), not fall-and-land.**
+In a fall-and-land scenario, pre-fix-4 ALSO fires STUCK —
+the body stops moving on landing, motion < 0.01/tick for 20
+ticks, motion fuse trips. Post-fix-4 fires at limbo entry +
+20 ticks instead of landing + 20. The two versions differ
+only in timing (= fall duration), which is too fragile to
+distinguish. The waterfall scenario is the only one where
+pre-fix-4 has no STUCK trigger at all and post-fix-4 does.
+
+**Constraint 2: K is anchored to "last plan-progress tick",
+not "limbo entry".** The fuse counts `ticksSinceProgress`,
+which is not necessarily 0 at limbo entry — if the body was
+not progressing for 5 ticks before entering limbo (legal
+case: a slow approach), STUCK may fire at entry+15, not
+entry+20. The assertion must compare against the last
+progress tick. K is the window length: 20 in the scripted
+unit test (exact), 25-30 in the gametest (physics-tick
+padding). The measurement instrument is the keepalive
+event's `ticksSinceProgress` field — fix 2 is the prerequisite
+for fix 4 verification.
 
 ## 8. Severity calibration
 
@@ -237,10 +315,15 @@ duration of continuous vertical motion:
   band against any single waypoint, never accumulates fuse
   time. Severity: undefined (until fix 4).
 - **Lava column** (Y fall + damage): same oscillation plus
-  the body dies in seconds. Severity: bot dies with no
-  task-failure event. Pre-fix-4 the harness sees "in
-  progress" until death; post-fix-4 the harness sees a STUCK
-  event before death.
+  the body dies in seconds. Severity: the *task* channel
+  goes silent, but the *threat* channel is alive — S-D's
+  damage rule fires a `THREAT_*` event (HP drop) every tick
+  the body is in lava, so the harness still has an event
+  stream to reconcile. The pure black hole is the waterfall
+  column (no damage, no event, no progress), not lava.
+  Pre-fix-4 the harness sees "in progress" + threat events
+  until death; post-fix-4 the harness sees a STUCK event
+  before death.
 - **Falling into water on flat ground**: fuse catches within
   20 ticks of landing. Severity: 1 second silent window.
   Acceptable.
