@@ -339,6 +339,32 @@ BotState getState();
     17b. WorldView queries support two view modes: `SNAPSHOT` (for the planner, a frozen view of a given tick) and `LIVE` (for the executor, a real-time view of the current tick). Under a single-threaded implementation the two are equivalent, but the interface must reserve a `ViewMode` parameter so future off-thread A* does not require an interface change. SNAPSHOT creation, invalidation, and lifecycle are entirely the caller's (the planner's) responsibility. WorldView promises only "return data per the requested `ViewMode` semantics"; snapshot storage, staleness, and disposal are NOT part of the WorldView contract -- if needed they go in workplan follow-ups, not in the interface.
 18. First boundary-D semantics: GotoCommand{target, tolerance,
     timeoutTicks}; seam verbs stay submit/cancel/status.
+19. Shape-vs-traits split: geometry is derived from
+    `CollisionShape`, non-geometric properties (climbable, liquid,
+    damaging) come from `BlockTraitsRegistry`. Movement viability
+    (can the body pass, can it stand) reads the shape; movement
+    vocabulary expansion (ladder, swim, pillar) reads the traits.
+    The split exists because "is the top half of this cell solid"
+    is a property the shape answers for free (the box) while "is
+    this a ladder" is a property the shape cannot infer (the
+    collision box is empty above the rung). Putting geometry in
+    the traits registry would force a per-id entry per block;
+    putting traits in the shape would force a box scheme that
+    pretends non-geometric behaviour. The trait registry is
+    state-aware: `minecraft:stone_slab[type=bottom]` and
+    `[type=top]` are different keys, because the two halves have
+    different damage / climb answers. Type-only keys collapse
+    them and the first half-slab the bot walks across teaches
+    the planner the wrong lesson. Registry default for an
+    unknown id is `BlockTraits.defaults()` (the safe "no
+    special property" record); a missing entry is the registry's
+    problem to surface, not the planner's.
+    19a. Every new Movement must answer "can its full physical
+    precondition be derived from `CollisionShape` plus the small
+    traits registry" before it lands. Diagonal corner clearance
+    (4-cell sweep, 1x2 vertical) is the first case the rule
+    applied to; future Movement classes (Climb, Drop, Ladder,
+    Swim, Pillar) are gated by the same answer.
 
 ## Deferred, with reopen conditions
 

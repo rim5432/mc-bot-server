@@ -2,7 +2,7 @@ package com.mcbot.mcbotserver.core.pathing;
 
 import com.mcbot.mcbotserver.api.pathing.Movement;
 import com.mcbot.mcbotserver.api.types.CellPos;
-import com.mcbot.mcbotserver.api.world.BlockSnapshot;
+import com.mcbot.mcbotserver.api.world.CollisionShape;
 import com.mcbot.mcbotserver.api.world.ViewMode;
 import com.mcbot.mcbotserver.api.world.WorldView;
 
@@ -19,13 +19,23 @@ import java.util.Objects;
  * <p>Viability rules (all reads via WorldView, LIVE mode):
  *
  * <ul>
- * <li>passable(cell): block present AND air - unloaded cells return
- * null from getBlock and are treated as impassable, honoring
- * decision 17a ("unknown" is never traversed).</li>
- * <li>supported(cell): the block below is solid (present, not air).</li>
+ * <li>passable(cell): the cell's CollisionShape is body-clear
+ * (EMPTY, or PARTIAL with top below STEP_HEIGHT). The shape is the
+ * source of truth, the block id is not consulted (decision 19). Cells
+ * the adapter does not annotate fall through to the WorldView's
+ * safe-default, which is FULL_CUBE - blocking, not traversable.</li>
+ * <li>supported(cell): the cell below has a walkable top
+ * ({@link CollisionShape#walkableTop()}).</li>
+ * <li>standable(cell): the body fits at the cell (foot + head
+ * passable) and the cell below is walkable.</li>
  * </ul>
+ *
+ * <p>Non-geometric block properties (climbable / liquid / damaging)
+ * live in {@link com.mcbot.mcbotserver.api.world.BlockTraits} and are
+ * not consulted here - this set has no Movement that uses them yet.
+ * Ladder / swim / pillar Movements will read traits, not shape.
  */
-// contract: see boundaries.md decisions 7/8 + 17a
+// contract: see boundaries.md decisions 7/8 + 17a + 19
 public final class BasicMoves {
 
     private BasicMoves() {
@@ -78,16 +88,35 @@ public final class BasicMoves {
         }
     }
 
+    /**
+     * Body-passability from the cell's collision shape. Replaces the
+     * Stage-0 {@code isAir} check: the shape's box tells us whether
+     * the body can sweep through, and a partial block (slab, fence)
+     * is correctly half-passable without an id check.
+     *
+     * @param world the view; must not be null
+     * @param cell  the cell to test; must not be null
+     * @return true when the cell is body-passable
+     */
     private static boolean passable(WorldView world, CellPos cell) {
-        BlockSnapshot s = world.getBlock(cell, ViewMode.LIVE);
-        return s != null && !s.isUnknown() && s.isAir();
+        return world.getCollisionShape(cell, ViewMode.LIVE).passable();
     }
 
+    /**
+     * Whether the cell below has a walkable top. Full cubes always;
+     * partial blocks only when their top sits at or above
+     * {@link CollisionShape#STEP_HEIGHT} and below a jump
+     * (a half-slab top at y=0.5 is too low; the upper half or a full
+     * step is fine).
+     *
+     * @param world the view; must not be null
+     * @param cell  the cell whose floor we test; must not be null
+     * @return true when the cell below can hold a body
+     */
     private static boolean supported(WorldView world, CellPos cell) {
-        BlockSnapshot below = world.getBlock(
+        return world.getCollisionShape(
             new CellPos(cell.x(), cell.y() - 1, cell.z()),
-            ViewMode.LIVE);
-        return below != null && !below.isUnknown() && !below.isAir();
+            ViewMode.LIVE).walkableTop();
     }
 
     private static boolean standable(WorldView world, CellPos cell) {
@@ -119,20 +148,44 @@ public final class BasicMoves {
     record Diagonal(CellPos source, CellPos destination)
         implements Movement {
 
+        /**
+         * Body-passability for the corner sweep. Reads the
+         * {@link com.mcbot.mcbotserver.api.world.CollisionShape} the
+         * adapter installed; the box's top is the source of truth
+         * for whether the swept body fits.
+         *
+         * @param world the view; must not be null
+         * @param cell  the cell to test; must not be null
+         * @return true when the cell is body-passable
+         */
         private static boolean passable(WorldView world, CellPos cell) {
-            BlockSnapshot s = world.getBlock(cell, ViewMode.LIVE);
-            return s != null && !s.isUnknown() && s.isAir();
+            return world.getCollisionShape(cell, ViewMode.LIVE).passable();
         }
 
         @Override
         public boolean isViable(WorldView world) {
             int dx = destination.x() - source.x();
             int dz = destination.z() - source.z();
+            // Foot-level corner sweep: the standard 1x1 grid answer
+            // for a point body. The hitbox at z=0.5 / x=1.0 is
+            // contained inside the destination cell; cells (1, 0)
+            // and (0, 1) carry the swept area between them.
             boolean edgeA = passable(world, new CellPos(
                 source.x() + dx, source.y(), source.z()));
             boolean edgeB = passable(world, new CellPos(
                 source.x(), source.y(), source.z() + dz));
-            return edgeA && edgeB && standable(world, destination);
+            // Head-level corner sweep: the player is 1.8 tall, so the
+            // swept body also touches the cells one level up. Without
+            // this check, a 1-cell obstruction directly above a
+            // foot-clear corner would let the diagonal through and
+            // the head would clip the obstruction on the next physics
+            // step. Verified by BasicMovesDiagonalTest.
+            boolean edgeAhead = passable(world, new CellPos(
+                source.x() + dx, source.y() + 1, source.z()));
+            boolean edgeBhead = passable(world, new CellPos(
+                source.x(), source.y() + 1, source.z() + dz));
+            return edgeA && edgeB && edgeAhead && edgeBhead
+                && standable(world, destination);
         }
 
         @Override

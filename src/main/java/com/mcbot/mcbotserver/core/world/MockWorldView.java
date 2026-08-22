@@ -2,6 +2,9 @@ package com.mcbot.mcbotserver.core.world;
 
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.BlockSnapshot;
+import com.mcbot.mcbotserver.api.world.BlockTraits;
+import com.mcbot.mcbotserver.api.world.BlockTraitsRegistry;
+import com.mcbot.mcbotserver.api.world.CollisionShape;
 import com.mcbot.mcbotserver.api.world.EntitySnapshot;
 import com.mcbot.mcbotserver.api.world.ViewMode;
 import com.mcbot.mcbotserver.api.world.WorldView;
@@ -29,6 +32,20 @@ public final class MockWorldView implements WorldView {
     private final Map<CellPos, BlockSnapshot> blocks = new HashMap<>();
     private final List<EntitySnapshot> entities = new ArrayList<>();
     private final Set<CellPos> unloaded = new HashSet<>();
+    // Per-cell shape overrides: tests that care about partial blocks
+    // (slabs, fences, stairs) call putShape() to inject the box.
+    // Cells without an explicit shape fall back to the blockId-based
+    // default: air -> EMPTY, anything else -> FULL_CUBE. That keeps
+    // the existing Stage-0 tests honest without forcing every test
+    // to spell out the geometry.
+    private final Map<CellPos, CollisionShape> shapes = new HashMap<>();
+    // Per-cell trait overrides and a fallback registry. Tests that
+    // need a specific climbable / damaging / liquid cell inject
+    // either a registry (covers many cells) or a single override
+    // (one cell). The fallback for an unknown id is the registry's
+    // answer, which is the empty registry's default by default.
+    private final Map<CellPos, BlockTraits> traitOverrides = new HashMap<>();
+    private BlockTraitsRegistry traitsRegistry = BlockTraitsRegistry.empty();
 
     /**
      * Place or replace a block cell.
@@ -91,6 +108,62 @@ public final class MockWorldView implements WorldView {
         return this;
     }
 
+    /**
+     * Inject a cell-local shape for a position. Overrides the
+     * blockId-based default; tests that exercise slabs, fences, or
+     * stairs call this.
+     *
+     * @param pos   the cell to annotate; must not be null
+     * @param shape the shape to install; must not be null
+     * @return this mock, for fluent test setup
+     */
+    public MockWorldView putShape(CellPos pos, CollisionShape shape) {
+        if (pos == null) {
+            throw new IllegalArgumentException("pos must not be null");
+        }
+        if (shape == null) {
+            throw new IllegalArgumentException("shape must not be null");
+        }
+        shapes.put(pos, shape);
+        return this;
+    }
+
+    /**
+     * Inject a per-cell trait override. Wins over the registry for
+     * the same cell.
+     *
+     * @param pos    the cell to annotate; must not be null
+     * @param traits the traits to install; must not be null
+     * @return this mock, for fluent test setup
+     */
+    public MockWorldView putTraits(CellPos pos, BlockTraits traits) {
+        if (pos == null) {
+            throw new IllegalArgumentException("pos must not be null");
+        }
+        if (traits == null) {
+            throw new IllegalArgumentException("traits must not be null");
+        }
+        traitOverrides.put(pos, traits);
+        return this;
+    }
+
+    /**
+     * Install the fallback trait registry. Cells with no per-cell
+     * override resolve their id through this registry; the default
+     * (the empty registry) returns {@link BlockTraits#defaults()}
+     * for every id.
+     *
+     * @param registry the registry to use; must not be null
+     * @return this mock, for fluent test setup
+     */
+    public MockWorldView setTraitsRegistry(BlockTraitsRegistry registry) {
+        if (registry == null) {
+            throw new IllegalArgumentException("registry must not be null");
+        }
+        this.traitsRegistry = registry;
+        return this;
+    }
+
     @Override
     public BlockSnapshot getBlock(CellPos pos, ViewMode mode) {
         if (pos == null) {
@@ -102,6 +175,42 @@ public final class MockWorldView implements WorldView {
         BlockSnapshot snapshot = blocks.get(pos);
         return snapshot != null ? snapshot
             : new BlockSnapshot(pos, BlockSnapshot.AIR);
+    }
+
+    @Override
+    public CollisionShape getCollisionShape(CellPos pos, ViewMode mode) {
+        if (pos == null) {
+            throw new IllegalArgumentException("pos must not be null");
+        }
+        if (unloaded.contains(pos)) {
+            return CollisionShape.fullCube();
+        }
+        // Explicit shape wins; otherwise blockId-based default
+        // (air -> empty, anything else -> full cube). Tests that
+        // need partial geometry use putShape().
+        CollisionShape shape = shapes.get(pos);
+        if (shape != null) {
+            return shape;
+        }
+        BlockSnapshot snapshot = blocks.get(pos);
+        boolean isAir = snapshot == null
+            || BlockSnapshot.AIR.equals(snapshot.blockId());
+        return isAir ? CollisionShape.empty() : CollisionShape.fullCube();
+    }
+
+    @Override
+    public BlockTraits getBlockTraits(CellPos pos, ViewMode mode) {
+        if (pos == null) {
+            throw new IllegalArgumentException("pos must not be null");
+        }
+        BlockTraits override = traitOverrides.get(pos);
+        if (override != null) {
+            return override;
+        }
+        BlockSnapshot snapshot = blocks.get(pos);
+        String id = snapshot == null ? BlockSnapshot.AIR
+            : snapshot.blockId();
+        return traitsRegistry.traitsFor(id);
     }
 
     @Override

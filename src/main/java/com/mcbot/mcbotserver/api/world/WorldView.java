@@ -38,6 +38,41 @@ public interface WorldView {
     BlockSnapshot getBlock(CellPos pos, ViewMode mode);
 
     /**
+     * Cell-local box geometry of one block cell. The shape is the
+     * source of truth for "can a body pass / can a body stand" -
+     * planners derive their viability from this and only this, never
+     * from the block id (decision 19).
+     *
+     * <p>Default contract: when the cell is unknown / unloaded /
+     * the implementation does not carry geometry, return
+     * {@link CollisionShape#fullCube()} — a conservative "blocking"
+     * answer that fails the planner's viability check rather than
+     * letting it walk through unrendered terrain. Implementations
+     * that have real geometry MUST override.
+     *
+     * @param pos  the cell to read; must not be null
+     * @param mode consistency requested, per decision 17b
+     * @return the cell's collision shape; never null
+     */
+    default CollisionShape getCollisionShape(CellPos pos, ViewMode mode) {
+        return CollisionShape.fullCube();
+    }
+
+    /**
+     * Non-geometric traits (climbable, liquid, damaging) of one block
+     * cell. The shape cannot say "is this a ladder"; the registry
+     * can. Production builds thread a {@link BlockTraitsRegistry}
+     * into their adapter; the default here is the empty registry.
+     *
+     * @param pos  the cell to read; must not be null
+     * @param mode consistency requested, per decision 17b
+     * @return the cell's traits; never null
+     */
+    default BlockTraits getBlockTraits(CellPos pos, ViewMode mode) {
+        return BlockTraits.defaults();
+    }
+
+    /**
      * All entities within a spherical range of a cell center.
      *
      * @param center search origin; must not be null
