@@ -176,8 +176,14 @@ class TickPipelineGateTest {
             "halt claim must come from the reflex, got "
                 + move.holder());
 
-        // Heal: threat gone -> resume hands control back next tick.
+        // Heal: signal crosses release (20 > 15) but the 20-tick
+        // hold window keeps the rule firing for FREEZE_HOLD_TICKS
+        // ticks. Drain the hold one tick past the window so the
+        // next controller.onTick sees a silent reflex and resumes.
         health[0] = 20f;
+        for (int i = 0; i < FreezeOnLowHealthRule.FREEZE_HOLD_TICKS; i++) {
+            controller.onTick(world);
+        }
         actor.submitted.clear();
         controller.onTick(world);
         assertNull(arbiter.paused());
@@ -274,7 +280,15 @@ class TickPipelineGateTest {
         assertEquals(List.of(EventKind.TASK_PAUSED), kindsOf(events),
             "preemption must surface as TASK_PAUSED");
 
+        // Heal: drain the 20-tick hold window before asserting the
+        // TASK_RESUMED event. Each pre-hold tick is also a tick
+        // where the reflex still fires, but the controller's tryResume
+        // is gated by the reflex decision only, not by an event, so
+        // no extra TASK_PAUSED events appear.
         health[0] = 20f;
+        for (int i = 0; i < FreezeOnLowHealthRule.FREEZE_HOLD_TICKS; i++) {
+            controller.onTick(world);
+        }
         controller.onTick(world);
         assertEquals(List.of(EventKind.TASK_PAUSED, EventKind.TASK_RESUMED),
             kindsOf(events),
@@ -312,6 +326,11 @@ class TickPipelineGateTest {
         health[0] = 3f;
         controller.onTick(flooredWorld());
         health[0] = 20f;
+        // Drain the 20-tick hold window; the mission is parked but
+        // tryResume must run to actually surface TASK_DROPPED.
+        for (int i = 0; i < FreezeOnLowHealthRule.FREEZE_HOLD_TICKS; i++) {
+            controller.onTick(flooredWorld());
+        }
         controller.onTick(flooredWorld());
 
         List<String> kinds = kindsOf(events);

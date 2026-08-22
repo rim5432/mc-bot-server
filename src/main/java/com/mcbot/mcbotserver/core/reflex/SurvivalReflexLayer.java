@@ -1,12 +1,15 @@
 package com.mcbot.mcbotserver.core.reflex;
 
+import com.mcbot.mcbotserver.api.reflex.ReflexHysteresis;
 import com.mcbot.mcbotserver.api.reflex.ReflexRule;
 import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
 import com.mcbot.mcbotserver.api.reflex.ThreatSensor;
 import com.mcbot.mcbotserver.api.world.WorldView;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -20,8 +23,15 @@ import java.util.Objects;
  * table is invisible to processes; that is the seam's promise.
  *
  * <p>Implementation note: runs on the server tick thread only.
+ * Rules implementing ReflexHysteresis are run through a
+ * double-threshold + hold-window state machine so a signal that
+ * jitters around the trigger does not flip the decision every
+ * tick. The absorption lives here in the scheduler, not in the
+ * rule itself, so ReflexRule stays pure.
  */
 // contract: see ADR-0003 section 2 (reflex first; non-null skips mission)
+// contract: see boundaries.md anti-oscillation note (double threshold
+//           + hold window absorb signal jitter at the scheduler)
 public final class SurvivalReflexLayer {
 
     /** One fired reflex, resolved for this tick. */
@@ -31,6 +41,12 @@ public final class SurvivalReflexLayer {
     private final ThreatSensor sensor;
     private final ThreatBlackboard blackboard = new ThreatBlackboard();
     private final List<ReflexRule> rules = new ArrayList<>();
+    // Per-rule hysteresis state, keyed by rule name. Only rules that
+    // implement ReflexHysteresis populate entries here; non-hysteretic
+    // rules pass through unchanged. ticksSinceChange starts at the
+    // maximum so a fresh layer can fire on its very first tick when
+    // the rule wants to.
+    private final Map<String, HysteresisState> hysteresisState = new HashMap<>();
 
     /**
      * Creates a layer over one sensing pass.
@@ -73,6 +89,12 @@ public final class SurvivalReflexLayer {
         // business; a single reference swap keeps tick reads atomic.
         this.rules.clear();
         this.rules.addAll(replacement);
+        // Hysteresis state is keyed by rule name, so a same-named
+        // replacement would inherit the previous instance's
+        // active/lastPriority/ticksSinceChange and fire stale
+        // decisions for up to FREEZE_HOLD_TICKS ticks. Clear on
+        // reload so the new table starts at a known baseline.
+        this.hysteresisState.clear();
     }
 
     /**
@@ -110,12 +132,86 @@ public final class SurvivalReflexLayer {
 
         ReflexDecision winner = null;
         for (ReflexRule rule : rules) {
-            int priority = rule.computePriority(blackboard);
-            if (priority > 0
-                && (winner == null || priority > winner.priority())) {
-                winner = new ReflexDecision(rule.name(), priority);
+            int rawPriority = rule.computePriority(blackboard);
+            boolean shouldFire;
+            int effectivePriority;
+            if (rule instanceof ReflexHysteresis h) {
+                shouldFire = decideHysteresis(h, rule.name(),
+                    rawPriority);
+                // When held, the rule still reports as firing but the
+                // raw priority is negative (signal above trigger) -
+                // use the last positive priority we saw so the
+                // arbiter sees a stable number across the hold.
+                effectivePriority = shouldFire
+                    ? (rawPriority > 0
+                        ? rawPriority
+                        : hysteresisState.get(rule.name()).lastPriority)
+                    : -1;
+            } else {
+                shouldFire = rawPriority > 0;
+                effectivePriority = rawPriority;
+            }
+            if (shouldFire
+                && (winner == null
+                    || effectivePriority > winner.priority())) {
+                winner = new ReflexDecision(rule.name(),
+                    effectivePriority);
             }
         }
         return winner;
+    }
+
+    /**
+     * State machine for a hysteretic rule: tracks the current
+     * should-fire decision and the ticks since the last change.
+     * The transition is gated by both the signal thresholds
+     * (current state dictates which threshold applies) and a
+     * per-rule hold window.
+     *
+     * @param h            the hysteretic rule
+     * @param ruleName     stable name for state lookup
+     * @param rawPriority  the rule's raw computed priority this tick;
+     *                     positive when the rule's base condition
+     *                     fires
+     * @return true when the layer should report the rule as firing
+     */
+    private boolean decideHysteresis(ReflexHysteresis h, String ruleName,
+                                     int rawPriority) {
+        HysteresisState s = hysteresisState.computeIfAbsent(ruleName,
+            k -> new HysteresisState());
+        if (rawPriority > 0) {
+            s.lastPriority = rawPriority;
+        }
+        float signal = h.signalValue(blackboard);
+        boolean wantsActive = s.active
+            ? signal < h.releaseThreshold()
+            : signal < h.triggerThreshold();
+        if (wantsActive == s.active) {
+            return s.active;
+        }
+        // Wants to change state: gate by the hold window. Increment
+        // first so a single wants-change tick that arrives exactly
+        // at the window boundary still has to wait one more tick.
+        if (s.ticksSinceChange < h.minHoldTicks()) {
+            s.ticksSinceChange++;
+            return s.active;
+        }
+        s.active = wantsActive;
+        s.ticksSinceChange = 0;
+        return s.active;
+    }
+
+    /**
+     * Per-rule hysteresis memory. {@code active} is the current
+     * should-fire decision; {@code ticksSinceChange} counts ticks
+     * since the last flip and gates the next one. {@code lastPriority}
+     * is the most recent positive priority the rule produced - used
+     * during the hold window when raw priority has dropped to -1
+     * but the rule should still report as firing.
+     */
+    private static final class HysteresisState {
+        boolean active;
+        int ticksSinceChange = Integer.MAX_VALUE;
+        int lastPriority = -1;
     }
 }

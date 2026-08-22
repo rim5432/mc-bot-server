@@ -126,9 +126,20 @@ class ReflexChainGateTest {
         assertEquals(1, mission.resumedTicks,
             "parked missions are skipped by call order");
 
-        // Heal: reflex goes silent, revalidation passes, control returns.
+        // Heal: signal crosses release (20 > 15) but the 20-tick
+        // hold window keeps the rule firing for FREEZE_HOLD_TICKS
+        // ticks - that's the anti-oscillation safety net. Drain
+        // the hold one tick past the window so the next layer.tick
+        // is allowed to flip silent.
         health[0] = 20f;
-        assertNull(layer.tick(WORLD, 12L, 3L, 8100L, POS, health[0]));
+        for (int i = 0; i < FreezeOnLowHealthRule.FREEZE_HOLD_TICKS; i++) {
+            assertNotNull(layer.tick(WORLD, 12L + i, 3L, 8100L,
+                POS, health[0]),
+                "hold must keep the rule firing for FREEZE_HOLD_TICKS");
+        }
+        assertNull(layer.tick(WORLD, 12L + FreezeOnLowHealthRule.FREEZE_HOLD_TICKS,
+            3L, 8100L, POS, health[0]),
+            "after the hold the rule must release");
         assertTrue(arbiter.tryResume());
         assertSame(mission, arbiter.current());
         arbiter.tick(WORLD);
