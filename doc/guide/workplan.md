@@ -123,7 +123,15 @@ test count when red).
 
 ## Stage 2 backlog - unlocked only by the stage-1 gate
 
-- [ ] XL A* over the Movement five-tuple model
+- [x] XL A* over the Movement five-tuple model
+         ENGINE+INTEGRATION SHIPPED 2026-08-22: offline finder
+         (BasicMoves walk/diag/climb/drop<=3, node-budget safety net,
+         best-partial on budget cut only) plus waypoint-follower
+         integration in PathingBehavior with replan ladder
+         (exhaustion / drift>3 / progress fuse) and cooldown guard;
+         verified in-engine by all three stage-1 gametests now
+         route-planning instead of straight-thrusting. Vocabulary
+         growth (parkour, pillar, swim) follows demand.
 - [ ] M  async replan worker + blackboard staleness guard (reopen trigger
          fires here)
 - [ ] L  DefendProcess planner + CombatDirective + CombatBehavior
