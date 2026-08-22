@@ -2,6 +2,8 @@ package com.mcbot.mcbotserver.core.world;
 
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.BlockSnapshot;
+import com.mcbot.mcbotserver.api.world.BlockTraits;
+import com.mcbot.mcbotserver.api.world.CollisionShape;
 import com.mcbot.mcbotserver.api.world.EntitySnapshot;
 import com.mcbot.mcbotserver.api.world.ViewMode;
 import com.mcbot.mcbotserver.api.world.WorldView;
@@ -12,11 +14,18 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Immutable block copy of a bounded region, captured on the server
- * tick thread and read from the replan worker thread - decision 17b's
- * SNAPSHOT half made concrete. Cells outside the captured box answer
- * null / not-loaded, which the planner already prunes as unknown; a
- * snapshot therefore can never route through terrain it did not see.
+ * Immutable copy of a bounded region - blocks, collision shapes, and
+ * block traits - captured on the server tick thread and read from the
+ * replan worker thread; decision 17b's SNAPSHOT half made concrete.
+ * Cells outside the captured box answer null / not-loaded / solid,
+ * which the planner already prunes as unknown; a snapshot therefore
+ * can never route through terrain it did not see.
+ *
+ * <p>Why shapes and traits are copied too: the planner's viability
+ * queries go through {@link #getCollisionShape} /
+ * {@link #getBlockTraits}, not through block ids. A snapshot that
+ * served only blocks would fall back to the interface defaults -
+ * solid everywhere - and every plan would come back empty.
  *
  * <p>Contract: see boundaries.md section A (read-only) and decision
  * 17b (ViewMode). The capture is a one-shot constructor side effect on
@@ -34,9 +43,15 @@ public final class SnapshotWorldView implements WorldView {
     public static final int Y_MARGIN = 4;
 
     private final Map<CellPos, BlockSnapshot> cells;
+    private final Map<CellPos, CollisionShape> shapes;
+    private final Map<CellPos, BlockTraits> traits;
 
-    private SnapshotWorldView(Map<CellPos, BlockSnapshot> cells) {
+    private SnapshotWorldView(Map<CellPos, BlockSnapshot> cells,
+                              Map<CellPos, CollisionShape> shapes,
+                              Map<CellPos, BlockTraits> traits) {
         this.cells = cells;
+        this.shapes = shapes;
+        this.traits = traits;
     }
 
     /**
@@ -66,6 +81,8 @@ public final class SnapshotWorldView implements WorldView {
         int maxZ = Math.max(a.z(), b.z()) + XZ_MARGIN;
 
         var copied = new HashMap<CellPos, BlockSnapshot>();
+        var shapes = new HashMap<CellPos, CollisionShape>();
+        var traits = new HashMap<CellPos, BlockTraits>();
         for (int x = minX; x <= maxX; x++) {
             for (int y = minY; y <= maxY; y++) {
                 for (int z = minZ; z <= maxZ; z++) {
@@ -75,10 +92,15 @@ public final class SnapshotWorldView implements WorldView {
                     if (snap != null) {
                         copied.put(pos, snap);
                     }
+                    shapes.put(pos,
+                        live.getCollisionShape(pos, ViewMode.LIVE));
+                    traits.put(pos,
+                        live.getBlockTraits(pos, ViewMode.LIVE));
                 }
             }
         }
-        return new SnapshotWorldView(Map.copyOf(copied));
+        return new SnapshotWorldView(Map.copyOf(copied),
+            Map.copyOf(shapes), Map.copyOf(traits));
     }
 
     /**
@@ -93,6 +115,37 @@ public final class SnapshotWorldView implements WorldView {
     @Override
     public BlockSnapshot getBlock(CellPos pos, ViewMode mode) {
         return cells.get(Objects.requireNonNull(pos, "pos"));
+    }
+
+    /**
+     * The captured shape inside the box; solid outside it - unknown
+     * ground must read as impassable, never as walkable.
+     *
+     * @param pos  the cell to read; must not be null
+     * @param mode ignored; accepted for interface conformance
+     * @return the captured shape; never null
+     */
+    @Override
+    public CollisionShape getCollisionShape(CellPos pos,
+                                            ViewMode mode) {
+        CollisionShape shape = shapes.get(
+            Objects.requireNonNull(pos, "pos"));
+        return shape != null ? shape : CollisionShape.fullCube();
+    }
+
+    /**
+     * The captured traits inside the box; conservative defaults
+     * outside it.
+     *
+     * @param pos  the cell to read; must not be null
+     * @param mode ignored; accepted for interface conformance
+     * @return the captured traits; never null
+     */
+    @Override
+    public BlockTraits getBlockTraits(CellPos pos, ViewMode mode) {
+        BlockTraits t = traits.get(
+            Objects.requireNonNull(pos, "pos"));
+        return t != null ? t : BlockTraits.defaults();
     }
 
     /**
