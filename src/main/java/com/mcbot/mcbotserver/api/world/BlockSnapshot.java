@@ -7,20 +7,26 @@ import com.mcbot.mcbotserver.api.types.CellPos;
  * out of a {@link WorldView} must never have side effects.
  *
  * <p>Contract: see boundaries.md section A; decision 17 (primitive
- * families). Block ids use the {@code minecraft:stone} style key so
- * data-driven rule tables can reference them without engine types.
+ * families). Block ids let data-driven rule tables reference blocks
+ * without engine types.
  *
  * @param pos     the cell this snapshot describes; never null
- * @param blockId registry-style id of the block; never null; the
- *                unloaded/unknown case is expressed by {@link #UNKNOWN},
- *                not by null
+ * @param blockId id of the block; never null; two styles by design -
+     *           real blocks use the registry key ({@code minecraft:stone}),
+ *                ambient markers use the canonical constants {@link #AIR}
+ *                and {@link #UNKNOWN}; never null - unknown is expressed
+ *                by {@link #UNKNOWN}, not by null
  */
 public record BlockSnapshot(CellPos pos, String blockId) {
 
     /** Block id used when the cell is outside any loaded chunk. */
     public static final String UNKNOWN = "?unknown";
 
-    /** Block id for air cells. */
+    /**
+     * Canonical (not registry-style) id for air cells. Adapters must
+     * normalize the engine's {@code minecraft:air} to this constant -
+     * the Stage 2 planner bug was exactly that mismatch.
+     */
     public static final String AIR = "air";
 
     /**
