@@ -52,9 +52,20 @@ public final class CombatBehavior implements Behavior {
     /** Minimum ticks between swings (vanilla invulnerability scale). */
     public static final int ATTACK_COOLDOWN_TICKS = 10;
 
+    /**
+     * Ticks a swing window stays open after reach left the gate.
+     * Edge-jittering targets (knockback, strafe) otherwise waste the
+     * cooldown expiry whenever it lands on an out-of-range tick; the
+     * hold bridges those gaps without widening honest reach.
+     */
+    public static final int AIM_HOLD_TICKS = 3;
+
     private final String name;
     private final PoseSource poseSource;
     private int ticksSinceSwing = ATTACK_COOLDOWN_TICKS;
+    // Starts EXPIRED: a target that has never been in reach earns no
+    // hold memory - only an actual in-reach sighting opens the window.
+    private int ticksSinceInReach = AIM_HOLD_TICKS + 1;
     private boolean pressLatched;
     private float lastYaw;
 
@@ -125,12 +136,21 @@ public final class CombatBehavior implements Behavior {
             new Intent.Look(yaw, pitch)));
 
         // Swing pacing: hold the release until cooldown expires so the
-        // adapter sees exactly one rising edge per attack window.
+        // adapter sees exactly one rising edge per attack window. The
+        // reach memory lets the window survive brief excursions past
+        // the gate instead of starving on edge jitter.
         boolean released = !pressLatched;
         ticksSinceSwing++;
         double reach = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (reach <= ATTACK_REACH) {
+            ticksSinceInReach = 0;
+        } else {
+            ticksSinceInReach++;
+        }
+        boolean inReachMemory = reach <= ATTACK_REACH
+            || ticksSinceInReach <= AIM_HOLD_TICKS;
         if (released && ticksSinceSwing >= ATTACK_COOLDOWN_TICKS
-            && reach <= ATTACK_REACH) {
+            && inReachMemory) {
             actor.submit(new Claim(Channel.USE, 20, name,
                 new Intent.Use(true)));
             pressLatched = true;
