@@ -94,14 +94,30 @@ public final class TaskArbiter {
      * Reflex-layer entry point: park whoever currently holds the body,
      * keeping their plan intact for resume.
      *
+     * <p>Preemption-vs-completion race semantics (the retirement lap):
+     * a mission that went terminal LAST tick still sits in
+     * {@code current} until this tick's stage 2 retires it. Freezing
+     * in that window must NOT park the corpse - parking would swallow
+     * its completion event behind a TASK_PAUSED and a silent cleanup.
+     * Terminal missions are retired instead, so the pipeline's
+     * transition detector can emit their verdict on this very tick;
+     * only live missions park (and return true).
+     *
      * @param context snapshot of the preemption moment; never null
-     * @return true when a running mission was actually parked
+     * @return true when a LIVE running mission was actually parked
      */
     public boolean forcePauseAll(InterruptionContext context) {
         if (context == null) {
             throw new IllegalArgumentException("context must not be null");
         }
         if (current == null) {
+            return false;
+        }
+        if (!current.isActive()) {
+            // Already decided - retire, never park. The controller's
+            // transition emitter owns announcing the verdict.
+            retireCurrent();
+            lastDirective = null;
             return false;
         }
         current.onLostControl(context);

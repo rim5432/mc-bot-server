@@ -382,6 +382,52 @@ class TickPipelineGateTest {
             "reason must be structured, not embedded in text");
     }
 
+    /**
+     * Preemption-vs-completion race (the retirement lap): a mission
+     * that went terminal LAST tick is still in the arbiter's current
+     * slot when a reflex fires. The freeze must retire it - never
+     * park it - so its verdict event reaches the stream; PAUSED for a
+     * corpse would be a lie, and silence would swallow the result.
+     */
+    @Test
+    void reflexInRetirementLapEmitsVerdictNotPaused() {
+        float[] health = {20f};
+        InMemoryEventQueue events =
+            new InMemoryEventQueue(() -> 1L, () -> 0L);
+        SurvivalReflexLayer layer = new SurvivalReflexLayer(
+            (world, board) -> board.botHealth = health[0]);
+        layer.addRule(new FreezeOnLowHealthRule());
+        TaskArbiter arbiter = new TaskArbiter();
+        com.mcbot.mcbotserver.core.process.GotoProcess mission =
+            new com.mcbot.mcbotserver.core.process.GotoProcess(
+                "gt-lap", new GoalBlock(new CellPos(5, 80, 5)),
+                50, 400);
+        arbiter.register(mission);
+        arbiter.requestControl(mission);
+        RecordingActor actor = new RecordingActor();
+        PathingBehavior mover = new PathingBehavior("mover", () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5), BasicMoves::from);
+        BotController controller = controller(health, layer, arbiter,
+            mover, actor, events);
+
+        // Tick 1: planner fails the floating goal -> mission terminal
+        // (active=false) but STILL current until stage 2 retires it.
+        controller.onTick(flooredWorld());
+        assertFalse(mission.isActive());
+
+        // Tick 2: reflex fires BEFORE retirement could happen.
+        health[0] = 3f;
+        controller.onTick(flooredWorld());
+
+        List<String> kinds = kindsOf(events);
+        assertFalse(kinds.contains(EventKind.TASK_PAUSED),
+            "a decided mission must not be announced as paused");
+        assertEquals(EventKind.TASK_FAILED, kinds.get(0),
+            "the verdict survives the freeze arriving one tick late");
+        assertEquals("NO_PATH",
+            events.statusSnapshot(0).events().get(0).attrs()
+                .get("reason"));
+    }
+
     private static List<String> kindsOf(InMemoryEventQueue events) {
         return events.statusSnapshot(0).events().stream()
             .map(BotEvent::kind)

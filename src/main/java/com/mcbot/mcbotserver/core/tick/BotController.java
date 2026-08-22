@@ -255,7 +255,8 @@ public final class BotController {
                 pose, activeName(), "reflex-preempt:" + decision.ruleName(),
                 "");
             String pausedTask = activeName();
-            if (arbiter.forcePauseAll(ctx)) {
+            boolean parked = arbiter.forcePauseAll(ctx);
+            if (parked) {
                 emitMissionEvent(EventKind.TASK_PAUSED, day, tod,
                     pausedTask, "paused by reflex "
                         + decision.ruleName());
@@ -267,6 +268,11 @@ public final class BotController {
                 "reflex:" + decision.ruleName(),
                 new Intent.Move(0, 0, false, false)));
             actor.flush();
+            // A mission caught terminal in its retirement lap was
+            // retired, not parked - its verdict must still be
+            // announced even though the reflex owns this tick. With a
+            // live park, previousCurrent is null and this is a no-op.
+            emitMissionTransition(day, tod);
             return;
         }
 
