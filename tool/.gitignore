@@ -8,3 +8,7 @@ __pycache__/
 
 # one-shot patch scripts produced by the agent during development
 .tmp_*.py
+
+# archive of finished one-shot patch scripts and per-session debug
+# artifacts; never tracked, kept on disk for postmortem reference
+_archive/
