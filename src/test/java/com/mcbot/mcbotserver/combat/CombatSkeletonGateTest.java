@@ -123,9 +123,13 @@ class CombatSkeletonGateTest {
             defend.failureReasonOrNull());
     }
 
-    /** Late reports cannot flip a decided terminal state. */
+    /**
+     * Reports never decide the fight: neither a locomotion FAILED nor
+     * a chase SUCCESS may flip terminal state - scans, leash, and
+     * timeout own the verdict.
+     */
     @Test
-    void terminalStateIsSticky() {
+    void reportsNeverDecideTheFight() {
         MockWorldView world = new MockWorldView();
         world.addEntity(zombie("z1", new CellPos(2, 64, 0)));
         DefendProcess defend = new DefendProcess("gt-def", 60, 400,
@@ -135,10 +139,33 @@ class CombatSkeletonGateTest {
             ExecutionReport.failed("STUCK"));
         defend.onExecutionReport(ExecutionReport.success());
 
-        assertFalse(defend.missionSucceeded(),
-            "the FAILED verdict stands");
-        assertEquals("STUCK", defend.failureReasonOrNull(),
-            "and so does its reason");
+        assertTrue(defend.isActive(),
+            "execution weather must not end the engagement");
+        assertNull(defend.failureReasonOrNull(),
+            "no verdict was reached");
+    }
+
+    /**
+     * Reaching the chase goal is where the fight starts: a SUCCEEDED
+     * locomotion report must never end the mission - victory belongs
+     * to the scans alone.
+     */
+    @Test
+    void locomotionSuccessDoesNotEndTheFight() {
+        MockWorldView world = new MockWorldView();
+        world.addEntity(zombie("z1", new CellPos(2, 64, 0)));
+        DefendProcess defend = new DefendProcess("gt-def", 60, 400,
+            () -> new CellPos(0, 64, 0), HOSTILES);
+        defend.onTick(world);
+
+        defend.onExecutionReport(ExecutionReport.success());
+
+        assertTrue(defend.isActive(),
+            "standing next to the enemy is not victory");
+        Directive directive = defend.onTick(world);
+        assertEquals("z1",
+            ((Attack) directive.overrides().combat()).targetId(),
+            "the fight continues on the same target");
     }
 
     /** Delegating actor that records every submission this tick. */

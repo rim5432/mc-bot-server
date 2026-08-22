@@ -9,8 +9,10 @@ import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.core.behavior.CombatBehavior;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
+import com.mcbot.mcbotserver.core.process.DefendProcess;
 import com.mcbot.mcbotserver.core.process.GotoProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.core.reflex.FreezeOnLowHealthRule;
@@ -201,6 +203,18 @@ public final class BotSliceGameTests {
         return mission;
     }
 
+    private static DefendProcess submitDefend(Rig rig) {
+        String taskId = "gt-df-" + Integer.toHexString(
+            System.identityHashCode(rig.body()));
+        DefendProcess mission = new DefendProcess(taskId, 60,
+            MISSION_BUDGET, () -> poseOf(rig.body()),
+            com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor
+                .hostileTypes());
+        rig.arbiter().register(mission);
+        rig.arbiter().requestControl(mission);
+        return mission;
+    }
+
     private static Rig rig(GameTestHelper helper, BlockPos spawnLocal) {
         ServerLevel level = helper.getLevel();
         for (int x = 0; x < 16; x++) {
@@ -242,13 +256,60 @@ public final class BotSliceGameTests {
             () -> finePoseOf(body),
             com.mcbot.mcbotserver.core.pathing.BasicMoves::from,
             new com.mcbot.mcbotserver.core.pathing.PlanWorker());
+        Behavior combat = new CombatBehavior("combat",
+            () -> finePoseOf(body));
 
         BotController controller = new BotController(reflex, arbiter,
-            List.of(mover), actor,
+            List.of(mover, combat), actor,
             () -> poseOf(body), body::getHealth,
             clockOf(level), events, CrashReporter.consoleFallback());
 
         return new Rig(body, view, events, arbiter, controller);
+    }
+
+    /**
+     * Scenario 4: an intruder inside the engage radius gets engaged,
+     * chased the last step, and beaten down - the defend mission
+     * completes only once the target stops existing.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = TIMEOUT)
+    public static void defendsByKillingZombie(GameTestHelper helper) {
+        Rig rig = rig(helper, new BlockPos(3, WALK_Y, 8));
+        var level = helper.getLevel();
+        net.minecraft.world.entity.monster.Zombie zombie =
+            net.minecraft.world.entity.EntityType.ZOMBIE.create(level);
+        check(zombie != null, "zombie creation failed");
+        var zAbs = helper.absolutePos(new BlockPos(7, WALK_Y, 8));
+        zombie.moveTo(zAbs.getX() + 0.5, zAbs.getY(),
+            zAbs.getZ() + 0.5, 0f, 0f);
+        zombie.setNoAi(true);
+        level.addFreshEntity(zombie);
+
+        DefendProcess mission = submitDefend(rig);
+
+        helper.startSequence()
+            .thenWaitUntil(driveUntil(rig,
+                () -> check(!mission.isActive(),
+                    "waiting for the fight to end")))
+            .thenExecuteFor(3, driveOnly(rig))
+            .thenExecuteAfter(0, () -> {
+                System.out.println("[s4-probe] ok=" + mission.missionSucceeded()
+                    + " active=" + mission.isActive()
+                    + " reason=" + mission.failureReasonOrNull()
+                    + " zhealth=" + zombie.getHealth()
+                    + " zalive=" + zombie.isAlive()
+                    + " events=" + rig.events().statusSnapshot(0)
+                        .events().stream().map(BotEvent::kind).toList());
+                check(mission.missionSucceeded(),
+                    "a killed target must complete the defend task");
+                assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
+                check(zombie.isDeadOrDying() || zombie.isRemoved(),
+                    "the zombie must not survive the engagement");
+                check(rig.body().isAlive(),
+                    "the body must walk away from this fight");
+                rig.body().discard();
+            })
+            .thenSucceed();
     }
 
     private static void assertEventSeen(InMemoryEventQueue events,

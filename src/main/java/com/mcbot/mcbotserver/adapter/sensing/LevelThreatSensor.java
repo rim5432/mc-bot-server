@@ -39,6 +39,17 @@ public final class LevelThreatSensor implements ThreatSensor {
             "minecraft:pillager",
             "minecraft:vindicator");
 
+    /**
+     * The shared hostile-type vocabulary. Threat classification is
+     * data owned by the sensing side; consumers (combat planner
+     * wiring) read it here instead of re-listing mobs.
+     *
+     * @return unmodifiable hostile type ids; never null or empty
+     */
+    public static java.util.Set<String> hostileTypes() {
+        return HOSTILE_TYPES;
+    }
+
     private final com.mcbot.mcbotserver.adapter.BindingWorldView view;
     private final java.util.function.Supplier<CellPos> bodyPos;
 

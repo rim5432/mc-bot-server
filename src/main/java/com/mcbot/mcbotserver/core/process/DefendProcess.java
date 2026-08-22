@@ -165,12 +165,19 @@ public final class DefendProcess implements BotProcess, TerminalMission {
             return;
         }
         switch (report.status()) {
-            case SUCCESS -> succeed();
-            case FAILED -> fail(report.reason() != null
-                ? report.reason() : "UNKNOWN");
+            // Deliberately NO success case here: a SUCCEEDED report
+            // means the chase locomotion reached its GoalNear - standing
+            // next to the enemy is where the FIGHT starts, never the
+            // verdict. Only this process's own scans declare victory.
+            //
+            // Deliberately NO failure case either: a locomotion FAILED
+            // describes the CHASE, not the FIGHT - a blocked path or a
+            // fuse trip while closing distance must not abort the
+            // engagement (the body may already be within swing range).
+            // Terminal authority belongs to scans, leash, and timeout.
             default -> {
-                // RUNNING and STUCK are execution weather, not
-                // verdicts; the mover's own cooldowns recover.
+                // RUNNING, STUCK, SUCCESS, FAILED - all execution
+                // weather; the scans decide.
             }
         }
     }
