@@ -49,6 +49,12 @@ public final class BindingWorldView implements WorldView {
             return null;
         }
         var state = level.getBlockState(mc);
+        // Canonical air id: the registry key would be "minecraft:air",
+        // which fails BlockSnapshot.isAir() and makes every open cell
+        // look solid to the move graph.
+        if (state.isAir()) {
+            return new BlockSnapshot(pos, BlockSnapshot.AIR);
+        }
         ResourceLocation key = BuiltInRegistries.BLOCK.getKey(
             state.getBlock());
         return new BlockSnapshot(pos,
