@@ -132,8 +132,22 @@ test count when red).
          verified in-engine by all three stage-1 gametests now
          route-planning instead of straight-thrusting. Vocabulary
          growth (parkour, pillar, swim) follows demand.
-- [ ] M  async replan worker + blackboard staleness guard (reopen trigger
-         fires here)
+- [x] M  async replan worker + blackboard staleness guard
+         SHIPPED 2026-08-22: PlanWorker (single daemon thread, wall
+         clock required) + SnapshotWorldView (decision 17b SNAPSHOT
+         half; hull capture, outside-box reads unknown) + adoption
+         freshness guard in PathingBehavior (goal unchanged AND start
+         cell still ours; stale results discarded whole with an
+         immediate re-request). AStarPathFinder grew the wall-clock
+         overload checked every 64 expansions. McBotServer and all
+         gametests run this path.
 - [ ] L  DefendProcess planner + CombatDirective + CombatBehavior
          micro-execution skeleton
-- [ ] S  rule-table JSON loading through Registry + Codec + ReloadListener
+- [x] S  rule-table JSON loading through Registry + Codec + ReloadListener
+         SHIPPED 2026-08-22 (gson instead of Codec - pure-Java parser
+         stays offline-testable per boundaries.md decision 5):
+         ReflexRuleJson parse/write, SurvivalReflexLayer.replaceRules,
+         ReflexRuleReloader on the vanilla reload pipeline, default
+         table shipped as a built-in datapack entry. Review NITs 1/2
+         landed alongside (attrs.reason structured events;
+         BlockSnapshot id-style Javadoc).
