@@ -39,7 +39,13 @@ public final class CombatBehavior implements Behavior {
 
     /**
      * Horizontal distance below which the aim bearing is held, not
-     * recomputed - overlapping a target makes direction noise.
+     * recomputed - overlapping a target makes direction noise. The
+     * threshold sits just under the player's half-width hitbox
+     * (0.6 wide / 2 = 0.3 each side, plus a little margin for the
+     * cap cell) so the body has to be measurably out of overlap
+     * before the bearing is allowed to swing again; below it the
+     * 180-degree-per-tick yaw flip dominates the atan2 signal and
+     * every dot-product check against the aim cone fails.
      */
     public static final double AIM_MIN_HORIZONTAL = 0.5;
 

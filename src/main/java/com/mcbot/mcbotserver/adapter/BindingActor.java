@@ -146,7 +146,12 @@ public final class BindingActor implements Actor {
             }
         }
         if (best != null) {
-            com.mojang.logging.LogUtils.getLogger().info(
+            // Kept at DEBUG: useful for in-engine melee tracing when
+            // tuning ATTACK_REACH / AIM_CONE_DEG, not noise the
+            // production log needs at INFO. The 8c09134 standoff
+            // bug was found by walking these lines; a future tuning
+            // pass will reach for the same lever.
+            com.mojang.logging.LogUtils.getLogger().debug(
                 "[melee] HIT dist={} hp={}", bestDist,
                 best.getHealth());
             best.hurt(body.damageSources()

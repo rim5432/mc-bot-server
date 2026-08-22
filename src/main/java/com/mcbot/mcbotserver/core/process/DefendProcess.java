@@ -53,6 +53,13 @@ public final class DefendProcess implements BotProcess, TerminalMission {
      * so the body stops outside swing-adjacent overlap instead of
      * driving into the target's cell, where the aim direction
      * degenerates.
+     *
+     * <p>Invariant: must stay strictly less than
+     * {@link com.mcbot.mcbotserver.core.behavior.CombatBehavior#ATTACK_REACH}
+     * so the body can still reach the target for a swing while
+     * holding the standoff. If ATTACK_REACH ever drops to 2 or
+     * below, raise this constant or the chase will end out of
+     * swing range.
      */
     public static final int GOAL_RANGE = 2;
 

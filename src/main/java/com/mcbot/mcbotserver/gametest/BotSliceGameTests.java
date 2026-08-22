@@ -293,13 +293,6 @@ public final class BotSliceGameTests {
                     "waiting for the fight to end")))
             .thenExecuteFor(3, driveOnly(rig))
             .thenExecuteAfter(0, () -> {
-                System.out.println("[s4-probe] ok=" + mission.missionSucceeded()
-                    + " active=" + mission.isActive()
-                    + " reason=" + mission.failureReasonOrNull()
-                    + " zhealth=" + zombie.getHealth()
-                    + " zalive=" + zombie.isAlive()
-                    + " events=" + rig.events().statusSnapshot(0)
-                        .events().stream().map(BotEvent::kind).toList());
                 check(mission.missionSucceeded(),
                     "a killed target must complete the defend task");
                 assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
