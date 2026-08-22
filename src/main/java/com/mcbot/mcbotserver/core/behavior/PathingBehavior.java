@@ -120,6 +120,18 @@ public final class PathingBehavior implements Behavior {
      */
     public static final long PLAN_WALL_CLOCK_MS = 50;
 
+    /**
+     * Freshness tolerance in cells (issue 0001 fix 5 / Ruling (c).
+     * The bot's current cell must be within Chebyshev distance
+     * {@code FRESHNESS_CELLS} of the {@code pendingStart} the
+     * search was launched from for the result to be adopted.
+     * {@code FRESHNESS_CELLS == 1} is the v1 vocabulary's
+     * tightest tolerance: every BasicMoves move is max-Chebyshev
+     * 1, so a 1-cell drift is the maximum the bot can accumulate
+     * in any single tick.
+     */
+    public static final int FRESHNESS_CELLS = 1;
+
     private final String name;
     private final PoseSource poseSource;
     private final MoveGraph graph;
@@ -330,8 +342,19 @@ public final class PathingBehavior implements Behavior {
         }
         pendingPlan = null;
 
+        // Freshness check (issue 0001 fix 5 / Ruling (c): cell-equality
+        // is too strict. A* takes time; the bot moves during the
+        // search. Walking speed 0.215 b/tick x a 4-5 tick search
+        // already crosses 1 cell; strict cell-equality would discard
+        // every result, eating the fuse accumulator through churn.
+        // Chebyshev distance 1 (max(|dx|, |dy|, |dz|) <= 1) accepts
+        // any cell the bot can reach in 1 step in the move graph
+        // (Walk, ClimbUp, Drop, Diagonal - all max-Chebyshev 1).
+        // Note: 1 cell is the v1 vocabulary's tightest tolerance;
+        // future moves that span more cells per step must revisit
+        // this constant in lockstep.
         boolean fresh = currentGoal.equals(pendingGoal)
-            && cell.equals(pendingStart);
+            && chebyshevDistance(cell, pendingStart) <= FRESHNESS_CELLS;
         pendingGoal = null;
         pendingStart = null;
         if (!fresh) {
@@ -481,6 +504,27 @@ public final class PathingBehavior implements Behavior {
         double dy = pose.y() - y;
         double dz = pose.z() - z;
         return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    /**
+     * Chebyshev distance between two cells (max of the per-axis
+     * deltas). Used by the freshness check in {@link #adoptCompletedPlan}:
+     * a search result is fresh if the bot's current cell is within
+     * {@link #FRESHNESS_CELLS} Chebyshev units of the cell the
+     * search was launched from. Chebyshev (not Euclidean) is the
+     * right metric here because the move graph's maximum step in
+     * any single tick is max-Chebyshev 1 (Walk, ClimbUp, Drop,
+     * Diagonal) - a 1-cell Euclidean step would reject valid moves.
+     *
+     * @param a one cell; must not be null
+     * @param b another cell; must not be null
+     * @return non-negative Chebyshev distance in cells
+     */
+    private static int chebyshevDistance(CellPos a, CellPos b) {
+        int dx = Math.abs(a.x() - b.x());
+        int dy = Math.abs(a.y() - b.y());
+        int dz = Math.abs(a.z() - b.z());
+        return Math.max(dx, Math.max(dy, dz));
     }
 
     /**
