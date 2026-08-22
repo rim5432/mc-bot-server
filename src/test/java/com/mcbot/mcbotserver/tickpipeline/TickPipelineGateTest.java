@@ -539,8 +539,9 @@ class TickPipelineGateTest {
             "keepalive carries pose: " + a.keySet());
         assertTrue(a.containsKey("waypointIndex"),
             "keepalive carries waypointIndex: " + a.keySet());
-        assertTrue(a.containsKey("ticksSinceProgress"),
-            "keepalive carries ticksSinceProgress: " + a.keySet());
+        assertTrue(a.containsKey("ticksSincePlanProgress"),
+            "keepalive carries ticksSincePlanProgress (renamed from "
+            + "ticksSinceProgress in PR-2): " + a.keySet());
         assertTrue(a.containsKey("ticksSincePlan"),
             "keepalive carries ticksSincePlan: " + a.keySet());
         assertTrue(a.containsKey("planAge"),

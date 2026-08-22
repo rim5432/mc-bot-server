@@ -20,6 +20,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Limbo-characterization gate (issue 0001 §3 branch 2, §7). Pins
@@ -64,14 +65,26 @@ class LimboCharacterizationGateTest {
     }
 
     /**
-     * Characterization: a body driven with continuous Y motion
+     * PR-2 fix proof: a body driven with continuous Y motion
      * (waterfall column), XZ held at 1.5 from the next waypoint,
-     * does NOT trip the progress fuse in 100 ticks. This钉住
-     * the pre-fix-4 behaviour so PR-2's diff is exactly the
-     * assertion flip ("STUCK fires within K").
+     * MUST trip the plan-progress fuse in <= 20 ticks. Pre-fix-4
+     * the motion detector saw 3D motion and kept resetting;
+     * post-fix-4 the plan-progress score sees zero waypoint
+     * advance, zero goal closure, zero current-waypoint
+     * approach, and the accumulator fires. PR-1 Characterization
+     * (no STUCK) is the inverse of this assertion - the diff
+     * between this commit and PR-1 IS the fix.
+     *
+     * <p>Form 1 from issue 0001 §7: STUCK fires within K ticks
+     * of the last plan-progress tick. Here K = 20. The harness
+     * gets exactly one STUCK event (status STUCK) before the
+     * planner's replan cooldown gate would otherwise gate
+     * further progress; FAILED+reason="STUCK" can also fire
+     * (PathingBehavior.java:280) if waypoints is empty and
+     * the fuse fires post-exhaustion. Both channels count.
      */
     @Test
-    void waterfallLimbodoesNotFireStuckPreFix4() {
+    void waterfallLimboFiresStuckPostFix4() {
         MockWorldView world = floorTo(60);
         // Start at (0.5, 64, 0.5). Goal at (40, 64, 0). Plan adopted
         // after the first tick; the first remaining waypoint is
@@ -90,43 +103,58 @@ class LimboCharacterizationGateTest {
         mover.tick(world, directive, actor);
 
         // Drive 100 ticks of continuous Y motion = 0.3 m/tick,
-        // XZ unchanged. Terminal waterfall speed is ~3.9 m/tick;
-        // 0.3 m/tick is conservative and well above STUCK_EPSILON
-        // (0.01) so the motion fuse keeps resetting.
-        boolean stuckFired = false;
-        String stuckReason = null;
+        // XZ unchanged. Pre-fix-4: motion > epsilon so the
+        // motion fuse kept resetting, no STUCK. Post-fix-4:
+        // no waypoint advance (XZ held), goal distance grows
+        // (Y moves away from y=64.5), current waypoint
+        // distance grows; the plan-progress score stays at 0
+        // for every tick, the accumulator fires at tick 20
+        // of no-progress.
+        int stuckTick = -1;
+        String stuckChannel = null;
         for (int i = 1; i <= 100; i++) {
             pose[0] = new Vec3(pose[0].x(),
                 pose[0].y() - 0.3, pose[0].z());
             ExecutionReport r = mover.tick(world, directive, actor);
-            if (r.status() == ExecutionReport.Status.STUCK) {
-                stuckFired = true;
-                stuckReason = "STUCK at tick " + i;
+            boolean stuck =
+                r.status() == ExecutionReport.Status.STUCK
+                || (r.status() == ExecutionReport.Status.FAILED
+                    && "STUCK".equals(r.reason()));
+            if (stuck) {
+                stuckTick = i;
+                stuckChannel = r.status()
+                    + (r.reason() == null ? "" : "+" + r.reason());
                 break;
             }
         }
-        assertFalse(stuckFired,
-            "limbo characterization: continuous Y motion must NOT fire "
-            + "STUCK pre-fix-4. (" + stuckReason + ") PR-2 will flip "
-            + "this assertion once the plan-progress fuse replaces "
-            + "the motion detector.");
+        // K=20 from issue 0001 §7 form 1, plus a known +1 offset
+        // from the first-observation credit on the outer tick. The
+        // fuse fires at i=21 (call#22 overall). PR-1's
+        // characterization (inverse assertion, "no STUCK fires")
+        // is the diff proof: the same body in pre-fix-4 never
+        // sees STUCK at all.
+        assertTrue(stuckTick > 0 && stuckTick <= 21,
+            "plan-progress fuse must fire STUCK within 21 ticks of "
+            + "entering continuous Y motion (limbo); fired at i="
+            + stuckTick + " (" + stuckChannel + "). Form 1 from "
+            + "issue 0001 §7 with K=20 + first-observation +1 offset.");
     }
 
     /**
-     * Sanity counterpart: a body at rest on solid ground (motion
-     * < STUCK_EPSILON for STUCK_WINDOW ticks) DOES fire STUCK
-     * via the existing motion fuse. Confirms the test rig is
-     * wired correctly - if this fails, the rig itself is broken,
-     * not the limbo scenario.
+     * Sanity counterpart: a body at rest on solid ground (no plan-
+     * progress for {@code STUCK_WINDOW} ticks) DOES fire STUCK.
+     * Confirms the test rig is wired correctly - if this fails,
+     * the rig itself is broken, not the plan-progress fuse.
      *
-     * <p>Timing: the first outer tick resets {@code ticksSinceProgress}
-     * to 0 (lastProgressPose was null). Subsequent ticks of no motion
-     * increment to 1, 2, ..., 20. STUCK fires on the 21st tick (i=20
-     * in the loop, which is the 21st mover.tick call overall). The
-     * +1 from the initial reset is a known offset; do not "fix" it.
+     * <p>Timing: the first outer tick credits progress (sentinel
+     * triggers: criterion 1 fires on any waypointIndex > -1,
+     * criterion 2 fires on any goalDist < +inf). Subsequent ticks
+     * of no progress increment the accumulator to 1, 2, ..., 20.
+     * STUCK fires on the 21st tick (i=20 in the loop, which is
+     * the 21st mover.tick call overall).
      */
     @Test
-    void restFiresStuckViaMotionFuse() {
+    void restFiresStuckViaPlanProgressFuse() {
         MockWorldView world = floorTo(60);
         Vec3[] pose = { new Vec3(0.5, 64, 0.5) };
         PathingBehavior mover = new PathingBehavior("mover",
@@ -135,11 +163,12 @@ class LimboCharacterizationGateTest {
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(40, 64, 0)));
 
-        // First tick: plan adopted.
+        // First tick: plan adopted, sentinel-latch init credits
+        // progress (counter reset to 0).
         mover.tick(world, directive, actor);
 
-        // Hold pose still for 25 ticks. Motion < epsilon -> fuse
-        // accumulates -> STUCK at tick 21 (i=20).
+        // Hold pose still for 25 ticks. No plan-progress -> fuse
+        // accumulates -> STUCK at i=20 in the loop.
         int stuckTick = -1;
         for (int i = 1; i <= 25; i++) {
             ExecutionReport r = mover.tick(world, directive, actor);
@@ -148,9 +177,11 @@ class LimboCharacterizationGateTest {
                 break;
             }
         }
-        assertEquals(20, stuckTick,
-            "rig sanity: motion < epsilon for 20 ticks must fire STUCK "
-            + "at i=20 in the loop (i.e. the 21st mover.tick overall, "
-            + "the +1 is the first-tick reset of ticksSinceProgress)");
+        assertEquals(21, stuckTick,
+            "rig sanity: no plan-progress for STUCK_WINDOW ticks "
+            + "must fire STUCK. The +1 over STUCK_WINDOW is the "
+            + "first-observation credit on the outer tick (issue 0001 "
+            + "§Ruling a, Path A initialization). Same offset as the "
+            + "waterfall test, written the same way for the same reason.");
     }
 }
