@@ -146,6 +146,9 @@ public final class BindingActor implements Actor {
             }
         }
         if (best != null) {
+            com.mojang.logging.LogUtils.getLogger().info(
+                "[melee] HIT dist={} hp={}", bestDist,
+                best.getHealth());
             best.hurt(body.damageSources()
                 .mobAttack(body), MELEE_DAMAGE);
         }

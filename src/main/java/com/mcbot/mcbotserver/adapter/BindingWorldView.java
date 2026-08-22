@@ -2,6 +2,7 @@ package com.mcbot.mcbotserver.adapter;
 
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.BlockSnapshot;
+import com.mcbot.mcbotserver.api.world.CollisionShape;
 import com.mcbot.mcbotserver.api.world.EntitySnapshot;
 import com.mcbot.mcbotserver.api.world.ViewMode;
 import com.mcbot.mcbotserver.api.world.WorldView;
@@ -59,6 +60,49 @@ public final class BindingWorldView implements WorldView {
             state.getBlock());
         return new BlockSnapshot(pos,
             key != null ? key.toString() : BlockSnapshot.UNKNOWN);
+    }
+
+    /**
+     * Engine collision geometry, cell-local: empty for non-solid
+     * blocks, the block's own voxel bounds otherwise. Unloaded chunks
+     * answer solid - unknown ground must read as impassable, never as
+     * walkable (decision 17a).
+     *
+     * @param pos  the cell to read; must not be null
+     * @param mode consistency requested, per decision 17b
+     * @return the cell-local shape; never null
+     */
+    @Override
+    public CollisionShape getCollisionShape(CellPos pos,
+                                            ViewMode mode) {
+        BlockPos mc = toMc(pos);
+        if (!level.hasChunkAt(mc)) {
+            return CollisionShape.fullCube();
+        }
+        var state = level.getBlockState(mc);
+        var voxels = state.getCollisionShape(level, mc);
+        if (voxels.isEmpty()) {
+            return CollisionShape.empty();
+        }
+        // Empirically verified: the returned shape is ALREADY cell-
+        // local ([0,1] per axis); subtracting the block origin again
+        // produced inverted boxes ("box min must be <= max").
+        double minX = voxels.min(net.minecraft.core.Direction.Axis.X);
+        double minY = voxels.min(net.minecraft.core.Direction.Axis.Y);
+        double minZ = voxels.min(net.minecraft.core.Direction.Axis.Z);
+        double maxX = voxels.max(net.minecraft.core.Direction.Axis.X);
+        double maxY = voxels.max(net.minecraft.core.Direction.Axis.Y);
+        double maxZ = voxels.max(net.minecraft.core.Direction.Axis.Z);
+        boolean full = minX <= 0 && minY <= 0 && minZ <= 0
+            && maxX >= 1 && maxY >= 1 && maxZ >= 1;
+        return full ? CollisionShape.fullCube()
+            : CollisionShape.partial(new CollisionShape.Box(
+                Math.max(0, Math.min(1, minX)),
+                Math.max(0, Math.min(1, minY)),
+                Math.max(0, Math.min(1, minZ)),
+                Math.max(0, Math.min(1, maxX)),
+                Math.max(0, Math.min(1, maxY)),
+                Math.max(0, Math.min(1, maxZ))));
     }
 
     @Override
