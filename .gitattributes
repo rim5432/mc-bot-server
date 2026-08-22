@@ -1,0 +1,32 @@
+# Normalize line endings across the repository. With this in place
+# `core.autocrlf=true` stops silently flipping files back and forth
+# on every checkout, and any future contributor editing on a
+# Windows machine that defaults to CRLF will get LF in the index
+# and the next commit will not look like a 200-line whitespace
+# change to reviewers on Linux/macOS.
+
+# Java sources and test sources: LF in the index, LF on disk.
+*.java          text eol=lf
+*.kt            text eol=lf
+*.scala         text eol=lf
+
+# Markdown and the doc tree: LF; the publish pipeline (if any)
+# downstream will not have to guess what byte it is reading.
+*.md            text eol=lf
+*.txt           text eol=lf
+
+# Build / run scripts: LF.
+*.sh            text eol=lf
+*.bat           text eol=crlf
+*.cmd           text eol=crlf
+*.py            text eol=lf
+
+# Gradle wrapper, configs, and JSON: LF.
+*.gradle        text eol=lf
+*.properties    text eol=lf
+*.json          text eol=lf
+*.xml           text eol=lf
+
+# Anything that has not been matched is left to core.autocrlf
+# behaviour. New contributors adding binary assets should pair
+# them with an explicit `binary` attribute below this line.
