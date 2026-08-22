@@ -229,6 +229,56 @@ class CombatSkeletonGateTest {
     }
 
     /**
+     * A ranged hostile (kite-and-shoot tactics) is REFUSED at engage
+     * time - terminal immediately, zero chase claims, structured
+     * attrs carrying the refused type for the harness's meta-strategy.
+     */
+    @Test
+    void rangedHostileIsRefusedInsteadOfChased() {
+        MockWorldView world = new MockWorldView();
+        EntitySnapshot skeleton = new EntitySnapshot("s1",
+            "minecraft:skeleton", new CellPos(4, 64, 0), 20f, 20f);
+        world.addEntity(skeleton);
+        // The scan must SEE the skeleton as hostile for the refusal
+        // branch to fire - refusal is a planner decision on a visible
+        // threat, not a scanning blind spot.
+        Set<String> hostiles = Set.of("minecraft:zombie",
+            "minecraft:skeleton");
+        DefendProcess defend = new DefendProcess("gt-def", 60, 400,
+            () -> new CellPos(0, 64, 0), hostiles,
+            Set.of("minecraft:skeleton"));
+        RecordingActor actor = new RecordingActor();
+
+        Directive directive = defend.onTick(world);
+
+        assertFalse(defend.isActive(),
+            "refusal is immediate - no bleeding chase");
+        assertFalse(defend.missionSucceeded());
+        assertEquals(DefendProcess.REASON_REFUSED,
+            defend.failureReasonOrNull());
+        assertEquals("minecraft:skeleton",
+            defend.verdictAttrs().get("threatType"));
+        assertTrue(actor.submitted.isEmpty(),
+            "refusal must not move a muscle");
+    }
+
+    /** Melee hostiles engage exactly as before the ranged set landed. */
+    @Test
+    void meleeEngagementUnaffectedByRangedSet() {
+        MockWorldView world = new MockWorldView();
+        world.addEntity(zombie("z1", new CellPos(2, 64, 0)));
+        DefendProcess defend = new DefendProcess("gt-def", 60, 400,
+            () -> new CellPos(0, 64, 0), HOSTILES,
+            Set.of("minecraft:skeleton"));
+
+        Directive directive = defend.onTick(world);
+
+        assertTrue(defend.isActive());
+        assertEquals("z1",
+            ((Attack) directive.overrides().combat()).targetId());
+    }
+
+    /**
      * Reports never decide the fight: neither a locomotion FAILED nor
      * a chase SUCCESS may flip terminal state - scans, leash, and
      * timeout own the verdict.
