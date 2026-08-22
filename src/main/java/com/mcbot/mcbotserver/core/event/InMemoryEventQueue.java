@@ -24,14 +24,28 @@ import java.util.function.LongSupplier;
  * not by producer diligence.
  *
  * <p>Behind-consumer recovery: when a caller polls with a
- * {@code sinceEventId} older than the oldest retained entry, the page
- * is preceded by a synthetic EVENT_GAP entry carrying the size of the
- * lost range, the caller's stale cursor, and the oldest id the page
- * actually contains. The gap event is urgent so the harness short-
- * circuits its {@code shouldDrain} gate and reconciles via
- * {@code getState()} before consuming the page — events answer
- * "what happened", state answers "what is", and a behind consumer
- * needs the second one first.
+ * non-zero {@code sinceEventId} older than the oldest retained entry
+ * AND the queue has at least one entry, the page is preceded by a
+ * synthetic EVENT_GAP entry carrying the size of the lost range, the
+ * caller's stale cursor, and the oldest id the page actually contains.
+ * The gap event is urgent so the harness short-circuits its
+ * {@code shouldDrain} gate and reconciles via {@code getState()}
+ * before consuming the page — events answer "what happened", state
+ * answers "what is", and a behind consumer needs the second one
+ * first.
+ *
+ * <p>Why {@code sinceEventId == 0} is excluded: cursor 0 is the
+ * sentinel for "first poll, give me everything" — the caller has no
+ * prior id and the gap's whole purpose (tell the consumer what was
+ * lost) does not apply. A harness that crashed without persisting
+ * its cursor also gets the full first-time page; the lost-range
+ * signal in that case is the {@code resetAt} marker, not a gap.
+ *
+ * <p>Why the empty-queue case is excluded: after {@link #reset()} the
+ * queue is empty but the lost range was a deliberate wipe, not a
+ * rotation overflow. The {@code resetAt} marker is the signal; firing
+ * a gap would be a false positive that misleads the harness into
+ * reconciling state it never lost.
  *
  * <p>Why a time-source injection: every event must carry a game-time
  * stamp, but the queue does not own a clock; the bot supplies its
@@ -88,19 +102,15 @@ public final class InMemoryEventQueue implements EventQueue {
     @Override
     public EventBatch statusSnapshot(long sinceEventId) {
         List<BotEvent> page = new ArrayList<>();
-        // Behind-consumer detection: if sinceEventId is older than
-        // the oldest retained entry, the range between them was lost
-        // to rotation. Surface it as a synthetic EVENT_GAP at the
-        // head of the page so the harness sees the loss at the same
-        // point it would have seen the lost events, not in some
-        // later reconciliation step. Empty queue + stale cursor is
-        // the worst case (everything was lost) - we still emit the
-        // gap so the harness can tell "behind and the world moved on"
-        // from "the bot is genuinely idle".
-        if (sinceEventId >= 0 && sinceEventId < lastEventId) {
-            long oldestId = entries.isEmpty()
-                ? lastEventId + 1L     // everything past sinceEventId was lost
-                : entries.peekFirst().id();
+        // Behind-consumer detection: only fires when the caller has a
+        // real (non-zero) cursor AND the queue still has entries to
+        // hand back. since=0 is a first-poll sentinel; empty-queue is
+        // a post-reset state. Both are excluded - see class Javadoc
+        // for the rationale. Once those gates pass, the gap fires if
+        // the caller's cursor is older than the oldest retained id.
+        if (sinceEventId > 0 && sinceEventId < lastEventId
+            && !entries.isEmpty()) {
+            long oldestId = entries.peekFirst().id();
             if (sinceEventId < oldestId - 1) {
                 long gap = oldestId - sinceEventId - 1;
                 java.util.Map<String, String> gapAttrs =

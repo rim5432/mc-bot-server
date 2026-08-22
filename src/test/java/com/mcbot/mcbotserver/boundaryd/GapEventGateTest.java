@@ -61,12 +61,15 @@ class GapEventGateTest {
             "4 events between since=1 and oldest=6");
         assertEquals("1", gap.attrs().get("since"));
         assertEquals("6", gap.attrs().get("oldest"));
-        // Real page starts at id 6 = "ev-4" (0-indexed after 5
-        // prior ev-* were evicted).
-        assertEquals("ev-4", page.get(1).text());
-        // Last entry on the page is the most recent push.
+        // Real page starts at id 6, which carries text "ev-5" (the
+        // first 5 ev-0..ev-4 are evicted, ev-5 is the oldest kept).
+        assertEquals("ev-5", page.get(1).text());
+        // The most recent push sits right before the synthetic
+        // EVENT_DROPPED notice - that one is appended at the tail
+        // because the same 205-push loop that evicted the 5 oldest
+        // also set droppedSinceLastPoll=5.
         assertEquals("ev-" + (InMemoryEventQueue.DEFAULT_CAP + 4),
-            page.get(page.size() - 1).text());
+            page.get(page.size() - 2).text());
     }
 
     /**
@@ -138,12 +141,16 @@ class GapEventGateTest {
     }
 
     /**
-     * Worst case: the original entries are all evicted and the
-     * caller is still behind. The gap fires anyway, with
+     * Worst case: the original entries the harness once saw are all
+     * evicted and the harness is still behind. The gap fires with
      * {@code oldest} pointing at the first retained id and
      * {@code count} covering the lost range, so the harness can
-     * tell "I fell behind, and the bot is now silent" from "fresh
-     * poll, bot idle".
+     * reconcile via {@code getState()} before draining the page.
+     *
+     * <p>Why since=1, not since=0: cursor 0 is the "first poll,
+     * give me everything" sentinel — the lost-range signal does not
+     * apply. To exercise the "harness is behind" semantic, the test
+     * must use a non-zero cursor that the harness once owned.
      */
     @Test
     void allOriginalEntriesEvictedAndStaleCursorEmitsGap() {
@@ -151,21 +158,21 @@ class GapEventGateTest {
             () -> 1L, () -> 0L);
         q.push(stamped("a"));
         q.push(stamped("b"));
-        // Push DEFAULT_CAP + 4 more events. After this loop:
-        // lastEventId = 2 + (DEFAULT_CAP + 4) = 2 + 204 = 206.
-        // The queue holds 200 entries; the first 6 ids (1..6) are
-        // evicted. Oldest retained = 7.
-        for (int i = 0; i < InMemoryEventQueue.DEFAULT_CAP + 4; i++) {
+        // Push DEFAULT_CAP + 5 more events. After this loop:
+        // lastEventId = 2 + (DEFAULT_CAP + 5) = 2 + 205 = 207.
+        // The queue holds 200 entries; the first 7 ids (1..7) are
+        // evicted. Oldest retained = 8.
+        for (int i = 0; i < InMemoryEventQueue.DEFAULT_CAP + 5; i++) {
             q.push(stamped("flood-" + i));
         }
-        // Caller asks since 0: lost range = 1..6, count = 6,
-        // oldest = 7.
-        EventBatch batch = q.statusSnapshot(0L);
+        // Harness last saw "a" (id 1), then the bot generated
+        // "b" + floods. Lost range = 2..7, count = 6, oldest = 8.
+        EventBatch batch = q.statusSnapshot(1L);
         BotEvent first = batch.events().get(0);
         assertEquals(EventKind.EVENT_GAP, first.kind());
         assertEquals("6", first.attrs().get("count"));
-        assertEquals("0", first.attrs().get("since"));
-        assertEquals("7", first.attrs().get("oldest"));
+        assertEquals("1", first.attrs().get("since"));
+        assertEquals("8", first.attrs().get("oldest"));
     }
 
     /**
