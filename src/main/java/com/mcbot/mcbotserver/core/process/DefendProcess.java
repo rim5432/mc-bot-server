@@ -46,8 +46,15 @@ public final class DefendProcess implements BotProcess, TerminalMission {
     /** Ticks a missing target gets before counting as neutralized. */
     public static final int TARGET_GRACE_TICKS = 10;
 
-    /** Chase-goal range around the target cell, in blocks. */
-    public static final int GOAL_RANGE = 1;
+    /**
+     * Chase-goal range around the target cell, in blocks. Deliberately
+     * 2, not 1: A* ends the plan on the FIRST popped cell satisfying
+     * the predicate - the nearest-to-bot cell of the standoff rim -
+     * so the body stops outside swing-adjacent overlap instead of
+     * driving into the target's cell, where the aim direction
+     * degenerates.
+     */
+    public static final int GOAL_RANGE = 2;
 
     /** Failure reason: engaged target left the leash radius. */
     public static final String REASON_LOST = "LOST_TARGET";

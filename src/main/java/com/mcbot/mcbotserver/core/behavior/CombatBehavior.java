@@ -37,6 +37,12 @@ public final class CombatBehavior implements Behavior {
     /** Distance from the aim point within which a swing may fire. */
     public static final double ATTACK_REACH = 3.0;
 
+    /**
+     * Horizontal distance below which the aim bearing is held, not
+     * recomputed - overlapping a target makes direction noise.
+     */
+    public static final double AIM_MIN_HORIZONTAL = 0.5;
+
     /** Minimum ticks between swings (vanilla invulnerability scale). */
     public static final int ATTACK_COOLDOWN_TICKS = 10;
 
@@ -44,6 +50,7 @@ public final class CombatBehavior implements Behavior {
     private final PoseSource poseSource;
     private int ticksSinceSwing = ATTACK_COOLDOWN_TICKS;
     private boolean pressLatched;
+    private float lastYaw;
 
     /**
      * Fine-grained body position, same shape as the pathing mover's.
@@ -96,9 +103,18 @@ public final class CombatBehavior implements Behavior {
         double dx = tx - pose.x();
         double dy = ty - pose.y();
         double dz = tz - pose.z();
-        float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+
+        // Aim degeneracy guard: when standing on top of the target,
+        // horizontal direction is noise and the computed yaw flips
+        // 180 degrees every tick. Hold the last bearing instead.
+        double horizontal = Math.hypot(dx, dz);
+        float yaw = lastYaw;
+        if (horizontal >= AIM_MIN_HORIZONTAL) {
+            yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+            lastYaw = yaw;
+        }
         float pitch = (float) -Math.toDegrees(
-            Math.atan2(dy, Math.hypot(dx, dz)));
+            Math.atan2(dy, Math.max(horizontal, 0.001)));
         actor.submit(new Claim(Channel.ROT, 20, name,
             new Intent.Look(yaw, pitch)));
 

@@ -63,8 +63,9 @@ class CombatSkeletonGateTest {
 
         assertEquals(60, defend.priority());
         assertTrue(defend.isActive());
-        assertEquals(new GoalNear(new CellPos(2, 64, 0), 1),
-            directive.goal(), "chase anchors on the NEAREST hostile");
+        assertEquals(new GoalNear(new CellPos(2, 64, 0), 2),
+            directive.goal(),
+            "chase anchors on the NEAREST hostile at standoff range");
         assertEquals("z-near",
             ((Attack) directive.overrides().combat()).targetId());
     }
