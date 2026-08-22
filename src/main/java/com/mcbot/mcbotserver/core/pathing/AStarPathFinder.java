@@ -48,7 +48,7 @@ public final class AStarPathFinder {
      * exhausted with a usable prefix toward the goal), or total failure.
      */
     public record PathResult(List<CellPos> waypoints, int expandedNodes,
-                             boolean reachedGoal) {
+                             boolean reachedGoal, double confidence) {
 
         /**
          * Creates a validated result.
@@ -58,9 +58,17 @@ public final class AStarPathFinder {
          * @param expandedNodes nodes popped from the open set
          * @param reachedGoal   whether the last waypoint satisfies the
          *                      goal predicate
+         * @param confidence    progress ratio in [0,1] - 1.0 for a
+         *                      reached goal, 0.0 for failure; partial
+                      *                      outcomes sit in (0,1) by construction
          */
         public PathResult {
             waypoints = List.copyOf(waypoints);
+            if (Double.isNaN(confidence) || confidence < 0.0
+                || confidence > 1.0) {
+                throw new IllegalArgumentException(
+                    "confidence must be in [0,1]: " + confidence);
+            }
         }
 
         /**
@@ -70,9 +78,19 @@ public final class AStarPathFinder {
          * @return an empty, unreached result
          */
         public static PathResult failed(int expanded) {
-            return new PathResult(List.of(), expanded, false);
+            return new PathResult(List.of(), expanded, false, 0.0);
         }
     }
+
+    /**
+     * Minimum heuristic progress ratio for a budget-cut search to
+     * surface a PARTIAL. Below this the partial is collapsed to
+     * FAILED - a fractional-tick advance almost always means the
+     * frontier is unreachable from the start vocabulary, and
+     * handing the follower a doomed prefix would loop it through
+     * "walk a few cells, replan, walk a few cells, replan" forever.
+     */
+    public static final double MIN_PARTIAL_CONFIDENCE = 0.10;
 
     private final MoveGraph graph;
     private final Heuristic heuristic;
@@ -211,7 +229,8 @@ public final class AStarPathFinder {
 
             if (goal.isInGoal(current.pos())) {
                 return new PathResult(
-                    reconstruct(cameFrom, current.pos()), expanded, true);
+                    reconstruct(cameFrom, current.pos()), expanded, true,
+                    1.0);
             }
 
             double g = gScore.getOrDefault(current.pos(), Double.MAX_VALUE);
@@ -239,10 +258,27 @@ public final class AStarPathFinder {
         // wall clock): when the open set drains naturally there is
         // definitively no path right now, and pretending otherwise
         // would hand the executor a doomed prefix.
+        //
+        // Confidence is 1 - bestH/startH (heuristic progress ratio),
+        // clamped to [0,1]. startH == 0 means we started at the goal
+        // - that is a reachedGoal case handled above, but guard
+        // division explicitly. Below MIN_PARTIAL_CONFIDENCE the
+        // partial is collapsed to FAILED: a fractional-tick advance
+        // almost always means the frontier is unreachable from the
+        // start vocabulary, and handing the follower a doomed
+        // prefix would loop it through "walk a few cells, replan,
+        // walk a few cells, replan" forever.
         if (searchCut && bestPartial != null
             && !bestPartial.equals(start)) {
-            return new PathResult(
-                reconstruct(cameFrom, bestPartial), expanded, false);
+            double startH = heuristic.estimate(start);
+            double confidence = (startH > 0.0)
+                ? Math.max(0.0, Math.min(1.0, 1.0 - bestH / startH))
+                : 0.0;
+            if (confidence >= MIN_PARTIAL_CONFIDENCE) {
+                return new PathResult(
+                    reconstruct(cameFrom, bestPartial), expanded, false,
+                    confidence);
+            }
         }
         return PathResult.failed(expanded);
     }

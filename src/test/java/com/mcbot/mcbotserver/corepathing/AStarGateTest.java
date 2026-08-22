@@ -100,7 +100,13 @@ class AStarGateTest {
             "no usable partial exists toward a floating goal");
     }
 
-    /** The node budget is a hard safety net on pathological searches. */
+    /**
+     * The node budget is a hard safety net on pathological
+     * searches. With 50 nodes against a ~60-cell goal the search
+     * makes enough heuristic progress to clear the confidence
+     * floor, so the result is a usable PARTIAL - exercising both
+     * the cap and the gate's pass-through.
+     */
     @Test
     void nodeBudgetCapsExpansion() {
         MockWorldView world = flatGround(60, 30);
@@ -115,5 +121,60 @@ class AStarGateTest {
             "50 nodes cannot reach 40+ blocks away");
         assertTrue(result.expandedNodes() <= 50,
             "budget must cap expansions");
+        assertTrue(result.waypoints().size() > 1,
+            "a 50-node search against a 60-cell goal makes "
+                + "enough progress to clear MIN_PARTIAL_CONFIDENCE");
+    }
+
+    /**
+     * Confidence gate: a budget cut whose best-frontier ratio is
+     * below MIN_PARTIAL_CONFIDENCE collapses to FAILED, not
+     * PARTIAL. With budget=2 against a 29-cell goal the search
+     * expands the start and one neighbor - the frontier's h
+     * stays near startH, so the heuristic progress ratio is
+     * well below 0.10 and the partial is suppressed.
+     */
+    @Test
+    void lowConfidencePartialCollapsesToFailed() {
+        MockWorldView world = flatGround(30, 20);
+        CellPos start = new CellPos(0, 65, 0);
+        CellPos farGoal = new CellPos(25, 65, 15);
+
+        var finder = new AStarPathFinder(BasicMoves::from,
+            Heuristic.euclideanTo(farGoal), 2);
+        var result = finder.compute(world, start, new GoalBlock(farGoal));
+
+        assertFalse(result.reachedGoal(),
+            "2 nodes cannot reach a 29-cell goal");
+        assertTrue(result.waypoints().isEmpty(),
+            "low-confidence PARTIAL must downgrade to FAILED, "
+                + "not surface a doomed prefix");
+        assertEquals(0.0, result.confidence(),
+            "FAILED carries zero confidence by definition");
+    }
+
+    /**
+     * Confidence of 1.0 is reserved for reachedGoal; FAILED carries
+     * 0.0. The clamp in the PathResult constructor rejects NaN and
+     * out-of-range values to keep the contract machine-checkable.
+     */
+    @Test
+    void pathResultConfidenceIsValidated() {
+        try {
+            new AStarPathFinder.PathResult(java.util.List.of(), 0,
+                true, 1.5);
+            org.junit.jupiter.api.Assertions.fail(
+                "confidence > 1.0 must be rejected");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("confidence"));
+        }
+        try {
+            new AStarPathFinder.PathResult(java.util.List.of(), 0,
+                true, Double.NaN);
+            org.junit.jupiter.api.Assertions.fail(
+                "NaN confidence must be rejected");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("confidence"));
+        }
     }
 }
