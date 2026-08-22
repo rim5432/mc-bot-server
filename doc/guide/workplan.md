@@ -201,7 +201,8 @@ test count when red).
          values. AStarGateTest grew two new cases
          (lowConfidencePartialCollapsesToFailed, pathResultConfidenceIsValidated).
 - [x] S  Idempotency key on submit (boundary D command channel)
-         DRAFT — pending review & build/test (2026-08-22): C-scheme
+         SHIPPED 2026-08-23 (build/test green; new gate test
+         IdempotencyKeyGateTest, 7 cases): C-scheme
          dedupe (explicit idempotencyKey OR verb+args fallback hash)
          added on CommandChannel.submit(BotCommand, String). Old
          submit(BotCommand) preserved as a default delegate so all
@@ -215,9 +216,14 @@ test count when red).
          Boundary D protocol carries the full contract including
          the dedupe-window semantics (cache evicted on terminal
          state, retry after terminate is a fresh acceptance not
-         an error). NOT YET exercised by build / test (build is
-         blocked by the parallel-session combat compilation pass;
-         the change is review-validated only).
+         an error). Gate coverage: explicit-key collapse to the
+         first acceptance without re-execution; verb+args
+         fallback dedupe (identical collapses, different args
+         independent); insertion-order-indifferent canonical
+         args; distinct explicit keys stay independent;
+         terminal-state and cancel both close the window into a
+         fresh acceptance; rejected submissions leave no cache
+         entry.
 - [x] S  Behind-consumer recovery: EVENT_GAP + state resync contract
          SHIPPED 2026-08-23 (build/test green; 6 gap cases +
          6 disclosure cases all pass): events answer "what
