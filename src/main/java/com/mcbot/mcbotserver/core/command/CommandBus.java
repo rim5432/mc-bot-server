@@ -153,7 +153,7 @@ public final class CommandBus implements CommandChannel {
             : "auto:" + command.verb() + ":" + canonicalArgs(command.args());
         String cachedTaskId = idempotencyCache.get(effectiveKey);
         if (cachedTaskId != null) {
-            return new SubmitResult.Ok(cachedTaskId, true);
+            return SubmitResult.Ok.replay(cachedTaskId);
         }
         String taskId = nextTaskId();
         activeTasks.add(taskId);
@@ -161,7 +161,7 @@ public final class CommandBus implements CommandChannel {
         idempotencyCache.put(effectiveKey, taskId);
         taskIdToIdempotencyKey.put(taskId, effectiveKey);
         handler.execute(command, taskId);
-        return new SubmitResult.Ok(taskId, false);
+        return SubmitResult.Ok.fresh(taskId);
     }
 
     /**
