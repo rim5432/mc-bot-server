@@ -7,8 +7,10 @@ import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.Overrides;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.EntitySnapshot;
+import com.mcbot.mcbotserver.api.world.ViewMode;
 import com.mcbot.mcbotserver.api.world.WorldView;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -27,8 +29,10 @@ import java.util.Map;
  * processes - the hostile-type set is injected data, one process
  * serves every enemy). Terminal semantics: an area with no hostile at
  * submission time completes immediately; an engaged target that stays
- * absent past the grace window counts as neutralized (SUCCESS);
- * leaving the leash or the tick budget fails the mission.
+ * absent from the hostile scan past the grace window completes as
+ * SUCCESS — "absent" includes both death and escape beyond scan range,
+ * so the harness must not treat SUCCESS as a confirmed kill; leaving
+ * the leash or the tick budget fails the mission.
  *
  * <p>Implementation note: runs on the server tick thread only.
  */
@@ -172,8 +176,8 @@ public final class DefendProcess implements BotProcess, TerminalMission {
         }
 
         CellPos position = positionSource.get();
-        EntitySnapshot nearest = nearestHostile(world, position);
         if (!engaged()) {
+            EntitySnapshot nearest = nearestHostile(world, position);
             if (nearest == null) {
                 // Nothing to defend against: the mission's purpose is
                 // already fulfilled.
@@ -193,9 +197,21 @@ public final class DefendProcess implements BotProcess, TerminalMission {
             return directiveFor(position);
         }
 
-        if (nearest != null && nearest.id().equals(targetId)) {
+        EntitySnapshot current = findTarget(world, position, targetId);
+        if (current != null) {
+            // Target still in the hostile scan: refresh, leash-check,
+            // keep fighting. A nearer hostile does NOT drop this target —
+            // switching is an explicit decision (death / leash / future
+            // policy), never a side effect of nearestHostile ordering.
+            //
+            // Leash is checked on the resolved target regardless of
+            // whether it is the nearest hostile — the old code nested
+            // this check inside nearest.id().equals(targetId), which let
+            // a closer hostile shield an escaping target from the leash
+            // break (A at 13 behind B at 7 → old code skipped leash,
+            // fell into grace → false SUCCESS).
             ticksSinceSeen = 0;
-            targetCell = nearest.pos();
+            targetCell = current.pos();
             if (position.distanceTo(targetCell) > LEASH_RADIUS) {
                 fail(REASON_LOST);
                 return lastDirective;
@@ -203,13 +219,20 @@ public final class DefendProcess implements BotProcess, TerminalMission {
             return directiveFor(position);
         }
 
-        // Target not re-seen this tick: grace, then declare it down.
+        // Target genuinely absent from the hostile scan: grace, then
+        // SUCCESS. "Absent" = dead OR out of scan range — see class
+        // Javadoc. The scan-radius / leash gap (14 vs 12) is tracked
+        // in issue 0006 and is not changed by this commit.
+        //
         // ORDER IS LOAD-BEARING: the seen-branch above resets
         // ticksSinceSeen to zero BEFORE this check runs. resume()
-        // exploits that by spending all grace credit - a target still
-        // present resets the counter and the fight continues; an
-        // absent one trips 11 > 10 immediately. Reordering these two
-        // blocks would unconditionally kill every resumed fight.
+        // exploits that by spending all grace credit (sets
+        // ticksSinceSeen = TARGET_GRACE_TICKS): a target still present
+        // on the first post-resume tick resets the counter and the fight
+        // continues; an absent one trips 11 > 10 immediately. Reordering
+        // these two blocks would unconditionally kill every resumed fight
+        // whose target is still present — the absent-target case is
+        // unaffected (both orders → SUCCESS).
         ticksSinceSeen++;
         if (ticksSinceSeen > TARGET_GRACE_TICKS) {
             succeed();
@@ -325,23 +348,41 @@ public final class DefendProcess implements BotProcess, TerminalMission {
         return lastDirective;
     }
 
-    private EntitySnapshot nearestHostile(WorldView world,
-                                          CellPos center) {
+    /**
+     * Single scan path for both target selection and target lookup:
+     * same radius, same hostile-type filter, same ViewMode. Callers
+     * differ only in how they pick from the returned list — nearest
+     * for initial engagement, id-match for engaged refresh.
+     *
+     * @param world  perception surface; never null
+     * @param center search origin; never null
+     * @return hostile-typed entities within the active scan radius;
+     *         never null, possibly empty
+     */
+    private List<EntitySnapshot> scanHostiles(WorldView world,
+                                               CellPos center) {
         // Tracking must see farther than engaging: an already-locked
         // target between ENGAGE and LEASH stays visible here, which is
         // what makes the leash break observable at all.
         double scanRadius = engaged()
             ? Math.max(ENGAGE_RADIUS, LEASH_RADIUS + 2)
             : ENGAGE_RADIUS;
-        List<EntitySnapshot> hits = world.getEntities(center,
-            scanRadius,
-            com.mcbot.mcbotserver.api.world.ViewMode.LIVE);
+        List<EntitySnapshot> hits = world.getEntities(center, scanRadius,
+            ViewMode.LIVE);
+        List<EntitySnapshot> out = new ArrayList<>();
+        for (EntitySnapshot e : hits) {
+            if (hostileTypes.contains(e.type())) {
+                out.add(e);
+            }
+        }
+        return out;
+    }
+
+    private EntitySnapshot nearestHostile(WorldView world,
+                                          CellPos center) {
         EntitySnapshot best = null;
         double bestDist = Double.MAX_VALUE;
-        for (EntitySnapshot e : hits) {
-            if (!hostileTypes.contains(e.type())) {
-                continue;
-            }
+        for (EntitySnapshot e : scanHostiles(world, center)) {
             double dist = center.distanceTo(e.pos());
             if (dist < bestDist) {
                 bestDist = dist;
@@ -349,6 +390,29 @@ public final class DefendProcess implements BotProcess, TerminalMission {
             }
         }
         return best;
+    }
+
+    /**
+     * Resolve the engaged target by identity within the hostile scan.
+     * Used by the engaged branch so that a nearer hostile does not
+     * make the current target "disappear" — the scan is the same
+     * {@link #scanHostiles} call, the selector is id-match instead
+     * of min-distance.
+     *
+     * @param world  perception surface; never null
+     * @param center search origin; never null
+     * @param id     engaged target identity; never null
+     * @return the matching snapshot, or {@code null} if absent from
+     *         the scan radius
+     */
+    private EntitySnapshot findTarget(WorldView world, CellPos center,
+                                      String id) {
+        for (EntitySnapshot e : scanHostiles(world, center)) {
+            if (id.equals(e.id())) {
+                return e;
+            }
+        }
+        return null;
     }
 
     private void succeed() {
