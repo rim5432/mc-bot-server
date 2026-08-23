@@ -123,10 +123,19 @@ public final class BotSliceGameTests {
                 // intervention - MC integrates the impulse.
             })
             .thenExecute(() -> {
-                // Sanity 1: displacement must exceed the 3.5-cell
-                // floor (REPLAN_DISTANCE + friction margin) or the
-                // test silently regresses to branch-2 limbo where
-                // offPath never fires.
+                // Sanity: displacement must exceed the 3.5-cell
+                // floor (REPLAN_DISTANCE + friction margin) so the
+                // test stays in branch 1 of issue 0001 §3 (offPath
+                // fires on XZ drift > 3.0 from the remaining
+                // waypoints), not branch 2 where offPath would NOT
+                // fire and the test silently regresses to limbo.
+                // Direction past the SPAWN point is deliberately not
+                // asserted: a knockback integrated near its full
+                // ~4-cell series can legally land the body back at or
+                // before spawn when the mid-point gate fired early,
+                // and branch 1 holds either way - drift is measured
+                // from the body's position at shove time, not from
+                // spawn.
                 double dx = xAtShove[0] - rig.body().getX();
                 check(dx > 3.5,
                     "shove must displace the body > 3.5 cells in -X "
@@ -135,11 +144,6 @@ public final class BotSliceGameTests {
                     + " - if friction or impulse changed, retune "
                     + "the impulse or extend the vanilla-tick window; "
                     + "do not relax the 3.5 margin silently.");
-                // Sanity 2: direction.
-                check(rig.body().getBlockX() < startAbsX,
-                    "shove must have displaced the body in -X; "
-                    + "X now " + rig.body().getBlockX()
-                    + ", start " + startAbsX);
             })
             .thenWaitUntil(driveUntil(rig,
                 () -> check(reached(rig.body(), goalCell),
