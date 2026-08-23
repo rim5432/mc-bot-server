@@ -3,7 +3,6 @@ package com.mcbot.mcbotserver.world;
 import com.mcbot.mcbotserver.api.world.CollisionShape;
 import com.mcbot.mcbotserver.api.world.CollisionShape.Box;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -19,8 +18,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * instead of inside the planner.
  *
  * <p>Contract: see boundaries.md decision 19. The box is in
- * cell-local {@code [0,1]} units; {@link CollisionShape#STEP_HEIGHT}
- * is the threshold for both predicates.
+ * cell-local {@code [0,1]} units; {@link CollisionShape#STEP_UP_REACH}
+ * gates passability, {@link CollisionShape#STANDABLE_THRESHOLD} plus
+ * the {@link CollisionShape#BODY_WIDTH} footprint rule gate
+ * standability.
  */
 class CollisionShapeGateTest {
 
@@ -42,15 +43,13 @@ class CollisionShapeGateTest {
     }
 
     @Test
-    @Disabled("see doc/architecture/issues/0002-world-collision-slab-fence.md; "
-        + "re-enabled when the slab/fence default shape is fixed")
     void lowerSlabIsStandable() {
-        // Bottom-half slab: top at y=0.5, just below step height
-        // (0.625). The body can stand on the slab (top is at the
-        // step-up height) and the upper half of the cell is body
-        // passable (top below step height). This is the canonical
-        // "is the half-slab actually walkable" case that the old
-        // isAir() check could not answer without a per-id table.
+        // Bottom-half slab: top at y=0.5, exactly the standability
+        // threshold and below step-up reach. The body stands on it
+        // and sweeps through the upper half of the cell. This is the
+        // canonical "is the half-slab actually walkable" case that
+        // the old isAir() check could not answer without a per-id
+        // table.
         CollisionShape s = CollisionShape.partial(
             new Box(0, 0, 0, 1, 0.5, 1));
         assertTrue(s.walkableTop());
@@ -70,20 +69,21 @@ class CollisionShapeGateTest {
     }
 
     @Test
-    @Disabled("see doc/architecture/issues/0002-world-collision-slab-fence.md; "
-        + "re-enabled when the fence default shape is fixed")
-    void fenceIsNotStandableAndPassableAround() {
-        // Fence: thin post at center, top at y=1.5. walkableTop
-        // requires top to be at the step height AND below a jump
-        // - a 1.5-tall post fails the second. Body cannot pass
-        // through the post itself but the empty box around it
-        // makes the cell passable overall.
+    void fencePostCellIsWallAndNotStandable() {
+        // Fence post: thin column through the cell center, top at
+        // y=1. passable() answers false - the cell is a wall. This
+        // is vanilla-aligned: a 0.6-wide body cannot fit through the
+        // 0.4 slot a centered post leaves, and real fences fill
+        // their cell near-full width; the way past a fence is the
+        // missing-post cell, which is EMPTY. walkableTop() answers
+        // false via the footprint rule - the top is high enough but
+        // 0.2 wide, nothing to balance on.
         CollisionShape s = CollisionShape.partial(
-            new Box(0.4, 0, 0.4, 0.6, 1.5, 0.6));
+            new Box(0.4, 0, 0.4, 0.6, 1, 0.6));
+        assertFalse(s.passable(),
+            "a tall post fills the body's sweep; the cell is a wall");
         assertFalse(s.walkableTop(),
-            "fence post is too tall to step up onto");
-        assertTrue(s.passable(),
-            "the cell around the fence is body-passable");
+            "fence post is too thin to stand on");
     }
 
     @Test

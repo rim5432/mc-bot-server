@@ -144,34 +144,66 @@ public record CollisionShape(Kind kind, Box box) {
 
     /**
      * Whether a body can pass through this cell. Derived from the
-     * box: the body box ({@code stepHeight = 0.625} for a hop, the
-     * 0.6-wide hitbox horizontal) can clear the cell if the top of
-     * the box is below stepHeight. An EMPTY cell trivially passes.
+     * box: the body clears the cell if the solid top stays below
+     * {@link #STEP_UP_REACH} (a hop clears it). An EMPTY cell
+     * trivially passes.
+     *
+     * <p>Deliberately footprint-blind: a tall thin box (fence post)
+     * answers false, i.e. the cell is a wall. This matches vanilla -
+     * a 0.6-wide body cannot fit through the slot a centered post
+     * leaves, and real fences fill their cell near-full width. The
+     * way past a fence is the missing-post cell, which is EMPTY and
+     * already answers true.
      *
      * @return true if the cell is body-passable
      */
     public boolean passable() {
-        return kind == Kind.EMPTY || box.maxY < STEP_HEIGHT;
+        return kind == Kind.EMPTY || box.maxY < STEP_UP_REACH;
     }
 
     /**
      * Whether a body can stand on the top of this cell. Derived from
-     * the box: the cell's top must be at or above a comfortable
-     * step-up height (a half-slab top at y=0.5 is the threshold).
+     * the box: the top must rise to a real surface
+     * ({@link #STANDABLE_THRESHOLD}) and span enough ground to bear
+     * the body's footprint ({@link #BODY_WIDTH} on both horizontal
+     * axes). A full cube always qualifies.
+     *
+     * <p>The footprint rule is what makes a fence post answer false:
+     * its top is high enough but 0.2 wide - nothing to stand on.
      *
      * @return true if the cell's top can hold the body
      */
     public boolean walkableTop() {
         return kind == Kind.FULL_CUBE
             || (kind == Kind.PARTIAL
-                && box.maxY >= STEP_HEIGHT
-                && box.minY < STEP_HEIGHT);
+                && box.maxY >= STANDABLE_THRESHOLD
+                && box.maxX - box.minX >= BODY_WIDTH
+                && box.maxZ - box.minZ >= BODY_WIDTH);
     }
 
     /**
-     * The step-up height the body can clear without a jump. Hard
-     * constant for Stage 2 (matches the player step-up in MC 1.20.1);
-     * lift to a config when vocabulary needs differ.
+     * The step-up height the body can clear without a jump; also the
+     * passability ceiling for a cell's solid top. Hard constant for
+     * Stage 2 (matches the player step-up in MC 1.20.1); lift to a
+     * config when vocabulary needs differ.
      */
-    public static final double STEP_HEIGHT = 0.625;
+    public static final double STEP_UP_REACH = 0.625;
+
+    /**
+     * The lowest top that counts as a standable surface. Not a
+     * half-slab special case: it is the floor of MC's partial-top
+     * spectrum - slab tops sit at 0.5, soul sand at 0.875, dirt path
+     * at 0.9375, all above it; farmland (0.25) and beds (0.375) fall
+     * below and are correctly not routing surfaces. Must stay below
+     * or equal to every top the planner may route across, and above
+     * every plate-like non-surface.
+     */
+    public static final double STANDABLE_THRESHOLD = 0.5;
+
+    /**
+     * The body's horizontal footprint (0.6 x 0.6 hitbox in MC
+     * 1.20.1). A partial top must span at least this much on both
+     * horizontal axes before the body can balance on it.
+     */
+    public static final double BODY_WIDTH = 0.6;
 }

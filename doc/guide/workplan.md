@@ -251,15 +251,19 @@ test count when red).
          and DisclosureGateTest (6 cases, including the
          post-reset polling invariant).
 - [x] M  Shape-vs-traits split: geometry derived, traits registered
-         SHIPPED 2026-08-23 (offline half; build/test green -
-         CollisionShapeGateTest 8, BlockTraitsRegistryGateTest
-         10, MockWorldViewShapeGateTest 9, BasicMovesShapeGateTest
-         6, of which 5 cases stay @Disabled under issue 0002): new
+         SHIPPED 2026-08-23 (full suite green, zero skips after the
+         issue 0002 contract settled - CollisionShapeGateTest 8,
+         BlockTraitsRegistryGateTest 10, MockWorldViewShapeGateTest
+         9, BasicMovesShapeGateTest 6): new
          api.world.CollisionShape now carries a cell-local Box
          (0..1) and the derived predicates passable() and
          walkableTop(). passable = EMPTY or PARTIAL with top below
-         STEP_HEIGHT (0.625); walkableTop = FULL_CUBE or PARTIAL
-         with top >= STEP_HEIGHT and below a jump. BasicMoves
+         STEP_UP_REACH (0.625); walkableTop = FULL_CUBE or PARTIAL
+         with top >= STANDABLE_THRESHOLD (0.5, the floor of MC's
+         partial-top spectrum) spanning >= BODY_WIDTH (0.6) on both
+         horizontal axes. A fence cell is therefore a wall with an
+         unstandable top - vanilla-aligned; the way past a fence is
+         the missing-post EMPTY cell. BasicMoves
          .passable / supported / standable now read the shape,
          never the block id. New api.world.BlockTraits record
          (climbable / liquid / damaging) plus BlockTraitsRegistry
@@ -288,25 +292,19 @@ test count when red).
          different block ids returning the same answer). The
          gauntlet gametest (a corridor with bottom-slab / upper /
          stairs / fence / ladder / water / lava sections, end to
-         end) is the remaining open piece, carried as a Stage 2
-         closeout follow-up; its five shape-semantics cases wait
-         on issue 0002 (fence + slab default traits), the rest of
-         the offline suite runs green.
+         end) remains open as a Stage 2 closeout follow-up, now
+         unblocked: the shape contract it asserts is settled.
 
 ### Stage 2 closeout follow-ups
 
-1. Issue 0002 shape-contract decision: the five disabled
-   world/collision cases exposed three conflicts between the
-   tests and the current CollisionShape contract - walkableTop's
-   code threshold (0.625) contradicts its own Javadoc ("a
-   half-slab top at y=0.5 is the threshold"); the fence cases
-   need a Box with maxY=1.5, which Box validation ([0,1]) and
-   the enabled boxRejectsOutOfRangeBounds case both reject; and
-   passable()'s pure-Y rule cannot return true for a fence under
-   any Y representation. Fixing this amends boundary vocabulary
-   (decision 19 discipline), so it waits for stage review per
-   the AGENTS.md stop rule.
+1. RESOLVED 2026-08-23 (issue 0002): the five disabled
+   world/collision cases are re-enabled and green under the
+   settled contract - STEP_UP_REACH / STANDABLE_THRESHOLD split
+   (step-up reach vs standability floor are different physical
+   quantities), a BODY_WIDTH footprint rule on walkableTop, and
+   fence-as-wall semantics replacing the physically-impossible
+   squeeze-past expectation. See issue 0002 Resolution.
 2. Gauntlet gametest (shape-bearing corridor end to end) -
-   blocked on follow-up 1: its fence/slab sections assert the
-   exact semantics issue 0002 must settle first.
+   unblocked by follow-up 1; its fence/slab sections can now
+   assert the settled semantics.
 

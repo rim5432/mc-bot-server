@@ -33,6 +33,9 @@ depth pending - [GAP] vocabulary absent, reopen-triggered -
 - [SHIPPED] Blocks + collision shapes + block traits, cell-granular;
   snapshot views for off-thread planning (decision 17b)
 - [SHIPPED] Entity scans (nearest-hostile, bearing-blind radius)
+- [PLANNED] Pose-aware collision: passable / walkableTop
+  parameterized by STANDING / SNEAKING body pose (issue 0003,
+  Stage 3 backlog; geometry contract settled in issue 0002)
 - [DEFERRED] Spatial memory / waypoint persistence (first
   cross-session requirement reopens)
 
@@ -42,6 +45,8 @@ depth pending - [GAP] vocabulary absent, reopen-triggered -
   async worker on immutable snapshots
 - [GAP] Parkour, pillar-up, swimming, door handling - each lands as a
   Movement + traits data; mechanisms written once (decision 8/10)
+- [PLANNED] SneakWalk: 1-wide edge traversal with 1.5-height AABB;
+  pose-aware collision predicates (issue 0003, Stage 3 backlog)
 - [DEFERRED] ConstraintGuardian generalization (second guardian need)
 
 ### Survival (reflex bypass, boundary C)
@@ -57,6 +62,8 @@ depth pending - [GAP] vocabulary absent, reopen-triggered -
   standoff range; CombatBehavior aims and paces swings; USE channel
   resolves melee with vanilla-aligned reach (eye to bounding-box
   SURFACE, 3.0), a line-of-sight clip, and lava-opaque rays
+- [PLANNED] ShieldBlock: damage mitigation via SNEAK+USE channel
+  combo; needs the sneak pose from issue 0003 (Stage 3 backlog)
 
 #### Structural mismatches (v1 honest limits)
 

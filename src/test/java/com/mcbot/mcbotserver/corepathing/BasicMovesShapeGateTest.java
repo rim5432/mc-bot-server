@@ -7,7 +7,6 @@ import com.mcbot.mcbotserver.api.world.CollisionShape.Box;
 import com.mcbot.mcbotserver.core.pathing.BasicMoves;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -48,12 +47,11 @@ class BasicMovesShapeGateTest {
     }
 
     @Test
-    @Disabled("see doc/architecture/issues/0002-world-collision-slab-fence.md; "
-        + "re-enabled when the slab default shape is fixed")
     void walkAcrossLowerSlabIsViable() {
         MockWorldView w = floor();
         // Mark the floor as a bottom-half slab. Body can stand on
-        // the slab (top at 0.5) and walk across.
+        // the slab (top at 0.5, the standability threshold) and walk
+        // across.
         for (int x = -2; x <= 3; x++) {
             for (int z = -2; z <= 3; z++) {
                 w.putShape(new CellPos(x, FLOOR_Y, z),
@@ -66,21 +64,21 @@ class BasicMovesShapeGateTest {
     }
 
     @Test
-    @Disabled("see doc/architecture/issues/0002-world-collision-slab-fence.md; "
-        + "re-enabled when the fence default shape is fixed")
     void walkOnFenceFloorIsNotViable() {
         MockWorldView w = floor();
-        // Fence post under the body: too tall to step up, body
-        // hovers above and cannot stand.
+        // Fence posts as the floor: tops are high enough but far too
+        // thin to bear the body's footprint, so no cell is supported
+        // and the walk is not viable. (Vanilla-aligned: a fence cell
+        // is a wall, and its top is never a routing surface.)
         for (int x = -2; x <= 3; x++) {
             for (int z = -2; z <= 3; z++) {
                 w.putShape(new CellPos(x, FLOOR_Y, z),
                     CollisionShape.partial(
-                        new Box(0.4, 0, 0.4, 0.6, 1.5, 0.6)));
+                        new Box(0.4, 0, 0.4, 0.6, 1, 0.6)));
             }
         }
         assertFalse(new BasicMoves.Walk(SRC, DST).isViable(w),
-            "fence post is too tall to step up onto");
+            "fence post top is too thin to stand on");
     }
 
     @Test
@@ -112,18 +110,14 @@ class BasicMovesShapeGateTest {
     }
 
     @Test
-    @Disabled("see doc/architecture/issues/0002-world-collision-slab-fence.md; "
-        + "re-enabled when the slab default shape is fixed")
-    void climbOntoUpperSlabFailsWhenDestinationHeadIsBlocked() {
-        // Stair-step case: floor is lower slab, body steps up to a
-        // upper-slab layer above. The destination foot cell is
-        // empty (standable), the destination head cell is also
-        // empty, and the cell below the destination foot is the
-        // upper slab (standable). The ClimbUp should be viable.
+    void climbOntoUpperSlabPlatformIsViable() {
+        // Stair-step case: an upper-slab platform sits in the
+        // (1, BODY_Y, 0) cell, its top at y=BODY_Y+1. The climb
+        // destination foot cell is (1, BODY_Y+1, 0) - empty and
+        // body-clear - the head cell above it is empty, and the
+        // cell below the foot carries the platform's walkable top.
         MockWorldView w = floor();
-        // Install an upper slab in the (1, FLOOR_Y+1, 0) cell as
-        // the climb target's floor.
-        w.putShape(new CellPos(1, FLOOR_Y, 0),
+        w.putShape(new CellPos(1, BODY_Y, 0),
             CollisionShape.partial(
                 new Box(0, 0.5, 0, 1, 1, 1)));
         assertTrue(new BasicMoves.ClimbUp(SRC,

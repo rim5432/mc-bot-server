@@ -9,7 +9,8 @@ covers:
   - src/main/java/com/mcbot/mcbotserver/core/pathing/BasicMoves.java
   - src/test/java/com/mcbot/mcbotserver/world/CollisionShapeGateTest.java
   - src/test/java/com/mcbot/mcbotserver/corepathing/BasicMovesShapeGateTest.java
-status: open
+status: resolved (2026-08-23; contract settled at Stage 2 closeout
+  review, see section 5)
 related:
   - doc/architecture/function-map.md
 ---
@@ -110,22 +111,45 @@ and `BotController` is independent of `CollisionShape` and
 in the PR-2 commit with `@Disabled("see issue 0002")` and
 re-enabled in the issue 0002 fix.
 
-## 5. Resolution direction (updated by the closeout audit)
+## 5. Resolution (2026-08-23, adopted at Stage 2 closeout review)
 
-The fix is a contract amendment, not a default-value patch,
-so it waits for stage review per the AGENTS.md stop rule
-(§0.4): it changes boundary vocabulary covered by decision
-19. The workplan's "Stage 2 closeout follow-ups" item 1
-carries the scheduling. Scope when picked up:
+The settled contract keeps decision 19 intact - both predicates
+stay pure geometry derived from the box; no id table, no traits
+read. Three changes:
 
-- Pick the walkableTop threshold from (0.1, 0.5] and make
-  code and Javadoc agree; re-derive `STEP_HEIGHT`'s role
-  (step-up reach vs standability floor are different
-  quantities and today share one constant).
-- Decide fence representation: Box Y range past 1, or
-  two-cell post. Whichever wins, `passable()` needs a
-  footprint-vs-body-width rule to answer fences true - pure-Y
-  cannot.
-- Fix the climb case's coordinates per finding 4, then
-  re-enable cases one finding at a time; each re-enable is
-  its own commit.
+1. **Constant split.** `STEP_HEIGHT` is gone. Two different
+   physical quantities were sharing one constant:
+   - `STEP_UP_REACH = 0.625` gates `passable()` (what a hop
+     clears);
+   - `STANDABLE_THRESHOLD = 0.5` gates `walkableTop()` (the
+     floor of MC's partial-top spectrum: slab 0.5, soul sand
+     0.875, dirt path 0.9375 above it; farmland 0.25 and beds
+     0.375 below it are not routing surfaces). Not a half-slab
+     magic number.
+2. **Footprint rule on standability.** `walkableTop()` for a
+   PARTIAL additionally requires the box to span >=
+   `BODY_WIDTH` (0.6) on both horizontal axes. This is what
+   makes a fence post answer false: top high enough, footprint
+   nothing to balance on. Finding 3's "horizontal reasoning"
+   lands here, on the standability side only.
+3. **Fence = wall (finding 2 resolved by correction, not
+   representation).** The squeeze-past expectation was
+   physically impossible: a centered post leaves two 0.4-wide
+   slots and a 0.6-wide body fits in neither; real fences fill
+   their cell near-full width anyway. The fence cases now pin
+   the vanilla-aligned answers - passable false (wall),
+   walkableTop false (thin) - with the single-cell post box
+   `(0.4,0,0.4)-(0.6,1,0.6)` inside `[0,1]`. The two-cell
+   representation idea is dropped as unnecessary machinery:
+   the way past a fence is the missing-post cell, which is
+   EMPTY and already answers true.
+
+Test outcomes: all five disabled cases re-enabled and green.
+Finding 4's climb case was re-derived per its own comment
+(slab at `(1, BODY_Y, 0)`, destination `(1, BODY_Y+1, 0)`) and
+renamed `climbOntoUpperSlabPlatformIsViable`; the single-cell
+fence case was rewritten as `fencePostCellIsWallAndNotStandable`.
+Full suite: zero skips.
+
+Remaining follow-up: the shape-bearing gauntlet gametest
+(workplan Stage 2 closeout follow-up 2), now unblocked.

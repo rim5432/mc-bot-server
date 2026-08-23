@@ -20,7 +20,7 @@ import java.util.Objects;
  *
  * <ul>
  * <li>passable(cell): the cell's CollisionShape is body-clear
- * (EMPTY, or PARTIAL with top below STEP_HEIGHT). The shape is the
+ * (EMPTY, or PARTIAL with top below STEP_UP_REACH). The shape is the
  * source of truth, the block id is not consulted (decision 19). Cells
  * the adapter does not annotate fall through to the WorldView's
  * safe-default, which is FULL_CUBE - blocking, not traversable.</li>
@@ -104,10 +104,11 @@ public final class BasicMoves {
 
     /**
      * Whether the cell below has a walkable top. Full cubes always;
-     * partial blocks only when their top sits at or above
-     * {@link CollisionShape#STEP_HEIGHT} and below a jump
-     * (a half-slab top at y=0.5 is too low; the upper half or a full
-     * step is fine).
+     * partial blocks only when their top rises to
+     * {@link CollisionShape#STANDABLE_THRESHOLD} and spans at least
+     * {@link CollisionShape#BODY_WIDTH} on both horizontal axes (a
+     * half-slab top qualifies; a plate is too low; a fence post is
+     * too thin to balance on).
      *
      * @param world the view; must not be null
      * @param cell  the cell whose floor we test; must not be null
