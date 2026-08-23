@@ -8,6 +8,7 @@ Generated: 2026-08-23. Validate anytime with `python tool/mcbot_tool.py doc chec
 | Document | Title | Verified | Status |
 |---|---|---|---|
 | [boundaries.md](architecture/boundaries.md) | Boundary Contracts and Decision Ledger | 2026-08-23 | ok |
+| [code-health.md](architecture/code-health.md) | Code Health Ledger | 2026-08-23 | ok |
 | [function-map.md](architecture/function-map.md) | Functional Convergence Map (device-layer capability envelope) | 2026-08-23 | ok |
 | [issues/0001-vertical-replan-failure-branches.md](architecture/issues/0001-vertical-replan-failure-branches.md) | PathingBehavior has three vertical-displacement failure branches and a fuse measuring the wrong quantity | 2026-08-23 | ok |
 | [issues/0002-world-collision-slab-fence.md](architecture/issues/0002-world-collision-slab-fence.md) | 5 disabled world/collision tests - shape-predicate contract conflicts (walkableTop threshold, Box Y range, fence passability) | 2026-08-23 | ok |
