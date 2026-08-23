@@ -1,6 +1,6 @@
 ---
 title: Movement primitive vocabulary - misnomers, fluid propulsion, missing key semantics
-last_verified: 2026-08-23
+last_verified: 2026-08-24
 covers:
   - src/main/java/com/mcbot/mcbotserver/core/pathing/BasicMoves.java
   - src/main/java/com/mcbot/mcbotserver/api/actor/Intent.java
@@ -80,6 +80,15 @@ comment, plus the comment-only mentions in PlanLifecycle,
 PlanProgressFuse, and four test classes - so global search keeps
 returning one name.
 
+**Implementation status (2026-08-24)**: D1 is fully implemented in
+code. `BasicMoves.JumpUp` (line 235) replaces the old `ClimbUp`;
+`PathingBehavior` uses `jumpForWaypoint` (renamed from `climbing`)
+and its comment reads "execution half of a JumpUp edge".
+PlanLifecycle / PlanProgressFuse have zero `climb` references.
+Test-class comment-only mentions cleaned up 2026-08-24. The
+finding and ruling stay as the historical record; `BlockTraits.climbable()`
+still has zero consumers, reserved for a future ladder/vine Movement.
+
 ### F2 - Fluid propulsion is planned but physically unreachable
 
 Verified chain (rev 2, all citations decompiled 1.20.1):
@@ -143,6 +152,19 @@ the split. The deep-pool gametest (three layers of water - two was
 exitable by a single grounded hop off the flooded floor and masked
 the gap) runs red without the fix and green with it; its crossing
 trace shows the body riding the surface lane across, matching F6(1).
+
+**Lava extension (2026-08-24, commit 3f2f9c0)**: the same
+direct-call deviation was applied to lava. `BotBodyEntity.customServerAiStep`
+now checks `isInLava() && !onGround()` before the water branch and
+calls `jumpInFluid(ForgeMod.LAVA_TYPE.get())`. In lava, `isInWater()`
+is false and `onGround()` is false, so without this branch `driveJump`
+was silently consumed every tick. The branch also closes the crashed-state
+MinimalReflex lava path: `BotController.inLethalFluid` (previously a
+dead field with zero call sites) is now wired from `McBotServer.onServerTick`
+reading `activeBody.isInLava()`, so `MinimalReflex.tick(inLethalFluid=true,
+actor)` submits `jump=true` and the lava branch fires. No lava gametest
+yet — water has trench + deep-pool coverage; lava in-engine scenario is
+a tracked follow-up.
 
 ### F3 - Vertical control: the yya axis gives real swim steering, not just rocket-up plus freefall
 

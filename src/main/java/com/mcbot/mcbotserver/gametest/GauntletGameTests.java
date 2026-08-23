@@ -31,10 +31,12 @@ import static com.mcbot.mcbotserver.gametest.GametestRig.submitGoto;
  *
  * <p>Contract: see workplan Stage 2 closeout follow-up 2 and issue
  * 0002 Resolution (fence = wall; slabs standable; the way past a
- * fence is the missing-post EMPTY cell). Water/lava sections are
- * deliberately absent: no swim Movement exists in the v1 vocabulary,
- * so traversal assertions there would test nothing - the function
- * map's GAP rows own that growth.
+ * fence is the missing-post EMPTY cell). Swim/SwimUp vocabulary
+ * shipped after this suite was built (workplan closeout follow-up
+ * 5); water traversal is gametest-gated in BotSliceGameTests
+ * (trench + three-deep pool). Lava execution landed (issue 0004
+ * F2 + lava branch) but a lava gauntlet section has no in-engine
+ * scenario yet — tracked as a follow-up, not a vocabulary gap.
  *
  * <p>Template: gameteststructures/empty16x8x16.snbt, paved by
  * {@link GametestRig#rig}.

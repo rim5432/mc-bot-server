@@ -1,6 +1,6 @@
 ---
 title: Functional Convergence Map (device-layer capability envelope)
-last_verified: 2026-08-23
+last_verified: 2026-08-24
 covers:
   - doc/guide/workplan.md
   - doc/architecture/boundaries.md
@@ -43,7 +43,12 @@ depth pending - [GAP] vocabulary absent, reopen-triggered -
 ### Locomotion (movement five-tuple family)
 - [SHIPPED] Walk / diagonal / jump-up / drop<=3 / **Swim / SwimUp**
   over A* with replan ladder (exhaustion / drift / progress fuse)
-  and wall-clock-bounded async worker on immutable snapshots
+  and wall-clock-bounded async worker on immutable snapshots.
+  Water execution gametest-gated (trench + three-deep pool in
+  BotSliceGameTests); lava execution shipped (issue 0004 F2 +
+  lava branch) but no in-engine scenario yet — [SHIPPED] covers
+  vocabulary + planner + water execution; lava gametest is a
+  tracked follow-up.
 - [GAP] Parkour, pillar-up, door handling - each lands as a
   Movement + traits data; mechanisms written once (decision 8/10)
 - [PLANNED] SneakWalk: 1-wide edge traversal with 1.5-height AABB;
@@ -55,6 +60,14 @@ depth pending - [GAP] vocabulary absent, reopen-triggered -
   chain; datapack-driven rule table (JSON hard-errors on typos)
 - [SKELETON] One rule (freeze-on-low-health); scenario packs are
   rule-table DATA per decision 10 - growth is content, not code
+- [SKELETON] Crashed-state floor (ADR-0005 D3): after any pipeline
+  RuntimeException the bot latches `crashed` and runs only
+  MinimalReflex, which covers lava ascent via `inLethalFluid` —
+  no low-health defense, no fall protection, no hostile engagement
+  in crashed state. `crashCounter` is a harness-side diagnostic;
+  the bot never self-clears. Recovery: harness `reset` (full clear)
+  or death+respawn (latch clears, counter preserved so pathological
+  crash rates stay visible)
 - [DEFERRED] pausedReflexes (process-suppresses-reflex); freeze
   outranking combat is correct v1 behavior
 
@@ -83,6 +96,15 @@ driver work. Grass/thin-collider occlusion over-blocking is a known
 micro-algorithm GAP. Kiting that drags the body past leash 12 ends
 as LOST_TARGET by design - the bot never fights on enemy terms it
 cannot answer.
+
+Escaped-target semantics (issue 0006): a target that leaves the
+scan radius (14) while the bot is engaged fires the unseen-grace
+timer -> SUCCESS after 10 ticks. SUCCESS means "absent from scan"
+(death OR escape), NOT "confirmed kill". A target between leash
+(12) and scan radius (13) fires LOST_TARGET instead. The 14-vs-12
+gap is a known semantic seam; harness must not count SUCCESS as a
+kill. Three resolution options (raise radius, document-only, add
+TARGET_ESCAPED terminal state) deferred to Stage 1 review.
 
 - [GAP] Loadout selection, ranged, multi-target, retreat-choreography
   - micro-algorithms are implementation freedom INSIDE boundary B;
