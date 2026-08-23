@@ -76,6 +76,7 @@ public class McBotServer {
 
     private BotController activeController;
     private BindingWorldView activeView;
+    private BotBodyEntity activeBody;
     private GotoCommandHandler activeGotoHandler;
     private InMemoryEventQueue activeEvents;
     private CommandBus activeBus;
@@ -144,7 +145,8 @@ public class McBotServer {
         if (event.phase != TickEvent.Phase.END) {
             return;
         }
-        if (activeController == null || activeView == null) {
+        if (activeController == null || activeView == null
+                || activeBody == null) {
             return;
         }
         try {
@@ -157,6 +159,12 @@ public class McBotServer {
                 // actually moved, so a per-tick drive cannot flood it.
                 activeState.current();
             }
+            // Feed the lava flag before the pipeline runs: MinimalReflex
+            // (crashed state) reads this to decide whether to jump. The
+            // normal reflex layer derives fluid state from ThreatBlackboard
+            // sensors; this flag is the crashed-state parallel that cannot
+            // depend on the sensor stack (ADR-0005 D3).
+            activeController.setInLethalFluid(activeBody.isInLava());
             activeController.onTick(activeView);
         } catch (RuntimeException e) {
             LOGGER.error("mcbotserver tick harness failed; "
@@ -244,6 +252,7 @@ public class McBotServer {
                 this.activeState = state;
                 this.activeController = controller;
                 this.activeView = view;
+                this.activeBody = body;
 
                 String spawned = "bot spawned at " + body.blockPosition()
                     + "; drive with /bot goto x y z tolerance timeoutTicks";

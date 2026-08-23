@@ -83,7 +83,7 @@ public final class BotBodyEntity extends PathfinderMob {
      * @param strafe  -1..1 strafe drive
      * @param jump    true to request upward thrust this tick - a
      *                ground jump on land, buoyant ascent while in
-     *                water (issue 0004 F2)
+     *                water or lava (issue 0004 F2 + lava branch)
      */
     public void setDrive(float forward, float strafe, boolean jump) {
         this.driveForward = forward;
@@ -118,7 +118,16 @@ public final class BotBodyEntity extends PathfinderMob {
         // binding must supply it or zza drives a speed-0 body.
         setSpeed((float) getAttributeValue(
             net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED));
-        if (driveJump && isInWater() && !onGround()) {
+        if (driveJump && isInLava() && !onGround()) {
+            // Lava ascent: same direct-call deviation as the water branch
+            // below — setJumping(true) produced zero vertical velocity on
+            // this carrier (issue 0004 F2, same anomaly class). Mob.jumpInFluid
+            // with LAVA_TYPE is the exact call the vanilla aiStep fluid branch
+            // makes for lava. Lava is more viscous than water so the ascent
+            // is slower, but a held flag keeps applying thrust each tick the
+            // way MinimalReflex intends while crashed in lava.
+            jumpInFluid(net.minecraftforge.common.ForgeMod.LAVA_TYPE.get());
+        } else if (driveJump && isInWater() && !onGround()) {
             // Fluid ascent with no floor to push from: call the
             // engine's fluid jump directly. Runtime probes killed the
             // subtler route - writing setJumping(true) lets the vanilla
