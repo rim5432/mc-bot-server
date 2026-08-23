@@ -121,6 +121,42 @@ public final class GauntletGameTests {
             .thenSucceed();
     }
 
+    /**
+     * A fence line spanning the whole lane, one missing post: the plan
+     * must thread the gap cell, not stall at the wall. Pins the
+     * issue-0002 fence semantics in-engine - the fence reads as a wall
+     * everywhere EXCEPT the EMPTY gap cell.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = TIMEOUT)
+    public static void routesThroughFenceGap(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, LANE_Z));
+        for (int z = 0; z < 16; z++) {
+            if (z != LANE_Z) {
+                helper.setBlock(new BlockPos(8, GametestRig.FLOOR_Y + 1, z),
+                    Blocks.OAK_FENCE);
+            }
+        }
+        CellPos goalCell = localToCell(helper,
+            new BlockPos(12, GametestRig.WALK_Y, LANE_Z));
+        var mission = submitGoto(rig, goalCell);
+
+        helper.startSequence()
+            .thenWaitUntil(driveUntil(rig,
+                () -> check(reached(rig.body(), goalCell)
+                    || !mission.isActive(),
+                    "waiting for the gap threading")))
+            .thenExecuteFor(3, driveOnly(rig))
+            .thenExecuteAfter(0, () -> {
+                check(mission.missionSucceeded(),
+                    "the gap is the only passage; routing must find it."
+                    + " reason=" + mission.failureReasonOrNull()
+                    + " bodyAt=" + positionOf(rig.body()));
+                assertCompleted(rig);
+                rig.body().discard();
+            })
+            .thenSucceed();
+    }
+
     /** Falling below the walk plane means the body left the paved
      * platform - fail here rather than as a confusing void STUCK. */
     private static void checkBodyOnPlane(GametestRig.Rig rig,

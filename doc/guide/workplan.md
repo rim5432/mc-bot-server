@@ -314,4 +314,14 @@ test count when red).
    jumpFromGround directly (documented deviation). Water/lava
    sections stay out: no swim Movement exists; the function
    map's GAP rows own that growth.
+3. RESOLVED 2026-08-23: PathingBehavior (738 lines) decomposed
+   into an orchestration shell plus four package-private
+   single-concern collaborators in core.behavior - WaypointCursor
+   (126), PlanProgressFuse (159, Ruling-a invariants verbatim),
+   ReplanGate (101), PlanLifecycle (235, Chebyshev freshness);
+   shell now 511 lines. Behaviour zero-change: verdicts, tick
+   order, keepalive keys, and ctor overloads all pinned by the
+   existing gates; tickpipeline reflection centralised in
+   PathingTestAccess. Verified offline (159 cases, 0 skips) and
+   in-engine (7/7 gametests).
 
