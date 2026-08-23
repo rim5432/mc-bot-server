@@ -239,4 +239,38 @@ class IdempotencyKeyGateTest {
             "the rejected attempt must not have seeded the cache");
         assertEquals(1, executed.size());
     }
+
+    @Test
+    void retireClosesTheWindowForDeathsAnnouncedOutsideTheBus() {
+        InMemoryEventQueue queue = new InMemoryEventQueue(() -> 1L, () -> 0L);
+        CommandBus bus = new CommandBus(queue);
+        List<String> executed = new ArrayList<>();
+        bus.register("goto", countingHandler(executed));
+
+        SubmitResult first = submitOk(bus,
+            new BotCommand("goto", Map.of("x", "5")), null);
+        String taskId = ((SubmitResult.Ok) first).taskId();
+
+        // The arbiter announces TIMEOUT deaths directly onto the event
+        // stream; the bus only learns of the death via retire() (the
+        // verb handler's lifecycle sweep). Before that sweep lands, a
+        // retry must still replay - after it, it must be fresh.
+        SubmitResult duringLife = submitOk(bus,
+            new BotCommand("goto", Map.of("x", "5")), null);
+        assertTrue(((SubmitResult.Ok) duringLife).idempotencyReplay(),
+            "while the death is unannounced, dedupe still holds");
+        assertEquals(1, executed.size());
+
+        assertTrue(bus.retire(taskId),
+            "retiring a live task closes its window");
+        assertFalse(bus.retire(taskId), "second retire is idempotent");
+
+        SubmitResult afterDeath = submitOk(bus,
+            new BotCommand("goto", Map.of("x", "5")), null);
+        assertFalse(((SubmitResult.Ok) afterDeath).idempotencyReplay(),
+            "post-retirement retry must be a fresh acceptance");
+        assertNotEquals(taskId,
+            ((SubmitResult.Ok) afterDeath).taskId());
+        assertEquals(2, executed.size());
+    }
 }

@@ -178,6 +178,29 @@ public final class CommandBus implements CommandChannel {
         return new TreeMap<>(args).toString();
     }
 
+    /**
+     * Close the dedupe window for a task whose terminal event was
+     * emitted OUTSIDE the bus - the arbiter's retirement lap announces
+     * TIMEOUT/STUCK deaths directly onto the event stream, so without
+     * this sweep a dead task's idempotency entry would live forever
+     * and every harness retry of the same verb+args would replay the
+     * dead id instead of submitting fresh. Idempotent: unknown ids
+     * answer false and change nothing.
+     *
+     * @param taskId the retired task's id; never null
+     * @return true when the task was still live here and is now closed
+     */
+    public boolean retire(String taskId) {
+        boolean removed = activeTasks.remove(taskId);
+        if (removed) {
+            String idemKey = taskIdToIdempotencyKey.remove(taskId);
+            if (idemKey != null) {
+                idempotencyCache.remove(idemKey, taskId);
+            }
+        }
+        return removed;
+    }
+
     @Override
     public boolean cancel(String taskId) {
         String verb = taskVerbs.get(taskId);

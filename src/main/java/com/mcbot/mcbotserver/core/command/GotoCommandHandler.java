@@ -40,6 +40,9 @@ public final class GotoCommandHandler {
     private final LongSupplier daySupplier;
     private final LongSupplier timeOfDaySupplier;
     private final Map<String, GotoProcess> missions = new HashMap<>();
+    // Set in attach(); the lifecycle sweep needs the bus to close
+    // dedupe windows for deaths announced outside it.
+    private CommandBus bus;
 
     /**
      * Creates the handler over the task channel and event stream.
@@ -72,6 +75,7 @@ public final class GotoCommandHandler {
         if (bus == null) {
             throw new IllegalArgumentException("bus must not be null");
         }
+        this.bus = bus;
         bus.setCancelListener(this::onCancel);
         bus.register("goto", new CommandBus.Handler() {
             @Override
@@ -105,7 +109,17 @@ public final class GotoCommandHandler {
      * directly by tests; safe to call at any cadence.
      */
     public void tick() {
-        missions.values().removeIf(m -> !m.isActive());
+        // Retire-before-sweep: a mission that died via the arbiter's
+        // retirement lap (TIMEOUT / STUCK) had its verdict announced
+        // outside the bus, so the bus's dedupe window would otherwise
+        // hold the dead id forever and replay every harness retry.
+        missions.values().removeIf(m -> {
+            if (m.isActive()) {
+                return false;
+            }
+            bus.retire(m.taskId());
+            return true;
+        });
     }
 
     /**

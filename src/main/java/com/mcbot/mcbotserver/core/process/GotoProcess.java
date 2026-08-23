@@ -132,6 +132,16 @@ public final class GotoProcess implements BotProcess, TerminalMission {
     }
 
     /**
+     * Returns the boundary-D task id passed at construction, for the
+     * command layer's lifecycle sweep.
+     *
+     * @return the task id; never null
+     */
+    public String taskId() {
+        return taskId;
+    }
+
+    /**
      * Terminal state query for the command layer's completion events.
      *
      * @return true when the goal predicate passed before any failure

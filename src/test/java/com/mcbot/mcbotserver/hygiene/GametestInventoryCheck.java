@@ -41,6 +41,7 @@ class GametestInventoryCheck {
     private static final Map<String, Set<String>> EXPECTED = Map.of(
         "BotSliceGameTests", Set.of(
             "walksToBlock",
+            "crossesWaterTrench",
             "failsCleanlyWhenUnwalkable",
             "recoversWhenShoved",
             "refusesRangedItCannotAnswer",
