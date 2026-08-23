@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * Reference command router: structural validation is synchronous, all
@@ -164,58 +165,17 @@ public final class CommandBus implements CommandChannel {
     }
 
     /**
-     * Canonical form of the args map for fallback dedupe. The order
-     * matters because two equal-by-content maps with different
-     * iteration order would otherwise hash to different keys and
-     * the same logical command would slip past the dedupe.
-     *
-     * <p>Why the sort is required: the args map arrives via
-     * {@link BotCommand}, whose canonical constructor runs
-     * {@code args = Map.copyOf(args)}. {@code Map.copyOf} returns
-     * an immutable map that preserves the caller's insertion
-     * order (it is not a HashMap and not a sorted view). Two
-     * callers passing the same logical args in different
-     * literal order - {@code Map.of("x", "1", "y", "2")} vs
-     * {@code Map.of("y", "2", "x", "1")} - get equal maps with
-     * different iteration orders, and the dedupe would treat
-     * them as different commands. Sorting by key with a
-     * {@code TreeMap} is the cheapest way to make the
-     * canonicalisation indifferent to the caller's key order.
-     *
-     * <p>Why a sort and not a hash: the cache key needs to be
-     * stable across the dedupe window (which can outlive a
-     * single process if the bot migrates state in some future
-     * build). A 32-bit hash would be sufficient within a single
-     * JVM but would couple dedupe to the hash function; a
-     * collision would silently merge two distinct commands.
-     * Keeping the canonical form as readable text means a
-     * debug log of the cache can be grepped for the args that
-     * produced a given key. The verb-level prefix in
-     * {@link #submit} keeps this string from colliding with a
-     * future verb whose id happens to start with the same
-     * characters.
+     * Canonical form of the args map for the fallback dedupe key.
+     * Sorted by key so two equal-by-content maps hash to one key
+     * regardless of the caller's insertion order ({@code Map.copyOf}
+     * preserves iteration order, so literal order would otherwise
+     * split one logical command into two cache entries).
      *
      * @param args command args; never null
-     * @return stable string for hashing; empty args yield
-     *         {@code "{}"} (the distinct empty-args case)
+     * @return stable cache-key text; empty args yield {@code "{}"}
      */
-    private static String canonicalArgs(
-            java.util.Map<String, String> args) {
-        if (args.isEmpty()) {
-            return "{}";
-        }
-        java.util.TreeMap<String, String> sorted =
-            new java.util.TreeMap<>(args);
-        StringBuilder sb = new StringBuilder("{");
-        boolean first = true;
-        for (java.util.Map.Entry<String, String> e : sorted.entrySet()) {
-            if (!first) {
-                sb.append(',');
-            }
-            sb.append(e.getKey()).append('=').append(e.getValue());
-            first = false;
-        }
-        return sb.append('}').toString();
+    private static String canonicalArgs(Map<String, String> args) {
+        return new TreeMap<>(args).toString();
     }
 
     @Override
