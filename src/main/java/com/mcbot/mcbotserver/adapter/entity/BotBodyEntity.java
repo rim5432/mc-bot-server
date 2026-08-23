@@ -116,8 +116,18 @@ public final class BotBodyEntity extends PathfinderMob {
         // binding must supply it or zza drives a speed-0 body.
         setSpeed((float) getAttributeValue(
             net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED));
-        if (driveJump) {
-            setJumping(true);
+        if (driveJump && onGround()) {
+            // Deliberate deviation from the vanilla flag path: writing
+            // setJumping(true) and letting LivingEntity.aiStep consume
+            // it never lifted this body (field verified true at write
+            // time, zero vertical velocity ever applied - traced by
+            // the gauntlet jump probe), so the binding fires
+            // jumpFromGround directly, the exact call that consumer
+            // would make. The one-shot reset keeps a held flag from
+            // machine-gunning jumps every tick; steering re-raises it
+            // each tick while the climb waypoint is still above us.
+            jumpFromGround();
+            driveJump = false;
         }
         if (hasPendingRotation) {
             setRot(targetYaw, targetPitch);
