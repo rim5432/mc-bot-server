@@ -73,7 +73,12 @@ collision.
 jump input; JumpUp says what the executor must do. (Baritone's
 corresponding movement is named Ascend, so there is no convention
 debt either way.) Reserve *Climb* for a future trait-driven
-ladder/vine Movement per decision 19a.
+ladder/vine Movement per decision 19a. Review addition: the rename
+must cover the execution side too - `PathingBehavior`'s local
+`climbing` variable and its "execution half of a ClimbUp edge"
+comment, plus the comment-only mentions in PlanLifecycle,
+PlanProgressFuse, and four test classes - so global search keeps
+returning one name.
 
 ### F2 - Fluid propulsion is planned but physically unreachable
 
@@ -111,6 +116,14 @@ Verified chain (rev 2, all citations decompiled 1.20.1):
 Consequence: `Swim`/`SwimUp` are planner-only fiction beyond wading
 depth. The existing `crossesWaterTrench` gametest cannot catch this -
 its trench is one cell deep; the bot wades on the bottom.
+
+Review scope note (recorded so nobody over-credits the fix): D2
+repairs VERTICAL fluid motion only. Sustained horizontal swimming at
+depth stays weak (forward drift ~one fifth of land acceleration);
+v1 lake crossings work by sinking, rising to the surface lane, and
+bobbing across - the surface-first shape F6(1) describes. True
+sub-surface cruising waits for the F3 yya wiring and the F5
+depth-tiered costs.
 
 **Ruling D2 (approved with pre-verification; verification done)**:
 the review's fallback ("call jumpInFluid manually if Mob breaks the
@@ -175,6 +188,16 @@ gate). The yya dive/ascend wiring lands as one adapter translation
 when an underwater scenario first demands it; reserved now so
 nobody concludes gravity-drift is the final answer. Sneak on LAND
 remains issue 0003's consumer exclusively.
+
+Review implementation notes for that future wiring, recorded where
+the work will find them: (a) `BotBodyEntity.setDrive` carries only
+(forward, strafe, jump) today - Shift=dive needs the sneak bit
+threaded through to the body (a `setDrive` parameter or a
+`setSneak` setter; adapter-internal either way, no Intent change);
+(b) the claim that `travel()`'s water branch consumes the yya
+component unrotated was read from `getInputVector`, but the
+end-to-end behaviour must be proven by a gametest at implementation
+time, not trusted from reading.
 
 One more pose fact reserved for exploration work: the swimming
 POSE (`Pose.SWIMMING`, the 0.6-tall hitbox that lets players crawl
