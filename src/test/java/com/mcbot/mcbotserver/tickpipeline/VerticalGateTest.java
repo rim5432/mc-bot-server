@@ -58,21 +58,6 @@ class VerticalGateTest {
         @Override public void clearAllIntents() { delegate.clearAllIntents(); }
     }
 
-    private static int readTicksSincePlan(PathingBehavior mover)
-        throws ReflectiveOperationException {
-        Field f = PathingBehavior.class.getDeclaredField("ticksSincePlan");
-        f.setAccessible(true);
-        return (int) f.get(mover);
-    }
-
-    private static int readTicksSincePlanProgress(PathingBehavior mover)
-        throws ReflectiveOperationException {
-        Field f = PathingBehavior.class.getDeclaredField(
-            "ticksSincePlanProgress");
-        f.setAccessible(true);
-        return (int) f.get(mover);
-    }
-
     /**
      * A body that falls continuously (onGround=false) for 30 ticks
      * must NOT trip the plan-progress fuse: the gate suppresses
@@ -133,7 +118,7 @@ class VerticalGateTest {
         // airborne: updatePlanProgress is gated, so the counter
         // stays at the ctor-default 0. The first tick did not
         // credit progress (gate was engaged even on tick 1).
-        assertEquals(0, readTicksSincePlanProgress(mover),
+        assertEquals(0, PathingTestAccess.ticksSincePlanProgress(mover),
             "airborne ticks must not increment ticksSincePlanProgress");
     }
 
@@ -175,7 +160,7 @@ class VerticalGateTest {
             position[0] = new Vec3(0.5 + i * 0.2, 64, 0.5);
             mover.tick(world, directive, actor);
         }
-        assertEquals(5, readTicksSincePlan(mover),
+        assertEquals(5, PathingTestAccess.ticksSincePlan(mover),
             "5 ticks after first replan: ticksSincePlan should be 5, "
             + "in the REPLAN_COOLDOWN=10 window");
 
@@ -186,7 +171,7 @@ class VerticalGateTest {
         position[0] = new Vec3(position[0].x() + 5, 64, position[0].z());
         mover.tick(world, directive, actor);
         // Verify: no replan fired (ticksSincePlan still 6, not 0).
-        assertEquals(6, readTicksSincePlan(mover),
+        assertEquals(6, PathingTestAccess.ticksSincePlan(mover),
             "offPath with ticksSincePlan in cooldown: no replan");
 
         // Go airborne (jump or fall off edge). wasOnGround was true
@@ -194,13 +179,13 @@ class VerticalGateTest {
         // edge. The gate suppresses trigger evaluation entirely.
         onGround[0] = false;
         mover.tick(world, directive, actor);
-        assertEquals(7, readTicksSincePlan(mover),
+        assertEquals(7, PathingTestAccess.ticksSincePlan(mover),
             "airborne tick: gate skips trigger eval, ticksSincePlan "
             + "increments to 7, no replan");
 
         // Still airborne.
         mover.tick(world, directive, actor);
-        assertEquals(8, readTicksSincePlan(mover),
+        assertEquals(8, PathingTestAccess.ticksSincePlan(mover),
             "still airborne: gate still skips trigger eval");
 
         // Land. onGround goes false -> true. landing = true. The
@@ -212,7 +197,7 @@ class VerticalGateTest {
         // the request.
         onGround[0] = true;
         mover.tick(world, directive, actor);
-        assertEquals(0, readTicksSincePlan(mover),
+        assertEquals(0, PathingTestAccess.ticksSincePlan(mover),
             "landing edge must request replan immediately, "
             + "bypassing the cooldown: ticksSincePlan should be 0");
     }
@@ -296,7 +281,7 @@ class VerticalGateTest {
                 position[0].y() - 0.3, position[0].z());
             mover.tick(world, directive, actor);
         }
-        assertEquals(0, readTicksSincePlanProgress(mover),
+        assertEquals(0, PathingTestAccess.ticksSincePlanProgress(mover),
             "airborne ticks must not touch ticksSincePlanProgress");
 
         // ticksSincePlan started at REPLAN_COOLDOWN=10, was
@@ -304,7 +289,7 @@ class VerticalGateTest {
         // replan was requested because the gate stayed engaged
         // and the neverPlanned short-circuit is also gated).
         // 10 + 50 = 60.
-        assertEquals(60, readTicksSincePlan(mover),
+        assertEquals(60, PathingTestAccess.ticksSincePlan(mover),
             "ticksSincePlan should equal 10 (ctor) + 50 (tick "
             + "increments) with no reset to 0: the gate prevented "
             + "any replan from being requested");

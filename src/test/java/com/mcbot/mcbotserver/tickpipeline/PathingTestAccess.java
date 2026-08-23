@@ -48,7 +48,21 @@ final class PathingTestAccess {
 
     /** Ticks since the last plan-progress criterion fired. */
     static int ticksSincePlanProgress(PathingBehavior mover) {
-        return (int) hostField(mover, "ticksSincePlanProgress");
+        return (int) fuseField(mover, "ticksSincePlanProgress");
+    }
+
+    private static Object fuseField(PathingBehavior mover,
+                                    String name) {
+        try {
+            Field f = PathingBehavior.class.getDeclaredField("fuse");
+            f.setAccessible(true);
+            Object fuse = f.get(mover);
+            Field inner = fuse.getClass().getDeclaredField(name);
+            inner.setAccessible(true);
+            return inner.get(fuse);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private static Object cursorField(PathingBehavior mover,

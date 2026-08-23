@@ -153,10 +153,9 @@ public final class PathingBehavior implements Behavior {
     private final MoveGraph graph;
     private final PlanWorker worker;
     private final WaypointCursor cursor = new WaypointCursor();
-    private boolean stuckLatched;
+    private final PlanProgressFuse fuse = new PlanProgressFuse();
     private boolean neverPlanned = true;
     private int ticksSincePlan = REPLAN_COOLDOWN;
-    private int ticksSincePlanProgress;
     private int ticksSinceAdoption;
     // Previous tick's onGround state, used to detect the landing
     // edge (false -> true). Initialised to false so the first
@@ -164,15 +163,6 @@ public final class PathingBehavior implements Behavior {
     // edge is harmless then because neverPlanned short-circuits
     // the replan gate anyway.
     private boolean wasOnGround;
-    // Plan-progress latches for issue 0001 §Ruling a. Initialised
-    // to "no prior observation" sentinels so the first tick after
-    // plan adoption counts as progress (criterion fires against
-    // the sentinel), and reset to sentinels on plan adoption so
-    // a new plan starts a fresh observation window.
-    private int lastWaypointIndex = -1;
-    private double lastWaypoint3DDistance = Double.POSITIVE_INFINITY;
-    private double lastGoalDistance = Double.POSITIVE_INFINITY;
-
     // Async plan bookkeeping; all fields touched on the tick thread
     // only - the future itself is the sole cross-thread object.
     private CompletableFuture<AStarPathFinder.PathResult> pendingPlan;
@@ -354,15 +344,14 @@ public final class PathingBehavior implements Behavior {
             // "moving but not progressing" case (limbo body in
             // free fall - large per-tick 3D displacement, zero
             // waypoint-progress).
-            if (updatePlanProgress(position, directive.goal())) {
-                ticksSincePlanProgress = 0;
-                stuckLatched = false;
+            if (fuse.evaluate(cursor, position,
+                anchorCell(directive.goal()))) {
+                fuse.onProgress();
             } else {
-                ticksSincePlanProgress++;
+                fuse.onStall();
             }
 
-            boolean fuseCondition = !stuckLatched
-                && ticksSincePlanProgress >= STUCK_WINDOW;
+            boolean fuseCondition = fuse.shouldFire();
             boolean offPath = !cursor.exhausted()
                 && distanceToWaypoint(position,
                     cursor.current()) > REPLAN_DISTANCE;
@@ -394,18 +383,18 @@ public final class PathingBehavior implements Behavior {
                 // STUCK (physically immovable), a planning-side
                 // one reports NO_PATH.
                 if (fuseCondition) {
-                    stuckLatched = true;
+                    fuse.latch();
                     return ExecutionReport.failed("STUCK");
                 }
                 return ExecutionReport.failed("NO_PATH");
             }
-            if (fuseCondition && !stuckLatched) {
+            if (fuseCondition && !fuse.latched()) {
                 // Fresh-plan grace expired while the body stayed
                 // frozen and the replan cooldown is still blocking
                 // the next attempt. Report once, latch, keep
                 // claims flowing; movement or a later successful
                 // plan clears the latch.
-                stuckLatched = true;
+                fuse.latch();
                 return ExecutionReport.stuck(
                     "frozen between replan cooldowns");
             }
@@ -488,18 +477,10 @@ public final class PathingBehavior implements Behavior {
         // Skip index 0: it is the cell we are standing in.
         cursor.set(result.waypoints());
         ticksSinceAdoption = 0;
-        // Plan adopted: reset the plan-progress latches so the new
-        // plan starts a fresh observation window. The fuse
-        // accumulator (ticksSincePlanProgress) is NOT reset - that
-        // is the invariant from issue 0001 §Ruling a: external
-        // replan does not clear the fuse. lastWaypointIndex is
-        // set to the CURRENT waypointIndex (not a sentinel) so
-        // the next updatePlanProgress call does not fire
-        // criterion 1 as a false positive.
-        lastWaypointIndex = cursor.index();
-        lastWaypoint3DDistance = Double.POSITIVE_INFINITY;
-        // lastGoalDistance stays - the goal cell is the same
-        // across replans, the latched value remains meaningful.
+        // Plan adopted: reset the observation latches (accumulator
+        // untouched) per the Ruling-a invariant - see PlanProgressFuse
+        // .onAdopted for the full rationale.
+        fuse.onAdopted(cursor.index());
     }
 
     private boolean planInFlight() {
@@ -520,12 +501,9 @@ public final class PathingBehavior implements Behavior {
         // Skip index 0: it is the cell we are standing in.
         cursor.set(result.waypoints());
         ticksSinceAdoption = 0;
-        // See adoptCompletedPlan for the latch-reset rationale.
-        // lastWaypointIndex is set to the CURRENT waypointIndex
-        // (not a sentinel) so the next updatePlanProgress call
-        // does not fire criterion 1 as a false positive.
-        lastWaypointIndex = cursor.index();
-        lastWaypoint3DDistance = Double.POSITIVE_INFINITY;
+        // See adoptCompletedPlan / PlanProgressFuse.onAdopted for
+        // the latch-reset rationale.
+        fuse.onAdopted(cursor.index());
     }
 
     private void resetPlan() {
@@ -535,74 +513,6 @@ public final class PathingBehavior implements Behavior {
         pendingPlan = null;
         pendingGoal = null;
         pendingStart = null;
-    }
-
-    /**
-     * Compute the plan-progress score for this tick (issue 0001
-     * §Ruling a, Path A). Returns true if any of the three OR
-     * criteria fires against the latched values; updates the latches
-     * for the criteria that fire so the next call can detect
-     * further progress.
-     *
-     * <p>Three OR criteria:
-     * <ol>
-     *   <li>{@code waypointIndex > lastWaypointIndex} (discrete
-     *       advance along the path)</li>
-     *   <li>{@code goalDistance < lastGoalDistance - STUCK_EPSILON}
-     *       (closure toward the goal by more than the margin)</li>
-     *   <li>current waypoint 3D distance dropped by more than
-     *       {@code STUCK_EPSILON} metres (latched-min tracked)</li>
-     * </ol>
-     *
-     * <p>The latches are reset to sentinels ({@code lastWaypointIndex
-     * = -1}, {@code lastWaypoint3DDistance = +inf}, {@code
-     * lastGoalDistance = +inf}) on plan adoption, so the first
-     * observation after a new plan is adopted always fires
-     * criterion 1 (any waypointIndex > -1) and criterion 3 (any
-     * distance is less than +inf). The accumulator is NOT reset on
-     * plan adoption; the first-observation "progress" is the
-     * initialization, not a real signal.
-     *
-     * <p>The 3D distance criterion 3 is correct under Path A
-     * (per-cell waypoint gap, move-at-waypoint steering, both
-     * pinned in the issue). If either assumption breaks, this
-     * method must be revisited (criterion 3 reverts to
-     * arclength-style polyline projection per Path B).
-     *
-     * @param position the body's current position; never null
-     * @param goal the directive's goal; never null
-     * @return true iff at least one criterion fired
-     */
-    private boolean updatePlanProgress(Vec3 position, Goal goal) {
-        CellPos goalCell = anchorCell(goal);
-        double goalDist = position.distanceTo(goalCell.x() + 0.5,
-            goalCell.y() + 0.5, goalCell.z() + 0.5);
-
-        boolean p1 = cursor.index() > lastWaypointIndex;
-        if (p1) {
-            lastWaypointIndex = cursor.index();
-        }
-
-        boolean p2 = goalDist < lastGoalDistance - STUCK_EPSILON;
-        if (p2) {
-            lastGoalDistance = goalDist;
-        }
-
-        boolean p3 = false;
-        if (!cursor.exhausted()) {
-            // Criterion 3 measures 3D, not XZ-only: vertical moves
-            // (ClimbUp, Drop) are real progress the latched min must
-            // capture (issue 0001 Ruling a).
-            CellPos wp = cursor.current();
-            double wpDist = position.distanceTo(wp.x() + 0.5,
-                wp.y() + 0.5, wp.z() + 0.5);
-            p3 = wpDist < lastWaypoint3DDistance - STUCK_EPSILON;
-            if (p3) {
-                lastWaypoint3DDistance = wpDist;
-            }
-        }
-
-        return p1 || p2 || p3;
     }
 
     /**
@@ -661,7 +571,7 @@ public final class PathingBehavior implements Behavior {
         // verifier-side impact is "ignore unknown attrs" (issue
         // 0001 §7 fix-2 contract).
         attrs.put("ticksSincePlanProgress",
-            String.valueOf(ticksSincePlanProgress));
+            String.valueOf(fuse.ticksWithoutProgress()));
         attrs.put("ticksSincePlan", String.valueOf(ticksSincePlan));
         attrs.put("planAge", String.valueOf(ticksSinceAdoption));
         if (goalCell != null) {
