@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
+import java.util.Map;
 
 /**
  * Light combat planner per boundaries.md decision 11: picks the
@@ -295,11 +296,11 @@ public final class DefendProcess implements BotProcess, TerminalMission {
     }
 
     @Override
-    public java.util.Map<String, String> verdictAttrs() {
+    public Map<String, String> verdictAttrs() {
         if (REASON_REFUSED.equals(failure) && lastRefusedType != null) {
-            return java.util.Map.of("threatType", lastRefusedType);
+            return Map.of("threatType", lastRefusedType);
         }
-        return java.util.Map.of();
+        return Map.of();
     }
 
     @Override

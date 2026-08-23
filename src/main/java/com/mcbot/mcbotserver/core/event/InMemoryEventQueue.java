@@ -8,7 +8,9 @@ import com.mcbot.mcbotserver.api.event.EventQueue;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.LongSupplier;
 
@@ -113,15 +115,15 @@ public final class InMemoryEventQueue implements EventQueue {
             long oldestId = entries.peekFirst().id();
             if (sinceEventId < oldestId - 1) {
                 long gap = oldestId - sinceEventId - 1;
-                java.util.Map<String, String> gapAttrs =
-                    new java.util.LinkedHashMap<>();
+                Map<String, String> gapAttrs =
+                    new LinkedHashMap<>();
                 gapAttrs.put("count", String.valueOf(gap));
                 gapAttrs.put("since", String.valueOf(sinceEventId));
                 gapAttrs.put("oldest", String.valueOf(oldestId));
                 page.add(new BotEvent(EventKind.EVENT_GAP,
                     daySupplier.getAsLong(),
                     timeOfDaySupplier.getAsLong(),
-                    true, java.util.Map.copyOf(gapAttrs),
+                    true, Map.copyOf(gapAttrs),
                     "events between since=" + sinceEventId
                         + " and oldest=" + oldestId
                         + " were lost; call getState() and re-poll from "
@@ -138,7 +140,7 @@ public final class InMemoryEventQueue implements EventQueue {
         if (dropped > 0) {
             page.add(new BotEvent(EventKind.EVENT_DROPPED,
                 daySupplier.getAsLong(), timeOfDaySupplier.getAsLong(),
-                false, java.util.Map.of("count", String.valueOf(dropped)),
+                false, Map.of("count", String.valueOf(dropped)),
                 dropped + " events could not be recorded"));
         }
         return new EventBatch(

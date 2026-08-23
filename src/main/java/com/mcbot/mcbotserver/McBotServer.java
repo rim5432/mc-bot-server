@@ -17,6 +17,7 @@ import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
 import com.mcbot.mcbotserver.core.tick.BotController;
 import com.mcbot.mcbotserver.core.tick.CrashReporter;
 
+import java.util.List;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EntityType;
@@ -186,7 +187,7 @@ public class McBotServer {
                     new com.mcbot.mcbotserver.core.pathing.PlanWorker());
 
                 BotController controller = new BotController(reflex,
-                    arbiter, java.util.List.of(mover), actor,
+                    arbiter, List.of(mover), actor,
                     () -> poseOf(body), body::getHealth,
                     clockOf(level), events,
                     CrashReporter.consoleFallback());

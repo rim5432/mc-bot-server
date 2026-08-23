@@ -28,6 +28,7 @@ import java.io.StringWriter;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.LinkedHashMap;
 
 /**
  * The single tick entry: fixed four-stage pipeline plus the ADR-0005
@@ -409,7 +410,7 @@ public final class BotController {
         } else {
             String reason = mission.failureReasonOrNull();
             String shown = reason != null ? reason : "unknown";
-            var extra = new java.util.LinkedHashMap<String, String>(
+            var extra = new LinkedHashMap<String, String>(
                 mission.verdictAttrs());
             extra.put("reason", reason != null ? reason : "unknown");
             emitMissionEvent(EventKind.TASK_FAILED, day, tod,
@@ -433,7 +434,7 @@ public final class BotController {
         boolean urgent = EventKind.TASK_PAUSED.equals(kind)
             || EventKind.TASK_DROPPED.equals(kind);
         try {
-            var attrs = new java.util.LinkedHashMap<String, String>();
+            var attrs = new LinkedHashMap<String, String>();
             attrs.put("task", taskName);
             attrs.putAll(extraAttrs);
             events.push(new BotEvent(kind, day, tod, urgent,

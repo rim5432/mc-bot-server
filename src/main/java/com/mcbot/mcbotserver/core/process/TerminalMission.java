@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.core.process;
 
+import java.util.Map;
 /**
  * Missions that know how they ended. Implemented by processes with
  * terminal states so the tick pipeline can emit boundary-D completion
@@ -42,7 +43,7 @@ public interface TerminalMission {
      *
      * @return extra attrs for the terminal event; never null
      */
-    default java.util.Map<String, String> verdictAttrs() {
-        return java.util.Map.of();
+    default Map<String, String> verdictAttrs() {
+        return Map.of();
     }
 }

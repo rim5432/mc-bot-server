@@ -1,5 +1,7 @@
 package com.mcbot.mcbotserver.api.command;
 
+import java.util.Map;
+
 /**
  * Boundary-D command payload: an opaque verb plus its raw argument map.
  *
@@ -14,7 +16,7 @@ package com.mcbot.mcbotserver.api.command;
  * @param args   raw string arguments keyed by name; never null,
  *               possibly empty
  */
-public record BotCommand(String verb, java.util.Map<String, String> args) {
+public record BotCommand(String verb, Map<String, String> args) {
 
     /**
      * Creates a validated command envelope.
@@ -26,6 +28,6 @@ public record BotCommand(String verb, java.util.Map<String, String> args) {
         if (verb == null || verb.isBlank()) {
             throw new IllegalArgumentException("verb must not be blank");
         }
-        args = java.util.Map.copyOf(args);
+        args = Map.copyOf(args);
     }
 }

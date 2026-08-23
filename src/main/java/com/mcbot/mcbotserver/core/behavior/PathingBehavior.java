@@ -19,7 +19,9 @@ import com.mcbot.mcbotserver.core.pathing.MoveGraph;
 import com.mcbot.mcbotserver.core.pathing.PlanWorker;
 import com.mcbot.mcbotserver.core.world.SnapshotWorldView;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
@@ -651,10 +653,10 @@ public final class PathingBehavior implements Behavior {
      * @return a fresh {@code LinkedHashMap} of attribute strings;
      *         never null
      */
-    public java.util.Map<String, String> keepaliveAttrs(
+    public Map<String, String> keepaliveAttrs(
         Vec3 pose, CellPos goalCell) {
-        java.util.Map<String, String> attrs =
-            new java.util.LinkedHashMap<>();
+        Map<String, String> attrs =
+            new LinkedHashMap<>();
         attrs.put("pose", pose.x() + "," + pose.y() + "," + pose.z());
         attrs.put("waypointIndex", String.valueOf(waypointIndex));
         attrs.put("waypointsTotal", String.valueOf(waypoints.size()));

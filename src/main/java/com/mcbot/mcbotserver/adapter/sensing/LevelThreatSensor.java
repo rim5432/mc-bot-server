@@ -7,6 +7,8 @@ import com.mcbot.mcbotserver.api.world.EntitySnapshot;
 import com.mcbot.mcbotserver.api.world.WorldView;
 
 import java.util.List;
+import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * The in-game sensing pass: nearest hostile within range, rear
@@ -26,8 +28,8 @@ public final class LevelThreatSensor implements ThreatSensor {
     /** Scan radius in blocks; matches vanilla hostile awareness scale. */
     public static final double THREAT_RANGE = 16.0;
 
-    private static final java.util.Set<String> HOSTILE_TYPES =
-        java.util.Set.of(
+    private static final Set<String> HOSTILE_TYPES =
+        Set.of(
             "minecraft:creeper",
             "minecraft:zombie",
             "minecraft:skeleton",
@@ -46,12 +48,12 @@ public final class LevelThreatSensor implements ThreatSensor {
      *
      * @return unmodifiable hostile type ids; never null or empty
      */
-    public static java.util.Set<String> hostileTypes() {
+    public static Set<String> hostileTypes() {
         return HOSTILE_TYPES;
     }
 
-    private static final java.util.Set<String> RANGED_TYPES =
-        java.util.Set.of(
+    private static final Set<String> RANGED_TYPES =
+        Set.of(
             "minecraft:skeleton",
             "minecraft:stray",
             "minecraft:pillager",
@@ -65,12 +67,12 @@ public final class LevelThreatSensor implements ThreatSensor {
      *
      * @return unmodifiable ranged hostile type ids; never null or empty
      */
-    public static java.util.Set<String> rangedTypes() {
+    public static Set<String> rangedTypes() {
         return RANGED_TYPES;
     }
 
     private final com.mcbot.mcbotserver.adapter.BindingWorldView view;
-    private final java.util.function.Supplier<CellPos> bodyPos;
+    private final Supplier<CellPos> bodyPos;
 
     /**
      * Creates a sensor scanning around the live body position.
@@ -80,7 +82,7 @@ public final class LevelThreatSensor implements ThreatSensor {
      */
     public LevelThreatSensor(com.mcbot.mcbotserver.adapter.BindingWorldView
                                  view,
-                             java.util.function.Supplier<CellPos> bodyPos) {
+                             Supplier<CellPos> bodyPos) {
         if (view == null || bodyPos == null) {
             throw new IllegalArgumentException(
                 "arguments must not be null");
