@@ -3,6 +3,7 @@ package com.mcbot.mcbotserver;
 import com.mcbot.mcbotserver.adapter.BindingActor;
 import com.mcbot.mcbotserver.adapter.BindingWorldView;
 import com.mcbot.mcbotserver.adapter.BotCommands;
+import com.mcbot.mcbotserver.adapter.BotControlSocket;
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
 import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
 import com.mcbot.mcbotserver.api.actor.Actor;
@@ -37,7 +38,9 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.EntityAttributeCreationEvent;
+import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
+import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -125,6 +128,28 @@ public class McBotServer {
     }
 
     /**
+     * Opens the control socket on servers vanilla RCON does not
+     * cover (the dev client's integrated server), so the external
+     * harness drives either server kind through the same tool.
+     *
+     * @param event the started event; never null
+     */
+    @SubscribeEvent
+    public void onServerStarted(ServerStartedEvent event) {
+        BotControlSocket.startIfEnabled(event.getServer());
+    }
+
+    /**
+     * Closes the control socket before the world saves.
+     *
+     * @param event the stopping event; never null
+     */
+    @SubscribeEvent
+    public void onServerStopping(ServerStoppingEvent event) {
+        BotControlSocket.stop();
+    }
+
+    /**
      * ADR-0004 D1: single tick entry on the server tick END phase.
      * World state is settled here; outputs apply during next tick's
      * physics (the documented one-tick latency).
@@ -187,6 +212,13 @@ public class McBotServer {
             .executes(ctx -> {
                 var level = ctx.getSource().getLevel();
                 var pos = ctx.getSource().getPosition();
+                // Replace semantics (class doc): at most one wired
+                // body. The old ENTITY must leave the world too, not
+                // just the wiring - leaving it turned every extra
+                // /botspawn into an orphaned zombie standing around.
+                if (activeBody != null && activeBody.isAlive()) {
+                    activeBody.discard();
+                }
                 BotBodyEntity body = BOT_BODY.get().create(level);
                 if (body == null) {
                     ctx.getSource().sendFailure(Component.literal(
@@ -262,6 +294,27 @@ public class McBotServer {
                     () -> Component.literal(spawned), true);
                 return 1;
             }));
+        event.getDispatcher().register(Commands.literal("botdespawn")
+            .requires(src -> src.hasPermission(2))
+            .executes(ctx -> {
+                var level = ctx.getSource().getLevel();
+                var bodies = level.getEntities(BOT_BODY.get(),
+                    b -> true);
+                bodies.forEach(BotBodyEntity::discard);
+                this.activeEvents = null;
+                this.activeBus = null;
+                this.activeState = null;
+                this.activeController = null;
+                this.activeView = null;
+                this.activeBody = null;
+                this.activeGotoHandler = null;
+                int n = bodies.size();
+                String msg = "removed " + n
+                    + (n == 1 ? " bot body" : " bot bodies");
+                ctx.getSource().sendSuccess(
+                    () -> Component.literal(msg), true);
+                return n;
+            }));
     }
 
     /**
@@ -276,7 +329,9 @@ public class McBotServer {
             return null;
         }
         return new BotCommands.Channels(activeEvents, activeBus,
-            activeState);
+            activeState,
+            () -> activeGotoHandler != null
+                ? activeGotoHandler.stopAll() : 0);
     }
 
     /**

@@ -13,6 +13,7 @@ import com.mcbot.mcbotserver.core.process.GotoProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.LongSupplier;
 
@@ -131,6 +132,25 @@ public final class GotoCommandHandler {
     public String activeTaskSummary() {
         var any = missions.values().iterator();
         return any.hasNext() ? any.next().displayName() : "idle";
+    }
+
+    /**
+     * Cancels every live mission through the bus, so each cancel
+     * closes its idempotency window exactly like a targeted
+     * {@code /bot cancel} does. Backs the human-facing
+     * {@code /bot stop}.
+     *
+     * @return number of missions actually cancelled
+     */
+    public int stopAll() {
+        List<String> ids = List.copyOf(missions.keySet());
+        int cancelled = 0;
+        for (String id : ids) {
+            if (bus.cancel(id)) {
+                cancelled++;
+            }
+        }
+        return cancelled;
     }
 
     private void onCancel(String taskId, String verb) {

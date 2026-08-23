@@ -15,6 +15,7 @@ import com.mojang.brigadier.context.CommandContext;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -39,14 +40,17 @@ import net.minecraft.network.chat.Component;
 public final class BotCommands {
 
     /**
-     * Live channel triple of one spawned bot.
+     * Live channel triple of one spawned bot, plus the stop lever.
      *
      * @param events the boundary-D event stream to poll; never null
      * @param bus    the command channel to submit through; never null
      * @param state  the state channel backing /bot status; never null
+     * @param stopAllTasks cancels every live task and returns how
+     *                     many; backs /bot stop; never null
      */
     public record Channels(EventQueue events, CommandBus bus,
-                           StateChannel state) {
+                           StateChannel state,
+                           IntSupplier stopAllTasks) {
     }
 
     /**
@@ -63,6 +67,7 @@ public final class BotCommands {
             .then(statusBranch(live))
             .then(gotoBranch(live))
             .then(cancelBranch(live))
+            .then(stopBranch(live))
             .then(eventsBranch(live)));
     }
 
@@ -73,9 +78,18 @@ public final class BotCommands {
             if (ch == null) {
                 return answer(ctx.getSource(), err("no active bot"));
             }
+            var snap = ch.state().current();
+            // Human line first - the JSON block is contract surface
+            // for harnesses, not something a person should have to
+            // read in chat.
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                "Bot at [" + snap.pos().x() + ", " + snap.pos().y()
+                    + ", " + snap.pos().z() + "] in "
+                    + snap.dimension() + "; task: "
+                    + snap.currentTaskSummary()), false);
             JsonObject root = ok();
             root.add("state",
-                BotStateJson.toJsonObject(ch.state().current()));
+                BotStateJson.toJsonObject(snap));
             return answer(ctx.getSource(), root);
         });
     }
@@ -149,6 +163,23 @@ public final class BotCommands {
                         ? ok()
                         : err("no such task: " + taskId));
                 }));
+    }
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> stopBranch(
+            Supplier<Channels> live) {
+        return Commands.literal("stop").executes(ctx -> {
+            Channels ch = live.get();
+            if (ch == null) {
+                return answer(ctx.getSource(), err("no active bot"));
+            }
+            int cancelled = ch.stopAllTasks().getAsInt();
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                "stopped " + cancelled + " task"
+                    + (cancelled == 1 ? "" : "s")), false);
+            JsonObject root = ok();
+            root.addProperty("cancelled", cancelled);
+            return answer(ctx.getSource(), root);
+        });
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> eventsBranch(
