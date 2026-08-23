@@ -7,17 +7,19 @@ Generated: 2026-08-23. Validate anytime with `python tool/mcbot_tool.py doc chec
 
 | Document | Title | Verified | Status |
 |---|---|---|---|
-| [boundaries.md](architecture/boundaries.md) | Boundary Contracts and Decision Ledger | 2026-08-22 | ok |
-| [function-map.md](architecture/function-map.md) | Functional Convergence Map (device-layer capability envelope) | 2026-08-22 | ok |
-| [issues/0001-replan-drift-3d-ambiguity.md](architecture/issues/0001-replan-drift-3d-ambiguity.md) | Replan drift threshold and waypoint reach are 2D-only while progress fuse and goal predicate are 3D | 2026-08-23 | ok |
-| [overview.md](architecture/overview.md) | Architecture Overview | 2026-08-22 | ok |
+| [boundaries.md](architecture/boundaries.md) | Boundary Contracts and Decision Ledger | 2026-08-23 | ok |
+| [function-map.md](architecture/function-map.md) | Functional Convergence Map (device-layer capability envelope) | 2026-08-23 | ok |
+| [issues/0001-vertical-replan-failure-branches.md](architecture/issues/0001-vertical-replan-failure-branches.md) | PathingBehavior has three vertical-displacement failure branches and a fuse measuring the wrong quantity | 2026-08-23 | ok |
+| [issues/0002-world-collision-slab-fence.md](architecture/issues/0002-world-collision-slab-fence.md) | 5 disabled world/collision tests - shape-predicate contract conflicts (walkableTop threshold, Box Y range, fence passability) | 2026-08-23 | ok |
+| [issues/0003-sneak-pose-and-edge-walk.md](architecture/issues/0003-sneak-pose-and-edge-walk.md) | Sneak pose and edge walk - pose-aware collision, SNEAK channel, shield block | 2026-08-23 | ok |
+| [overview.md](architecture/overview.md) | Architecture Overview | 2026-08-23 | ok |
 
 ## guide/
 
 | Document | Title | Verified | Status |
 |---|---|---|---|
 | [build-and-run.md](guide/build-and-run.md) | Build & Run Guide | 2026-08-22 | ok |
-| [workplan.md](guide/workplan.md) | Work Plan (effort-sized checklist) | 2026-08-22 | ok |
+| [workplan.md](guide/workplan.md) | Work Plan (effort-sized checklist) | 2026-08-23 | ok |
 
 ## reference/
 
