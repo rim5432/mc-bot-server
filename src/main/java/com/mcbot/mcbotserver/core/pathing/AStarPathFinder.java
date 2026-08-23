@@ -9,6 +9,7 @@ import com.mcbot.mcbotserver.api.world.WorldView;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -194,7 +195,7 @@ public final class AStarPathFinder {
         var open = new PriorityQueue<Node>();
         Map<CellPos, Double> gScore = new HashMap<>();
         Map<CellPos, CellPos> cameFrom = new HashMap<>();
-        var closed = new HashMap<CellPos, Boolean>();
+        var closed = new HashSet<CellPos>();
 
         gScore.put(start, 0.0);
         open.add(new Node(start, heuristic.estimate(start)));
@@ -216,7 +217,7 @@ public final class AStarPathFinder {
                 break;
             }
             Node current = open.poll();
-            if (closed.putIfAbsent(current.pos(), Boolean.TRUE) != null) {
+            if (!closed.add(current.pos())) {
                 continue;
             }
             expanded++;
@@ -239,7 +240,7 @@ public final class AStarPathFinder {
                     continue;
                 }
                 CellPos next = move.destination();
-                if (closed.containsKey(next)) {
+                if (closed.contains(next)) {
                     continue;
                 }
                 double tentative = g + move.cost(world);
