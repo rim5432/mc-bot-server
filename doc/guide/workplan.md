@@ -290,10 +290,8 @@ test count when red).
          (6 cases proving the move predicates answer from shape
          not id, including the same geometry under three
          different block ids returning the same answer). The
-         gauntlet gametest (a corridor with bottom-slab / upper /
-         stairs / fence / ladder / water / lava sections, end to
-         end) remains open as a Stage 2 closeout follow-up, now
-         unblocked: the shape contract it asserts is settled.
+         shape-bearing corridor is now covered in-engine by
+         GauntletGameTests (see follow-up 2).
 
 ### Stage 2 closeout follow-ups
 
@@ -304,7 +302,16 @@ test count when red).
    quantities), a BODY_WIDTH footprint rule on walkableTop, and
    fence-as-wall semantics replacing the physically-impossible
    squeeze-past expectation. See issue 0002 Resolution.
-2. Gauntlet gametest (shape-bearing corridor end to end) -
-   unblocked by follow-up 1; its fence/slab sections can now
-   assert the settled semantics.
+2. RESOLVED 2026-08-23: gauntlet gametest shipped as
+   GauntletGameTests and green in-engine via build runGameTest
+   (7/7 with the slice and combat suites). Sections: bottom-slab
+   carpet (auto-step), one-block plateau (ClimbUp execution),
+   drop off the far edge, fence wall with a single missing-post
+   gap, plus a focused gap-routing test. Building it exposed the
+   executor half of the climb vocabulary: steering's jump flag
+   was never actuated because setJumping consumption is dead
+   under the swapped-out MoveControl - BotBodyEntity now fires
+   jumpFromGround directly (documented deviation). Water/lava
+   sections stay out: no swim Movement exists; the function
+   map's GAP rows own that growth.
 
