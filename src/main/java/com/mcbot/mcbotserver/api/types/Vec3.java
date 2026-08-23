@@ -23,9 +23,24 @@ public record Vec3(double x, double y, double z) {
      * @return straight-line distance
      */
     public double distanceTo(Vec3 other) {
-        double dx = x - other.x;
-        double dy = y - other.y;
-        double dz = z - other.z;
+        return distanceTo(other.x, other.y, other.z);
+    }
+
+    /**
+     * Euclidean distance to the given coordinates. Overload for
+     * cell-center arithmetic so callers need not build a throwaway
+     * vector per check.
+     *
+     * @param targetX target x
+     * @param targetY target y
+     * @param targetZ target z
+     * @return straight-line distance
+     */
+    public double distanceTo(double targetX, double targetY,
+                             double targetZ) {
+        double dx = x - targetX;
+        double dy = y - targetY;
+        double dz = z - targetZ;
         return Math.sqrt(dx * dx + dy * dy + dz * dz);
     }
 }

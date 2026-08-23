@@ -579,8 +579,8 @@ public final class PathingBehavior implements Behavior {
      */
     private boolean updatePlanProgress(Vec3 pose, Goal goal) {
         CellPos goalCell = anchorCell(goal);
-        double goalDist = distance3D(pose,
-            goalCell.x() + 0.5, goalCell.y() + 0.5, goalCell.z() + 0.5);
+        double goalDist = pose.distanceTo(goalCell.x() + 0.5,
+            goalCell.y() + 0.5, goalCell.z() + 0.5);
 
         boolean p1 = waypointIndex > lastWaypointIndex;
         if (p1) {
@@ -594,9 +594,12 @@ public final class PathingBehavior implements Behavior {
 
         boolean p3 = false;
         if (waypointIndex < waypoints.size()) {
+            // Criterion 3 measures 3D, not XZ-only: vertical moves
+            // (ClimbUp, Drop) are real progress the latched min must
+            // capture (issue 0001 Ruling a).
             CellPos wp = waypoints.get(waypointIndex);
-            double wpDist = distance3D(pose,
-                wp.x() + 0.5, wp.y() + 0.5, wp.z() + 0.5);
+            double wpDist = pose.distanceTo(wp.x() + 0.5,
+                wp.y() + 0.5, wp.z() + 0.5);
             p3 = wpDist < lastWaypoint3DDistance - STUCK_EPSILON;
             if (p3) {
                 lastWaypoint3DDistance = wpDist;
@@ -604,20 +607,6 @@ public final class PathingBehavior implements Behavior {
         }
 
         return p1 || p2 || p3;
-    }
-
-    /**
-     * 3D Euclidean distance from a pose to a 3D point. Used by the
-     * plan-progress score for goal and waypoint distance checks.
-     * Issue 0001 §Ruling a: criterion 3 is 3D (not XZ-only) because
-     * the move vocabulary has vertical moves (ClimbUp, Drop) and
-     * the latched min must capture vertical progress too.
-     */
-    private static double distance3D(Vec3 pose, double x, double y, double z) {
-        double dx = pose.x() - x;
-        double dy = pose.y() - y;
-        double dz = pose.z() - z;
-        return Math.sqrt(dx * dx + dy * dy + dz * dz);
     }
 
     /**
