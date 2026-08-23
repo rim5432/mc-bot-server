@@ -128,9 +128,18 @@ public final class BotControlSocket {
             OutputStream out = client.getOutputStream();
             boolean authed = false;
             while (true) {
+                // Source framing: length covers id + type + payload
+                // plus the two NUL terminators, so the payload is
+                // exactly length - 10 bytes.
+                int length = readLittleEndianInt(in);
+                if (length < 10 || length > 8192) {
+                    throw new IOException(
+                        "unreasonable packet length: " + length);
+                }
                 int id = readLittleEndianInt(in);
                 int type = readLittleEndianInt(in);
-                String payload = readPayload(in);
+                String payload =
+                    readPayload(in, length - 10);
                 if (type == 3) {
                     authed = constantTimeEquals(payload, password);
                     writePacket(out, authed ? id : -1, type, "");
@@ -218,29 +227,26 @@ public final class BotControlSocket {
     }
 
     /**
-     * Reads the payload plus its two NUL terminators.
+     * Reads exactly {@code textLength} payload bytes and strips the
+     * trailing NUL terminators.
      *
-     * @param in the packet stream; never null
+     * @param in         the packet stream; never null
+     * @param textLength exact payload byte count; non-negative
      * @return decoded payload text; empty string when absent
      * @throws IOException when the stream breaks mid-packet
      */
-    private static String readPayload(InputStream in)
+    private static String readPayload(InputStream in, int textLength)
             throws IOException {
-        int size = readLittleEndianInt(in);
-        if (size <= 0 || size > 8192) {
-            throw new IOException("unreasonable packet size: " + size);
-        }
-        byte[] body = new byte[size];
+        byte[] body = new byte[textLength];
         int off = 0;
-        while (off < size) {
-            int n = in.read(body, off, size - off);
+        while (off < textLength) {
+            int n = in.read(body, off, textLength - off);
             if (n < 0) {
                 throw new EOFException("packet body truncated");
             }
             off += n;
         }
-        // body = payload bytes + NUL + NUL; strip both terminators.
-        int end = size;
+        int end = textLength;
         while (end > 0 && body[end - 1] == 0) {
             end--;
         }
