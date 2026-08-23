@@ -110,9 +110,9 @@ class BasicMovesShapeGateTest {
     }
 
     @Test
-    void climbOntoUpperSlabPlatformIsViable() {
+    void jumpOntoUpperSlabPlatformIsViable() {
         // Stair-step case: an upper-slab platform sits in the
-        // (1, BODY_Y, 0) cell, its top at y=BODY_Y+1. The climb
+        // (1, BODY_Y, 0) cell, its top at y=BODY_Y+1. The jump-up
         // destination foot cell is (1, BODY_Y+1, 0) - empty and
         // body-clear - the head cell above it is empty, and the
         // cell below the foot carries the platform's walkable top.
@@ -122,7 +122,7 @@ class BasicMovesShapeGateTest {
                 new Box(0, 0.5, 0, 1, 1, 1)));
         assertTrue(new BasicMoves.JumpUp(SRC,
             new CellPos(1, BODY_Y + 1, 0)).isViable(w),
-            "climb onto an upper-slab platform must be viable");
+            "jump onto an upper-slab platform must be viable");
     }
 
     @Test

@@ -29,7 +29,7 @@ final class PathingTestAccess {
         return (int) cursorField(mover, "waypointIndex");
     }
 
-    /** Force the cursor to a cell - climb-waypoint steering tests. */
+    /** Force the cursor to a cell - JumpUp-waypoint steering tests. */
     static void writeWaypointIndex(PathingBehavior mover, int value) {
         try {
             Field f = cursorOf(mover).getClass()

@@ -137,8 +137,7 @@ public final class BotBodyEntity extends PathfinderMob {
             // issue 0004 F2). Mob.jumpInFluid is the exact call that
             // branch makes; invoking it here is the same class of
             // deviation as jumpFromGround. +0.3/tick while held,
-            // matching a player holding space to surface. Lava waits
-            // for a scenario that needs it.
+            // matching a player holding space to surface.
             jumpInFluid(net.minecraftforge.common.ForgeMod.WATER_TYPE
                 .get());
         } else if (driveJump && onGround()) {
@@ -152,7 +151,7 @@ public final class BotBodyEntity extends PathfinderMob {
             // noJumpDelay=10, and the slow hops stalled the trench
             // exit that per-tick direct jumps clear. The one-shot
             // reset keeps a held flag from machine-gunning jumps;
-            // steering re-raises it each tick while the climb
+            // steering re-raises it each tick while the JumpUp
             // waypoint is still above us.
             jumpFromGround();
             driveJump = false;

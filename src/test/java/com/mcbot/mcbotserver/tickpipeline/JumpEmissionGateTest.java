@@ -21,10 +21,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Climb-execution gate: the MOVE claim carries jump=true exactly when
+ * JumpUp-execution gate: the MOVE claim carries jump=true exactly when
  * the current waypoint sits above the body's floor cell - the executor
  * half of A*'s JumpUp edges. Auto-step cannot clear a full block;
- * without this flag every planned climb stalls into a progress-fuse
+ * without this flag every planned jump-up stalls into a progress-fuse
  * STUCK at the step face while the plan says the route is viable.
  */
 class JumpEmissionGateTest {
@@ -84,10 +84,10 @@ class JumpEmissionGateTest {
     /**
      * The plan onto the plateau contains a JumpUp cell; steering at
      * that waypoint raises the jump flag. Pins the executor half of
-     * the climb vocabulary against silent regression to jump=false.
+     * the JumpUp vocabulary against silent regression to jump=false.
      */
     @Test
-    void climbWaypointSteersWithJump()
+    void jumpUpWaypointSteersWithJump()
         throws ReflectiveOperationException {
         Vec3[] position = {new Vec3(0.5, 64, 0.5)};
         PathingBehavior mover = newMover(position);
@@ -101,18 +101,18 @@ class JumpEmissionGateTest {
             "the approach waypoint is flat; no jump yet");
 
         List<CellPos> waypoints = PathingTestAccess.waypoints(mover);
-        int climbIndex = waypoints.indexOf(new CellPos(2, 65, 0));
-        assertTrue(climbIndex >= 0,
+        int jumpUpIndex = waypoints.indexOf(new CellPos(2, 65, 0));
+        assertTrue(jumpUpIndex >= 0,
             "plan must route through the plateau edge cell, got "
             + waypoints);
 
-        PathingTestAccess.writeWaypointIndex(mover, climbIndex);
+        PathingTestAccess.writeWaypointIndex(mover, jumpUpIndex);
         actor.submitted.clear();
         mover.tick(world, directive, actor);
 
         assertTrue(lastMoveClaim(actor).jump(),
-            "steering at the climb waypoint must raise the jump flag");
+            "steering at the JumpUp waypoint must raise the jump flag");
         assertEquals(1.0f, lastMoveClaim(actor).forward(),
-            "climb keeps full forward drive");
+            "jump-up keeps full forward drive");
     }
 }
