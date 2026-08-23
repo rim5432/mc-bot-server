@@ -209,8 +209,8 @@ hard re-test of PR-2's limbo and detour coverage.**
 `STUCK_EPSILON` semantic changes from "per-tick motion in
 metres" to **"new-min margin"** — a candidate new minimum must
 beat the latched minimum by at least `STUCK_EPSILON` (in
-metres) to count as progress. Without this, 原地振荡
-micro-noise would刷出 0.001 m new minima and the fuse would
+metres) to count as progress. Without this, in-place jitter
+micro-noise would mint 0.001 m new minima and the fuse would
 never trip on a waterfall column. The waterfall
 characterization test in PR-1 exposes this immediately if the
 margin is left at zero.
@@ -330,7 +330,7 @@ regression-test validity: a useful assertion must fail when
 the fix is reverted. Form 2 mixes an external condition
 (landing or XZ-drift-out-of-band) into the SUT boundary —
 when fix 4 is reverted, the waterfall body eventually falls
-into the same offPath or motion-fuse兜底 path that a
+into the same offPath or motion-fuse fallback path that a
 fall-and-land body takes, so the "or leaves band" branch
 still passes and the test stays green. Form 2 cannot detect
 the disappearance of fix 4. Form 3 couples to downstream
