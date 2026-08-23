@@ -28,12 +28,20 @@ import java.util.Objects;
  * ({@link CollisionShape#walkableTop()}).</li>
  * <li>standable(cell): the body fits at the cell (foot + head
  * passable) and the cell below is walkable.</li>
+ * <li>swimmable(cell): the cell's traits say liquid (decision 19:
+ * "is this water?" is a property the empty collision shape cannot
+ * infer). Water cells are passable but never standable, so they are
+ * invisible to Walk/ClimbUp - Swim and SwimUp exist for them.</li>
  * </ul>
  *
  * <p>Non-geometric block properties (climbable / liquid / damaging)
  * live in {@link com.mcbot.mcbotserver.api.world.BlockTraits} and are
- * not consulted here - this set has no Movement that uses them yet.
- * Ladder / swim / pillar Movements will read traits, not shape.
+ * consulted by the swim set; Ladder / pillar Movements will read
+ * traits the same way when they land.
+ *
+ * <p>Decision 19a gate (swim): the full physical precondition is
+ * derivable from Shape plus Traits - passability from the (empty)
+ * collision box, swimmability from the liquid trait. No id table.
  */
 // contract: see boundaries.md decisions 7/8 + 17a + 19
 public final class BasicMoves {
@@ -55,6 +63,11 @@ public final class BasicMoves {
             out.add(new Walk(src,
                 new CellPos(src.x() + d.dx, src.y(), src.z() + d.dz)));
             out.add(new ClimbUp(src,
+                new CellPos(src.x() + d.dx, src.y() + 1,
+                    src.z() + d.dz)));
+            out.add(new Swim(src,
+                new CellPos(src.x() + d.dx, src.y(), src.z() + d.dz)));
+            out.add(new SwimUp(src,
                 new CellPos(src.x() + d.dx, src.y() + 1,
                     src.z() + d.dz)));
             for (int k = 1; k <= MAX_DROP; k++) {
@@ -125,6 +138,19 @@ public final class BasicMoves {
             && passable(world,
                 new CellPos(cell.x(), cell.y() + 1, cell.z()))
             && supported(world, cell);
+    }
+
+    /**
+     * Whether the cell holds a swimmable fluid. Reads the liquid
+     * trait, never the shape - water's collision box is empty, which
+     * is exactly the case the shape cannot speak to (decision 19).
+     *
+     * @param world the view; must not be null
+     * @param cell  the cell to test; must not be null
+     * @return true when the traits registry marks the cell liquid
+     */
+    private static boolean liquid(WorldView world, CellPos cell) {
+        return world.getBlockTraits(cell, ViewMode.LIVE).liquid();
     }
 
     record Walk(CellPos source, CellPos destination)
@@ -231,7 +257,10 @@ public final class BasicMoves {
                     return false;
                 }
             }
-            return standable(world, destination);
+            // Landing in liquid needs no floor: the fluid holds the
+            // body. Landing on land still demands a walkable top.
+            return standable(world, destination)
+                || liquid(world, destination);
         }
 
         @Override
@@ -242,6 +271,55 @@ public final class BasicMoves {
         @Override
         public String describe() {
             return "drop" + depth + " " + source + "->" + destination;
+        }
+    }
+
+    /**
+     * Horizontal swim, including stepping off a shore into water at
+     * the same level: the destination is liquid (passable by its
+     * empty shape, held by the fluid, never standable). The source
+     * may be dry - entering water is deliberate here; leaving water
+     * onto land is Walk/ClimbUp's job and needs no new vocabulary.
+     */
+    record Swim(CellPos source, CellPos destination)
+        implements Movement {
+
+        @Override
+        public boolean isViable(WorldView world) {
+            return passable(world, destination)
+                && liquid(world, destination);
+        }
+
+        @Override
+        public double cost(WorldView world) {
+            return 1.5;
+        }
+
+        @Override
+        public String describe() {
+            return "swim " + source + "->" + destination;
+        }
+    }
+
+    /** Vertical swim: treading up one cell inside a water column. */
+    record SwimUp(CellPos source, CellPos destination)
+        implements Movement {
+
+        @Override
+        public boolean isViable(WorldView world) {
+            return liquid(world, source)
+                && passable(world, destination)
+                && liquid(world, destination);
+        }
+
+        @Override
+        public double cost(WorldView world) {
+            return 2.0;
+        }
+
+        @Override
+        public String describe() {
+            return "swimup " + source + "->" + destination;
         }
     }
 }

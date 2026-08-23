@@ -41,10 +41,10 @@ depth pending - [GAP] vocabulary absent, reopen-triggered -
   cross-session requirement reopens)
 
 ### Locomotion (movement five-tuple family)
-- [SHIPPED] Walk / diagonal / climb-up / drop<=3 over A* with replan
-  ladder (exhaustion / drift / progress fuse) and wall-clock-bounded
-  async worker on immutable snapshots
-- [GAP] Parkour, pillar-up, swimming, door handling - each lands as a
+- [SHIPPED] Walk / diagonal / climb-up / drop<=3 / **Swim / SwimUp**
+  over A* with replan ladder (exhaustion / drift / progress fuse)
+  and wall-clock-bounded async worker on immutable snapshots
+- [GAP] Parkour, pillar-up, door handling - each lands as a
   Movement + traits data; mechanisms written once (decision 8/10)
 - [PLANNED] SneakWalk: 1-wide edge traversal with 1.5-height AABB;
   pose-aware collision predicates (issue 0003, Stage 3 backlog)

@@ -2,6 +2,8 @@ package com.mcbot.mcbotserver.adapter;
 
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.BlockSnapshot;
+import com.mcbot.mcbotserver.api.world.BlockTraits;
+import com.mcbot.mcbotserver.api.world.BlockTraitsRegistry;
 import com.mcbot.mcbotserver.api.world.CollisionShape;
 import com.mcbot.mcbotserver.api.world.EntitySnapshot;
 import com.mcbot.mcbotserver.api.world.ViewMode;
@@ -33,14 +35,31 @@ import java.util.Objects;
 public final class BindingWorldView implements WorldView {
 
     private final ServerLevel level;
+    private final BlockTraitsRegistry traits;
 
     /**
-     * Creates a view over one level.
+     * Creates a view over one level with no trait annotations - every
+     * cell answers {@link BlockTraits#defaults()}.
      *
      * @param level the world to read; never null
      */
     public BindingWorldView(ServerLevel level) {
+        this(level, BlockTraitsRegistry.empty());
+    }
+
+    /**
+     * Creates a view over one level with a trait registry backing
+     * {@link #getBlockTraits}. The swim vocabulary needs at least the
+     * liquid trait for water; without an entry every fluid reads as
+     * plain passable air and no water move is ever viable.
+     *
+     * @param level  the world to read; never null
+     * @param traits sealed trait registry; never null
+     */
+    public BindingWorldView(ServerLevel level,
+                            BlockTraitsRegistry traits) {
         this.level = Objects.requireNonNull(level, "level");
+        this.traits = Objects.requireNonNull(traits, "traits");
     }
 
     @Override
@@ -129,6 +148,29 @@ public final class BindingWorldView implements WorldView {
                 e.getHealth(), e.getMaxHealth()));
         }
         return out;
+    }
+
+    /**
+     * Registry traits for the cell's block id, bare-id form (the
+     * state suffix is dropped; the registry's exact-then-fallback
+     * matching covers both keyings). Unknown ids answer
+     * {@link BlockTraits#defaults()} per the registry contract.
+     *
+     * @param pos  the cell to read; must not be null
+     * @param mode consistency requested, per decision 17b
+     * @return the cell's traits; never null
+     */
+    @Override
+    public BlockTraits getBlockTraits(CellPos pos, ViewMode mode) {
+        BlockPos mc = toMc(pos);
+        if (!level.hasChunkAt(mc)) {
+            return BlockTraits.defaults();
+        }
+        var state = level.getBlockState(mc);
+        ResourceLocation key = BuiltInRegistries.BLOCK.getKey(
+            state.getBlock());
+        return traits.traitsFor(key != null ? key.toString()
+            : BlockSnapshot.UNKNOWN);
     }
 
     @Override

@@ -332,4 +332,18 @@ test count when red).
    10 minutes of overworld, surviving without human input; the
    run's telemetry lands in tool/sessions/<run>/ and its verdict
    closes this entry.
+5. OPEN 2026-08-23: swim vocabulary landed after the acceptance
+   rehearsal found a body stranded in a lake - every surrounding
+   cell read unstunnable (empty collision shape) and the planner
+   answered NO_PATH correctly for a vocabulary that could not
+   swim. Swim/SwimUp now read the liquid trait (decision 19a:
+   precondition derivable from Shape plus Traits), Drop accepts a
+   liquid landing, and BindingWorldView carries a baseline trait
+   registry (water/lava) wired in both the live entry class and
+   the gametest rig; datapack JSON supersedes the code baseline as
+   a follow-up. PLAN_WALL_CLOCK_MS raised 50 -> 200: with the
+   larger edge set, a budget-cut no-route search returned a
+   misleading partial instead of concluding NO_PATH. Verified by
+   BasicMovesSwimTest offline and crossesWaterTrench in-engine;
+   gametests 8/8.
 

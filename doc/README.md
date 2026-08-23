@@ -19,7 +19,7 @@ Generated: 2026-08-23. Validate anytime with `python tool/mcbot_tool.py doc chec
 
 | Document | Title | Verified | Status |
 |---|---|---|---|
-| [build-and-run.md](guide/build-and-run.md) | Build & Run Guide | 2026-08-22 | ok |
+| [build-and-run.md](guide/build-and-run.md) | Build & Run Guide | 2026-08-22 | **ROT** |
 | [workplan.md](guide/workplan.md) | Work Plan (effort-sized checklist) | 2026-08-23 | ok |
 
 ## reference/

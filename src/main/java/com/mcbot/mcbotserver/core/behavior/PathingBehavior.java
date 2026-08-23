@@ -117,8 +117,16 @@ public final class PathingBehavior implements Behavior {
      * Soft wall-clock cap for one off-thread search. The node budget
      * is the safety net; this is the CPU throttle the worker owns
      * (numen-notes section 17).
+     *
+     * <p>Must stay generous enough for a bounded arena's exhaustive
+     * no-route search to CONCLUDE: a budget-cut unreachable-goal
+     * search returns a best-effort partial, which reads as a real
+     * route and converts an honest NO_PATH into a late STUCK (the
+     * failscleanly gametest pins this). 50ms was enough before the
+     * swim vocabulary grew the edge set; the worker runs off the
+     * tick thread, so the larger cap costs tick latency nothing.
      */
-    public static final long PLAN_WALL_CLOCK_MS = 50;
+    public static final long PLAN_WALL_CLOCK_MS = 200;
 
     /**
      * Freshness tolerance in cells (issue 0001 fix 5 / Ruling (c).

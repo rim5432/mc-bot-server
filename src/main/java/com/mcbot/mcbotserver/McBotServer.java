@@ -9,6 +9,8 @@ import com.mcbot.mcbotserver.api.actor.Actor;
 import com.mcbot.mcbotserver.api.behavior.Behavior;
 import com.mcbot.mcbotserver.api.state.BotState;
 import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.api.world.BlockTraits;
+import com.mcbot.mcbotserver.api.world.BlockTraitsRegistry;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 import com.mcbot.mcbotserver.core.command.CommandBus;
 import com.mcbot.mcbotserver.core.command.GotoCommandHandler;
@@ -19,6 +21,7 @@ import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
 import com.mcbot.mcbotserver.core.state.ChangeDetectingStateChannel;
 import com.mcbot.mcbotserver.core.tick.BotController;
 import com.mcbot.mcbotserver.core.tick.CrashReporter;
+import com.mcbot.mcbotserver.core.world.MapBlockTraitsRegistry;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -187,7 +190,20 @@ public class McBotServer {
                     () -> level.getDayTime() / 24000L,
                     () -> level.getDayTime() % 24000L);
                 TaskArbiter arbiter = new TaskArbiter();
-                BindingWorldView view = new BindingWorldView(level);
+                // Baseline trait annotations the swim vocabulary
+                // cannot work without. Code-level floor for now; the
+                // datapack JSON pipeline (decision 10) supersedes
+                // this when block traits get their reload listener -
+                // tracked as a workplan follow-up.
+                BlockTraitsRegistry traits =
+                    new MapBlockTraitsRegistry()
+                        .register("minecraft:water",
+                            BlockTraits.liquidOnly())
+                        .register("minecraft:lava",
+                            BlockTraits.dangerousLiquid())
+                        .seal();
+                BindingWorldView view =
+                    new BindingWorldView(level, traits);
                 Actor actor = new BindingActor(body);
 
                 SurvivalReflexLayer reflex = new SurvivalReflexLayer(

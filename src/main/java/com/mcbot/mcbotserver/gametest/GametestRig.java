@@ -102,7 +102,17 @@ final class GametestRig {
             () -> level.getDayTime() % 24000L);
 
         TaskArbiter arbiter = new TaskArbiter();
-        BindingWorldView view = new BindingWorldView(level);
+        // Same baseline trait floor as the live wiring: water must
+        // read liquid or the swim vocabulary never engages.
+        BindingWorldView view = new BindingWorldView(level,
+            new com.mcbot.mcbotserver.core.world.MapBlockTraitsRegistry()
+                .register("minecraft:water",
+                    com.mcbot.mcbotserver.api.world.BlockTraits
+                        .liquidOnly())
+                .register("minecraft:lava",
+                    com.mcbot.mcbotserver.api.world.BlockTraits
+                        .dangerousLiquid())
+                .seal());
         BindingActor actor = new BindingActor(body);
 
         SurvivalReflexLayer reflex = new SurvivalReflexLayer(
