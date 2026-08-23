@@ -9,8 +9,9 @@ covers:
   - src/main/java/com/mcbot/mcbotserver/core/pathing/BasicMoves.java
   - src/test/java/com/mcbot/mcbotserver/world/CollisionShapeGateTest.java
   - src/test/java/com/mcbot/mcbotserver/corepathing/BasicMovesShapeGateTest.java
-status: resolved (2026-08-23; contract settled at Stage 2 closeout
-  review, see section 5)
+status: archived (2026-08-23; settled semantics recorded as
+  boundaries.md decision ledger entry 19b)
+superseded_by: architecture/boundaries.md
 related:
   - doc/architecture/function-map.md
 ---

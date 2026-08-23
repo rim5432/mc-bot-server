@@ -130,7 +130,7 @@ without an anchor is a workplan item, not a row here.
 | Vertical trigger gate: airborne ticks skip trigger eval; landing edge bypasses cooldown | `ReplanGate` Javadoc + steering in `PathingBehavior` | 4c3f51f |
 | Park semantics: explicit ParkResult, atomic retire sweep, resume revalidation | `TaskArbiter.forcePauseAll` + `ParkResult` Javadoc | 17ba7a2 |
 | One-tick retirement lap: verdict announced on the reflex tick; no tail sweep inside arbiter tick | `TaskArbiter.tick` tail comment; function-map reflex-tick event semantics section | 17ba7a2 |
-| Shape contract: STEP_UP_REACH / STANDABLE_THRESHOLD split, footprint rule, fence-as-wall | `CollisionShape` constant Javadoc + issue 0002 Resolution | e08c6bd |
+| Shape contract: STEP_UP_REACH / STANDABLE_THRESHOLD split, footprint rule, fence-as-wall | `CollisionShape` constant Javadoc + boundaries.md decision ledger 19b (issue 0002 archived) | e08c6bd |
 | Melee LOS clip: eye-to-surface ray with lava-opaque cells | `BindingActor.sightBlocked` | function-map combat row |
 | Executor jump actuation: direct `jumpFromGround()` under swapped MoveControl | `BotBodyEntity` deviation comment | f942b9b |
 

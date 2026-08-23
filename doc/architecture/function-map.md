@@ -35,7 +35,8 @@ depth pending - [GAP] vocabulary absent, reopen-triggered -
 - [SHIPPED] Entity scans (nearest-hostile, bearing-blind radius)
 - [PLANNED] Pose-aware collision: passable / walkableTop
   parameterized by STANDING / SNEAKING body pose (issue 0003,
-  Stage 3 backlog; geometry contract settled in issue 0002)
+  Stage 3 backlog; geometry contract settled in boundaries.md
+  decision ledger 19b)
 - [DEFERRED] Spatial memory / waypoint persistence (first
   cross-session requirement reopens)
 

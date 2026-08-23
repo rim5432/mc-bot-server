@@ -387,6 +387,23 @@ BotState getState();
     (4-cell sweep, 1x2 vertical) is the first case the rule
     applied to; future Movement classes (Climb, Drop, Ladder,
     Swim, Pillar) are gated by the same answer.
+    19b. Settled geometry semantics of the two predicates
+    (issue 0002, adopted at the Stage 2 closeout review).
+    `STEP_UP_REACH` (0.625) gates `passable()` - what a hop
+    clears; `STANDABLE_THRESHOLD` (0.5) gates `walkableTop()` -
+    the floor of MC's partial-top spectrum (slab 0.5, soul sand
+    0.875, dirt path 0.9375 above it; farmland 0.25 and beds
+    0.375 below it are not routing surfaces). The split exists
+    because step-up reach and standability are different
+    physical quantities that briefly shared one constant. A
+    PARTIAL top is additionally walkable only if the box spans
+    >= BODY_WIDTH (0.6) on both horizontal axes - the footprint
+    rule that makes a fence post answer false: top high enough,
+    footprint nothing to balance on. Fence cells are walls -
+    passable false, walkableTop false; the way past a fence is
+    the missing-post cell, which is EMPTY and already answers
+    true. Pose-aware parameterization reopens via issue 0003
+    without touching this entry.
 
 ## Deferred, with reopen conditions
 

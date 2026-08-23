@@ -301,7 +301,8 @@ test count when red).
    (step-up reach vs standability floor are different physical
    quantities), a BODY_WIDTH footprint rule on walkableTop, and
    fence-as-wall semantics replacing the physically-impossible
-   squeeze-past expectation. See issue 0002 Resolution.
+   squeeze-past expectation. Settled semantics now recorded as
+   boundaries.md decision ledger 19b (issue 0002 archived).
 2. RESOLVED 2026-08-23: gauntlet gametest shipped as
    GauntletGameTests and green in-engine via build runGameTest
    (7/7 with the slice and combat suites). Sections: bottom-slab
