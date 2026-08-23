@@ -67,7 +67,9 @@ public class McBotServer {
     private static final DeferredRegister<EntityType<?>> ENTITIES =
         DeferredRegister.create(ForgeRegistries.ENTITY_TYPES, MODID);
 
-    private static final RegistryObject<EntityType<BotBodyEntity>>
+    /** Registry handle for the physical carrier; read by the client
+     *  renderer wiring. */
+    public static final RegistryObject<EntityType<BotBodyEntity>>
         BOT_BODY = ENTITIES.register("bot_body",
             () -> EntityType.Builder.of(BotBodyEntity::new,
                     MobCategory.CREATURE)
