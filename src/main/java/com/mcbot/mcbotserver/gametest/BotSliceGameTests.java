@@ -1,44 +1,39 @@
 package com.mcbot.mcbotserver.gametest;
 
 import com.mcbot.mcbotserver.McBotServer;
-import com.mcbot.mcbotserver.adapter.BindingActor;
-import com.mcbot.mcbotserver.adapter.BindingWorldView;
-import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
-import com.mcbot.mcbotserver.api.behavior.Behavior;
+import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
 import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
-import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.types.CellPos;
-import com.mcbot.mcbotserver.core.behavior.CombatBehavior;
-import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
-import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.process.DefendProcess;
-import com.mcbot.mcbotserver.core.process.GotoProcess;
-import com.mcbot.mcbotserver.core.process.TaskArbiter;
-import com.mcbot.mcbotserver.core.reflex.FreezeOnLowHealthRule;
-import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
-import com.mcbot.mcbotserver.core.tick.BotController;
-import com.mcbot.mcbotserver.core.tick.CrashReporter;
 
-import net.minecraft.gametest.framework.GameTest;
-import net.minecraft.gametest.framework.GameTestAssertException;
-import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.block.Blocks;
+import net.minecraft.gametest.framework.GameTest;
+import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.monster.Skeleton;
+import net.minecraft.world.entity.monster.Zombie;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
-import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.List;
-import java.util.Objects;
+
+import static com.mcbot.mcbotserver.gametest.GametestRig.check;
+import static com.mcbot.mcbotserver.gametest.GametestRig.checkEquals;
+import static com.mcbot.mcbotserver.gametest.GametestRig.driveOnly;
+import static com.mcbot.mcbotserver.gametest.GametestRig.driveUntil;
+import static com.mcbot.mcbotserver.gametest.GametestRig.localToCell;
+import static com.mcbot.mcbotserver.gametest.GametestRig.positionOf;
+import static com.mcbot.mcbotserver.gametest.GametestRig.reached;
+import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
+import static com.mcbot.mcbotserver.gametest.GametestRig.submitGoto;
 
 /**
  * Stage-1 acceptance, in-engine: the three slice scenarios from the
- * workplan gate. Each test builds a full pipeline around one
- * BotBodyEntity and drives it every gametest tick through the same
- * onTick entry the server wiring uses.
+ * workplan gate plus the two combat scenarios from the Stage 2
+ * skeleton. Harness wiring lives in {@link GametestRig}; this class
+ * owns only the scenarios and their assertions.
  *
  * <p>Contract: see workplan Stage 1 gate (walks-to-block /
  * recovers-when-shoved / fails-cleanly-unwalkable) and boundaries.md
@@ -48,29 +43,15 @@ import java.util.Objects;
  * tests pave themselves. MC 1.20.1 ships no empty template; the SNBT
  * fallback path in StructureUtils resolves this file relative to the
  * gameTestServer working directory.
- *
- * <p>Assertion style: gametests live in the main source set where JUnit
- * is not on the classpath, so checks throw plain IllegalStateException -
- * GameTestSequence retries a thrown waitUntil each tick and treats a
- * thrown execute as test failure, which is exactly the contract needed.
  */
 @GameTestHolder(McBotServer.MODID)
 @PrefixGameTestTemplate(false)
 public final class BotSliceGameTests {
 
-    private static final int FLOOR_Y = 0;
-    private static final int WALK_Y = FLOOR_Y + 1;
     private static final int TIMEOUT = 400;
     private static final int MISSION_BUDGET = 350;
 
     private BotSliceGameTests() {
-    }
-
-    /** Everything one scenario needs, pre-wired around one body. */
-    private record Rig(BotBodyEntity body, BindingWorldView view,
-                       InMemoryEventQueue events,
-                       TaskArbiter arbiter,
-                       BotController controller) {
     }
 
     /**
@@ -78,10 +59,10 @@ public final class BotSliceGameTests {
      */
     @GameTest(template = "empty16x8x16", timeoutTicks = TIMEOUT)
     public static void walksToBlock(GameTestHelper helper) {
-        Rig rig = rig(helper, new BlockPos(3, WALK_Y, 8));
+        var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
         CellPos goalCell = localToCell(helper,
-            new BlockPos(12, WALK_Y, 8));
-        GotoProcess mission = submitGoto(rig, goalCell);
+            new BlockPos(12, GametestRig.WALK_Y, 8));
+        var mission = submitGoto(rig, goalCell);
 
         helper.startSequence()
             .thenWaitUntil(driveUntil(rig,
@@ -101,24 +82,18 @@ public final class BotSliceGameTests {
     /**
      * Scenario 2: shoved mid-path, the bot re-walks to the same goal.
      *
-     * <p>Issue 0001 fix 3: the shove is now a real vanilla-physics
+     * <p>Issue 0001 fix 3: the shove is a real vanilla-physics
      * knockback (setDeltaMovement + 5 physics ticks of integration)
-     * rather than an admin teleport. The previous test verified
-     * "if a teleport returns the body to start, the planner
-     * replans" - that was trivially true and missed every
-     * interesting shove semantic (collision, gravity, friction).
-     * The new test gives the body a 1.5 m/tick X impulse, lets MC
-     * integrate it for 5 ticks, and verifies (a) the body
-     * actually displaced horizontally and (b) the planner re-routes
-     * to the original goal.
+     * rather than an admin teleport. The body must actually displace
+     * horizontally and the planner must re-route to the original goal.
      */
     @GameTest(template = "empty16x8x16", timeoutTicks = TIMEOUT)
     public static void recoversWhenShoved(GameTestHelper helper) {
-        BlockPos start = new BlockPos(3, WALK_Y, 8);
-        Rig rig = rig(helper, start);
+        BlockPos start = new BlockPos(3, GametestRig.WALK_Y, 8);
+        var rig = rig(helper, start);
         CellPos goalCell = localToCell(helper,
-            new BlockPos(13, WALK_Y, 8));
-        GotoProcess mission = submitGoto(rig, goalCell);
+            new BlockPos(13, GametestRig.WALK_Y, 8));
+        var mission = submitGoto(rig, goalCell);
         int startAbsX = helper.absolutePos(start).getX();
 
         // Pre-shove body X. Used by the post-shove displacement
@@ -140,38 +115,26 @@ public final class BotSliceGameTests {
                 // mid-path, so the planner must re-route after
                 // the shove lands.
                 xAtShove[0] = rig.body().getX();
-                rig.body().setDeltaMovement(
-                    new net.minecraft.world.phys.Vec3(
-                        -1.8, 0.0, 0.0));
+                rig.body().setDeltaMovement(new Vec3(
+                    -1.8, 0.0, 0.0));
             })
             .thenExecuteFor(5, () -> {
                 // 5 vanilla physics ticks without pipeline
-                // intervention - MC integrates the impulse, body
-                // moves ~4.06 cells in -X with default ground
-                // friction (sum of the geometric decay series:
-                // 1.8 * (1 + 0.588 + 0.346 + 0.203 + 0.119)).
-                // The planner's next pipeline tick sees the new
-                // cell.
+                // intervention - MC integrates the impulse.
             })
             .thenExecute(() -> {
-                // Sanity 1 (catch 1 follow-up): the body must
-                // actually displace > 3.5 cells in -X so the test
-                // stays in branch 1 of issue 0001 §3 (offPath fires
-                // because XZ drift > 3.0), not branch 2 (0.8~3.0,
-                // where offPath would NOT fire and the test would
-                // silently regress to limbo). The previous 1.5
-                // impulse integrated to only ~3.3-3.4 cells -
-                // below its own 3.5 floor, i.e. unpassable as
-                // written.
+                // Sanity 1: displacement must exceed the 3.5-cell
+                // floor (REPLAN_DISTANCE + friction margin) or the
+                // test silently regresses to branch-2 limbo where
+                // offPath never fires.
                 double dx = xAtShove[0] - rig.body().getX();
                 check(dx > 3.5,
                     "shove must displace the body > 3.5 cells in -X "
                     + "so the test stays in branch 1 (offPath fires), "
                     + "not branch 2 (silent limbo). Got dx=" + dx
                     + " - if friction or impulse changed, retune "
-                    + "the 1.5 m/tick impulse or extend the "
-                    + "vanilla-tick window; do not relax the 3.5 "
-                    + "margin silently.");
+                    + "the impulse or extend the vanilla-tick window; "
+                    + "do not relax the 3.5 margin silently.");
                 // Sanity 2: direction.
                 check(rig.body().getBlockX() < startAbsX,
                     "shove must have displaced the body in -X; "
@@ -183,7 +146,7 @@ public final class BotSliceGameTests {
                     "still re-walking after the shove")))
             .thenExecuteFor(3, driveOnly(rig))
             .thenExecuteAfter(0, () -> {
-                checkEquals(goalCell, poseOf(rig.body()),
+                checkEquals(goalCell, positionOf(rig.body()),
                     "must still arrive after the shove");
                 rig.body().discard();
             })
@@ -196,20 +159,20 @@ public final class BotSliceGameTests {
      */
     @GameTest(template = "empty16x8x16", timeoutTicks = TIMEOUT)
     public static void failsCleanlyWhenUnwalkable(GameTestHelper helper) {
-        BlockPos start = new BlockPos(3, WALK_Y, 8);
-        Rig rig = rig(helper, start);
+        BlockPos start = new BlockPos(3, GametestRig.WALK_Y, 8);
+        var rig = rig(helper, start);
         // Floating goal five above the walk plane: no move in the
         // stage-2 vocabulary lands there (drops need support below,
         // climbs need a step chain), so the island drains to NO_PATH.
-        GotoProcess mission = submitGoto(rig,
-            localToCell(helper, new BlockPos(13, WALK_Y + 5, 8)));
+        var mission = submitGoto(rig,
+            localToCell(helper, new BlockPos(13, GametestRig.WALK_Y + 5, 8)));
 
         for (int x = 3; x <= 14; x++) {
             for (int y = 1; y <= 3; y++) {
-                helper.setBlock(new BlockPos(x, FLOOR_Y + y, 7),
-                    Blocks.SMOOTH_STONE);
-                helper.setBlock(new BlockPos(x, FLOOR_Y + y, 9),
-                    Blocks.SMOOTH_STONE);
+                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y + y, 7),
+                    net.minecraft.world.level.block.Blocks.SMOOTH_STONE);
+                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y + y, 9),
+                    net.minecraft.world.level.block.Blocks.SMOOTH_STONE);
             }
         }
 
@@ -227,106 +190,6 @@ public final class BotSliceGameTests {
             .thenSucceed();
     }
 
-    // ===== harness =====
-
-    /**
-     * Wait-until body: drives the pipeline every gametest tick, then
-     * evaluates the keep-throwing condition - a throw means "not yet".
-     */
-    private static Runnable driveUntil(Rig rig, Runnable keepThrowing) {
-        return () -> {
-            rig.controller().onTick(rig.view());
-            keepThrowing.run();
-        };
-    }
-
-    /**
-     * Keep-alive for the ticks between a waitUntil passing and the
-     * assertions: the pipeline must keep ticking or the arbiter never
-     * retires the mission and the transition event never fires (this
-     * exact race cost three debug rounds).
-     */
-    private static Runnable driveOnly(Rig rig) {
-        return () -> rig.controller().onTick(rig.view());
-    }
-
-    private static GotoProcess submitGoto(Rig rig, CellPos target) {
-        String taskId = "gt-" + Integer.toHexString(
-            System.identityHashCode(target));
-        GotoProcess mission = new GotoProcess(taskId,
-            new GoalBlock(target), 50, MISSION_BUDGET);
-        rig.arbiter().register(mission);
-        rig.arbiter().requestControl(mission);
-        return mission;
-    }
-
-    private static DefendProcess submitDefend(Rig rig) {
-        String taskId = "gt-df-" + Integer.toHexString(
-            System.identityHashCode(rig.body()));
-        DefendProcess mission = new DefendProcess(taskId, 60,
-            MISSION_BUDGET, () -> poseOf(rig.body()),
-            com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor
-                .hostileTypes(),
-            com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor
-                .rangedTypes());
-        rig.arbiter().register(mission);
-        rig.arbiter().requestControl(mission);
-        return mission;
-    }
-
-    private static Rig rig(GameTestHelper helper, BlockPos spawnLocal) {
-        ServerLevel level = helper.getLevel();
-        for (int x = 0; x < 16; x++) {
-            for (int z = 0; z < 16; z++) {
-                helper.setBlock(new BlockPos(x, FLOOR_Y, z),
-                    Blocks.SMOOTH_STONE);
-                helper.setBlock(new BlockPos(x, FLOOR_Y + 1, z),
-                    Blocks.AIR);
-            }
-        }
-
-        var type = ForgeRegistries.ENTITY_TYPES.getValue(
-            new ResourceLocation(McBotServer.MODID, "bot_body"));
-        if (type == null) {
-            helper.fail("bot_body entity type not registered");
-        }
-        BotBodyEntity body = (BotBodyEntity) type.create(level);
-        if (body == null) {
-            helper.fail("bot_body creation failed");
-        }
-        var abs = helper.absolutePos(spawnLocal);
-        body.moveTo(abs.getX() + 0.5, abs.getY(), abs.getZ() + 0.5, 0f,
-            0f);
-        level.addFreshEntity(body);
-
-        InMemoryEventQueue events = new InMemoryEventQueue(
-            () -> level.getDayTime() / 24000L,
-            () -> level.getDayTime() % 24000L);
-
-        TaskArbiter arbiter = new TaskArbiter();
-        BindingWorldView view = new BindingWorldView(level);
-        BindingActor actor = new BindingActor(body);
-
-        SurvivalReflexLayer reflex = new SurvivalReflexLayer(
-            (world, board) -> board.botHealth = body.getHealth());
-        reflex.addRule(new FreezeOnLowHealthRule());
-
-        Behavior mover = new PathingBehavior("mover",
-            () -> finePoseOf(body),
-            () -> body.onGround(),
-            com.mcbot.mcbotserver.core.pathing.BasicMoves::from,
-            new com.mcbot.mcbotserver.core.pathing.PlanWorker());
-        Behavior combat = new CombatBehavior("combat",
-            () -> finePoseOf(body));
-
-        BotController controller = new BotController(reflex, arbiter,
-            List.of(mover, combat), actor,
-            () -> poseOf(body), body::getHealth,
-            clockOf(level), events, CrashReporter.consoleFallback());
-
-        return new Rig(body, view, events, arbiter, controller);
-    }
-
     /**
      * Scenario 5: a ranged hostile is REFUSED, not chased. The planner
      * sees the structural mismatch (melee-only vs kite-and-shoot) and
@@ -335,12 +198,11 @@ public final class BotSliceGameTests {
      */
     @GameTest(template = "empty16x8x16", timeoutTicks = TIMEOUT)
     public static void refusesRangedItCannotAnswer(GameTestHelper helper) {
-        Rig rig = rig(helper, new BlockPos(3, WALK_Y, 8));
+        var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
         var level = helper.getLevel();
-        net.minecraft.world.entity.monster.Skeleton skeleton =
-            net.minecraft.world.entity.EntityType.SKELETON.create(level);
+        Skeleton skeleton = EntityType.SKELETON.create(level);
         check(skeleton != null, "skeleton creation failed");
-        var sAbs = helper.absolutePos(new BlockPos(7, WALK_Y, 8));
+        var sAbs = helper.absolutePos(new BlockPos(7, GametestRig.WALK_Y, 8));
         skeleton.moveTo(sAbs.getX() + 0.5, sAbs.getY(),
             sAbs.getZ() + 0.5, 0f, 0f);
         skeleton.setNoAi(true);
@@ -384,12 +246,11 @@ public final class BotSliceGameTests {
      */
     @GameTest(template = "empty16x8x16", timeoutTicks = TIMEOUT)
     public static void defendsByKillingZombie(GameTestHelper helper) {
-        Rig rig = rig(helper, new BlockPos(3, WALK_Y, 8));
+        var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
         var level = helper.getLevel();
-        net.minecraft.world.entity.monster.Zombie zombie =
-            net.minecraft.world.entity.EntityType.ZOMBIE.create(level);
+        Zombie zombie = EntityType.ZOMBIE.create(level);
         check(zombie != null, "zombie creation failed");
-        var zAbs = helper.absolutePos(new BlockPos(7, WALK_Y, 8));
+        var zAbs = helper.absolutePos(new BlockPos(7, GametestRig.WALK_Y, 8));
         zombie.moveTo(zAbs.getX() + 0.5, zAbs.getY(),
             zAbs.getZ() + 0.5, 0f, 0f);
         zombie.setNoAi(true);
@@ -415,70 +276,24 @@ public final class BotSliceGameTests {
             .thenSucceed();
     }
 
-    private static void assertEventSeen(InMemoryEventQueue events,
-                                        String kind) {
+    private static DefendProcess submitDefend(GametestRig.Rig rig) {
+        String taskId = "gt-df-" + Integer.toHexString(
+            System.identityHashCode(rig.body()));
+        DefendProcess mission = new DefendProcess(taskId, 60,
+            MISSION_BUDGET, () -> GametestRig.positionOf(rig.body()),
+            LevelThreatSensor.hostileTypes(),
+            LevelThreatSensor.rangedTypes());
+        rig.arbiter().register(mission);
+        rig.arbiter().requestControl(mission);
+        return mission;
+    }
+
+    private static void assertEventSeen(
+            com.mcbot.mcbotserver.core.event.InMemoryEventQueue events,
+            String kind) {
         List<String> kinds = events.statusSnapshot(0).events().stream()
             .map(BotEvent::kind).toList();
         check(kinds.contains(kind),
             "expected " + kind + " in stream, got " + kinds);
-    }
-
-    /**
-     * Wait-phase contract: GameTestSequence.tickAndContinue retries a
-     * step only while it throws GameTestAssertException, so every
-     * condition here throws exactly that - retry in thenWaitUntil,
-     * clean failure inside thenExecute.
-     */
-    private static void check(boolean condition, String message) {
-        if (!condition) {
-            throw new GameTestAssertException(message);
-        }
-    }
-
-    private static void checkEquals(Object expected, Object actual,
-                                    String message) {
-        if (!Objects.equals(expected, actual)) {
-            throw new GameTestAssertException(message + ": expected="
-                + expected + " actual=" + actual);
-        }
-    }
-
-    private static CellPos poseOf(BotBodyEntity body) {
-        return new CellPos(body.getBlockX(), body.getBlockY(),
-            body.getBlockZ());
-    }
-
-    private static com.mcbot.mcbotserver.api.types.Vec3 finePoseOf(
-            BotBodyEntity body) {
-        return new com.mcbot.mcbotserver.api.types.Vec3(body.getX(),
-            body.getY(), body.getZ());
-    }
-
-    /**
-     * Goal-predicate echo for wait conditions; the pipeline itself
-     * still owns SUCCESS via the same predicate.
-     */
-    private static boolean reached(BotBodyEntity body, CellPos goal) {
-        return goal.equals(poseOf(body));
-    }
-
-    private static CellPos localToCell(GameTestHelper helper,
-                                       BlockPos local) {
-        BlockPos abs = helper.absolutePos(local);
-        return new CellPos(abs.getX(), abs.getY(), abs.getZ());
-    }
-
-    private static BotController.GameClock clockOf(ServerLevel level) {
-        return new BotController.GameClock() {
-            @Override
-            public long day() {
-                return level.getDayTime() / 24000L;
-            }
-
-            @Override
-            public long timeOfDayTicks() {
-                return level.getDayTime() % 24000L;
-            }
-        };
     }
 }
