@@ -201,7 +201,7 @@ class AdoptFreshnessGateTest {
         }
         assertNotEquals(0, PathingTestAccess.waypoints(mover).size(),
             "Chebyshev-1 must accept 1-cell drift on ANY axis, "
-            + "including Y (ClimbUp / Drop in the move vocabulary "
+            + "including Y (JumpUp / Drop in the move vocabulary "
             + "are max-Chebyshev 1, so this is the tightest "
             + "tolerance that does not over-reject)");
     }

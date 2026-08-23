@@ -41,7 +41,7 @@ depth pending - [GAP] vocabulary absent, reopen-triggered -
   cross-session requirement reopens)
 
 ### Locomotion (movement five-tuple family)
-- [SHIPPED] Walk / diagonal / climb-up / drop<=3 / **Swim / SwimUp**
+- [SHIPPED] Walk / diagonal / jump-up / drop<=3 / **Swim / SwimUp**
   over A* with replan ladder (exhaustion / drift / progress fuse)
   and wall-clock-bounded async worker on immutable snapshots
 - [GAP] Parkour, pillar-up, door handling - each lands as a

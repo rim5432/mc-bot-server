@@ -306,7 +306,7 @@ test count when red).
 2. RESOLVED 2026-08-23: gauntlet gametest shipped as
    GauntletGameTests and green in-engine via build runGameTest
    (7/7 with the slice and combat suites). Sections: bottom-slab
-   carpet (auto-step), one-block plateau (ClimbUp execution),
+   carpet (auto-step), one-block plateau (JumpUp execution),
    drop off the far edge, fence wall with a single missing-post
    gap, plus a focused gap-routing test. Building it exposed the
    executor half of the climb vocabulary: steering's jump flag

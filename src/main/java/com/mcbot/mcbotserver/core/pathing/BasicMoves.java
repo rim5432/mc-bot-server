@@ -31,7 +31,7 @@ import java.util.Objects;
  * <li>swimmable(cell): the cell's traits say liquid (decision 19:
  * "is this water?" is a property the empty collision shape cannot
  * infer). Water cells are passable but never standable, so they are
- * invisible to Walk/ClimbUp - Swim and SwimUp exist for them.</li>
+ * invisible to Walk/JumpUp - Swim and SwimUp exist for them.</li>
  * </ul>
  *
  * <p>Non-geometric block properties (climbable / liquid / damaging)
@@ -62,7 +62,7 @@ public final class BasicMoves {
         for (Direction d : Direction.values()) {
             out.add(new Walk(src,
                 new CellPos(src.x() + d.dx, src.y(), src.z() + d.dz)));
-            out.add(new ClimbUp(src,
+            out.add(new JumpUp(src,
                 new CellPos(src.x() + d.dx, src.y() + 1,
                     src.z() + d.dz)));
             out.add(new Swim(src,
@@ -226,7 +226,13 @@ public final class BasicMoves {
         }
     }
 
-    record ClimbUp(CellPos source, CellPos destination)
+    /**
+     * Deliberate jump onto one higher standable cell. Named for the
+     * executor input it demands - a real jump thrust each tick the
+     * waypoint is above the body (issue 0004 F1: vanilla "climb" is
+     * reserved for a future trait-driven ladder/vine Movement).
+     */
+    record JumpUp(CellPos source, CellPos destination)
         implements Movement {
 
         @Override
@@ -241,7 +247,7 @@ public final class BasicMoves {
 
         @Override
         public String describe() {
-            return "up " + source + "->" + destination;
+            return "jumpup " + source + "->" + destination;
         }
     }
 
@@ -279,7 +285,7 @@ public final class BasicMoves {
      * the same level: the destination is liquid (passable by its
      * empty shape, held by the fluid, never standable). The source
      * may be dry - entering water is deliberate here; leaving water
-     * onto land is Walk/ClimbUp's job and needs no new vocabulary.
+     * onto land is Walk/JumpUp's job and needs no new vocabulary.
      */
     record Swim(CellPos source, CellPos destination)
         implements Movement {

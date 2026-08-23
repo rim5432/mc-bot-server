@@ -473,12 +473,12 @@ public final class PathingBehavior implements Behavior {
         double dz = wp.z() + 0.5 - position.z();
         float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
         // Jump only when the current waypoint sits above the body's
-        // floor cell - the execution half of a ClimbUp edge.
+        // floor cell - the execution half of a JumpUp edge.
         // Auto-step clears rises <= 0.5 (slabs); taller steps need
         // this thrust to leave the ground.
-        boolean climbing = wp.y() > floorOf(position).y();
+        boolean jumpForWaypoint = wp.y() > floorOf(position).y();
         actor.submit(new Claim(Channel.MOVE, 10, name,
-            new Intent.Move(1.0, 0, climbing, false)));
+            new Intent.Move(1.0, 0, jumpForWaypoint, false)));
         actor.submit(new Claim(Channel.ROT, 10, name,
             new Intent.Look(yaw, 0f)));
     }

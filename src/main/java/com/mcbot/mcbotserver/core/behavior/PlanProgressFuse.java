@@ -76,7 +76,7 @@ final class PlanProgressFuse {
         boolean p3 = false;
         if (!cursor.exhausted()) {
             // Criterion 3 measures 3D, not XZ-only: vertical moves
-            // (ClimbUp, Drop) are real progress the latched min must
+            // (JumpUp, Drop) are real progress the latched min must
             // capture (issue 0001 Ruling a).
             CellPos wp = cursor.current();
             double wpDist = position.distanceTo(wp.x() + 0.5,

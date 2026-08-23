@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Scenario: a shore at BODY_Y west of a water channel. The water
  * column is collision-empty (passable) but never standable - which
- * is exactly why Walk/ClimbUp cannot see it and Swim must.
+ * is exactly why Walk/JumpUp cannot see it and Swim must.
  */
 class BasicMovesSwimTest {
 

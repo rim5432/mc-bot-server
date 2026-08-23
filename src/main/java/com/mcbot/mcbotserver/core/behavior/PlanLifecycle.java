@@ -193,7 +193,7 @@ final class PlanLifecycle {
         // every result, eating the fuse accumulator through churn.
         // Chebyshev distance 1 (max(|dx|, |dy|, |dz|) <= 1) accepts
         // any cell the bot can reach in 1 step in the move graph
-        // (Walk, ClimbUp, Drop, Diagonal - all max-Chebyshev 1).
+        // (Walk, JumpUp, Drop, Diagonal - all max-Chebyshev 1).
         // Note: 1 cell is the v1 vocabulary's tightest tolerance;
         // future moves that span more cells per step must revisit
         // this constant in lockstep.
@@ -219,7 +219,7 @@ final class PlanLifecycle {
      * {@link PathingBehavior#FRESHNESS_CELLS} Chebyshev units of the
      * cell the search was launched from. Chebyshev (not Euclidean)
      * is the right metric here because the move graph's maximum step
-     * in any single tick is max-Chebyshev 1 (Walk, ClimbUp, Drop,
+     * in any single tick is max-Chebyshev 1 (Walk, JumpUp, Drop,
      * Diagonal) - a 1-cell Euclidean step would reject valid moves.
      *
      * @param a one cell; must not be null

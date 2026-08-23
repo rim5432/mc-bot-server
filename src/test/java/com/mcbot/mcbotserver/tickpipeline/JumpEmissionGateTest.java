@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Climb-execution gate: the MOVE claim carries jump=true exactly when
  * the current waypoint sits above the body's floor cell - the executor
- * half of A*'s ClimbUp edges. Auto-step cannot clear a full block;
+ * half of A*'s JumpUp edges. Auto-step cannot clear a full block;
  * without this flag every planned climb stalls into a progress-fuse
  * STUCK at the step face while the plan says the route is viable.
  */
@@ -39,7 +39,7 @@ class JumpEmissionGateTest {
         }
         // One-block plateau at x=2..3: its walk surface is y=65, one
         // full block above the floor lane, reachable only via a
-        // ClimbUp edge.
+        // JumpUp edge.
         for (int x = 2; x <= 3; x++) {
             for (int z = -2; z <= 2; z++) {
                 world.putBlock(new BlockSnapshot(
@@ -82,7 +82,7 @@ class JumpEmissionGateTest {
     }
 
     /**
-     * The plan onto the plateau contains a ClimbUp cell; steering at
+     * The plan onto the plateau contains a JumpUp cell; steering at
      * that waypoint raises the jump flag. Pins the executor half of
      * the climb vocabulary against silent regression to jump=false.
      */

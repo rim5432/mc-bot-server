@@ -120,7 +120,7 @@ class BasicMovesShapeGateTest {
         w.putShape(new CellPos(1, BODY_Y, 0),
             CollisionShape.partial(
                 new Box(0, 0.5, 0, 1, 1, 1)));
-        assertTrue(new BasicMoves.ClimbUp(SRC,
+        assertTrue(new BasicMoves.JumpUp(SRC,
             new CellPos(1, BODY_Y + 1, 0)).isViable(w),
             "climb onto an upper-slab platform must be viable");
     }

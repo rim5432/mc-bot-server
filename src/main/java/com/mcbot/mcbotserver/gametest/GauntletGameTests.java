@@ -25,7 +25,7 @@ import static com.mcbot.mcbotserver.gametest.GametestRig.submitGoto;
 /**
  * Stage 2 closeout gauntlet, in-engine: one corridor that makes the
  * body exercise every v1 locomotion section back to back - bottom-slab
- * carpet (auto-step), a one-block plateau (ClimbUp execution via the
+ * carpet (auto-step), a one-block plateau (JumpUp execution via the
  * steering jump flag), a drop back down, and a fence wall whose single
  * missing-post gap is the only way through.
  *

@@ -88,7 +88,7 @@ public final class BotSliceGameTests {
      * water - every swim cell reads unstunnable without the liquid
      * trait, so a lake meant NO_PATH everywhere. This pins the Swim
      * vocabulary end to end: Walk to the edge, Drop/Swim through the
-     * channel, ClimbUp out. The trench spans all z so walking around
+     * channel, JumpUp out. The trench spans all z so walking around
      * is impossible.
      */
     @GameTest(template = "empty16x8x16", timeoutTicks = TIMEOUT)

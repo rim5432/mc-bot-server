@@ -157,7 +157,7 @@ waypoint" criterion safe:
 - `AStarPathFinder.reconstruct` (line 286-297) emits every
   visited cell as a waypoint. No simplification, no collapse,
   no LOS. Waypoint gap = 1 cell for every move in the v1
-  vocabulary (Walk, ClimbUp, Drop, Diagonal in
+  vocabulary (Walk, JumpUp, Drop, Diagonal in
   `BasicMoves.from`).
 - `PathingBehavior.steerTowardCurrentWaypoint` is
   forward=1.0, strafe=0, jump=false. No away-from-waypoint
