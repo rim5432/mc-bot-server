@@ -60,7 +60,9 @@ TASKS_ALL = ["tasks", "--all"]
 DEPS_TASK = ["dependencies"]
 
 RUN_CLIENT = ["runClient"]
-RUN_SERVER = ["runServer", "--nogui"]
+# --nogui 不能走命令行：moddev 的 run 任务不认这个选项，
+# build.gradle 的 server 块已用 programArgument 注入
+RUN_SERVER = ["runServer"]
 RUN_DATA = ["runData"]
 RUN_GAMETEST = ["runGameTestServer"]
 
