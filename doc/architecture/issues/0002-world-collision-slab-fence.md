@@ -5,7 +5,7 @@ covers:
   - src/main/java/com/mcbot/mcbotserver/api/world/CollisionShape.java
   - src/main/java/com/mcbot/mcbotserver/api/world/BlockTraitsRegistry.java
   - src/main/java/com/mcbot/mcbotserver/core/world/MapBlockTraitsRegistry.java
-  - src/main/java/com/mcbot/mcbotserver/core/world/MockWorldView.java
+  - src/test/java/com/mcbot/mcbotserver/core/world/MockWorldView.java
   - src/main/java/com/mcbot/mcbotserver/core/pathing/BasicMoves.java
   - src/test/java/com/mcbot/mcbotserver/world/CollisionShapeGateTest.java
   - src/test/java/com/mcbot/mcbotserver/corepathing/BasicMovesShapeGateTest.java
