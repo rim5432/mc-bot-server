@@ -42,6 +42,7 @@ class GametestInventoryCheck {
         "BotSliceGameTests", Set.of(
             "walksToBlock",
             "crossesWaterTrench",
+            "crossesDeepPool",
             "failsCleanlyWhenUnwalkable",
             "recoversWhenShoved",
             "refusesRangedItCannotAnswer",

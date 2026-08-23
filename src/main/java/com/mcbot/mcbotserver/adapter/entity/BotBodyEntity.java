@@ -81,7 +81,9 @@ public final class BotBodyEntity extends PathfinderMob {
      *
      * @param forward -1..1 forward drive
      * @param strafe  -1..1 strafe drive
-     * @param jump    true to request a jump this tick
+     * @param jump    true to request upward thrust this tick - a
+     *                ground jump on land, buoyant ascent while in
+     *                water (issue 0004 F2)
      */
     public void setDrive(float forward, float strafe, boolean jump) {
         this.driveForward = forward;
@@ -116,16 +118,33 @@ public final class BotBodyEntity extends PathfinderMob {
         // binding must supply it or zza drives a speed-0 body.
         setSpeed((float) getAttributeValue(
             net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED));
-        if (driveJump && onGround()) {
-            // Deliberate deviation from the vanilla flag path: writing
-            // setJumping(true) and letting LivingEntity.aiStep consume
-            // it never lifted this body (field verified true at write
-            // time, zero vertical velocity ever applied - traced by
-            // the gauntlet jump probe), so the binding fires
-            // jumpFromGround directly, the exact call that consumer
-            // would make. The one-shot reset keeps a held flag from
-            // machine-gunning jumps every tick; steering re-raises it
-            // each tick while the climb waypoint is still above us.
+        if (driveJump && isInWater() && !onGround()) {
+            // Fluid ascent with no floor to push from: call the
+            // engine's fluid jump directly. Runtime probes killed the
+            // subtler route - writing setJumping(true) lets the vanilla
+            // aiStep fluid branch read the flag but produced ZERO
+            // vertical velocity on this carrier, the same anomaly as
+            // the land case below (deep-pool gametest position trace,
+            // issue 0004 F2). Mob.jumpInFluid is the exact call that
+            // branch makes; invoking it here is the same class of
+            // deviation as jumpFromGround. +0.3/tick while held,
+            // matching a player holding space to surface. Lava waits
+            // for a scenario that needs it.
+            jumpInFluid(net.minecraftforge.common.ForgeMod.WATER_TYPE
+                .get());
+        } else if (driveJump && onGround()) {
+            // Grounded (dry OR wading): fire jumpFromGround directly.
+            // Two deliberate deviations live in this branch. First,
+            // the vanilla flag path never lifted this body on LAND
+            // (field verified true at write time, zero vertical
+            // velocity ever applied - traced by the gauntlet jump
+            // probe). Second, the flag route must NOT be used while
+            // grounded in shallow water: aiStep throttles it with
+            // noJumpDelay=10, and the slow hops stalled the trench
+            // exit that per-tick direct jumps clear. The one-shot
+            // reset keeps a held flag from machine-gunning jumps;
+            // steering re-raises it each tick while the climb
+            // waypoint is still above us.
             jumpFromGround();
             driveJump = false;
         }

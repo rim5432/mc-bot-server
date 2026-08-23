@@ -125,17 +125,24 @@ bobbing across - the surface-first shape F6(1) describes. True
 sub-surface cruising waits for the F3 yya wiring and the F5
 depth-tiered costs.
 
-**Ruling D2 (approved with pre-verification; verification done)**:
-the review's fallback ("call jumpInFluid manually if Mob breaks the
-chain") is unnecessary - the chain holds. Fix shape: in
-`customServerAiStep`, when the body is in fluid express driveJump as
-`setJumping(true)` and let vanilla consume it; keep today's
-`jumpFromGround` path for land. The `setJumping(false)` reset in
-`setDrive` stays keyed to the same request bit, so request-off
-ticks clear the flag exactly once per tick with no same-tick
-clobber. Add a deep-pool gametest: >=2 cells of water requiring a
-SwimUp chain, then shore exit. This gates the acceptance run and
-touches no frozen signature.
+**Ruling D2 (approved with pre-verification; verification done,
+then corrected by runtime)**: the review's fallback ("call
+jumpInFluid manually if Mob breaks the chain") is what shipped.
+The static chain holds - Mob.aiStep calls super, the deep-water
+branch honors the flag unthrottled - but a gametest position probe
+showed `setJumping(true)` mid-fluid produced ZERO vertical velocity
+on this carrier, the same inert-flag anomaly already recorded for
+land in the gauntlet jump probe. Static reading lost to runtime
+twice on this field; the binding now calls `Mob.jumpInFluid`
+directly (public) when driveJump arrives while airborne in water -
+the exact call that branch makes, same deviation class as the land
+`jumpFromGround` path. Grounded ticks (dry or wading) keep direct
+`jumpFromGround`: routing them through the flag stalls on aiStep's
+noJumpDelay=10 throttle, which regressed the one-deep trench before
+the split. The deep-pool gametest (three layers of water - two was
+exitable by a single grounded hop off the flooded floor and masked
+the gap) runs red without the fix and green with it; its crossing
+trace shows the body riding the surface lane across, matching F6(1).
 
 ### F3 - Vertical control: the yya axis gives real swim steering, not just rocket-up plus freefall
 

@@ -121,6 +121,61 @@ public final class BotSliceGameTests {
     }
 
     /**
+     * Scenario 1c: a three-deep pool spans the lane; the bot must
+     * rise through the fluid column and climb out the far side.
+     *
+     * <p>Why: issue 0004 F2 - the planner sells SwimUp edges the
+     * executor could not physically express, because driveJump fired
+     * jumpFromGround only under onGround(). Depth matters here: a
+     * shallower pool lets the grounded body hop off the flooded floor
+     * (onGround stays true under water) and masks the gap entirely -
+     * the first draft at two deep passed before the fix. At three,
+     * the surface sits beyond a single jump's 1.25-block reach, so
+     * only the vanilla jumping-flag buoyancy (Mob.jumpInFluid,
+     * +0.3/tick while canFloat is false) crosses the column. Red
+     * first (STUCK at the pool bottom), green once the binding
+     * expresses jump-in-fluid as the jumping flag.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = TIMEOUT)
+    public static void crossesDeepPool(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
+        for (int x = 6; x <= 8; x++) {
+            for (int z = 0; z < 16; z++) {
+                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y, z),
+                    Blocks.WATER);
+                helper.setBlock(
+                    new BlockPos(x, GametestRig.FLOOR_Y - 1, z),
+                    Blocks.WATER);
+                helper.setBlock(
+                    new BlockPos(x, GametestRig.FLOOR_Y - 2, z),
+                    Blocks.WATER);
+                helper.setBlock(
+                    new BlockPos(x, GametestRig.FLOOR_Y - 3, z),
+                    Blocks.SMOOTH_STONE);
+            }
+        }
+        CellPos goalCell = localToCell(helper,
+            new BlockPos(12, GametestRig.WALK_Y, 8));
+        var mission = submitGoto(rig, goalCell,
+            MISSION_BUDGET + 150);
+
+        helper.startSequence()
+            .thenWaitUntil(driveUntil(rig,
+                () -> check(reached(rig.body(), goalCell),
+                    "waiting for arrival across the deep pool")))
+            .thenExecuteFor(3, driveOnly(rig))
+            .thenExecuteAfter(0, () -> {
+                check(!mission.isActive(),
+                    "mission must retire after crossing");
+                check(mission.missionSucceeded(),
+                    "crossing must be a success");
+                assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
+                rig.body().discard();
+            })
+            .thenSucceed();
+    }
+
+    /**
      * Scenario 2: shoved mid-path, the bot re-walks to the same goal.
      *
      * <p>Issue 0001 fix 3: the shove is a real vanilla-physics
