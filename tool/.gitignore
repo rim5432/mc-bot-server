@@ -1,6 +1,10 @@
 # mcbot_tool runtime — never tracked
 .runtime/
 
+# harness driving sessions: event pulls, command logs, verdicts.
+# Telemetry, not source; copy a verdict out explicitly to track it.
+sessions/
+
 # python
 __pycache__/
 *.pyc

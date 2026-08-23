@@ -129,6 +129,35 @@ python tool/mcbot_tool.py doc index           # regenerate the doc/README.md ind
 Daily rhythm: edit covered code → update the covering doc → `doc check`
 all green → `doc touch <name>`.
 
+## Driving the bot over RCON
+
+[`rcon.py`](./rcon.py) is a stdlib-only Source-RCON client for driving
+the bot through the `/bot` command surface (single-line JSON in and
+out; see `adapter/BotCommands.java`). One-time setup:
+
+```bash
+# 1) run/server.properties: enable-rcon=true, set rcon.password
+# 2) store the same credentials locally (gitignored):
+python tool/rcon.py init
+```
+
+A driving session gets its own folder under `tool/sessions/`
+(gitignored telemetry):
+
+```bash
+python tool/rcon.py new-session survival10          # create session dir
+python tool/rcon.py --session <dir> "/botspawn"     # log a command
+python tool/rcon.py poll <dir>                      # drain /bot events,
+                                                    #   append events.jsonl,
+                                                    #   advance cursor.txt
+```
+
+Session contents: `session.json` (metadata), `events.jsonl` (one line
+per poll), `commands.jsonl` (every issued command + response),
+`cursor.txt` (drain position), and a hand-written `verdict.md` when the
+run concludes. Copy a verdict out of the folder explicitly if it needs
+to be tracked.
+
 ## Troubleshooting checklist
 
 - `gradle not found` → set `MCBOT_GRADLE` or fix PATH

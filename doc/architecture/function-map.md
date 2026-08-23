@@ -100,8 +100,10 @@ cannot answer.
 ### Harness seam (boundary D)
 - [SHIPPED] submit/cancel verbs, cursor-drained event stream with
   gap recovery + structured failure reasons, state snapshot channel
-- [GAP] Transport choice (MCP vs HTTP vs stdio) - bot stays blind;
-  the seam already froze the six invariants
+- [GAP] Transport choice beyond the v1 console bridge (MCP vs HTTP
+  vs stdio) - bot stays blind; v1 drives over the server's native
+  RCON through /bot commands answering single-line JSON, a
+  provisional bridge that touches no boundary invariant
 - [DEFERRED] JsonlJournal replay across restarts (first cross-session
   requirement); idempotency-key persistence
 

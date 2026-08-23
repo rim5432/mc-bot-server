@@ -320,9 +320,16 @@ test count when red).
    single-concern collaborators in core.behavior - WaypointCursor
    (126), PlanProgressFuse (159, Ruling-a invariants verbatim),
    ReplanGate (101), PlanLifecycle (235, Chebyshev freshness);
-   shell now 511 lines. Behaviour zero-change: verdicts, tick
+   shell now 500 lines. Behaviour zero-change: verdicts, tick
    order, keepalive keys, and ctor overloads all pinned by the
    existing gates; tickpipeline reflection centralised in
    PathingTestAccess. Verified offline (159 cases, 0 skips) and
    in-engine (7/7 gametests).
+4. OPEN 2026-08-23: RCON console bridge shipped (boundary-D
+   command surface + tool/rcon.py session ledger) - the first
+   external transport. Acceptance is convergence criterion 2's
+   rehearsal: one body driven unattended through /bot verbs for
+   10 minutes of overworld, surviving without human input; the
+   run's telemetry lands in tool/sessions/<run>/ and its verdict
+   closes this entry.
 
