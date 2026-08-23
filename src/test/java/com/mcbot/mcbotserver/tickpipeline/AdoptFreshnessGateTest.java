@@ -122,8 +122,11 @@ class AdoptFreshnessGateTest {
      */
     @Test
     void chebyshevBoundaryCases() throws Exception {
-        // Reflectively read the static helper.
-        var m = PathingBehavior.class.getDeclaredMethod(
+        // Reflectively read the static helper (lives on PlanLifecycle,
+        // package-private, so resolve by name).
+        var lifecycleClass = Class.forName(
+            "com.mcbot.mcbotserver.core.behavior.PlanLifecycle");
+        var m = lifecycleClass.getDeclaredMethod(
             "chebyshevDistance", CellPos.class, CellPos.class);
         m.setAccessible(true);
 

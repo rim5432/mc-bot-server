@@ -9,21 +9,17 @@ import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
 import com.mcbot.mcbotserver.api.goal.Goal;
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.goal.GoalNear;
-import com.mcbot.mcbotserver.api.pathing.Heuristic;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.api.world.WorldView;
-import com.mcbot.mcbotserver.core.pathing.AStarPathFinder;
 import com.mcbot.mcbotserver.core.pathing.MoveGraph;
 import com.mcbot.mcbotserver.core.pathing.PlanWorker;
-import com.mcbot.mcbotserver.core.world.SnapshotWorldView;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Waypoint follower over the A* move graph: plans through the finder,
@@ -150,18 +146,11 @@ public final class PathingBehavior implements Behavior {
     private final String name;
     private final PositionSource positionSource;
     private final OnGroundSource onGroundSource;
-    private final MoveGraph graph;
-    private final PlanWorker worker;
+    private final PlanLifecycle lifecycle;
     private final WaypointCursor cursor = new WaypointCursor();
     private final PlanProgressFuse fuse = new PlanProgressFuse();
     private final ReplanGate gate = new ReplanGate();
     private int ticksSinceAdoption;
-    // Async plan bookkeeping; all fields touched on the tick thread
-    // only - the future itself is the sole cross-thread object.
-    private CompletableFuture<AStarPathFinder.PathResult> pendingPlan;
-    private Goal pendingGoal;
-    private CellPos pendingStart;
-
     /**
      * Fine-grained body position. Doubles are load-bearing here: the
      * stuck fuse measures sub-cell motion, and a block-cell source
@@ -274,11 +263,10 @@ public final class PathingBehavior implements Behavior {
         this.name = name;
         this.positionSource = positionSource;
         this.onGroundSource = onGroundSource;
-        this.graph = graph;
-        // Null is the deliberate synchronous-planning mode used by
-        // offline tests; see the two-, three-, and four-argument
-        // constructors above.
-        this.worker = worker;
+        // Null worker is the deliberate synchronous-planning mode
+        // used by offline tests; see the two-, three-, and
+        // four-argument constructors above.
+        this.lifecycle = new PlanLifecycle(graph, worker);
     }
 
     @Override
@@ -318,7 +306,7 @@ public final class PathingBehavior implements Behavior {
         // ground tick immediately has a usable plan), and the
         // freshness check is the cell-based guard regardless of
         // ground state.
-        adoptCompletedPlan(directive.goal(), cell);
+        applyAdoption(lifecycle.adoptIfReady(directive.goal(), cell));
 
         if (evaluateTriggers) {
             // Plan-progress score (issue 0001 §Ruling a, Path A).
@@ -352,14 +340,15 @@ public final class PathingBehavior implements Behavior {
             if ((fuseCondition || offPath || exhausted)
                 && gate.mayRequest(window)) {
                 gate.onRequest();
-                requestPlan(world, cell, directive.goal());
+                applyAdoption(lifecycle.request(world, cell,
+                    directive.goal()));
             }
 
             if (cursor.isEmpty()) {
                 // A search still running is not an answer: report
                 // RUNNING rather than inventing NO_PATH for a
                 // question in flight.
-                if (planInFlight()) {
+                if (lifecycle.inFlight()) {
                     return ExecutionReport.running();
                 }
                 // Definitive no-path right now: fail cleanly; the
@@ -393,131 +382,42 @@ public final class PathingBehavior implements Behavior {
         return ExecutionReport.running();
     }
 
-    private void requestPlan(WorldView world, CellPos start,
-                             Goal goal) {
-        if (worker == null) {
-            planSync(world, start, goal);
-            return;
-        }
-        // One search in flight at a time; the cooldown gate above
-        // spaces requests, this guard absorbs same-tick re-triggers.
-        if (planInFlight()) {
-            return;
-        }
-        pendingGoal = goal;
-        pendingStart = start;
-        CellPos anchor = anchorCell(goal);
-        var snapshot = SnapshotWorldView.capture(world, start, anchor);
-        pendingPlan = worker.submit(snapshot, graph, start, goal,
-            Heuristic.euclideanTo(anchor),
-            AStarPathFinder.DEFAULT_NODE_BUDGET, PLAN_WALL_CLOCK_MS);
-    }
-
     /**
-     * Consume a finished off-thread search. Freshness is decided
-     * against the CURRENT directive and position: a plan for an abandoned
-     * goal or from a cell we have left is stale and discarded whole -
-     * adopting it would steer toward where we no longer want to go.
+     * Apply an adoption verdict to the follower's collaborators.
+     * Both arrival paths funnel here - the synchronous answer from
+     * {@code request} and the asynchronous one from
+     * {@code adoptIfReady} - so the application side effects
+     * (cursor install, adoption-age reset, fuse latch refresh) exist
+     * in exactly one place.
+     *
+     * @param adoption the verdict to apply; never null
      */
-    private void adoptCompletedPlan(Goal currentGoal, CellPos cell) {
-        if (pendingPlan == null || !pendingPlan.isDone()) {
-            return;
+    private void applyAdoption(PlanLifecycle.Adoption adoption) {
+        switch (adoption.outcome()) {
+            case ADOPTED -> {
+                // Skip index 0: it is the cell we are standing in.
+                cursor.set(adoption.plan());
+                ticksSinceAdoption = 0;
+                fuse.onAdopted(cursor.index());
+            }
+            case NO_ROUTE -> cursor.clear();
+            case STALE -> {
+                // The discarded answer was for a question we no longer
+                // ask. Prime the ladder so THIS tick's trigger
+                // evaluation immediately requests a plan for the
+                // current goal - the cooldown guards executing routes,
+                // not unanswered goals, and reporting NO_PATH without
+                // asking would be a lie.
+                gate.primeLadder();
+            }
+            case NOT_READY -> { }
         }
-        AStarPathFinder.PathResult result;
-        try {
-            result = pendingPlan.join();
-        } catch (RuntimeException cancelled) {
-            result = AStarPathFinder.PathResult.failed(0);
-        }
-        pendingPlan = null;
-
-        // Freshness check (issue 0001 fix 5 / Ruling (c): cell-equality
-        // is too strict. A* takes time; the bot moves during the
-        // search. Walking speed 0.215 b/tick x a 4-5 tick search
-        // already crosses 1 cell; strict cell-equality would discard
-        // every result, eating the fuse accumulator through churn.
-        // Chebyshev distance 1 (max(|dx|, |dy|, |dz|) <= 1) accepts
-        // any cell the bot can reach in 1 step in the move graph
-        // (Walk, ClimbUp, Drop, Diagonal - all max-Chebyshev 1).
-        // Note: 1 cell is the v1 vocabulary's tightest tolerance;
-        // future moves that span more cells per step must revisit
-        // this constant in lockstep.
-        boolean fresh = currentGoal.equals(pendingGoal)
-            && chebyshevDistance(cell, pendingStart) <= FRESHNESS_CELLS;
-        pendingGoal = null;
-        pendingStart = null;
-        if (!fresh) {
-            // The discarded answer was for a question we no longer
-            // ask. Prime the ladder so THIS tick's trigger evaluation
-            // immediately requests a plan for the current goal - the
-            // cooldown guards executing routes, not unanswered goals,
-            // and reporting NO_PATH without asking would be a lie.
-            gate.primeLadder();
-            return;
-        }
-        if (!result.reachedGoal() && result.waypoints().isEmpty()) {
-            cursor.clear();
-            return;
-        }
-        // Skip index 0: it is the cell we are standing in.
-        cursor.set(result.waypoints());
-        ticksSinceAdoption = 0;
-        // Plan adopted: reset the observation latches (accumulator
-        // untouched) per the Ruling-a invariant - see PlanProgressFuse
-        // .onAdopted for the full rationale.
-        fuse.onAdopted(cursor.index());
-    }
-
-    private boolean planInFlight() {
-        return pendingPlan != null && !pendingPlan.isDone();
-    }
-
-    private void planSync(WorldView world, CellPos start, Goal goal) {
-        CellPos anchor = anchorCell(goal);
-        var finder = new AStarPathFinder(graph,
-            Heuristic.euclideanTo(anchor),
-            AStarPathFinder.DEFAULT_NODE_BUDGET);
-        var result = finder.compute(world, start, goal,
-            Heuristic.euclideanTo(anchor));
-        if (!result.reachedGoal() && result.waypoints().isEmpty()) {
-            cursor.clear();
-            return;
-        }
-        // Skip index 0: it is the cell we are standing in.
-        cursor.set(result.waypoints());
-        ticksSinceAdoption = 0;
-        // See adoptCompletedPlan / PlanProgressFuse.onAdopted for
-        // the latch-reset rationale.
-        fuse.onAdopted(cursor.index());
     }
 
     private void resetPlan() {
         cursor.clear();
         gate.reset();
-        pendingPlan = null;
-        pendingGoal = null;
-        pendingStart = null;
-    }
-
-    /**
-     * Chebyshev distance between two cells (max of the per-axis
-     * deltas). Used by the freshness check in {@link #adoptCompletedPlan}:
-     * a search result is fresh if the bot's current cell is within
-     * {@link #FRESHNESS_CELLS} Chebyshev units of the cell the
-     * search was launched from. Chebyshev (not Euclidean) is the
-     * right metric here because the move graph's maximum step in
-     * any single tick is max-Chebyshev 1 (Walk, ClimbUp, Drop,
-     * Diagonal) - a 1-cell Euclidean step would reject valid moves.
-     *
-     * @param a one cell; must not be null
-     * @param b another cell; must not be null
-     * @return non-negative Chebyshev distance in cells
-     */
-    private static int chebyshevDistance(CellPos a, CellPos b) {
-        int dx = Math.abs(a.x() - b.x());
-        int dy = Math.abs(a.y() - b.y());
-        int dz = Math.abs(a.z() - b.z());
-        return Math.max(dx, Math.max(dy, dz));
+        lifecycle.discardPending();
     }
 
     /**
@@ -598,7 +498,7 @@ public final class PathingBehavior implements Behavior {
      * @param goal the mission goal; never null
      * @return anchor cell; never null
      */
-    private static CellPos anchorCell(Goal goal) {
+    static CellPos anchorCell(Goal goal) {
         if (goal instanceof GoalBlock b) {
             return b.target();
         }
