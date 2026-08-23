@@ -161,21 +161,21 @@ class CombatSkeletonGateTest {
      */
     @Test
     void edgeJitterBridgedByHoldButPermanentEscapeIsNot() {
-        Vec3[] pose = {new Vec3(0.5, 64, 0.5)};
+        Vec3[] position = {new Vec3(0.5, 64, 0.5)};
         CombatBehavior combat = new CombatBehavior("combat",
-            () -> pose[0]);
+            () -> position[0]);
         RecordingActor actor = new RecordingActor();
         Directive directive = fightOrder(new CellPos(2, 64, 0));
 
-        // Aim point sits at x=2.5, y=65: matching pose.y makes reach
-        // purely horizontal, so pose.x tunes it exactly.
+        // Aim point sits at x=2.5, y=65: matching position.y makes reach
+        // purely horizontal, so position.x tunes it exactly.
         // in-reach: x = 2.5 - 2.9 = -0.4; out: x = 2.5 - 3.15 = -0.65
         Vec3 inReach = new Vec3(-0.4, 64.0 + 1.0, 0.5);
         Vec3 outReach = new Vec3(-0.65, 64.0 + 1.0, 0.5);
 
         int swings = 0;
         for (int t = 0; t < 40; t++) {
-            pose[0] = (t % 10 < 2) ? inReach : outReach;
+            position[0] = (t % 10 < 2) ? inReach : outReach;
             int before = actor.submitted.size();
             combat.tick(emptyWorld(), directive, actor);
             boolean pressed = actor.submitted.subList(before,
@@ -362,9 +362,9 @@ class CombatSkeletonGateTest {
      */
     @Test
     void inReachAimsEveryTickAndSwingsOncePerWindow() {
-        Vec3[] pose = {new Vec3(0.5, 64, 0.5)};
+        Vec3[] position = {new Vec3(0.5, 64, 0.5)};
         CombatBehavior combat = new CombatBehavior("combat",
-            () -> pose[0]);
+            () -> position[0]);
         RecordingActor actor = new RecordingActor();
         Directive directive = fightOrder(new CellPos(2, 64, 0));
 
@@ -396,9 +396,9 @@ class CombatSkeletonGateTest {
     /** Out of reach the behavior keeps aiming but holds fire. */
     @Test
     void outOfReachHoldsFireWhileAiming() {
-        Vec3[] pose = {new Vec3(0.5, 64, 0.5)};
+        Vec3[] position = {new Vec3(0.5, 64, 0.5)};
         CombatBehavior combat = new CombatBehavior("combat",
-            () -> pose[0]);
+            () -> position[0]);
         RecordingActor actor = new RecordingActor();
         Directive directive = fightOrder(new CellPos(30, 64, 0));
 

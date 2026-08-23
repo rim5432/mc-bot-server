@@ -88,13 +88,13 @@ class LimboCharacterizationGateTest {
         MockWorldView world = floorTo(60);
         // Start at (0.5, 64, 0.5). Goal at (40, 64, 0). Plan adopted
         // after the first tick; the first remaining waypoint is
-        // around (1, 64, 0). The pose will sit at XZ=(0.5, 0.5)
+        // around (1, 64, 0). The position will sit at XZ=(0.5, 0.5)
         // (distance 0.707 from waypoint (1, 0)) - inside the
         // WAYPOINT_REACH band, so the waypoint is consumed
-        // quickly. We hold the pose XZ=0.5 and let Y fall.
-        Vec3[] pose = { new Vec3(0.5, 64, 0.5) };
+        // quickly. We hold the position XZ=0.5 and let Y fall.
+        Vec3[] position = { new Vec3(0.5, 64, 0.5) };
         PathingBehavior mover = new PathingBehavior("mover",
-            () -> pose[0], BasicMoves::from);
+            () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(40, 64, 0)));
@@ -113,8 +113,8 @@ class LimboCharacterizationGateTest {
         int stuckTick = -1;
         String stuckChannel = null;
         for (int i = 1; i <= 100; i++) {
-            pose[0] = new Vec3(pose[0].x(),
-                pose[0].y() - 0.3, pose[0].z());
+            position[0] = new Vec3(position[0].x(),
+                position[0].y() - 0.3, position[0].z());
             ExecutionReport r = mover.tick(world, directive, actor);
             boolean stuck =
                 r.status() == ExecutionReport.Status.STUCK
@@ -156,9 +156,9 @@ class LimboCharacterizationGateTest {
     @Test
     void restFiresStuckViaPlanProgressFuse() {
         MockWorldView world = floorTo(60);
-        Vec3[] pose = { new Vec3(0.5, 64, 0.5) };
+        Vec3[] position = { new Vec3(0.5, 64, 0.5) };
         PathingBehavior mover = new PathingBehavior("mover",
-            () -> pose[0], BasicMoves::from);
+            () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(40, 64, 0)));
@@ -167,7 +167,7 @@ class LimboCharacterizationGateTest {
         // progress (counter reset to 0).
         mover.tick(world, directive, actor);
 
-        // Hold pose still for 25 ticks. No plan-progress -> fuse
+        // Hold position still for 25 ticks. No plan-progress -> fuse
         // accumulates -> STUCK at i=20 in the loop.
         int stuckTick = -1;
         for (int i = 1; i <= 25; i++) {

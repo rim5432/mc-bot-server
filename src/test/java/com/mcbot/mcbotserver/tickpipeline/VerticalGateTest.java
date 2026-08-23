@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * is not declared STUCK while still in the air - the body cannot
  * be "frozen" while it is on a ballistic trajectory. The
  * landing-edge bypass then fires an immediate replan so the
- * post-landing pose is the basis for the next plan, not a stale
+ * post-landing position is the basis for the next plan, not a stale
  * pre-take-off plan.
  */
 class VerticalGateTest {
@@ -87,10 +87,10 @@ class VerticalGateTest {
     @Test
     void airborneTicksDoNotTripFuse() throws ReflectiveOperationException {
         MockWorldView world = floorTo(60);
-        Vec3[] pose = { new Vec3(0.5, 64, 0.5) };
+        Vec3[] position = { new Vec3(0.5, 64, 0.5) };
         // Always airborne.
         PathingBehavior mover = new PathingBehavior("mover",
-            () -> pose[0], () -> false, BasicMoves::from);
+            () -> position[0], () -> false, BasicMoves::from);
         RecordingActor actor = new RecordingActor();
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(40, 64, 0)));
@@ -110,8 +110,8 @@ class VerticalGateTest {
         int stuckTick = -1;
         String stuckChannel = null;
         for (int i = 1; i <= 30; i++) {
-            pose[0] = new Vec3(pose[0].x(),
-                pose[0].y() - 0.3, pose[0].z());
+            position[0] = new Vec3(position[0].x(),
+                position[0].y() - 0.3, position[0].z());
             ExecutionReport r = mover.tick(world, directive, actor);
             boolean stuck =
                 r.status() == ExecutionReport.Status.STUCK
@@ -155,10 +155,10 @@ class VerticalGateTest {
     void landingEdgeBypassesReplanCooldown()
         throws ReflectiveOperationException {
         MockWorldView world = floorTo(60);
-        Vec3[] pose = { new Vec3(0.5, 64, 0.5) };
+        Vec3[] position = { new Vec3(0.5, 64, 0.5) };
         boolean[] onGround = { true };
         PathingBehavior mover = new PathingBehavior("mover",
-            () -> pose[0], () -> onGround[0], BasicMoves::from);
+            () -> position[0], () -> onGround[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(40, 64, 0)));
@@ -172,18 +172,18 @@ class VerticalGateTest {
         // ticksSincePlan has advanced to 5 (still in cooldown of
         // REPLAN_COOLDOWN=10).
         for (int i = 1; i <= 5; i++) {
-            pose[0] = new Vec3(0.5 + i * 0.2, 64, 0.5);
+            position[0] = new Vec3(0.5 + i * 0.2, 64, 0.5);
             mover.tick(world, directive, actor);
         }
         assertEquals(5, readTicksSincePlan(mover),
             "5 ticks after first replan: ticksSincePlan should be 5, "
             + "in the REPLAN_COOLDOWN=10 window");
 
-        // Now jump sideways 5m from the current pose. The active
+        // Now jump sideways 5m from the current position. The active
         // waypoint is far behind; offPath is true. But
         // ticksSincePlan=5 < 10 so a normal-tick replan is blocked
         // by the cooldown.
-        pose[0] = new Vec3(pose[0].x() + 5, 64, pose[0].z());
+        position[0] = new Vec3(position[0].x() + 5, 64, position[0].z());
         mover.tick(world, directive, actor);
         // Verify: no replan fired (ticksSincePlan still 6, not 0).
         assertEquals(6, readTicksSincePlan(mover),
@@ -229,10 +229,10 @@ class VerticalGateTest {
     void steadyGroundedStillFiresFuseAt20()
         throws ReflectiveOperationException {
         MockWorldView world = floorTo(60);
-        Vec3[] pose = { new Vec3(0.5, 64, 0.5) };
+        Vec3[] position = { new Vec3(0.5, 64, 0.5) };
         // Always grounded (same default as the 3-arg constructor).
         PathingBehavior mover = new PathingBehavior("mover",
-            () -> pose[0], () -> true, BasicMoves::from);
+            () -> position[0], () -> true, BasicMoves::from);
         RecordingActor actor = new RecordingActor();
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(40, 64, 0)));
@@ -240,7 +240,7 @@ class VerticalGateTest {
         // First tick: plan adopted.
         mover.tick(world, directive, actor);
 
-        // Hold pose still for 25 ticks. No plan-progress -> fuse
+        // Hold position still for 25 ticks. No plan-progress -> fuse
         // accumulates -> STUCK within the 21-tick bound (K=20
         // + first-observation +1 offset, see issue 0001 §7).
         int stuckTick = -1;
@@ -278,9 +278,9 @@ class VerticalGateTest {
     void alwaysAirborneIsolatesTriggerEvaluation()
         throws ReflectiveOperationException {
         MockWorldView world = floorTo(60);
-        Vec3[] pose = { new Vec3(0.5, 64, 0.5) };
+        Vec3[] position = { new Vec3(0.5, 64, 0.5) };
         PathingBehavior mover = new PathingBehavior("mover",
-            () -> pose[0], () -> false, BasicMoves::from);
+            () -> position[0], () -> false, BasicMoves::from);
         RecordingActor actor = new RecordingActor();
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(40, 64, 0)));
@@ -292,8 +292,8 @@ class VerticalGateTest {
         // resetting to 0 (which is what a successful replan
         // request would do).
         for (int i = 0; i < 50; i++) {
-            pose[0] = new Vec3(pose[0].x(),
-                pose[0].y() - 0.3, pose[0].z());
+            position[0] = new Vec3(position[0].x(),
+                position[0].y() - 0.3, position[0].z());
             mover.tick(world, directive, actor);
         }
         assertEquals(0, readTicksSincePlanProgress(mover),

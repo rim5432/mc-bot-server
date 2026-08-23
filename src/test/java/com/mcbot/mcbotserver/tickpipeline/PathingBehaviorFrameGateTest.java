@@ -88,17 +88,17 @@ class PathingBehaviorFrameGateTest {
     @Test
     void stuckEpsilonIs3DEuclidean() throws ReflectiveOperationException {
         MockWorldView world = floorTo(60);
-        Vec3[] pose = { new Vec3(0.5, 64, 0.5) };
+        Vec3[] position = { new Vec3(0.5, 64, 0.5) };
         PathingBehavior mover = new PathingBehavior("mover",
-            () -> pose[0], BasicMoves::from);
+            () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(40, 64, 0)));
 
         // Walk forward 5 ticks so we have an active waypoint and
-        // the first progress pose is recorded.
+        // the first progress position is recorded.
         for (int i = 1; i <= 5; i++) {
-            pose[0] = new Vec3(0.5 + i * 0.2, 64, 0.5);
+            position[0] = new Vec3(0.5 + i * 0.2, 64, 0.5);
             mover.tick(world, directive, actor);
         }
 
@@ -108,8 +108,8 @@ class PathingBehaviorFrameGateTest {
         // see 0 m/tick XZ and accumulate.
         boolean stuckFired = false;
         for (int i = 1; i <= 25; i++) {
-            pose[0] = new Vec3(pose[0].x(),
-                pose[0].y() + 0.05, pose[0].z());
+            position[0] = new Vec3(position[0].x(),
+                position[0].y() + 0.05, position[0].z());
             ExecutionReport r = mover.tick(world, directive, actor);
             if (r.status() == ExecutionReport.Status.FAILED
                 && "STUCK".equals(r.reason())) {
@@ -123,19 +123,19 @@ class PathingBehaviorFrameGateTest {
     }
 
     /**
-     * WAYPOINT_REACH is XZ only: a pose whose XZ is within the
+     * WAYPOINT_REACH is XZ only: a position whose XZ is within the
      * reach but whose Y is 100 above the waypoint still consumes
      * the waypoint on the next tick (OR semantics, see issue 0001
-     * §2). If a future change makes the reach 3D, the same pose
+     * §2). If a future change makes the reach 3D, the same position
      * would NOT consume the waypoint (Y diff >> 0.8) and the
      * waypointIndex would stay at the previous value.
      */
     @Test
     void waypointReachIgnoresY() throws ReflectiveOperationException {
         MockWorldView world = floorTo(60);
-        Vec3[] pose = { new Vec3(0.5, 64, 0.5) };
+        Vec3[] position = { new Vec3(0.5, 64, 0.5) };
         PathingBehavior mover = new PathingBehavior("mover",
-            () -> pose[0], BasicMoves::from);
+            () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(40, 64, 0)));
@@ -148,11 +148,11 @@ class PathingBehaviorFrameGateTest {
         assertTrue(waypoints.size() > 1, "plan must have waypoints");
         assertEquals(1, indexBefore, "waypointIndex starts at 1 after plan adoption");
 
-        // Place the pose at XZ within 0.8 of the current waypoint
+        // Place the position at XZ within 0.8 of the current waypoint
         // but Y 100 above. With OR semantics the waypoint must be
         // consumed.
         CellPos next = waypoints.get(indexBefore);
-        pose[0] = new Vec3(next.x() + 0.5, 164, next.z() + 0.5);
+        position[0] = new Vec3(next.x() + 0.5, 164, next.z() + 0.5);
         mover.tick(world, directive, actor);
 
         int indexAfter = readWaypointIndex(mover);
@@ -163,7 +163,7 @@ class PathingBehaviorFrameGateTest {
     }
 
     /**
-     * REPLAN_DISTANCE is XZ only: a pose that has drifted 5 cells
+     * REPLAN_DISTANCE is XZ only: a position that has drifted 5 cells
      * straight up (Y) but stays in the same XZ as the active
      * waypoint does NOT trigger an offPath replan. The drift
      * signal is horizontal-only; Y drift is intentionally outside
@@ -172,16 +172,16 @@ class PathingBehaviorFrameGateTest {
     @Test
     void replanDistanceIgnoresY() throws ReflectiveOperationException {
         MockWorldView world = floorTo(60);
-        Vec3[] pose = { new Vec3(0.5, 64, 0.5) };
+        Vec3[] position = { new Vec3(0.5, 64, 0.5) };
         PathingBehavior mover = new PathingBehavior("mover",
-            () -> pose[0], BasicMoves::from);
+            () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(40, 64, 0)));
 
         // Walk to midpoint, adopt plan.
         for (int i = 1; i <= 10; i++) {
-            pose[0] = new Vec3(0.5 + i * 0.2, 64, 0.5);
+            position[0] = new Vec3(0.5 + i * 0.2, 64, 0.5);
             mover.tick(world, directive, actor);
         }
 
@@ -193,7 +193,7 @@ class PathingBehaviorFrameGateTest {
         // (Y=5 > REPLAN_DISTANCE if the check were 3D; under the
         // XZ-only check the drift is 0 and offPath is false.)
         int indexBefore = readWaypointIndex(mover);
-        pose[0] = new Vec3(pose[0].x(), 69, pose[0].z());
+        position[0] = new Vec3(position[0].x(), 69, position[0].z());
         mover.tick(world, directive, actor);
         int indexAfter = readWaypointIndex(mover);
 

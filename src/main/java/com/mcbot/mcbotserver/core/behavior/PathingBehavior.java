@@ -62,7 +62,7 @@ import java.util.concurrent.CompletableFuture;
  * landing cell, and re-evaluating mid-flight burns cooldown slots
  * on snapshots the freshness check will discard. The landing edge
  * ({@code onGround} transitions false -&gt; true) bypasses the
- * replan cooldown: the moment of contact is when the new pose first
+ * replan cooldown: the moment of contact is when the new position first
  * matters, and a stale plan from before take-off must be replaced
  * immediately rather than after the cooldown elapses.
  *
@@ -106,7 +106,7 @@ public final class PathingBehavior implements Behavior {
      * Horizontal reach that counts as "waypoint touched", in metres.
      * Frame: XZ only (`Math.hypot(dx, dz)` in
      * {@link #advanceReachedWaypoints} and {@link #distanceToWaypoint}).
-     * Y is intentionally ignored - a pose directly above a waypoint
+     * Y is intentionally ignored - a position directly above a waypoint
      * is treated as "not at the waypoint" for reach purposes; the
      * goal predicate is the 3D cell-equality authority for arrival.
      */
@@ -148,7 +148,7 @@ public final class PathingBehavior implements Behavior {
     public static final int FRESHNESS_CELLS = 1;
 
     private final String name;
-    private final PoseSource poseSource;
+    private final PositionSource positionSource;
     private final OnGroundSource onGroundSource;
     private final MoveGraph graph;
     private final PlanWorker worker;
@@ -186,12 +186,12 @@ public final class PathingBehavior implements Behavior {
      * reads zero while a slowly accelerating body crosses its own cell.
      */
     @FunctionalInterface
-    public interface PoseSource {
+    public interface PositionSource {
 
         /**
          * Current body position in world doubles.
          *
-         * @return the pose; never null
+         * @return the position; never null
          */
         Vec3 get();
     }
@@ -205,7 +205,7 @@ public final class PathingBehavior implements Behavior {
      * <p>For real entities the wiring is {@code () -> body.onGround()};
      * for offline tests the two-argument and three-argument
      * constructors use {@code () -> true} (always grounded), which
-     * is correct because the rig's pose is stationary.
+     * is correct because the rig's position is stationary.
      */
     @FunctionalInterface
     public interface OnGroundSource {
@@ -226,12 +226,12 @@ public final class PathingBehavior implements Behavior {
      *
      * @param name       stable identity for claims and diagnostics;
      *                   never null or blank
-     * @param poseSource body position accessor; never null
+     * @param positionSource body position accessor; never null
      * @param graph      edge supplier for planning; never null
      */
-    public PathingBehavior(String name, PoseSource poseSource,
+    public PathingBehavior(String name, PositionSource positionSource,
                            MoveGraph graph) {
-        this(name, poseSource, () -> true, graph, null);
+        this(name, positionSource, () -> true, graph, null);
     }
 
     /**
@@ -242,13 +242,13 @@ public final class PathingBehavior implements Behavior {
      *
      * @param name       stable identity for claims and diagnostics;
      *                   never null or blank
-     * @param poseSource body position accessor; never null
+     * @param positionSource body position accessor; never null
      * @param graph      edge supplier for planning; never null
      * @param worker     search executor; never null
      */
-    public PathingBehavior(String name, PoseSource poseSource,
+    public PathingBehavior(String name, PositionSource positionSource,
                            MoveGraph graph, PlanWorker worker) {
-        this(name, poseSource, () -> true, graph, worker);
+        this(name, positionSource, () -> true, graph, worker);
     }
 
     /**
@@ -259,14 +259,14 @@ public final class PathingBehavior implements Behavior {
      *
      * @param name            stable identity for claims and
      *                        diagnostics; never null or blank
-     * @param poseSource      body position accessor; never null
+     * @param positionSource      body position accessor; never null
      * @param onGroundSource  body contact-state accessor; never null
      * @param graph           edge supplier for planning; never null
      */
-    public PathingBehavior(String name, PoseSource poseSource,
+    public PathingBehavior(String name, PositionSource positionSource,
                            OnGroundSource onGroundSource,
                            MoveGraph graph) {
-        this(name, poseSource, onGroundSource, graph, null);
+        this(name, positionSource, onGroundSource, graph, null);
     }
 
     /**
@@ -278,19 +278,19 @@ public final class PathingBehavior implements Behavior {
      *
      * @param name            stable identity for claims and
      *                        diagnostics; never null or blank
-     * @param poseSource      body position accessor; never null
+     * @param positionSource      body position accessor; never null
      * @param onGroundSource  body contact-state accessor; never null
      * @param graph           edge supplier for planning; never null
      * @param worker          search executor; never null
      */
-    public PathingBehavior(String name, PoseSource poseSource,
+    public PathingBehavior(String name, PositionSource positionSource,
                            OnGroundSource onGroundSource,
                            MoveGraph graph, PlanWorker worker) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("name must not be blank");
         }
         this.name = name;
-        this.poseSource = poseSource;
+        this.positionSource = positionSource;
         this.onGroundSource = onGroundSource;
         this.graph = graph;
         // Null is the deliberate synchronous-planning mode used by
@@ -310,14 +310,14 @@ public final class PathingBehavior implements Behavior {
         if (directive == null) {
             return ExecutionReport.running();
         }
-        Vec3 pose = poseSource.get();
+        Vec3 position = positionSource.get();
         ticksSincePlan++;
         ticksSinceAdoption++;
 
         // Vertical gate (issue 0001 fix 6). Replan triggers fire only
         // while the body is in ground contact; the landing edge
         // (false -> true) bypasses the replan cooldown so the
-        // post-landing pose is the basis for the next plan, not a
+        // post-landing position is the basis for the next plan, not a
         // stale pre-take-off plan. Mid-air ticks still steer toward
         // the current waypoint (the bot moves through the air on
         // its trajectory), but they do not score progress, do not
@@ -329,7 +329,7 @@ public final class PathingBehavior implements Behavior {
         wasOnGround = onGround;
         boolean evaluateTriggers = onGround || landing;
 
-        CellPos cell = floorOf(pose);
+        CellPos cell = floorOf(position);
         if (directive.goal().isInGoal(cell)) {
             resetPlan();
             return ExecutionReport.success();
@@ -355,7 +355,7 @@ public final class PathingBehavior implements Behavior {
             // "moving but not progressing" case (limbo body in
             // free fall - large per-tick 3D displacement, zero
             // waypoint-progress).
-            if (updatePlanProgress(pose, directive.goal())) {
+            if (updatePlanProgress(position, directive.goal())) {
                 ticksSincePlanProgress = 0;
                 stuckLatched = false;
             } else {
@@ -365,12 +365,12 @@ public final class PathingBehavior implements Behavior {
             boolean fuseCondition = !stuckLatched
                 && ticksSincePlanProgress >= STUCK_WINDOW;
             boolean offPath = waypointIndex < waypoints.size()
-                && distanceToWaypoint(pose,
+                && distanceToWaypoint(position,
                     waypoints.get(waypointIndex)) > REPLAN_DISTANCE;
             boolean exhausted = waypointIndex >= waypoints.size();
 
             // Replan cooldown bypassed on the landing edge: contact
-            // is the first tick the body's pose is meaningful for
+            // is the first tick the body's position is meaningful for
             // pathing, and a stale plan from before take-off must
             // be replaced immediately rather than after the
             // cooldown elapses.
@@ -412,11 +412,11 @@ public final class PathingBehavior implements Behavior {
             }
         }
 
-        advanceReachedWaypoints(pose);
+        advanceReachedWaypoints(position);
         if (waypointIndex >= waypoints.size()) {
             return ExecutionReport.running();
         }
-        steerTowardCurrentWaypoint(pose, actor);
+        steerTowardCurrentWaypoint(position, actor);
         return ExecutionReport.running();
     }
 
@@ -442,7 +442,7 @@ public final class PathingBehavior implements Behavior {
 
     /**
      * Consume a finished off-thread search. Freshness is decided
-     * against the CURRENT directive and pose: a plan for an abandoned
+     * against the CURRENT directive and position: a plan for an abandoned
      * goal or from a cell we have left is stale and discarded whole -
      * adopting it would steer toward where we no longer want to go.
      */
@@ -575,13 +575,13 @@ public final class PathingBehavior implements Behavior {
      * method must be revisited (criterion 3 reverts to
      * arclength-style polyline projection per Path B).
      *
-     * @param pose the body's current pose; never null
+     * @param position the body's current position; never null
      * @param goal the directive's goal; never null
      * @return true iff at least one criterion fired
      */
-    private boolean updatePlanProgress(Vec3 pose, Goal goal) {
+    private boolean updatePlanProgress(Vec3 position, Goal goal) {
         CellPos goalCell = anchorCell(goal);
-        double goalDist = pose.distanceTo(goalCell.x() + 0.5,
+        double goalDist = position.distanceTo(goalCell.x() + 0.5,
             goalCell.y() + 0.5, goalCell.z() + 0.5);
 
         boolean p1 = waypointIndex > lastWaypointIndex;
@@ -600,7 +600,7 @@ public final class PathingBehavior implements Behavior {
             // (ClimbUp, Drop) are real progress the latched min must
             // capture (issue 0001 Ruling a).
             CellPos wp = waypoints.get(waypointIndex);
-            double wpDist = pose.distanceTo(wp.x() + 0.5,
+            double wpDist = position.distanceTo(wp.x() + 0.5,
                 wp.y() + 0.5, wp.z() + 0.5);
             p3 = wpDist < lastWaypoint3DDistance - STUCK_EPSILON;
             if (p3) {
@@ -645,7 +645,7 @@ public final class PathingBehavior implements Behavior {
      * null-bridges per field. The map keys are stable strings; the
      * caller copies them into a {@code BotEvent} attrs map.
      *
-     * @param pose     the body's current pose (sampled by the caller
+     * @param position     the body's current position (sampled by the caller
      *                 in the same tick); never null
      * @param goalCell the active goal cell (sampled by the caller
      *                 from the directive); may be null if no
@@ -654,10 +654,10 @@ public final class PathingBehavior implements Behavior {
      *         never null
      */
     public Map<String, String> keepaliveAttrs(
-        Vec3 pose, CellPos goalCell) {
+        Vec3 position, CellPos goalCell) {
         Map<String, String> attrs =
             new LinkedHashMap<>();
-        attrs.put("pose", pose.x() + "," + pose.y() + "," + pose.z());
+        attrs.put("pose", position.x() + "," + position.y() + "," + position.z());
         attrs.put("waypointIndex", String.valueOf(waypointIndex));
         attrs.put("waypointsTotal", String.valueOf(waypoints.size()));
         // Renamed from "ticksSinceProgress" in PR-2. The field
@@ -677,12 +677,12 @@ public final class PathingBehavior implements Behavior {
         return attrs;
     }
 
-    private void advanceReachedWaypoints(Vec3 pose) {
+    private void advanceReachedWaypoints(Vec3 position) {
         while (waypointIndex < waypoints.size()) {
             CellPos wp = waypoints.get(waypointIndex);
-            boolean sameCell = floorOf(pose).equals(wp);
+            boolean sameCell = floorOf(position).equals(wp);
             double horizontal = Math.hypot(
-                pose.x() - (wp.x() + 0.5), pose.z() - (wp.z() + 0.5));
+                position.x() - (wp.x() + 0.5), position.z() - (wp.z() + 0.5));
             if (sameCell || horizontal <= WAYPOINT_REACH) {
                 waypointIndex++;
             } else {
@@ -691,16 +691,16 @@ public final class PathingBehavior implements Behavior {
         }
     }
 
-    private double distanceToWaypoint(Vec3 pose, CellPos wp) {
-        return Math.hypot(pose.x() - (wp.x() + 0.5),
-            pose.z() - (wp.z() + 0.5));
+    private double distanceToWaypoint(Vec3 position, CellPos wp) {
+        return Math.hypot(position.x() - (wp.x() + 0.5),
+            position.z() - (wp.z() + 0.5));
     }
 
-    private void steerTowardCurrentWaypoint(Vec3 pose, Actor actor) {
+    private void steerTowardCurrentWaypoint(Vec3 position, Actor actor) {
         CellPos wp = waypoints.get(Math.min(waypointIndex,
             waypoints.size() - 1));
-        double dx = wp.x() + 0.5 - pose.x();
-        double dz = wp.z() + 0.5 - pose.z();
+        double dx = wp.x() + 0.5 - position.x();
+        double dz = wp.z() + 0.5 - position.z();
         float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
         actor.submit(new Claim(Channel.MOVE, 10, name,
             new Intent.Move(1.0, 0, false, false)));
@@ -708,9 +708,9 @@ public final class PathingBehavior implements Behavior {
             new Intent.Look(yaw, 0f)));
     }
 
-    private static CellPos floorOf(Vec3 pose) {
-        return new CellPos((int) Math.floor(pose.x()),
-            (int) Math.floor(pose.y()), (int) Math.floor(pose.z()));
+    private static CellPos floorOf(Vec3 position) {
+        return new CellPos((int) Math.floor(position.x()),
+            (int) Math.floor(position.y()), (int) Math.floor(position.z()));
     }
 
     /**

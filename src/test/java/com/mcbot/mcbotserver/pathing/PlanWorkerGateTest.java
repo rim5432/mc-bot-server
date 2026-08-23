@@ -90,9 +90,9 @@ class PlanWorkerGateTest {
     @Test
     void asyncPlanAdoptsAndSteersWithoutFalseNoPath()
             throws Exception {
-        Vec3[] pose = {new Vec3(0.5, 64, 0.5)};
+        Vec3[] position = {new Vec3(0.5, 64, 0.5)};
         PathingBehavior mover = new PathingBehavior("mover",
-            () -> pose[0], BasicMoves::from, worker);
+            () -> position[0], BasicMoves::from, worker);
         RecordingActor actor = new RecordingActor();
         WorldView world = floorTo(60);
         Directive directive = Directive.of(
@@ -121,9 +121,9 @@ class PlanWorkerGateTest {
      */
     @Test
     void staleResultForAbandonedGoalIsDiscarded() throws Exception {
-        Vec3[] pose = {new Vec3(0.5, 64, 0.5)};
+        Vec3[] position = {new Vec3(0.5, 64, 0.5)};
         PathingBehavior mover = new PathingBehavior("mover",
-            () -> pose[0], BasicMoves::from, worker);
+            () -> position[0], BasicMoves::from, worker);
         RecordingActor actor = new RecordingActor();
         WorldView world = floorTo(60);
         Directive oldGoal = Directive.of(

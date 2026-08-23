@@ -146,7 +146,7 @@ proposed in earlier review iterations and are wrong:
 | 3 | Physicalised shove test | rewrite `recoversWhenShoved`, add 3-4 new tests | whether the gametest harness can run vanilla physics ticks for free |
 | 4 | Fuse quantity: motion -> plan-progress | rewrite progress-check block at `PathingBehavior.java:169-176`; new `planProgressScore(pose, waypoints, goal)`; redefine `STUCK_EPSILON` semantic (0.01 m cannot be reused — the new threshold is in score units) | (a) the three OR criteria for plan-progress (§Ruling a); (b) subsumption argument for deleting motion detection and the `lastProgressPose` field, included in PR description so reviewers do not re-litigate |
 | 5 | Freshness ±1 cell tolerance | 1 equality to Chebyshev-distance + 1 test | Chebyshev vs Euclidean; tolerance value |
-| 6 | Vertical gate (only evaluate offPath/fuse when `onGround`; landing edge fires one immediate evaluation) | new `PathingBehavior.OnGroundSource` functional interface (`boolean isOnGround()`), 4-constructor overload set (5-arg primary, 4-/3-/2-arg delegators that wire `() -> true` for default-grounded offline tests), `wasOnGround` field, `tick` gate wrap; `McBotServer` and `BotSliceGameTests` pass `() -> body.onGround()` | resolved: a separate `OnGroundSource` interface (boolean) was cleaner than overloading `PoseSource` (Vec3) and avoided test-file churn (3-arg form keeps the `() -> true` default for offline rigs) |
+| 6 | Vertical gate (only evaluate offPath/fuse when `onGround`; landing edge fires one immediate evaluation) | new `PathingBehavior.OnGroundSource` functional interface (`boolean isOnGround()`), 4-constructor overload set (5-arg primary, 4-/3-/2-arg delegators that wire `() -> true` for default-grounded offline tests), `wasOnGround` field, `tick` gate wrap; `McBotServer` and `BotSliceGameTests` pass `() -> body.onGround()` | resolved: a separate `OnGroundSource` interface (boolean) was cleaner than overloading `PositionSource` (Vec3) and avoided test-file churn (3-arg form keeps the `() -> true` default for offline rigs) |
 
 ### Ruling (a) — plan-progress score (Path A: per-cell + move-at-waypoint)
 
@@ -434,7 +434,7 @@ firing (and from being wasted) while the body is in the air.
 PR-4 implementation notes (for reviewers):
 
 - `OnGroundSource` is a separate `boolean`-returning functional
-  interface nested in `PathingBehavior`; `PoseSource` (Vec3)
+  interface nested in `PathingBehavior`; `PositionSource` (Vec3)
   stays unchanged so the contract surface is minimally
   enlarged. The 2-arg and 3-arg constructors wire
   `() -> true` (always grounded), preserving the test rig's

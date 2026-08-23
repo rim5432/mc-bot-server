@@ -61,7 +61,7 @@ public final class CombatBehavior implements Behavior {
     public static final int AIM_HOLD_TICKS = 3;
 
     private final String name;
-    private final PoseSource poseSource;
+    private final PositionSource positionSource;
     private int ticksSinceSwing = ATTACK_COOLDOWN_TICKS;
     // Starts EXPIRED: a target that has never been in reach earns no
     // hold memory - only an actual in-reach sighting opens the window.
@@ -73,29 +73,29 @@ public final class CombatBehavior implements Behavior {
      * Fine-grained body position, same shape as the pathing mover's.
      */
     @FunctionalInterface
-    public interface PoseSource {
+    public interface PositionSource {
 
         /**
          * Current body position in world doubles.
          *
-         * @return the pose; never null
+         * @return the position; never null
          */
         Vec3 get();
     }
 
     /**
-     * Creates a combat behavior over one body pose source.
+     * Creates a combat behavior over one body position source.
      *
      * @param name       stable identity for claims; never null or blank
-     * @param poseSource body position accessor; never null
+     * @param positionSource body position accessor; never null
      */
-    public CombatBehavior(String name, PoseSource poseSource) {
+    public CombatBehavior(String name, PositionSource positionSource) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("name must not be blank");
         }
         this.name = name;
-        this.poseSource = Objects.requireNonNull(poseSource,
-            "poseSource");
+        this.positionSource = Objects.requireNonNull(positionSource,
+            "positionSource");
     }
 
     @Override
@@ -111,15 +111,15 @@ public final class CombatBehavior implements Behavior {
             return ExecutionReport.running();
         }
 
-        Vec3 pose = poseSource.get();
+        Vec3 position = positionSource.get();
         CellPos aimCell = aimPointOf(directive.goal());
         double tx = aimCell.x() + 0.5;
         double ty = aimCell.y() + 1.0;
         double tz = aimCell.z() + 0.5;
 
-        double dx = tx - pose.x();
-        double dy = ty - pose.y();
-        double dz = tz - pose.z();
+        double dx = tx - position.x();
+        double dy = ty - position.y();
+        double dz = tz - position.z();
 
         // Aim degeneracy guard: when standing on top of the target,
         // horizontal direction is noise and the computed yaw flips

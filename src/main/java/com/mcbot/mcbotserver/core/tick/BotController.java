@@ -41,7 +41,7 @@ import java.util.LinkedHashMap;
  * degraded mode; reset vs respawn recovery asymmetry). Reordering the
  * stages is a boundary violation.
  *
- * <p>Body facts (pose, health, clock, lava flag) arrive through
+ * <p>Body facts (position, health, clock, lava flag) arrive through
  * constructor-injected accessors — the controller never imports engine
  * types, and the Stage 1 adapter is their only production supplier.
  *
@@ -54,12 +54,12 @@ public final class BotController {
 
     /** Body-position accessor. */
     @FunctionalInterface
-    public interface PoseSource {
+    public interface PositionSource {
 
         /**
          * Current block cell of the body.
          *
-         * @return the pose; never null
+         * @return the position; never null
          */
         CellPos get();
     }
@@ -98,7 +98,7 @@ public final class BotController {
     private final TaskArbiter arbiter;
     private final List<Behavior> behaviors;
     private final Actor actor;
-    private final PoseSource poseSource;
+    private final PositionSource positionSource;
     private final HealthSource healthSource;
     private final GameClock clock;
     private final EventQueue events;
@@ -128,7 +128,7 @@ public final class BotController {
      * @param arbiter       task-channel winner selector; never null
      * @param behaviors     execution tier; never null, may be empty
      * @param actor         claim surface; never null
-     * @param poseSource    body position accessor; never null
+     * @param positionSource    body position accessor; never null
      * @param healthSource  body health accessor; never null
      * @param clock         game-time accessor; never null
      * @param events        event stream for the primary crash channel;
@@ -137,14 +137,14 @@ public final class BotController {
      */
     public BotController(SurvivalReflexLayer reflex, TaskArbiter arbiter,
                          List<Behavior> behaviors, Actor actor,
-                         PoseSource poseSource, HealthSource healthSource,
+                         PositionSource positionSource, HealthSource healthSource,
                          GameClock clock, EventQueue events,
                          CrashReporter crashReporter) {
         this.reflex = Objects.requireNonNull(reflex, "reflex");
         this.arbiter = Objects.requireNonNull(arbiter, "arbiter");
         this.behaviors = List.copyOf(behaviors);
         this.actor = Objects.requireNonNull(actor, "actor");
-        this.poseSource = Objects.requireNonNull(poseSource, "poseSource");
+        this.positionSource = Objects.requireNonNull(positionSource, "positionSource");
         this.healthSource =
             Objects.requireNonNull(healthSource, "healthSource");
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -258,17 +258,17 @@ public final class BotController {
     }
 
     private void runPipeline(WorldView world) {
-        CellPos pose = poseSource.get();
+        CellPos position = positionSource.get();
         float health = healthSource.get();
         long day = clock.day();
         long tod = clock.timeOfDayTicks();
 
         // Stage 1: reflex bypass — non-null decision skips the mission.
         var decision = reflex.tick(world, tickCounter, day, tod,
-            pose, health);
+            position, health);
         if (decision != null) {
             InterruptionContext ctx = new InterruptionContext(tickCounter,
-                pose, activeName(), "reflex-preempt:" + decision.ruleName(),
+                position, activeName(), "reflex-preempt:" + decision.ruleName(),
                 "");
             String pausedTask = activeName();
             var result = arbiter.forcePauseAll(ctx);
@@ -335,7 +335,7 @@ public final class BotController {
         // state pushed to the event stream. Issue 0001 fix 2.
         if (++ticksSinceKeepalive >= KEEPALIVE_INTERVAL) {
             ticksSinceKeepalive = 0;
-            emitKeepalive(pose, directive, day, tod);
+            emitKeepalive(position, directive, day, tod);
         }
     }
 
@@ -345,10 +345,10 @@ public final class BotController {
      * (v1 has at most one; if more plan reporters are added later,
      * extract a small interface and merge their snapshots here).
      */
-    private void emitKeepalive(CellPos pose, Directive directive,
+    private void emitKeepalive(CellPos position, Directive directive,
                                long day, long tod) {
         CellPos goalCell = goalCellOf(directive);
-        Vec3 poseD = new Vec3(pose.x(), pose.y(), pose.z());
+        Vec3 poseD = new Vec3(position.x(), position.y(), position.z());
         for (Behavior b : behaviors) {
             if (b instanceof PathingBehavior pb) {
                 Map<String, String> attrs = pb.keepaliveAttrs(
@@ -448,16 +448,16 @@ public final class BotController {
     private void handleCrash(RuntimeException e) {
         crashed = true;
         crashCounter++;
-        CellPos pose;
+        CellPos position;
         try {
-            pose = poseSource.get();
+            position = positionSource.get();
         } catch (RuntimeException poseFailure) {
-            pose = new CellPos(0, -64, 0);
+            position = new CellPos(0, -64, 0);
         }
         StringWriter stack = new StringWriter();
         e.printStackTrace(new PrintWriter(stack));
         InterruptionContext ctx = new InterruptionContext(tickCounter,
-            pose, activeName(),
+            position, activeName(),
             e.getClass().getSimpleName() + ":" + e.getMessage(),
             stack.toString());
 

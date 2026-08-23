@@ -84,7 +84,7 @@ public final class DefendProcess implements BotProcess, TerminalMission {
     private final String taskId;
     private final int priority;
     private final long timeoutTicks;
-    private final Supplier<CellPos> poseSource;
+    private final Supplier<CellPos> positionSource;
     private final Set<String> hostileTypes;
     private final Set<String> rangedTypes;
     private String lastRefusedType;
@@ -104,15 +104,15 @@ public final class DefendProcess implements BotProcess, TerminalMission {
      * @param taskId       boundary-D task id for tracing; never null
      * @param priority     band-legal priority per PriorityBands
      * @param timeoutTicks tick budget; positive
-     * @param poseSource   body cell accessor; never null
+     * @param positionSource   body cell accessor; never null
      * @param hostileTypes entity types worth engaging; never null,
      *                     may be empty (then the mission completes at
      *                     once)
      */
     public DefendProcess(String taskId, int priority, long timeoutTicks,
-                         Supplier<CellPos> poseSource,
+                         Supplier<CellPos> positionSource,
                          Set<String> hostileTypes) {
-        this(taskId, priority, timeoutTicks, poseSource, hostileTypes,
+        this(taskId, priority, timeoutTicks, positionSource, hostileTypes,
             Set.of());
     }
 
@@ -122,14 +122,14 @@ public final class DefendProcess implements BotProcess, TerminalMission {
      * @param taskId       boundary-D task id for tracing; never null
      * @param priority     band-legal priority per PriorityBands
      * @param timeoutTicks tick budget; positive
-     * @param poseSource   body cell accessor; never null
+     * @param positionSource   body cell accessor; never null
      * @param hostileTypes entity types worth engaging; never null
      * @param rangedTypes  hostile types whose tactics defeat melee -
      *                     these are REFUSED at engage time instead of
      *                     chased; never null
      */
     public DefendProcess(String taskId, int priority, long timeoutTicks,
-                         Supplier<CellPos> poseSource,
+                         Supplier<CellPos> positionSource,
                          Set<String> hostileTypes,
                          Set<String> rangedTypes) {
         if (taskId == null || taskId.isBlank()) {
@@ -142,8 +142,8 @@ public final class DefendProcess implements BotProcess, TerminalMission {
         this.taskId = taskId;
         this.priority = priority;
         this.timeoutTicks = timeoutTicks;
-        this.poseSource = Objects.requireNonNull(poseSource,
-            "poseSource");
+        this.positionSource = Objects.requireNonNull(positionSource,
+            "positionSource");
         this.hostileTypes = Set.copyOf(Objects.requireNonNull(
             hostileTypes, "hostileTypes"));
         this.rangedTypes = Set.copyOf(Objects.requireNonNull(
@@ -171,8 +171,8 @@ public final class DefendProcess implements BotProcess, TerminalMission {
             return lastDirective;
         }
 
-        CellPos pose = poseSource.get();
-        EntitySnapshot nearest = nearestHostile(world, pose);
+        CellPos position = positionSource.get();
+        EntitySnapshot nearest = nearestHostile(world, position);
         if (!engaged()) {
             if (nearest == null) {
                 // Nothing to defend against: the mission's purpose is
@@ -190,17 +190,17 @@ public final class DefendProcess implements BotProcess, TerminalMission {
                 return lastDirective;
             }
             engage(nearest);
-            return directiveFor(pose);
+            return directiveFor(position);
         }
 
         if (nearest != null && nearest.id().equals(targetId)) {
             ticksSinceSeen = 0;
             targetCell = nearest.pos();
-            if (pose.distanceTo(targetCell) > LEASH_RADIUS) {
+            if (position.distanceTo(targetCell) > LEASH_RADIUS) {
                 fail(REASON_LOST);
                 return lastDirective;
             }
-            return directiveFor(pose);
+            return directiveFor(position);
         }
 
         // Target not re-seen this tick: grace, then declare it down.
@@ -215,7 +215,7 @@ public final class DefendProcess implements BotProcess, TerminalMission {
             succeed();
             return lastDirective;
         }
-        return directiveFor(pose);
+        return directiveFor(position);
     }
 
     @Override

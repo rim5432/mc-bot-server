@@ -78,9 +78,9 @@ class AdoptFreshnessGateTest {
      */
     @Test
     void oneCellDriftDuringSearchIsAdopted() throws Exception {
-        Vec3[] pose = { new Vec3(0.5, 64, 0.5) };
+        Vec3[] position = { new Vec3(0.5, 64, 0.5) };
         PathingBehavior mover = new PathingBehavior("mover",
-            () -> pose[0], BasicMoves::from, worker);
+            () -> position[0], BasicMoves::from, worker);
         WorldView world = floorTo(60);
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(40, 64, 0)));
@@ -93,7 +93,7 @@ class AdoptFreshnessGateTest {
         // search. This is the scenario the old cell-equality
         // check silently broke: a 0.215 b/tick walk x 5 ticks
         // (typical A* duration) crosses 1 cell.
-        pose[0] = new Vec3(1.5, 64, 0.5);
+        position[0] = new Vec3(1.5, 64, 0.5);
 
         // Wait for the search to complete (PlanWorker is async
         // on a single daemon thread, so the future finishes out
@@ -175,9 +175,9 @@ class AdoptFreshnessGateTest {
      */
     @Test
     void oneCellVerticalDriftDuringSearchIsAdopted() throws Exception {
-        Vec3[] pose = { new Vec3(0.5, 64, 0.5) };
+        Vec3[] position = { new Vec3(0.5, 64, 0.5) };
         PathingBehavior mover = new PathingBehavior("mover",
-            () -> pose[0], BasicMoves::from, worker);
+            () -> position[0], BasicMoves::from, worker);
         WorldView world = floorTo(60);
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(40, 64, 0)));
@@ -187,7 +187,7 @@ class AdoptFreshnessGateTest {
 
         // Bot jumps 1 cell up. Chebyshev distance = 1 (just the
         // Y axis).
-        pose[0] = new Vec3(0.5, 65, 0.5);
+        position[0] = new Vec3(0.5, 65, 0.5);
 
         for (int i = 0; i < 100; i++) {
             Thread.sleep(10);

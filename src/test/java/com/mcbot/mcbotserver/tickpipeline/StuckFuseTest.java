@@ -77,9 +77,9 @@ class StuckFuseTest {
      */
     @Test
     void recoveryReplanKeepsMissionAlive() {
-        Vec3[] pose = {at(0.5)};
+        Vec3[] position = {at(0.5)};
         PathingBehavior mover = new PathingBehavior("mover",
-            () -> pose[0], BasicMoves::from);
+            () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
         MockWorldView world = floorTo(60);
         Directive directive = Directive.of(
@@ -100,7 +100,7 @@ class StuckFuseTest {
             "a frozen-but-reachable stall keeps claiming movement");
 
         // Arrival overrides everything: predicate decides SUCCESS.
-        pose[0] = at(40.5);
+        position[0] = at(40.5);
         assertEquals(ExecutionReport.Status.SUCCESS,
             mover.tick(world, directive, actor).status());
     }
@@ -112,9 +112,9 @@ class StuckFuseTest {
      */
     @Test
     void failedRecoveryReportsStuck() {
-        Vec3[] pose = {at(0.5)};
+        Vec3[] position = {at(0.5)};
         PathingBehavior mover = new PathingBehavior("mover",
-            () -> pose[0], BasicMoves::from);
+            () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
         MockWorldView world = floorTo(60);
         Directive directive = Directive.of(
@@ -122,7 +122,7 @@ class StuckFuseTest {
 
         // Walk a little so the window holds motion history.
         for (int i = 1; i <= 10; i++) {
-            pose[0] = at(0.5 + i * 0.05);
+            position[0] = at(0.5 + i * 0.05);
             mover.tick(world, directive, actor);
         }
         // Seal the corridor far ahead: remaining route impossible.
@@ -152,9 +152,9 @@ class StuckFuseTest {
      */
     @Test
     void moverClaimsMoveAndRotChannels() {
-        Vec3[] pose = {at(0.5)};
+        Vec3[] position = {at(0.5)};
         PathingBehavior mover = new PathingBehavior("mover",
-            () -> pose[0], BasicMoves::from);
+            () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
         MockWorldView world = floorTo(60);
         Directive directive = Directive.of(
@@ -174,9 +174,9 @@ class StuckFuseTest {
      */
     @Test
     void shoveInsideWindowDoesNotTripFuse() {
-        Vec3[] pose = {at(0.5)};
+        Vec3[] position = {at(0.5)};
         PathingBehavior mover = new PathingBehavior("mover",
-            () -> pose[0], BasicMoves::from);
+            () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
         MockWorldView world = floorTo(60);
         Directive directive = Directive.of(
@@ -184,13 +184,13 @@ class StuckFuseTest {
 
         for (int round = 0; round < 3; round++) {
             int base = round * 2;
-            pose[0] = at(base + 0.5);
+            position[0] = at(base + 0.5);
             assertEquals(ExecutionReport.Status.RUNNING,
                 mover.tick(world, directive, actor).status());
-            pose[0] = at(base + 1.5);
+            position[0] = at(base + 1.5);
             assertEquals(ExecutionReport.Status.RUNNING,
                 mover.tick(world, directive, actor).status());
-            pose[0] = at(base + 0.5);
+            position[0] = at(base + 0.5);
             assertEquals(ExecutionReport.Status.RUNNING,
                 mover.tick(world, directive, actor).status(),
                 "a shove is displacement, never STUCK");

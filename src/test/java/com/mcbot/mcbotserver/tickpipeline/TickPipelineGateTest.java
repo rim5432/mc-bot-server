@@ -497,7 +497,7 @@ class TickPipelineGateTest {
      * {@code KEEPALIVE_INTERVAL} ticks with a snapshot of
      * plan-progress state. Verified end-to-end: 20 ticks of silent
      * pipeline produce exactly one KEEPALIVE on the event stream,
-     * carrying the documented attrs (pose, waypointIndex,
+     * carrying the documented attrs (position, waypointIndex,
      * ticksSinceProgress, ticksSincePlan, planAge, goalCell).
      */
     @Test
@@ -536,7 +536,7 @@ class TickPipelineGateTest {
         // order; the contract is the field names, not positions.
         Map<String, String> a = k.attrs();
         assertTrue(a.containsKey("pose"),
-            "keepalive carries pose: " + a.keySet());
+            "keepalive carries position: " + a.keySet());
         assertTrue(a.containsKey("waypointIndex"),
             "keepalive carries waypointIndex: " + a.keySet());
         assertTrue(a.containsKey("ticksSincePlanProgress"),
