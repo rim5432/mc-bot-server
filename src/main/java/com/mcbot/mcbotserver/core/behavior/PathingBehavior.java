@@ -28,46 +28,35 @@ import java.util.Objects;
  *
  * <p>Contract: see boundaries.md decisions 7/8 and ADR-0004 D3/D4 -
  * SUCCESS comes only from the goal predicate evaluated on the bot cell;
- * STUCK is declared here (this behavior owns plan-progress history) but
- * only when a recovery replan also failed - a frozen body with a fresh,
- * usable route stays silent and simply waits out the replan cooldown
- * with claims flowing. Replan triggers: plan exhausted, body drifted
- * beyond {@value #REPLAN_DISTANCE} of the active waypoint, or
- * {@value #STUCK_WINDOW} ticks without plan-progress.
+ * STUCK is declared here but only when a recovery replan also failed -
+ * a frozen body with a fresh, usable route stays silent and simply waits
+ * out the replan cooldown with claims flowing. Replan triggers: plan
+ * exhausted, body drifted beyond {@value #REPLAN_DISTANCE} of the active
+ * waypoint, or {@value #STUCK_WINDOW} ticks without plan-progress.
  *
- * <p>Plan-progress tracking (issue 0001 §Ruling a, Path A): three OR
- * criteria - waypointIndex advanced, goalDistance decreased, or
- * currentWaypointDistance3D decreased by more than {@code STUCK_EPSILON}
- * metres - drive a single accumulator. The accumulator is immune to
- * replan triggers: external replan (exhaustion, offPath, freshness
- * drop) MUST NOT clear it (settled fact 2 in issue 0001 §2 documents
- * compliance for the prior motion detector, this fuse preserves it).
- * Only real plan-progress or the fuse itself firing resets the
- * accumulator. The motion detector (per-tick 3D displacement) was
- * removed: it was strictly weaker than plan-progress in the
- * "moving but not progressing" case (limbo body in free fall -
- * 4.3 cells per 20 ticks of motion, zero waypoint-progress) and is
- * the root cause of the waterfall-column silent deadlock.
- *
- * <p>Vertical gate (issue 0001 fix 6): trigger evaluation
- * (plan-progress score, offPath, exhausted, fuse, replan request,
- * STUCK report) runs only when the body is in ground contact.
- * Airborne ticks skip all of it - a ballistic trajectory's drift
- * and progress scores are meaningless for "should I replan?" because
- * the active plan was authored for the take-off cell, not the
- * landing cell, and re-evaluating mid-flight burns cooldown slots
- * on snapshots the freshness check will discard. The landing edge
- * ({@code onGround} transitions false -&gt; true) bypasses the
- * replan cooldown: the moment of contact is when the new position first
- * matters, and a stale plan from before take-off must be replaced
- * immediately rather than after the cooldown elapses.
+ * <p>Decomposition: this class is the orchestration shell - it owns the
+ * tuning constants, the constructor surface, steering, and the
+ * STUCK / NO_PATH verdicts; each concern's state machine lives beside
+ * it in the package:
+ * <ul>
+ *   <li>{@link WaypointCursor} - the active plan chain and cursor</li>
+ *   <li>{@link PlanProgressFuse} - issue 0001 §Ruling a progress
+ *       criteria, the accumulator immune to replan triggers, and the
+ *       repeat-report latch</li>
+ *   <li>{@link ReplanGate} - cooldown rationing plus the issue 0001
+ *       fix-6 vertical gate and landing-edge bypass</li>
+ *   <li>{@link PlanLifecycle} - search request, synchronous compute,
+ *       and the Chebyshev freshness guard (decision 17b)</li>
+ * </ul>
+ * Those class docs carry the load-bearing invariant language; change
+ * behaviour there and here in lockstep.
  *
  * <p>Implementation note: runs on the server tick thread only. With a
- * {@link PlanWorker} injected, searches execute off-thread on an
- * immutable {@link SnapshotWorldView} and are adopted only when still
- * fresh (goal unchanged, start cell still ours) - the staleness guard
- * of decision 17b. All behavior state stays tick-thread-local; the
- * future is the sole cross-thread object.
+ * {@link PlanWorker} injected, searches execute off-thread over an
+ * immutable snapshot and are adopted only when still fresh (goal
+ * unchanged, start cell still ours) - the staleness guard of decision
+ * 17b, enforced inside {@link PlanLifecycle}. All behavior state stays
+ * tick-thread-local; the future is the sole cross-thread object.
  */
 // contract: see ADR-0004 D3 + numen-notes.md section 18 (replan ladder)
 public final class PathingBehavior implements Behavior {
@@ -88,8 +77,8 @@ public final class PathingBehavior implements Behavior {
      * (0.01 m) so PR-2's redefinition of "what 0.01 means" is the
      * only semantics change; the value carries over.
      *
-     * <p>Why margin, not equality: without a margin, 原地振荡
-     * micro-noise would刷出 0.001 m new minima and the fuse
+     * <p>Why margin, not equality: without a margin, in-place jitter
+     * micro-noise would mint 0.001 m new minima and the fuse
      * would never trip on a waterfall column (the latched value
      * would only decrease by sub-margin amounts per tick). The
      * waterfall characterization test in

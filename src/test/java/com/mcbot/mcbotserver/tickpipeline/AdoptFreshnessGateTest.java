@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Freshness-tolerance gate (issue 0001 fix 5 / Ruling (c)):
- * the {@code adoptCompletedPlan} check that a search result is
+ * the {@code PlanLifecycle.adoptIfReady} check that a search result is
  * still valid must accept a 1-cell Chebyshev drift of the bot,
  * not strict cell-equality. A 4-5 tick A* run plus walking
  * speed 0.215 b/tick already crosses 1 cell on flat ground;

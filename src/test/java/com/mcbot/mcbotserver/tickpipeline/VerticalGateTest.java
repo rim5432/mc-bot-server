@@ -82,7 +82,7 @@ class VerticalGateTest {
 
         // First tick: wasOnGround=false, onGround=false. This is
         // NOT a landing edge (landing = onGround && !wasOnGround).
-        // The gate stays engaged. updatePlanProgress is NOT called,
+        // The gate stays engaged. PlanProgressFuse.evaluate is NOT called,
         // so ticksSincePlanProgress stays at 0 (ctor default).
         // neverPlanned=true is checked INSIDE the gated replan
         // block, so it cannot fire a replan either. The first
@@ -115,7 +115,7 @@ class VerticalGateTest {
             + "Fired at i=" + stuckTick + " (" + stuckChannel + ")");
 
         // ticksSincePlanProgress must not have accumulated while
-        // airborne: updatePlanProgress is gated, so the counter
+        // airborne: PlanProgressFuse.evaluate is gated, so the counter
         // stays at the ctor-default 0. The first tick did not
         // credit progress (gate was engaged even on tick 1).
         assertEquals(0, PathingTestAccess.ticksSincePlanProgress(mover),
