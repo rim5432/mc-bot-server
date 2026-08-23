@@ -68,6 +68,32 @@ def _recv_packet(sock: socket.socket):
     return req_id, ptype, payload
 
 
+def _recv_response(sock: socket.socket,
+                   timeout: float = 2.0) -> str:
+    """Read one command response, joining fragmented packets.
+
+    The server splits large payloads into 4096-byte RESPONSE_VALUE
+    chunks terminated by an empty chunk; small answers arrive as a
+    single short packet with no terminator. So: stop on the empty
+    terminator, on any short chunk, or on timeout as last resort.
+    """
+    sock.settimeout(timeout)
+    parts = []
+    try:
+        while True:
+            _, ptype, payload = _recv_packet(sock)
+            if ptype != 0:
+                continue
+            if not payload and parts:
+                break
+            parts.append(payload)
+            if 0 < len(payload) < 4096:
+                break
+    except socket.timeout:
+        pass
+    return "".join(parts)
+
+
 def load_config() -> dict:
     if not CONFIG_PATH.exists():
         raise RconError(
@@ -88,8 +114,7 @@ def run_command(cfg: dict, command: str) -> str:
                 if req_id == 1:
                     break
             _send_packet(sock, 2, SERVERDATA_EXECCOMMAND, command)
-            _, _, response = _recv_packet(sock)
-            return response
+            return _recv_response(sock)
     except (OSError, socket.timeout) as exc:
         raise RconError(f"connection error: {exc}") from exc
 
