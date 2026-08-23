@@ -25,11 +25,13 @@ raised directly: is the movement primitive set itself designed
 correctly for Minecraft, or does it import verbs the game does not
 have while lacking the ones players actually use?
 
-Revision 2 folds in two inputs: a review that challenged the fluid
-fix's inheritance assumptions (all resolved against the decompiled
-tree, see R2 below), and a realism pass asking whether each verb
-matches how an actual player drives the body. That pass changed one
-ruling (D3), added finding F6, and reshaped the cost work.
+Revision history: rev 1 proposed the original five findings; rev 2
+folded in the review's inheritance challenge (resolved against the
+decompiled tree) and a first realism pass; rev 3 retracts rev 2's
+"sink ships as nothing" ruling after the user challenged it with
+underwater exploration - deliberate depth control is a real future
+requirement, and the decompiled tree holds a ready-made vertical
+swim axis for it (`yya`, see F3).
 
 ## 2. Current inventory vs vanilla
 
@@ -122,31 +124,65 @@ clobber. Add a deep-pool gametest: >=2 cells of water requiring a
 SwimUp chain, then shore exit. This gates the acceptance run and
 touches no frozen signature.
 
-### F3 - Vertical verbs for a mob carrier: sink is free, sneak is not the answer
+### F3 - Vertical control: the yya axis gives real swim steering, not just rocket-up plus freefall
 
-The original proposal adopted sneak-as-sink for player parity.
-Verification kills it for our carrier:
+Rev 2 ruled "sink = neutral input, nothing ships". The user's
+challenge is correct: crossing a lake needs nothing more, but
+deliberate underwater activity (exploring ruins, mining, hovering
+at a depth) requires depth to be an actively controlled axis, not
+a passive drift. Verification of the carrier's options:
 
-- `moveRelative` rotates input by **yaw only**
-  (`Entity.getInputVector` consults `getYRot()` alone), so
-  pitch steering never moves the body vertically - the player verb
-  "look down to dive" does not exist for a mob driven through
-  xxa/zza.
-- The water branch of `travel()` reads no shift/sneak state;
-  `isShiftKeyDown()` has no effect on mob buoyancy.
+- **Fine vertical axis exists and is unused by us**:
+  `LivingEntity.yya` is a public field (line 224) flowing straight
+  into `travel(new Vec3(xxa, yya, zza))` (line 2654). The water
+  branch feeds the whole vector through
+  `moveRelative(0.02 x SWIM_SPEED, ...)`, and `getInputVector`
+  passes the Y component through unrotated. Writing yya therefore
+  yields continuous bidirectional vertical thrust consumed entirely
+  by vanilla physics: positive swims up, negative dives down, zero
+  hands the body to gravity. This is the same input slot flying
+  mobs use; it is the mob-carrier equivalent of the player's
+  swim-along-input mechanic.
+- **Strong vertical burst**: the jumping flag path from F2
+  (+0.3/tick via Mob.jumpInFluid while canFloat is false) remains
+  the "shoot for the surface / pop out at the shore" verb.
+  Two speeds, two verbs, exactly like a player feathering space
+  versus holding it.
+- **Sneak-as-dive is implementable after all** - rev 2 wrongly
+  closed this: the engine ignores shift for mobs (the water branch
+  reads no sneak state), but that only means the ADAPTER must
+  translate, which is its job. Mapping Shift-in-fluid to negative
+  yya in `customServerAiStep` reproduces authentic Java player key
+  semantics with no new Intent field.
+- Hovering: no engine hover exists for mobs or players; both manage
+  depth by feathering inputs. Behavior-level duty cycling of yya
+  (pulse toward target depth band) is the honest equivalent.
 
-But the player operation this was meant to replicate - descending in
-water - costs the player nothing either: release space, gravity
-sinks you (~slow, damped by the 0.8 vertical factor). For the bot,
-neutral input IS the sink verb, already available. Depth-hover
-precision is out of scope until something demands it.
+Key mapping stays player-shaped because a keyboard works exactly
+this way - same keys, meaning depends on medium:
 
-The `Intent.Move.sneak` field stays dropped by `BindingActor.flush()`
-for now - its real consumer is issue 0003's SneakWalk (sneaking AABB
-and edge safety), where wiring it belongs.
+| Keys | On land | In fluid |
+|---|---|---|
+| Space | jumpFromGround (F2 land path) | ascend (yya+ fine; flag burst when surfacing) |
+| Shift | sneak (issue 0003) | dive (yya-) |
+| neither | stand | sink slowly by gravity |
 
-**Ruling D3 (amended by evidence)**: no sink mechanism ships. Sink =
-neutral input; sneak wiring defers entirely to issue 0003.
+`Intent.Move(forward, strafe, jump, sneak)` needs no signature
+change - the executor interprets contextually.
+
+**Ruling D3 (rev 3)**: v1 ships only the F2 ascent fix (acceptance
+gate). The yya dive/ascend wiring lands as one adapter translation
+when an underwater scenario first demands it; reserved now so
+nobody concludes gravity-drift is the final answer. Sneak on LAND
+remains issue 0003's consumer exclusively.
+
+One more pose fact reserved for exploration work: the swimming
+POSE (`Pose.SWIMMING`, the 0.6-tall hitbox that lets players crawl
+through 1-block flooded gaps) does not shrink our carrier -
+mob entity types do not map pose to dimensions. Crawling gaps need
+a `getDimensions(Pose)` override plus issue 0003's pose-aware
+collision predicates. Recorded here so underwater scope estimates
+include it.
 
 ### F4 - No world-modification primitives exist at all
 
@@ -212,11 +248,18 @@ current primitive set:
    Intent signature change**; revisit when a long-haul scenario
    demands pace.
 
+Underwater exploration additionally pulls in the F3 yya wiring, the
+swimming-pose dimension override, and F6(2)'s air-budget reflex -
+all reserved, none blocking v1.
+
 ## 4. Boundary tension notes
 
 - F1 renames a core-pathing record - internal, review-gated.
 - F2 touches only the adapter - no signature change.
-- F3 ships nothing; future sneak wiring rides issue 0003.
+- F3 ships only the F2 ascent in v1; the yya dive/ascend
+  translation reuses existing Intent fields, so it is adapter work,
+  not a signature change - but it lands only with an underwater
+  scenario to validate against. Sneak on LAND rides issue 0003.
 - F4 adds Intent kinds eventually - frozen-boundary territory, so
   backlog text only until the Stage review lifts it.
 
@@ -226,6 +269,6 @@ current primitive set:
 |---|---|---|
 | D1 | Rename ClimbUp? | Approved -> **JumpUp** (not StepUp; jump input is load-bearing) |
 | D2 | Fluid-jump fix now? | Approved; inheritance verified in tree, `setJumping` path suffices, deep-pool gametest required |
-| D3 | Sink semantics | **Amended**: no mechanism ships; sink = neutral input (mob carrier has neither look-dive nor shift-sink); sneak defers to issue 0003 |
+| D3 | Sink semantics | **Rev 3**: v1 ships the F2 ascent only; deliberate depth control reserved on the `yya` axis (Space=ascend / Shift=dive translation in fluid, no Intent change); gravity-drift is NOT the final answer; swimming-pose dimensions noted for exploration scope |
 | D4 | Sprint in v1? | Deferred; recorded as F6(3) no-signature policy candidate |
 | D5 | World-modification order? | Approved: inventory -> Place/Break intents -> Movements; Movement interface must not grow (construction injection or adoption-time state checks) |
