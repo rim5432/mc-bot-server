@@ -108,6 +108,17 @@ public final class GotoCommandHandler {
         missions.values().removeIf(m -> !m.isActive());
     }
 
+    /**
+     * One-line workload summary for the state snapshot channel.
+     *
+     * @return display name of one live mission, or "idle" when none;
+     *         never null
+     */
+    public String activeTaskSummary() {
+        var any = missions.values().iterator();
+        return any.hasNext() ? any.next().displayName() : "idle";
+    }
+
     private void onCancel(String taskId, String verb) {
         GotoProcess mission = missions.remove(taskId);
         if (mission == null) {

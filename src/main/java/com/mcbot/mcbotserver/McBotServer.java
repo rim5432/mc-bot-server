@@ -2,10 +2,12 @@ package com.mcbot.mcbotserver;
 
 import com.mcbot.mcbotserver.adapter.BindingActor;
 import com.mcbot.mcbotserver.adapter.BindingWorldView;
+import com.mcbot.mcbotserver.adapter.BotCommands;
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
 import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
 import com.mcbot.mcbotserver.api.actor.Actor;
 import com.mcbot.mcbotserver.api.behavior.Behavior;
+import com.mcbot.mcbotserver.api.state.BotState;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 import com.mcbot.mcbotserver.core.command.CommandBus;
@@ -14,12 +16,17 @@ import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.core.reflex.FreezeOnLowHealthRule;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
+import com.mcbot.mcbotserver.core.state.ChangeDetectingStateChannel;
 import com.mcbot.mcbotserver.core.tick.BotController;
 import com.mcbot.mcbotserver.core.tick.CrashReporter;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import net.minecraft.commands.Commands;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
@@ -67,6 +74,9 @@ public class McBotServer {
     private BotController activeController;
     private BindingWorldView activeView;
     private GotoCommandHandler activeGotoHandler;
+    private InMemoryEventQueue activeEvents;
+    private CommandBus activeBus;
+    private ChangeDetectingStateChannel activeState;
     private final com.mcbot.mcbotserver.adapter.ReflexRuleReloader
         ruleReloader = new com.mcbot.mcbotserver.adapter.ReflexRuleReloader();
 
@@ -138,6 +148,12 @@ public class McBotServer {
             if (activeGotoHandler != null) {
                 activeGotoHandler.tick();
             }
+            if (activeState != null) {
+                // Pull-through state capture: change detection pushes
+                // STATE_PUSH onto the stream only when the snapshot
+                // actually moved, so a per-tick drive cannot flood it.
+                activeState.current();
+            }
             activeController.onTick(activeView);
         } catch (RuntimeException e) {
             LOGGER.error("mcbotserver tick harness failed; "
@@ -152,6 +168,7 @@ public class McBotServer {
      */
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
+        BotCommands.register(event.getDispatcher(), this::channels);
         event.getDispatcher().register(Commands.literal("botspawn")
             .requires(src -> src.hasPermission(2))
             .executes(ctx -> {
@@ -199,15 +216,67 @@ public class McBotServer {
                 gotoHandler.attach(bus);
                 this.activeGotoHandler = gotoHandler;
 
+                ChangeDetectingStateChannel state =
+                    new ChangeDetectingStateChannel(
+                        () -> snapshotOf(body, gotoHandler, level),
+                        events,
+                        () -> level.getDayTime() / 24000L,
+                        () -> level.getDayTime() % 24000L);
+
+                this.activeEvents = events;
+                this.activeBus = bus;
+                this.activeState = state;
                 this.activeController = controller;
                 this.activeView = view;
 
                 String spawned = "bot spawned at " + body.blockPosition()
-                    + "; use /goto x y z [tolerance] [timeoutTicks]";
+                    + "; drive with /bot goto x y z tolerance timeoutTicks";
                 ctx.getSource().sendSuccess(
                     () -> Component.literal(spawned), true);
                 return 1;
             }));
+    }
+
+    /**
+     * Live channel triple for the console command surface.
+     *
+     * @return channels of the active bot, or null before the first
+     *         /botspawn
+     */
+    private BotCommands.Channels channels() {
+        if (activeEvents == null || activeBus == null
+            || activeState == null) {
+            return null;
+        }
+        return new BotCommands.Channels(activeEvents, activeBus,
+            activeState);
+    }
+
+    /**
+     * Captures the boundary-D state snapshot from the live body.
+     *
+     * @param body        the spawned body; never null
+     * @param gotoHandler workload owner for the task summary; never
+     *                    null
+     * @param level       the body's level; never null
+     * @return fresh snapshot; never null
+     */
+    private static BotState snapshotOf(BotBodyEntity body,
+                                       GotoCommandHandler gotoHandler,
+                                       net.minecraft.server.level.ServerLevel level) {
+        // Item fields stay empty until an inventory mechanic exists -
+        // inventory skills are a function-map DEFERRED row, and an
+        // honest empty map beats a fake loadout.
+        Map<String, Integer> items = new LinkedHashMap<>();
+        Map<String, Integer> effects = new LinkedHashMap<>();
+        for (MobEffectInstance instance : body.getActiveEffects()) {
+            effects.put(BuiltInRegistries.MOB_EFFECT
+                    .getKey(instance.getEffect()).toString(),
+                instance.getAmplifier());
+        }
+        return new BotState(poseOf(body), body.getYRot(),
+            body.getXRot(), level.dimension().location().getPath(),
+            items, 0, effects, gotoHandler.activeTaskSummary());
     }
 
     private static CellPos poseOf(BotBodyEntity body) {
