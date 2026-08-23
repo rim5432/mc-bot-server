@@ -154,15 +154,8 @@ public final class PathingBehavior implements Behavior {
     private final PlanWorker worker;
     private final WaypointCursor cursor = new WaypointCursor();
     private final PlanProgressFuse fuse = new PlanProgressFuse();
-    private boolean neverPlanned = true;
-    private int ticksSincePlan = REPLAN_COOLDOWN;
+    private final ReplanGate gate = new ReplanGate();
     private int ticksSinceAdoption;
-    // Previous tick's onGround state, used to detect the landing
-    // edge (false -> true). Initialised to false so the first
-    // grounded tick is correctly classified as a "landing" - the
-    // edge is harmless then because neverPlanned short-circuits
-    // the replan gate anyway.
-    private boolean wasOnGround;
     // Async plan bookkeeping; all fields touched on the tick thread
     // only - the future itself is the sole cross-thread object.
     private CompletableFuture<AStarPathFinder.PathResult> pendingPlan;
@@ -300,23 +293,17 @@ public final class PathingBehavior implements Behavior {
             return ExecutionReport.running();
         }
         Vec3 position = positionSource.get();
-        ticksSincePlan++;
         ticksSinceAdoption++;
 
-        // Vertical gate (issue 0001 fix 6). Replan triggers fire only
-        // while the body is in ground contact; the landing edge
-        // (false -> true) bypasses the replan cooldown so the
-        // post-landing position is the basis for the next plan, not a
-        // stale pre-take-off plan. Mid-air ticks still steer toward
-        // the current waypoint (the bot moves through the air on
-        // its trajectory), but they do not score progress, do not
-        // accumulate the fuse, and do not request replans - those
-        // would all be measured against a snapshot the freshness
-        // check will discard on landing.
-        boolean onGround = onGroundSource.isOnGround();
-        boolean landing = onGround && !wasOnGround;
-        wasOnGround = onGround;
-        boolean evaluateTriggers = onGround || landing;
+        // Vertical gate (issue 0001 fix 6): the gate owns ground
+        // sampling, the landing edge, and cooldown rationing. Mid-air
+        // ticks still steer toward the current waypoint (the bot moves
+        // through the air on its trajectory), but they do not score
+        // progress, do not accumulate the fuse, and do not request
+        // replans - those would all be measured against a snapshot
+        // the freshness check will discard on landing.
+        var window = gate.beginTick(onGroundSource.isOnGround());
+        boolean evaluateTriggers = window.evaluateTriggers();
 
         CellPos cell = floorOf(position);
         if (directive.goal().isInGoal(cell)) {
@@ -363,10 +350,8 @@ public final class PathingBehavior implements Behavior {
             // be replaced immediately rather than after the
             // cooldown elapses.
             if ((fuseCondition || offPath || exhausted)
-                && (neverPlanned || landing
-                    || ticksSincePlan >= REPLAN_COOLDOWN)) {
-                neverPlanned = false;
-                ticksSincePlan = 0;
+                && gate.mayRequest(window)) {
+                gate.onRequest();
                 requestPlan(world, cell, directive.goal());
             }
 
@@ -467,7 +452,7 @@ public final class PathingBehavior implements Behavior {
             // immediately requests a plan for the current goal - the
             // cooldown guards executing routes, not unanswered goals,
             // and reporting NO_PATH without asking would be a lie.
-            ticksSincePlan = REPLAN_COOLDOWN;
+            gate.primeLadder();
             return;
         }
         if (!result.reachedGoal() && result.waypoints().isEmpty()) {
@@ -508,8 +493,7 @@ public final class PathingBehavior implements Behavior {
 
     private void resetPlan() {
         cursor.clear();
-        neverPlanned = true;
-        ticksSincePlan = REPLAN_COOLDOWN;
+        gate.reset();
         pendingPlan = null;
         pendingGoal = null;
         pendingStart = null;
@@ -572,7 +556,7 @@ public final class PathingBehavior implements Behavior {
         // 0001 §7 fix-2 contract).
         attrs.put("ticksSincePlanProgress",
             String.valueOf(fuse.ticksWithoutProgress()));
-        attrs.put("ticksSincePlan", String.valueOf(ticksSincePlan));
+        attrs.put("ticksSincePlan", String.valueOf(gate.ticksSinceRequest()));
         attrs.put("planAge", String.valueOf(ticksSinceAdoption));
         if (goalCell != null) {
             attrs.put("goalCell",
