@@ -54,22 +54,6 @@ class JumpEmissionGateTest {
             () -> position[0], BasicMoves::from);
     }
 
-    @SuppressWarnings("unchecked")
-    private static List<CellPos> readWaypoints(PathingBehavior mover)
-        throws ReflectiveOperationException {
-        Field f = PathingBehavior.class.getDeclaredField("waypoints");
-        f.setAccessible(true);
-        return (List<CellPos>) f.get(mover);
-    }
-
-    private static void writeWaypointIndex(PathingBehavior mover,
-                                           int value)
-        throws ReflectiveOperationException {
-        Field f = PathingBehavior.class.getDeclaredField("waypointIndex");
-        f.setAccessible(true);
-        f.set(mover, value);
-    }
-
     private static Intent.Move lastMoveClaim(RecordingActor actor) {
         return actor.submitted.stream()
             .filter(c -> c.channel() == Channel.MOVE)
@@ -116,13 +100,13 @@ class JumpEmissionGateTest {
         assertFalse(lastMoveClaim(actor).jump(),
             "the approach waypoint is flat; no jump yet");
 
-        List<CellPos> waypoints = readWaypoints(mover);
+        List<CellPos> waypoints = PathingTestAccess.waypoints(mover);
         int climbIndex = waypoints.indexOf(new CellPos(2, 65, 0));
         assertTrue(climbIndex >= 0,
             "plan must route through the plateau edge cell, got "
             + waypoints);
 
-        writeWaypointIndex(mover, climbIndex);
+        PathingTestAccess.writeWaypointIndex(mover, climbIndex);
         actor.submitted.clear();
         mover.tick(world, directive, actor);
 

@@ -103,11 +103,11 @@ class AdoptFreshnessGateTest {
             Thread.sleep(10);
             mover.tick(world, directive, new NullActor());
             // Once claims flow, the plan was adopted.
-            if (waypointsSize(mover) > 0) {
+            if (PathingTestAccess.waypoints(mover).size() > 0) {
                 break;
             }
         }
-        assertNotEquals(0, waypointsSize(mover),
+        assertNotEquals(0, PathingTestAccess.waypoints(mover).size(),
             "after 1-cell drift during search, the plan must still "
             + "be adopted (Chebyshev-1 freshness, not cell-equality)");
     }
@@ -192,22 +192,15 @@ class AdoptFreshnessGateTest {
         for (int i = 0; i < 100; i++) {
             Thread.sleep(10);
             mover.tick(world, directive, new NullActor());
-            if (waypointsSize(mover) > 0) {
+            if (PathingTestAccess.waypoints(mover).size() > 0) {
                 break;
             }
         }
-        assertNotEquals(0, waypointsSize(mover),
+        assertNotEquals(0, PathingTestAccess.waypoints(mover).size(),
             "Chebyshev-1 must accept 1-cell drift on ANY axis, "
             + "including Y (ClimbUp / Drop in the move vocabulary "
             + "are max-Chebyshev 1, so this is the tightest "
             + "tolerance that does not over-reject)");
     }
 
-    /** Reflective read of waypoints.size() for assertion. */
-    private static int waypointsSize(PathingBehavior mover)
-        throws ReflectiveOperationException {
-        var f = PathingBehavior.class.getDeclaredField("waypoints");
-        f.setAccessible(true);
-        return ((java.util.List<?>) f.get(mover)).size();
-    }
 }

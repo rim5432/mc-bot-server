@@ -54,22 +54,6 @@ class PathingBehaviorFrameGateTest {
         return world;
     }
 
-    private static List<CellPos> readWaypoints(PathingBehavior mover)
-        throws ReflectiveOperationException {
-        Field f = PathingBehavior.class.getDeclaredField("waypoints");
-        f.setAccessible(true);
-        @SuppressWarnings("unchecked")
-        List<CellPos> v = (List<CellPos>) f.get(mover);
-        return v;
-    }
-
-    private static int readWaypointIndex(PathingBehavior mover)
-        throws ReflectiveOperationException {
-        Field f = PathingBehavior.class.getDeclaredField("waypointIndex");
-        f.setAccessible(true);
-        return (int) f.get(mover);
-    }
-
     /**
      * STUCK_EPSILON is 3D Euclidean: pure Y motion at 5x epsilon
      * (0.05 m/tick) for 25 ticks must NOT trip the progress fuse,
@@ -136,8 +120,8 @@ class PathingBehaviorFrameGateTest {
         // First tick: plan adopted. waypointIndex starts at 1
         // (skip 0 = current cell).
         mover.tick(world, directive, actor);
-        int indexBefore = readWaypointIndex(mover);
-        List<CellPos> waypoints = readWaypoints(mover);
+        int indexBefore = PathingTestAccess.waypointIndex(mover);
+        List<CellPos> waypoints = PathingTestAccess.waypoints(mover);
         assertTrue(waypoints.size() > 1, "plan must have waypoints");
         assertEquals(1, indexBefore, "waypointIndex starts at 1 after plan adoption");
 
@@ -148,7 +132,7 @@ class PathingBehaviorFrameGateTest {
         position[0] = new Vec3(next.x() + 0.5, 164, next.z() + 0.5);
         mover.tick(world, directive, actor);
 
-        int indexAfter = readWaypointIndex(mover);
+        int indexAfter = PathingTestAccess.waypointIndex(mover);
         assertTrue(indexAfter > indexBefore,
             "waypoint must be consumed when XZ is within "
             + PathingBehavior.WAYPOINT_REACH
@@ -185,10 +169,10 @@ class PathingBehaviorFrameGateTest {
         // unchanged does NOT trigger a replan via offPath.
         // (Y=5 > REPLAN_DISTANCE if the check were 3D; under the
         // XZ-only check the drift is 0 and offPath is false.)
-        int indexBefore = readWaypointIndex(mover);
+        int indexBefore = PathingTestAccess.waypointIndex(mover);
         position[0] = new Vec3(position[0].x(), 69, position[0].z());
         mover.tick(world, directive, actor);
-        int indexAfter = readWaypointIndex(mover);
+        int indexAfter = PathingTestAccess.waypointIndex(mover);
 
         // The waypoint index should not have decreased (replan
         // would either advance or rewind; if the bot stayed on

@@ -105,7 +105,7 @@ public final class PathingBehavior implements Behavior {
     /**
      * Horizontal reach that counts as "waypoint touched", in metres.
      * Frame: XZ only (`Math.hypot(dx, dz)` in
-     * {@link #advanceReachedWaypoints} and {@link #distanceToWaypoint}).
+     * {@link WaypointCursor#advance} and {@link #distanceToWaypoint}).
      * Y is intentionally ignored - a position directly above a waypoint
      * is treated as "not at the waypoint" for reach purposes; the
      * goal predicate is the 3D cell-equality authority for arrival.
@@ -152,8 +152,7 @@ public final class PathingBehavior implements Behavior {
     private final OnGroundSource onGroundSource;
     private final MoveGraph graph;
     private final PlanWorker worker;
-    private List<CellPos> waypoints = List.of();
-    private int waypointIndex;
+    private final WaypointCursor cursor = new WaypointCursor();
     private boolean stuckLatched;
     private boolean neverPlanned = true;
     private int ticksSincePlan = REPLAN_COOLDOWN;
@@ -364,10 +363,10 @@ public final class PathingBehavior implements Behavior {
 
             boolean fuseCondition = !stuckLatched
                 && ticksSincePlanProgress >= STUCK_WINDOW;
-            boolean offPath = waypointIndex < waypoints.size()
+            boolean offPath = !cursor.exhausted()
                 && distanceToWaypoint(position,
-                    waypoints.get(waypointIndex)) > REPLAN_DISTANCE;
-            boolean exhausted = waypointIndex >= waypoints.size();
+                    cursor.current()) > REPLAN_DISTANCE;
+            boolean exhausted = cursor.exhausted();
 
             // Replan cooldown bypassed on the landing edge: contact
             // is the first tick the body's position is meaningful for
@@ -382,7 +381,7 @@ public final class PathingBehavior implements Behavior {
                 requestPlan(world, cell, directive.goal());
             }
 
-            if (waypoints.isEmpty()) {
+            if (cursor.isEmpty()) {
                 // A search still running is not an answer: report
                 // RUNNING rather than inventing NO_PATH for a
                 // question in flight.
@@ -412,8 +411,8 @@ public final class PathingBehavior implements Behavior {
             }
         }
 
-        advanceReachedWaypoints(position);
-        if (waypointIndex >= waypoints.size()) {
+        cursor.advance(position);
+        if (cursor.exhausted()) {
             return ExecutionReport.running();
         }
         steerTowardCurrentWaypoint(position, actor);
@@ -483,13 +482,11 @@ public final class PathingBehavior implements Behavior {
             return;
         }
         if (!result.reachedGoal() && result.waypoints().isEmpty()) {
-            waypoints = List.of();
-            waypointIndex = 0;
+            cursor.clear();
             return;
         }
         // Skip index 0: it is the cell we are standing in.
-        waypoints = result.waypoints();
-        waypointIndex = waypoints.size() > 1 ? 1 : 0;
+        cursor.set(result.waypoints());
         ticksSinceAdoption = 0;
         // Plan adopted: reset the plan-progress latches so the new
         // plan starts a fresh observation window. The fuse
@@ -499,7 +496,7 @@ public final class PathingBehavior implements Behavior {
         // set to the CURRENT waypointIndex (not a sentinel) so
         // the next updatePlanProgress call does not fire
         // criterion 1 as a false positive.
-        lastWaypointIndex = waypointIndex;
+        lastWaypointIndex = cursor.index();
         lastWaypoint3DDistance = Double.POSITIVE_INFINITY;
         // lastGoalDistance stays - the goal cell is the same
         // across replans, the latched value remains meaningful.
@@ -517,25 +514,22 @@ public final class PathingBehavior implements Behavior {
         var result = finder.compute(world, start, goal,
             Heuristic.euclideanTo(anchor));
         if (!result.reachedGoal() && result.waypoints().isEmpty()) {
-            waypoints = List.of();
-            waypointIndex = 0;
+            cursor.clear();
             return;
         }
         // Skip index 0: it is the cell we are standing in.
-        waypoints = result.waypoints();
-        waypointIndex = waypoints.size() > 1 ? 1 : 0;
+        cursor.set(result.waypoints());
         ticksSinceAdoption = 0;
         // See adoptCompletedPlan for the latch-reset rationale.
         // lastWaypointIndex is set to the CURRENT waypointIndex
         // (not a sentinel) so the next updatePlanProgress call
         // does not fire criterion 1 as a false positive.
-        lastWaypointIndex = waypointIndex;
+        lastWaypointIndex = cursor.index();
         lastWaypoint3DDistance = Double.POSITIVE_INFINITY;
     }
 
     private void resetPlan() {
-        waypoints = List.of();
-        waypointIndex = 0;
+        cursor.clear();
         neverPlanned = true;
         ticksSincePlan = REPLAN_COOLDOWN;
         pendingPlan = null;
@@ -584,9 +578,9 @@ public final class PathingBehavior implements Behavior {
         double goalDist = position.distanceTo(goalCell.x() + 0.5,
             goalCell.y() + 0.5, goalCell.z() + 0.5);
 
-        boolean p1 = waypointIndex > lastWaypointIndex;
+        boolean p1 = cursor.index() > lastWaypointIndex;
         if (p1) {
-            lastWaypointIndex = waypointIndex;
+            lastWaypointIndex = cursor.index();
         }
 
         boolean p2 = goalDist < lastGoalDistance - STUCK_EPSILON;
@@ -595,11 +589,11 @@ public final class PathingBehavior implements Behavior {
         }
 
         boolean p3 = false;
-        if (waypointIndex < waypoints.size()) {
+        if (!cursor.exhausted()) {
             // Criterion 3 measures 3D, not XZ-only: vertical moves
             // (ClimbUp, Drop) are real progress the latched min must
             // capture (issue 0001 Ruling a).
-            CellPos wp = waypoints.get(waypointIndex);
+            CellPos wp = cursor.current();
             double wpDist = position.distanceTo(wp.x() + 0.5,
                 wp.y() + 0.5, wp.z() + 0.5);
             p3 = wpDist < lastWaypoint3DDistance - STUCK_EPSILON;
@@ -658,8 +652,8 @@ public final class PathingBehavior implements Behavior {
         Map<String, String> attrs =
             new LinkedHashMap<>();
         attrs.put("pose", position.x() + "," + position.y() + "," + position.z());
-        attrs.put("waypointIndex", String.valueOf(waypointIndex));
-        attrs.put("waypointsTotal", String.valueOf(waypoints.size()));
+        attrs.put("waypointIndex", String.valueOf(cursor.index()));
+        attrs.put("waypointsTotal", String.valueOf(cursor.size()));
         // Renamed from "ticksSinceProgress" in PR-2. The field
         // now counts ticks without PLAN-PROGRESS (one of the
         // three Ruling (a) criteria), not ticks without MOTION.
@@ -677,28 +671,13 @@ public final class PathingBehavior implements Behavior {
         return attrs;
     }
 
-    private void advanceReachedWaypoints(Vec3 position) {
-        while (waypointIndex < waypoints.size()) {
-            CellPos wp = waypoints.get(waypointIndex);
-            boolean sameCell = floorOf(position).equals(wp);
-            double horizontal = Math.hypot(
-                position.x() - (wp.x() + 0.5), position.z() - (wp.z() + 0.5));
-            if (sameCell || horizontal <= WAYPOINT_REACH) {
-                waypointIndex++;
-            } else {
-                break;
-            }
-        }
-    }
-
     private double distanceToWaypoint(Vec3 position, CellPos wp) {
         return Math.hypot(position.x() - (wp.x() + 0.5),
             position.z() - (wp.z() + 0.5));
     }
 
     private void steerTowardCurrentWaypoint(Vec3 position, Actor actor) {
-        CellPos wp = waypoints.get(Math.min(waypointIndex,
-            waypoints.size() - 1));
+        CellPos wp = cursor.steerTarget();
         double dx = wp.x() + 0.5 - position.x();
         double dz = wp.z() + 0.5 - position.z();
         float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
@@ -713,7 +692,7 @@ public final class PathingBehavior implements Behavior {
             new Intent.Look(yaw, 0f)));
     }
 
-    private static CellPos floorOf(Vec3 position) {
+    static CellPos floorOf(Vec3 position) {
         return new CellPos((int) Math.floor(position.x()),
             (int) Math.floor(position.y()), (int) Math.floor(position.z()));
     }
