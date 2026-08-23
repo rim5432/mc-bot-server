@@ -54,13 +54,6 @@ class PathingBehaviorFrameGateTest {
         return world;
     }
 
-    private static final class RecordingActor implements Actor {
-        final ChannelArbiter delegate = new ChannelArbiter();
-        @Override public void submit(Claim claim) { delegate.submit(claim); }
-        @Override public Map<Channel, Claim> flush() { return delegate.flush(); }
-        @Override public void clearAllIntents() { delegate.clearAllIntents(); }
-    }
-
     private static List<CellPos> readWaypoints(PathingBehavior mover)
         throws ReflectiveOperationException {
         Field f = PathingBehavior.class.getDeclaredField("waypoints");

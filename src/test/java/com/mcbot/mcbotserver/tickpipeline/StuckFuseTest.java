@@ -45,31 +45,6 @@ class StuckFuseTest {
     }
 
     /** Delegating actor that records every submission this tick. */
-    private static final class RecordingActor implements Actor {
-        private final com.mcbot.mcbotserver.core.actor.ChannelArbiter
-            delegate = new com.mcbot.mcbotserver.core.actor.ChannelArbiter();
-        final java.util.List<com.mcbot.mcbotserver.api.actor.Claim>
-            submitted = new java.util.ArrayList<>();
-
-        @Override
-        public void submit(com.mcbot.mcbotserver.api.actor.Claim claim) {
-            submitted.add(claim);
-            delegate.submit(claim);
-        }
-
-        @Override
-        public java.util.Map<Channel,
-                com.mcbot.mcbotserver.api.actor.Claim> flush() {
-            return delegate.flush();
-        }
-
-        @Override
-        public void clearAllIntents() {
-            submitted.clear();
-            delegate.clearAllIntents();
-        }
-    }
-
     /**
      * Frozen body trips the fuse; the recovery replan finds a fresh
      * route; reports stay RUNNING and claims keep flowing until real
