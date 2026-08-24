@@ -1,6 +1,6 @@
 ---
 title: Scan radius / leash gap in DefendProcess
-last_verified: 2026-08-23
+last_verified: 2026-08-24
 covers:
   - src/main/java/com/mcbot/mcbotserver/core/process/DefendProcess.java
   - doc/architecture/boundaries.md
