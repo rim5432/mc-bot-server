@@ -15,6 +15,7 @@ import com.mcbot.mcbotserver.api.goal.GoalNear;
 import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
 import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.api.process.Directive;
+import com.mcbot.mcbotserver.api.reflex.ReflexAction;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.api.world.WorldView;
@@ -103,6 +104,13 @@ public final class BotController {
     private final GameClock clock;
     private final EventQueue events;
     private final CrashReporter crashReporter;
+    /**
+     * Reflex-owned engage mission factory; null degrades ENGAGE
+     * decisions to the freeze hold (rigs without combat wiring park
+     * the mission instead of fighting blind).
+     */
+    private final java.util.function.Supplier<BotProcess>
+        engageMissionFactory;
 
     private long tickCounter;
     private boolean crashed;
@@ -110,6 +118,9 @@ public final class BotController {
     private boolean inLethalFluid;
     private BotProcess previousCurrent;
     private int ticksSinceKeepalive;
+    /** Live reflex-owned defend mission, if any; null otherwise. */
+    private BotProcess reflexEngageMission;
+    private int ticksSinceEngageSubmit = ENGAGE_RESUBMIT_COOLDOWN;
 
     /**
      * How often the keepalive event fires. Matches
@@ -121,8 +132,22 @@ public final class BotController {
     private static final int KEEPALIVE_INTERVAL = 20;
 
     /**
-     * Assembles the pipeline. All collaborators stay plain constructor
-     * arguments — no service lookup, no optional wiring.
+     * Ticks between reflex engage submissions. Deliberately ABOVE
+     * the engage rule's hold window plus a release-band transit:
+     * (a) a reflex-owned defend whose verdict landed while the rule
+     * still fires - a threat fleeing through the release band - must
+     * not mint a mission per tick; (b) after the threat disappears
+     * the rule keeps firing through its hysteresis hold with no
+     * threat left, and resubmitting there would mint a spurious
+     * instant-SUCCESS defend per engagement tail. The fight's own
+     * leash, grace and escape verdicts resolve the engagement.
+     */
+    private static final int ENGAGE_RESUBMIT_COOLDOWN = 40;
+
+    /**
+     * Assembles the pipeline without combat wiring: ENGAGE reflex
+     * decisions degrade to the freeze hold. Delegates to the
+     * ten-argument constructor.
      *
      * @param reflex        survival bypass; never null
      * @param arbiter       task-channel winner selector; never null
@@ -140,6 +165,37 @@ public final class BotController {
                          PositionSource positionSource, HealthSource healthSource,
                          GameClock clock, EventQueue events,
                          CrashReporter crashReporter) {
+        this(reflex, arbiter, behaviors, actor, positionSource,
+            healthSource, clock, events, crashReporter, null);
+    }
+
+    /**
+     * Assembles the pipeline. All collaborators stay plain constructor
+     * arguments — no service lookup, no optional wiring.
+     *
+     * @param reflex        survival bypass; never null
+     * @param arbiter       task-channel winner selector; never null
+     * @param behaviors     execution tier; never null, may be empty
+     * @param actor         claim surface; never null
+     * @param positionSource    body position accessor; never null
+     * @param healthSource  body health accessor; never null
+     * @param clock         game-time accessor; never null
+     * @param events        event stream for the primary crash channel;
+     *                      never null
+     * @param crashReporter fallback reporter; never null
+     * @param engageMissionFactory supplies one fresh defend mission
+     *                      per reflex engage submission (the wiring
+     *                      owns identity, budgets and type sets);
+     *                      may be null - ENGAGE then degrades to the
+     *                      freeze hold
+     */
+    public BotController(SurvivalReflexLayer reflex, TaskArbiter arbiter,
+                         List<Behavior> behaviors, Actor actor,
+                         PositionSource positionSource, HealthSource healthSource,
+                         GameClock clock, EventQueue events,
+                         CrashReporter crashReporter,
+                         java.util.function.Supplier<BotProcess>
+                             engageMissionFactory) {
         this.reflex = Objects.requireNonNull(reflex, "reflex");
         this.arbiter = Objects.requireNonNull(arbiter, "arbiter");
         this.behaviors = List.copyOf(behaviors);
@@ -151,6 +207,7 @@ public final class BotController {
         this.events = Objects.requireNonNull(events, "events");
         this.crashReporter =
             Objects.requireNonNull(crashReporter, "crashReporter");
+        this.engageMissionFactory = engageMissionFactory;
     }
 
     /**
@@ -262,53 +319,52 @@ public final class BotController {
         float health = healthSource.get();
         long day = clock.day();
         long tod = clock.timeOfDayTicks();
+        if (ticksSinceEngageSubmit < ENGAGE_RESUBMIT_COOLDOWN) {
+            ticksSinceEngageSubmit++;
+        }
 
-        // Stage 1: reflex bypass — non-null decision skips the mission.
+        // Stage 1: reflex bypass — non-null decision skips the mission,
+        // except the ENGAGE kind, which spends exactly one tick on the
+        // preemption and then runs the fight through the mission stage
+        // (a fight is multi-tick state; a held-body reflex cannot carry
+        // target tracking, leash and grace - ReflexAction#ENGAGE).
         var decision = reflex.tick(world, tickCounter, day, tod,
             position, health);
         if (decision != null) {
-            InterruptionContext ctx = new InterruptionContext(tickCounter,
-                position, activeName(), "reflex-preempt:" + decision.ruleName(),
-                "");
-            String pausedTask = activeName();
-            var result = arbiter.forcePauseAll(ctx);
-            boolean announceVerdict = false;
-            switch (result) {
-                case PARKED -> {
-                    emitMissionEvent(EventKind.TASK_PAUSED, day, tod,
-                        pausedTask, "paused by reflex "
-                            + decision.ruleName());
-                    // No current while parked: the transition detector
-                    // must not fire on stale state.
-                    previousCurrent = null;
+            boolean engageDecision =
+                decision.action() == ReflexAction.ENGAGE;
+            if (engageDecision && engageMissionFactory != null) {
+                if (maybeSubmitEngageMission(decision, day, tod)) {
+                    return;
                 }
-                case RETIRED_TERMINAL -> announceVerdict = true;
-                case NO_CURRENT -> {
-                }
-            }
-            // ReflexAction owns the intent shape (ADR-0003 section
-            // 2: rules say HOW URGENT, the controller says WHAT the
-            // held body does): FREEZE halts, ASCEND holds jump so
-            // vanilla fluid physics swims the body up (boundary A -
-            // intents only, the engine computes the motion).
-            Intent.Move hold = decision.action()
-                == com.mcbot.mcbotserver.api.reflex.ReflexAction.ASCEND
+                // Live reflex-owned mission (or the resubmit cooldown):
+                // fall through to the mission stage so the fight keeps
+                // running - preempting it every tick would starve the
+                // very mission this reflex submitted.
+            } else {
+                // ReflexAction owns the intent shape (ADR-0003 section
+                // 2: rules say HOW URGENT, the controller says WHAT the
+                // held body does): FREEZE halts, ASCEND holds jump so
+                // vanilla fluid physics swims the body up (boundary A -
+                // intents only, the engine computes the motion). An
+                // ENGAGE decision without a factory degrades to this
+                // hold: no combat wiring means park, never fight blind.
+                Intent.Move hold = decision.action() == ReflexAction.ASCEND
                     ? new Intent.Move(0, 0, true, false)
                     : new Intent.Move(0, 0, false, false);
-            actor.submit(new Claim(Channel.MOVE, decision.priority(),
-                "reflex:" + decision.ruleName(), hold));
-            actor.flush();
-            if (announceVerdict) {
-                // Retirement-lap corpse: its verdict is announced here,
-                // on the reflex tick, explicitly per the ParkResult
-                // contract - not via any previousCurrent side effect.
-                emitMissionTransition(day, tod);
+                preemptAndHold(decision, hold, day, tod);
+                return;
             }
-            return;
         }
 
         // Threat gone: hand control back through world revalidation.
-        if (arbiter.paused() != null) {
+        // Guarded on both no reflex firing this tick (an engage
+        // fall-through tick must not hand the body to the parked
+        // mission before the fight even started) and no seated
+        // current (a live reflex-owned defend keeps the body until
+        // its own verdict retires it).
+        if (decision == null && arbiter.paused() != null
+                && arbiter.current() == null) {
             String resumingTask = arbiter.paused().displayName();
             boolean resumed = arbiter.tryResume();
             emitMissionEvent(resumed
@@ -345,6 +401,89 @@ public final class BotController {
             ticksSinceKeepalive = 0;
             emitKeepalive(position, directive, day, tod);
         }
+    }
+
+    /**
+     * Park whoever holds the body and hold it under the reflex claim
+     * for this tick - the shared skeleton of every reflex
+     * preemption: InterruptionContext snapshot, forcePauseAll with
+     * its PARKED / RETIRED_TERMINAL / NO_CURRENT outcomes, the hold
+     * claim, flush, and the retirement-lap verdict announcement.
+     *
+     * @param decision the winning reflex decision; never null
+     * @param hold     the intent that holds the body this tick;
+     *                 never null
+     * @param day      game day for event stamping
+     * @param tod      time-of-day ticks for event stamping
+     */
+    private void preemptAndHold(
+            SurvivalReflexLayer.ReflexDecision decision, Intent.Move hold,
+            long day, long tod) {
+        InterruptionContext ctx = new InterruptionContext(tickCounter,
+            positionSource.get(), activeName(),
+            "reflex-preempt:" + decision.ruleName(), "");
+        String pausedTask = activeName();
+        boolean announceVerdict = false;
+        switch (arbiter.forcePauseAll(ctx)) {
+            case PARKED -> {
+                emitMissionEvent(EventKind.TASK_PAUSED, day, tod,
+                    pausedTask, "paused by reflex "
+                        + decision.ruleName());
+                // No current while parked: the transition detector
+                // must not fire on stale state.
+                previousCurrent = null;
+            }
+            case RETIRED_TERMINAL -> announceVerdict = true;
+            case NO_CURRENT -> {
+            }
+        }
+        actor.submit(new Claim(Channel.MOVE, decision.priority(),
+            "reflex:" + decision.ruleName(), hold));
+        actor.flush();
+        if (announceVerdict) {
+            // Retirement-lap corpse: its verdict is announced here,
+            // on the reflex tick, explicitly per the ParkResult
+            // contract - not via any previousCurrent side effect.
+            emitMissionTransition(day, tod);
+        }
+    }
+
+    /**
+     * One reflex engage submission: park the current mission through
+     * the shared preemption skeleton, then hand the body to a fresh
+     * reflex-owned defend mission from the factory. The fight itself
+     * starts next tick, through the normal mission stage.
+     *
+     * <p>No-op (returns false) while a reflex-owned mission is still
+     * live, or inside the resubmit cooldown - a threat fleeing
+     * through the release band must not mint a mission per tick.
+     *
+     * @param decision the winning ENGAGE decision; never null
+     * @param day      game day for event stamping
+     * @param tod      time-of-day ticks for event stamping
+     * @return true when a mission was submitted and this tick is the
+     *         preemption; false when the caller should fall through
+     */
+    private boolean maybeSubmitEngageMission(
+            SurvivalReflexLayer.ReflexDecision decision, long day,
+            long tod) {
+        if (reflexEngageMission != null
+                && !reflexEngageMission.isActive()) {
+            // Retired; the transition detector announced its verdict.
+            reflexEngageMission = null;
+        }
+        if (reflexEngageMission != null
+                || ticksSinceEngageSubmit < ENGAGE_RESUBMIT_COOLDOWN) {
+            return false;
+        }
+        preemptAndHold(decision, new Intent.Move(0, 0, false, false),
+            day, tod);
+        BotProcess mission = engageMissionFactory.get();
+        arbiter.register(mission);
+        arbiter.requestControl(mission);
+        reflexEngageMission = mission;
+        ticksSinceEngageSubmit = 0;
+        return true;
     }
 
     /**

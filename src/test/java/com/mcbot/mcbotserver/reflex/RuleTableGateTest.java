@@ -94,6 +94,42 @@ class RuleTableGateTest {
     }
 
     @Test
+    void engageRuleParsesRoundTripsAndFiresUnderTrigger() {
+        List<ReflexRule> rules = ReflexRuleJson.parse("{\"rules\": ["
+            + "{\"type\": \"ENGAGE_ON_HOSTILE_PROXIMITY\","
+            + " \"trigger\": 5.0, \"release\": 12.0, \"priority\": 85}"
+            + "]}");
+        var engage =
+            (com.mcbot.mcbotserver.core.reflex
+                .EngageOnHostileProximityRule) rules.get(0);
+        assertEquals(5.0, engage.trigger());
+        assertEquals(12.0, engage.release());
+        assertEquals(85, engage.priority());
+
+        // Fires on a sensed threat under the trigger, silent without.
+        var board = new ThreatBlackboard();
+        board.beginTick(0L, 0L, 0L,
+            new com.mcbot.mcbotserver.api.types.CellPos(0, 64, 0), 20f);
+        board.nearestThreat = new com.mcbot.mcbotserver.api.world
+            .EntitySnapshot("z-1", "minecraft:zombie",
+                new com.mcbot.mcbotserver.api.types.CellPos(4, 64, 0),
+                20f, 20f);
+        board.nearestThreatDistance = 4.0;
+        assertEquals(85, engage.computePriority(board));
+        board.nearestThreat = null;
+        board.nearestThreatDistance = Double.MAX_VALUE;
+        assertEquals(-1, engage.computePriority(board));
+
+        var reparsed = (com.mcbot.mcbotserver.core.reflex
+                .EngageOnHostileProximityRule)
+            ReflexRuleJson.parse(ReflexRuleJson.write(rules)).get(0);
+        assertTrue(engage.trigger() == reparsed.trigger()
+            && engage.release() == reparsed.release()
+            && engage.priority() == reparsed.priority(),
+            "write->parse must preserve the engage configuration");
+    }
+
+    @Test
     void unknownTypeAndBadValuesAreHardErrors() {
         assertThrows(IllegalArgumentException.class,
             () -> ReflexRuleJson.parse("{\"rules\": ["

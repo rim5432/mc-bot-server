@@ -10,6 +10,12 @@
       "trigger": 80,
       "release": 200,
       "priority": 110
+    },
+    {
+      "type": "ENGAGE_ON_HOSTILE_PROXIMITY",
+      "trigger": 6.0,
+      "release": 14.0,
+      "priority": 90
     }
   ]
 }

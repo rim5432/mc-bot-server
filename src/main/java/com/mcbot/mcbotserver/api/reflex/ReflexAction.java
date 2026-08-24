@@ -27,5 +27,16 @@ public enum ReflexAction {
      * reflex - no pathing, no self-computed physics; the engine is
      * the only thing that moves the body (boundary A).
      */
-    ASCEND
+    ASCEND,
+
+    /**
+     * Engage the nearest hostile: the controller parks the current
+     * mission for one tick and submits a reflex-owned defend mission
+     * to the arbiter; from the next tick the fight runs THROUGH the
+     * mission stage (not as a held-body reflex). Needed because a
+     * fight is multi-tick state (target tracking, leash, grace) and
+     * reflexes are one-tick decisions - the rule only notices the
+     * threat; DefendProcess owns the fight.
+     */
+    ENGAGE
 }

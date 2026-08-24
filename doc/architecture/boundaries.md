@@ -489,6 +489,35 @@ BotState getState();
     at the film). Priority ordering is part of the contract:
     SURFACE (110) must outrank FREEZE (100) - freezing while
     drowning converts one lethal condition into two.
+    23. Reflex-carried idle combat (ENGAGE_ON_HOSTILE_PROXIMITY,
+    ReflexAction#ENGAGE; after the 2026-08-24 night-cave death).
+    Resolves the workplan's standing ruling - standing idle-band
+    DefendProcess vs reflex-carried combat directive - as a hybrid:
+    the RULE only notices the threat (boundary-C shape, pure
+    blackboard function, trigger 6 / release 14 / priority 90, below
+    the survival holds); the CONTROLLER converts a winning ENGAGE
+    decision into one preemption tick (shared park skeleton) plus a
+    factory-built reflex-owned DefendProcess submitted to the
+    arbiter; from the next tick the fight runs THROUGH the mission
+    stage, because a fight is multi-tick state (target tracking,
+    leash, grace) and a held-body reflex cannot carry it. The
+    factory is wiring-owned (identity, timeout, type sets) and
+    nullable - no factory degrades ENGAGE to the freeze hold. Two
+    controller-side guards are part of the semantics: (a) the
+    threat-gone resume path runs only when NO reflex fired this tick
+    AND no mission is seated - otherwise the parked mission would
+    steal the body back on the submission's very next tick (the
+    one-tick window) or mid-fight; (b) a resubmit cooldown (40
+    ticks, deliberately above the rule's hold window plus a
+    release-band transit) absorbs both a threat fleeing through the
+    release band and the hysteresis-held rule with no threat left -
+    neither may mint a defend per tick, and the engagement tail
+    must not mint a spurious instant-SUCCESS defend. Trigger 6 sits
+    inside melee closing range and below ranged kiting standoff
+    (~8-10): a skeleton at its preferred distance never trips the
+    rule, because engaging it would only mint ENGAGEMENT_REFUSED
+    churn (decision 11). Ranged idle threats remain an open gap
+    (workplan survival gate).
 
 ## Deferred, with reopen conditions
 

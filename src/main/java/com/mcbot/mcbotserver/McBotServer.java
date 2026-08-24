@@ -86,6 +86,14 @@ public class McBotServer {
     private InMemoryEventQueue activeEvents;
     private CommandBus activeBus;
     private ChangeDetectingStateChannel activeState;
+
+    /**
+     * Tick budget for one reflex-owned engage mission: long enough
+     * for a melee fight plus its grace window, short enough that an
+     * unwinnable scrap cannot pin the body - the mission's own
+     * leash/escape verdicts usually land first.
+     */
+    private static final long ENGAGE_MISSION_TIMEOUT_TICKS = 600L;
     private final com.mcbot.mcbotserver.adapter.ReflexRuleReloader
         ruleReloader = new com.mcbot.mcbotserver.adapter.ReflexRuleReloader();
 
@@ -258,6 +266,14 @@ public class McBotServer {
                 reflex.addRule(
                     new com.mcbot.mcbotserver.core.reflex
                         .SurfaceOnLowAirRule());
+                // Idle-combat reflex (2026-08-24 night-cave death):
+                // engages a hostile that closes to melee range even
+                // when no mission is running. Sits BELOW the survival
+                // holds: at three health points the right reflex is
+                // to stop, not to start a fight.
+                reflex.addRule(
+                    new com.mcbot.mcbotserver.core.reflex
+                        .EngageOnHostileProximityRule());
                 // Future /reload swaps follow the datapack table.
                 ruleReloader.bind(reflex);
 
@@ -266,12 +282,35 @@ public class McBotServer {
                     () -> body.onGround(),
                     com.mcbot.mcbotserver.core.pathing.BasicMoves::from,
                     new com.mcbot.mcbotserver.core.pathing.PlanWorker());
+                // CombatBehavior must be seated here too: without it
+                // the engage reflex submits defend missions whose
+                // Attack overrides nobody executes - the production
+                // gap behind the idle night-cave death.
+                Behavior combat = new com.mcbot.mcbotserver.core.behavior
+                    .CombatBehavior("combat", () -> finePoseOf(body));
+
+                // One fresh reflex-owned defend per engage submission;
+                // the wiring owns identity, budget and type sets.
+                var engageCounter = new java.util.concurrent.atomic
+                    .AtomicInteger();
+                java.util.function.Supplier<
+                        com.mcbot.mcbotserver.api.process.BotProcess>
+                    engageFactory = () -> new com.mcbot.mcbotserver.core
+                        .process.DefendProcess(
+                            "reflex-engage-" + engageCounter
+                                .incrementAndGet(),
+                            com.mcbot.mcbotserver.api.process.PriorityBands
+                                .DEFEND_PRIORITY,
+                            ENGAGE_MISSION_TIMEOUT_TICKS,
+                            () -> poseOf(body),
+                            LevelThreatSensor.hostileTypes(),
+                            LevelThreatSensor.rangedTypes());
 
                 BotController controller = new BotController(reflex,
-                    arbiter, List.of(mover), actor,
+                    arbiter, List.of(mover, combat), actor,
                     () -> poseOf(body), body::getHealth,
                     clockOf(level), events,
-                    CrashReporter.consoleFallback());
+                    CrashReporter.consoleFallback(), engageFactory);
                 CommandBus bus = new CommandBus(events);
                 GotoCommandHandler gotoHandler = new GotoCommandHandler(
                     arbiter, events,

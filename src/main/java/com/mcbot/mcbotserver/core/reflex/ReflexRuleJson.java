@@ -88,6 +88,11 @@ public final class ReflexRuleJson {
                 entry.addProperty("trigger", surface.trigger());
                 entry.addProperty("release", surface.release());
                 entry.addProperty("priority", surface.priority());
+            } else if (rule instanceof EngageOnHostileProximityRule
+                    engage) {
+                entry.addProperty("trigger", engage.trigger());
+                entry.addProperty("release", engage.release());
+                entry.addProperty("priority", engage.priority());
             } else {
                 throw new IllegalArgumentException(
                     "no JSON form for rule type: "
@@ -109,6 +114,9 @@ public final class ReflexRuleJson {
         }
         if ("SURFACE_ON_LOW_AIR".equals(type)) {
             return surfaceRule(rule);
+        }
+        if ("ENGAGE_ON_HOSTILE_PROXIMITY".equals(type)) {
+            return engageRule(rule);
         }
         throw new IllegalArgumentException(
             "unknown rule type: " + type);
@@ -144,6 +152,25 @@ public final class ReflexRuleJson {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(
                 "SURFACE_ON_LOW_AIR: " + e.getMessage(), e);
+        }
+    }
+
+    private static ReflexRule engageRule(JsonObject rule) {
+        double trigger = rule.has("trigger")
+            ? rule.get("trigger").getAsDouble()
+            : EngageOnHostileProximityRule.TRIGGER_DISTANCE;
+        double release = rule.has("release")
+            ? rule.get("release").getAsDouble()
+            : EngageOnHostileProximityRule.RELEASE_DISTANCE;
+        int priority = rule.has("priority")
+            ? rule.get("priority").getAsInt()
+            : EngageOnHostileProximityRule.ENGAGE_PRIORITY;
+        try {
+            return new EngageOnHostileProximityRule(trigger, release,
+                priority);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                "ENGAGE_ON_HOSTILE_PROXIMITY: " + e.getMessage(), e);
         }
     }
 }
