@@ -128,6 +128,20 @@ class ReflexHysteresisGateTest {
             : "trigger must be strictly below release";
     }
 
+    /**
+     * Activation at exactly the trigger: the state machine's edge
+     * must agree with computePriority's documented "at or below" -
+     * a strict < would shift the effective trigger one tick late
+     * (air 80 firing at 79 instead).
+     */
+    @Test
+    void signalExactlyAtTriggerActivates() {
+        float[] health = {FreezeOnLowHealthRule.FREEZE_THRESHOLD};
+        SurvivalReflexLayer layer = layerWith(health);
+        var d = tick(layer, 1L, health[0]);
+        assertNotNull(d, "the boundary value itself must fire");
+    }
+
     @Test
     void heldPhaseReportsLastPositivePriority() {
         float[] health = {4f};

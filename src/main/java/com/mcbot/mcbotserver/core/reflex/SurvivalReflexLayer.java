@@ -185,9 +185,14 @@ public final class SurvivalReflexLayer {
             s.lastPriority = rawPriority;
         }
         float signal = h.signalValue(blackboard);
+        // Activation uses <= so the documented "at or below the
+        // trigger" is exactly true at the boundary value; release
+        // keeps strict < so the deadband spans (trigger, release).
+        // computePriority's <= and this state machine must agree -
+        // a mismatch would shift the effective trigger by one tick.
         boolean wantsActive = s.active
             ? signal < h.releaseThreshold()
-            : signal < h.triggerThreshold();
+            : signal <= h.triggerThreshold();
         if (wantsActive == s.active) {
             return s.active;
         }
