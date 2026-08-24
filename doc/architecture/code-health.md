@@ -72,7 +72,7 @@ admitted here may encode a size cap.
 
 | Rule | Invariant it guards | Gate | Status |
 |---|---|---|---|
-| H-R1 Reflection is the exception | Collaborator unit tests live same-package with direct package-private access; reflection exists only in `PathingTestAccess`, only for integration-level mid-drive state | pending: scan `src/test` for `getDeclaredField` / `getDeclaredMethod` / `Class.forName` outside `PathingTestAccess` | pending |
+| H-R1 Reflection is the exception | Collaborator unit tests live same-package with direct package-private access; reflection exists only in `PathingTestAccess`, only for integration-level mid-drive state | `hygiene.ReflectionDoorCheck` | gated 2026-08-24 |
 | H-R2 No inline FQNs | A type used in code is imported; FQNs appear only where Java demands them | none scheduled (textually checkable, lowest value) | review-only |
 | H-R3 English-only everywhere | Zero CJK codepoints in any `.md` file and any Java source | `hygiene.EnglishOnlyScan` | gated 2026-08-24 |
 | H-R4 Wire keys frozen | Serialized boundary-D keys survive field renames | key-set assertions in `TickPipelineGateTest` (keepalive attrs only) | pending: widen to all boundary-D payloads |
@@ -91,7 +91,10 @@ admitted here may encode a size cap.
   integration-level assertions that must inspect mid-drive state
   from outside the package. The `Class.forName` bypass that used to
   live in `chebyshevBoundaryCases` was the violation this rewrite
-  retired.
+  retired. Mechanical half: `hygiene.ReflectionDoorCheck` scans the
+  test sources for reflective access outside the door, so a new
+  inline `getDeclaredField` or `Class.forName` fails the offline
+  suite before commit.
 - **H-R2 No inline fully-qualified names in sources.** A type used
   in code gets an import; FQNs appear only where Java demands them
   (javadoc `{@link}`, disambiguation against a same-named import).
