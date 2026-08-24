@@ -193,29 +193,37 @@ ruling must add its row before implementation.
 |---|---|---|
 | SURFACE + FREEZE | SURFACE (shipped, ledger 22) | freezing underwater doubles the death |
 | FREEZE + ENGAGE | FREEZE (shipped, ledger 23) | no fights at 3 HP |
-| LAVA(?) + FREEZE | LAVA | 4 HP/tick does not negotiate |
-| SUFFOCATE(?) + any | SUFFOCATE | 1 HP/tick, and movement may worsen it |
-| FIRE + SURFACE | SURFACE, then fire dies in water | water extinguishes |
+| LAVA + any | LAVA (shipped, ledger 24) | 4 HP/tick does not negotiate |
+| SUFFOCATE + SURFACE/FREEZE/ENGAGE | SUFFOCATE (shipped, ledger 24) | 1 HP/tick, and movement may worsen it |
+| SUFFOCATE + LAVA | LAVA (shipped, ledger 24) | both instant-class; lava is faster and ASCEND is the only exit |
+| FIRE + SURFACE | SURFACE; fire then dies in water (no rule, D4) | water extinguishes |
 
-(Names with (?) are proposals, not shipped rules.)
+## 5. Sequencing (as ruled)
 
-## 5. Proposed sequencing (for ruling)
-
-1. **Now, survival-gate residue**: F1 (vitals pass) + F2's reflex
-   half (live-pipeline lava ASCEND) — S each, closes the only
-   dead-field dishonesty in the board and the fastest killer's
-   blind spot. F2's escape mission and F4's suffocation rule are
-   the two candidates for the next mechanism slot after that.
-2. **With 0007 Phase 1**: F7's sensing groundwork.
-3. **Deferred with numbers recorded**: F3 (no rule), F5 (no rule),
-   F6, F8 pending ruling.
+1. **Shipped 2026-08-25 (ledger 24)**: D1 vitals pass + D2 lava
+   ASCEND + D5 crashed-state air (6ccdb3b), D3 suffocation FREEZE
+   and the reload-parity repair (review follow-up: 6ccdb3b shipped
+   the lava rule without a JSON form or datapack row - the first
+   /reload would have silently dropped it; ReflexRuleJson branches
+   + default table rows +
+   `shippedDatapackTableCoversEveryCodeRegisteredRuleType` now pin
+   the lockstep). D2's escape mission stays deferred: ASCEND buys
+   seconds at the surface, the horizontal exit is ENGAGE-pattern
+   machinery awaiting an unattended run that actually dies in lava.
+2. **Adopted without code (D4)**: fire is sense-only; the sensing
+   fields landed in D1.
+3. **With 0007 Phase 1**: F7's sensing groundwork (hunger is
+   Player-only, FoodData on Player.java:168).
+4. **Deferred with numbers recorded**: F5 (void/fall - no rule,
+   planner's job), F6 (freezing - slowest gauge, shares F2's escape
+   machinery if that lands).
 
 ## 6. Decision log
 
 | # | Question | Ruling |
 |---|---|---|
-| D1 | Vitals sensing pass (F1)? | OPEN |
-| D2 | Live-pipeline lava: ASCEND-only vs + escape mission (F2)? | OPEN |
-| D3 | Suffocation FREEZE rule at 115 (F4)? | OPEN |
-| D4 | Widen MinimalReflex with an air check (F8)? | OPEN |
-| D5 | Fire: sense-only, no rule (F3)? | OPEN |
+| D1 | Vitals sensing pass (F1)? | RULED YES - shipped 2026-08-25 (6ccdb3b, ledger 24): fireTicks / freezeTicks / inWall / inLethalFluid all sensor-stamped with safe beginTick defaults |
+| D2 | Live-pipeline lava: ASCEND-only vs + escape mission (F2)? | RULED ASCEND-only first (6ccdb3b): 130/ASCEND buys surface seconds; the ENGAGE-pattern escape mission stays deferred until an unattended run dies in lava for real. Review follow-up repaired the missing JSON form + datapack row (reload-parity, ledger 24) |
+| D3 | Suffocation FREEZE rule at 115 (F4)? | RULED YES - shipped 2026-08-25 (ledger 24): FREEZE_ON_SUFFOCATION 115/hold 10, FREEZE action; ladder-gated between SURFACE and LAVA |
+| D4 | Widen MinimalReflex with an air check (F8)? | RULED YES - shipped 2026-08-25 (6ccdb3b): one more if, air < 80 holds jump; ADR-0005 D3 dependency class intact |
+| D5 | Fire: sense-only, no rule (F3)? | RULED ADOPTED - no rule; sensing fields arrived with D1 |

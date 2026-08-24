@@ -18,6 +18,7 @@ import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.core.reflex.AscendInLethalFluidRule;
 import com.mcbot.mcbotserver.core.reflex.EngageOnHostileProximityRule;
 import com.mcbot.mcbotserver.core.reflex.FreezeOnLowHealthRule;
+import com.mcbot.mcbotserver.core.reflex.FreezeOnSuffocationRule;
 import com.mcbot.mcbotserver.core.reflex.SurfaceOnLowAirRule;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
 import com.mcbot.mcbotserver.core.state.ChangeDetectingStateChannel;
@@ -132,6 +133,14 @@ public final class BotAssembly {
         // since ADR-0003 (issue 0008 F2); this rule + the vitals
         // sensor pass close the live-pipeline lava blind spot.
         reflex.addRule(new AscendInLethalFluidRule());
+        // Suffocation halt (issue 0008 D3): 1 HP/tick instant-class,
+        // and the rescue direction is unknown - a reflex guessing a
+        // direction can push the body deeper into the glitch, so
+        // freezing is strictly correct. 115 sits between SURFACE and
+        // LAVA per the 0008 F9 triage table. On this codebase inWall
+        // is almost always a pathing bug - the reflex is also the
+        // siren; the fix lives upstream.
+        reflex.addRule(new FreezeOnSuffocationRule());
         // Idle-combat reflex (2026-08-24 night-cave death): engages a
         // hostile that closes to melee range even when no mission is
         // running. Sits BELOW the survival holds: at three health

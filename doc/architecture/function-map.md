@@ -63,14 +63,28 @@ reopened on demand — **[DEFERRED]** outside v1.
   by hostilesAggroOnSight.
 - **[SHIPPED]** Freezes on low health, surfaces on low air (trigger 80
   of 300, decision 22; ASCEND holds jump, vanilla fluid physics does
-  the swimming), and engages hostiles that close to melee range while
+  the swimming), ascends in lethal fluid (lava, 4 HP/tick with no
+  interval - the one vital that outranks everything, decision 24),
+  halts on suffocation (1 HP/tick instant class where a guessed
+  rescue direction can worsen the glitch - freeze is the only
+  strictly-correct verb, and the reflex doubles as the pathing-bug
+  siren), and engages hostiles that close to melee range while
   idle (decision 23: one preemption tick, then a reflex-owned defend
-  mission runs the fight through the arbiter). Reflex rules are
-  datapack JSON; new survival scenarios are data, not code. A reflex
-  preemption skips all mission work for that tick - except ENGAGE,
-  which spends exactly one tick preempting.
+  mission runs the fight through the arbiter). Triage ladder frozen
+  at five rungs: LAVA 130 > SUFFOCATION 115 > SURFACE 110 > FREEZE
+  100 > ENGAGE 90 (decision 24). Fire and freeze are sensed but
+  ruleless by ruling (issue 0008 D4/F6 - fire is self-answering,
+  freezing is the slowest gauge). Reflex rules are datapack JSON;
+  new survival scenarios are data, not code; a code-registered rule
+  type must land with its JSON branch and datapack row in the same
+  change or the first /reload silently drops it (ledger 24
+  reload-parity rule). A reflex preemption skips all mission work
+  for that tick - except ENGAGE, which spends exactly one tick
+  preempting.
 - **[SHIPPED]** After any pipeline crash the bot latches into a minimal
-  state: only ascend from lethal fluid, nothing else. The latch clears
+  state: ascend from lethal fluid or critically low air, otherwise
+  nothing (decision 24 widened the air check; still one if-flag per
+  vital, ADR-0005 D3 class). The latch clears
   on harness reset or death+respawn (crash counter preserved).
 - **[GAP]** Fall protection, projectile dodge, automatic eating, ranged
   idle threats (a skeleton kiting at standoff never trips the melee

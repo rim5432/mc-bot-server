@@ -1,6 +1,6 @@
 ---
 title: Boundary Contracts and Decision Ledger
-last_verified: 2026-08-24
+last_verified: 2026-08-25
 covers:
   - doc/decisions/0002-capability-model-task-arbiter.md
   - doc/decisions/0003-reflex-layer-preemption.md
@@ -542,6 +542,34 @@ BotState getState();
     aligned with computePriority's documented "at or below" - a
     strict < shifted every hysteretic rule's effective trigger one
     tick late.
+    24. Vitals pass and the extreme-scenario reflexes (issue 0008
+    D1/D2/D3/D5; ruling batch 2026-08-25). D1: ThreatBlackboard
+    gains fireTicks, freezeTicks, inWall - all entity-state reads in
+    the airSupply category (sensor-stamped suppliers, beginTick
+    reset to safe) - and the inLethalFluid field dead since ADR-0003
+    finally has a writer. D2: ASCEND_IN_LETHAL_FLUID (priority 130,
+    ASCEND - held jump routes to jumpInFluid(LAVA); lava is 4 HP/tick
+    with no interval, the one vital that outranks everything). D3:
+    FREEZE_ON_SUFFOCATION (priority 115, FREEZE - 1 HP/tick instant
+    class where the rescue direction is UNKNOWN, so halting is the
+    only strictly-correct reflex response; inWall on this codebase
+    is almost always a pathing bug, the reflex doubles as the
+    siren). D5: MinimalReflex.tick gains an airSupply parameter -
+    a crashed bot with air < 80 holds jump; one more if in the same
+    dependency class as the lava flag, ADR-0005 D3 intact. D4 ruled
+    NO RULE: fire is self-answering (extinguished by water the
+    ongoing route touches) and sense-only since D1. The triage
+    ladder is now five rungs and frozen: LAVA 130 > SUFFOCATION 115
+    > SURFACE 110 > FREEZE 100 > ENGAGE 90. RELOAD-PARITY RULE (found
+    live in review): a reflex type registered by assembly code MUST
+    land with its ReflexRuleJson parse/write branch AND its default
+    datapack row in the same change - /reload replaces the whole
+    table, so a code-only rule is silently dropped by the first
+    reload; the RuleTableGateTest
+    shippedDatapackTableCoversEveryCodeRegisteredRuleType gate pins
+    the lockstep. Boolean-condition rules (lava, suffocation) carry
+    only their priority in JSON - the inverted 0/1 signal's
+    hysteresis thresholds are code constants, not tunable data.
 
 ## Deferred, with reopen conditions
 
