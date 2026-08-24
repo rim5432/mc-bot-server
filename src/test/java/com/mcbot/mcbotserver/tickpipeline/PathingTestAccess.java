@@ -1,9 +1,11 @@
 package com.mcbot.mcbotserver.tickpipeline;
 
 import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.List;
 
 /**
@@ -22,6 +24,22 @@ final class PathingTestAccess {
     /** The active plan chain. */
     static List<CellPos> waypoints(PathingBehavior mover) {
         return (List<CellPos>) cursorField(mover, "waypoints");
+    }
+
+    /**
+     * Steer pitch toward one waypoint - invokes the package-private
+     * static directly so the clamp math is unit-pinnable without
+     * fabricating a plan shape the planner may not produce.
+     */
+    static float steerPitch(Vec3 position, CellPos wp) {
+        try {
+            Method m = PathingBehavior.class.getDeclaredMethod(
+                "steerPitch", Vec3.class, CellPos.class);
+            m.setAccessible(true);
+            return (Float) m.invoke(null, position, wp);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     /** Cursor position within the plan. */

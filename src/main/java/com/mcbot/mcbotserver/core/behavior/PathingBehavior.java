@@ -129,6 +129,16 @@ public final class PathingBehavior implements Behavior {
     public static final long PLAN_WALL_CLOCK_MS = 200;
 
     /**
+     * Steer pitch limit, in degrees. Presentation only (issue 0005
+     * P0): the look pitch toward the steer waypoint follows terrain
+     * so the head reads as going somewhere, but a waypoint almost
+     * straight overhead (deep-water surface ascent) must not pin the
+     * view at -90; past this limit the glance stops climbing. Frame:
+     * degrees, symmetric up/down, engine sign (negative = up).
+     */
+    public static final float STEER_PITCH_LIMIT_DEG = 60f;
+
+    /**
      * Freshness tolerance in cells (issue 0001 fix 5 / Ruling (c).
      * The bot's current cell must be within Chebyshev distance
      * {@code FRESHNESS_CELLS} of the {@code pendingStart} the
@@ -480,7 +490,31 @@ public final class PathingBehavior implements Behavior {
         actor.submit(new Claim(Channel.MOVE, 10, name,
             new Intent.Move(1.0, 0, jumpForWaypoint, false)));
         actor.submit(new Claim(Channel.ROT, 10, name,
-            new Intent.Look(yaw, 0f)));
+            new Intent.Look(yaw, steerPitch(position, wp))));
+    }
+
+    /**
+     * Terrain-following look pitch toward the steer waypoint, engine
+     * sign convention (negative = up). Computed feet-to-feet: the
+     * waypoint's standable floor sits at {@code wp.y()} and the body's
+     * feet at {@code position.y()}, so eye heights cancel on both ends
+     * and the pitch says "how much vertical travel the next leg has".
+     * A flat leg reads exactly 0. Clamped to
+     * {@link #STEER_PITCH_LIMIT_DEG}; presentation only (issue 0005
+     * P0) - no physics consumes this value.
+     *
+     * @param position the body's current fine position; never null
+     * @param wp       the steer target cell; never null
+     * @return pitch in degrees within
+     *         {@code [-STEER_PITCH_LIMIT_DEG, +STEER_PITCH_LIMIT_DEG]}
+     */
+    static float steerPitch(Vec3 position, CellPos wp) {
+        double dy = wp.y() - position.y();
+        double horizontal = Math.hypot(wp.x() + 0.5 - position.x(),
+            wp.z() + 0.5 - position.z());
+        float pitch = (float) -Math.toDegrees(Math.atan2(dy, horizontal));
+        return Math.max(-STEER_PITCH_LIMIT_DEG,
+            Math.min(STEER_PITCH_LIMIT_DEG, pitch));
     }
 
     static CellPos floorOf(Vec3 position) {
