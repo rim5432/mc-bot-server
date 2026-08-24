@@ -72,7 +72,7 @@ admitted here may encode a size cap.
 
 | Rule | Invariant it guards | Gate | Status |
 |---|---|---|---|
-| H-R1 Reflection one door | Test-side reflective access to behavior internals exists only in `PathingTestAccess` | pending: scan `src/test` for `getDeclaredField` / `getDeclaredMethod` / `Class.forName` outside `PathingTestAccess` | pending |
+| H-R1 Reflection is the exception | Collaborator unit tests live same-package with direct package-private access; reflection exists only in `PathingTestAccess`, only for integration-level mid-drive state | pending: scan `src/test` for `getDeclaredField` / `getDeclaredMethod` / `Class.forName` outside `PathingTestAccess` | pending |
 | H-R2 No inline FQNs | A type used in code is imported; FQNs appear only where Java demands them | none scheduled (textually checkable, lowest value) | review-only |
 | H-R3 English-only everywhere | Zero CJK codepoints in any `.md` file and any Java source | `hygiene.EnglishOnlyScan` | gated 2026-08-24 |
 | H-R4 Wire keys frozen | Serialized boundary-D keys survive field renames | key-set assertions in `TickPipelineGateTest` (keepalive attrs only) | pending: widen to all boundary-D payloads |
@@ -81,12 +81,17 @@ admitted here may encode a size cap.
 
 ### Rule detail
 
-- **H-R1 Reflection goes through one door.** Test-side reflective
-  access to behavior internals is centralized in
-  `PathingTestAccess` (two-hop: mover, then collaborator field, then
-  target). New tests must not inline `getDeclaredField` against
-  behavior classes; when state moves between collaborators, only
-  that one file changes.
+- **H-R1 Reflection is the exception, not the door.** Collaborator
+  level unit tests live in same-package directories under
+  `src/test` (`core/behavior` hosts the pathing-collaborator tests)
+  and call package-private members directly - a moved class is a
+  compile error, never a runtime `ClassNotFoundException` from an
+  FQN string. Routing through `PathingTestAccess` (two-hop: mover,
+  then collaborator field, then target) is reserved for
+  integration-level assertions that must inspect mid-drive state
+  from outside the package. The `Class.forName` bypass that used to
+  live in `chebyshevBoundaryCases` was the violation this rewrite
+  retired.
 - **H-R2 No inline fully-qualified names in sources.** A type used
   in code gets an import; FQNs appear only where Java demands them
   (javadoc `{@link}`, disambiguation against a same-named import).
@@ -131,7 +136,11 @@ simplified to `Ok.fresh`/`replay` routing (0b3700d) and
 source set (e88aed6); inline FQNs became imports repo-wide
 (2e01ed3); `pose` renamed to `position` ahead of the Stage 3 pose
 vocabulary while keeping wire key `"pose"` (3193e84). Main source
-set went from 8654 to 8396 lines with zero behavior change.
+set went from 8654 to 8396 lines with zero behavior change. The
+line delta is a side effect of the pass, not its evidence: the
+decomposition round below grew total lines and is equally a win -
+the binding evidence in both rounds is the offline suite (0 skips)
+and the blast radius.
 
 ### Gametest harness consolidation (2026-08-23)
 

@@ -1,18 +1,21 @@
 package com.mcbot.mcbotserver.tickpipeline;
 
 import com.mcbot.mcbotserver.api.types.CellPos;
-import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.List;
 
 /**
- * Centralised reflective access to PathingBehavior's private state
- * for the tickpipeline gates. Every field move inside the follower
- * (state extracted into collaborators) retargets exactly this file,
- * not a dozen tests.
+ * Reflective access to PathingBehavior's private mid-drive state
+ * for the tickpipeline integration gates - and nothing else.
+ * Collaborator-level unit tests live same-package under
+ * core.behavior and call package-private members directly
+ * (code-health.md H-R1): a moved class must surface as a compile
+ * error, never as a runtime ClassNotFoundException from an FQN
+ * string. Routing through this file (two-hop: mover, then
+ * collaborator field, then target) is reserved for assertions
+ * that must inspect mid-drive state from outside the package.
  *
  * <p>Package-private test infrastructure; not part of any boundary.
  */
@@ -24,22 +27,6 @@ final class PathingTestAccess {
     /** The active plan chain. */
     static List<CellPos> waypoints(PathingBehavior mover) {
         return (List<CellPos>) cursorField(mover, "waypoints");
-    }
-
-    /**
-     * Steer pitch toward one waypoint - invokes the package-private
-     * static directly so the clamp math is unit-pinnable without
-     * fabricating a plan shape the planner may not produce.
-     */
-    static float steerPitch(Vec3 position, CellPos wp) {
-        try {
-            Method m = PathingBehavior.class.getDeclaredMethod(
-                "steerPitch", Vec3.class, CellPos.class);
-            m.setAccessible(true);
-            return (Float) m.invoke(null, position, wp);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException(e);
-        }
     }
 
     /** Cursor position within the plan. */
@@ -99,17 +86,6 @@ final class PathingTestAccess {
     private static Object cursorOf(PathingBehavior mover) {
         try {
             Field f = PathingBehavior.class.getDeclaredField("cursor");
-            f.setAccessible(true);
-            return f.get(mover);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    private static Object hostField(PathingBehavior mover,
-                                    String name) {
-        try {
-            Field f = PathingBehavior.class.getDeclaredField(name);
             f.setAccessible(true);
             return f.get(mover);
         } catch (ReflectiveOperationException e) {

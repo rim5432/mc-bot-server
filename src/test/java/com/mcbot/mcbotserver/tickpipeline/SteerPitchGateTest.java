@@ -112,26 +112,7 @@ class SteerPitchGateTest {
             "JumpUp steering pitch must be -atan2(dy=1, dx=2)");
     }
 
-    /**
-     * Clamp math without a fabricated plan: a waypoint 3 up and 1
-     * across reads -71.6 unclamped and must stop at -60; the mirror
-     * case downward clamps at +60 (drops of 3 with the waypoint one
-     * cell ahead exist in real plans).
-     */
-    @Test
-    void steepWaypointsClampToLimit() {
-        Vec3 position = new Vec3(0.5, 64, 0.5);
-        assertEquals(-PathingBehavior.STEER_PITCH_LIMIT_DEG,
-            PathingTestAccess.steerPitch(position,
-                new CellPos(1, 67, 0)), 0.01,
-            "near-vertical ascent clamps at the up limit");
-        assertEquals(PathingBehavior.STEER_PITCH_LIMIT_DEG,
-            PathingTestAccess.steerPitch(position,
-                new CellPos(1, 61, 0)), 0.01,
-            "near-vertical descent clamps at the down limit");
-        assertEquals(0f,
-            PathingTestAccess.steerPitch(position,
-                new CellPos(1, 64, 0)), 1e-6,
-            "level waypoint reads exactly 0");
-    }
+    // Clamp-at-limit cases are pinned same-package in
+    // core.behavior.SteerPitchClampTest (H-R1: direct call, no
+    // reflection).
 }

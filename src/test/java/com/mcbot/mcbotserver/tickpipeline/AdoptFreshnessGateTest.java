@@ -113,61 +113,10 @@ class AdoptFreshnessGateTest {
     }
 
     /**
-     * Chebyshev distance (the freshness metric) at the boundary
-     * cases. Direct unit test of the helper, since the integration
-     * 2-cell-discard test is non-deterministic (a discarded plan
-     * immediately triggers a fresh plan that re-populates
-     * waypoints, so the only observable difference is the
-     * discard's primitive effect, not the eventual state).
+     * Chebyshev boundary semantics are pinned same-package in
+     * core.behavior.PlanLifecycleChebyshevTest (H-R1: direct call,
+     * no reflection).
      */
-    @Test
-    void chebyshevBoundaryCases() throws Exception {
-        // Reflectively read the static helper (lives on PlanLifecycle,
-        // package-private, so resolve by name).
-        var lifecycleClass = Class.forName(
-            "com.mcbot.mcbotserver.core.behavior.PlanLifecycle");
-        var m = lifecycleClass.getDeclaredMethod(
-            "chebyshevDistance", CellPos.class, CellPos.class);
-        m.setAccessible(true);
-
-        // Same cell: 0.
-        assertEquals(0, (int) m.invoke(null,
-            new CellPos(5, 64, 0), new CellPos(5, 64, 0)),
-            "same cell has Chebyshev 0");
-
-        // 1-cell offset on each axis independently: 1.
-        assertEquals(1, (int) m.invoke(null,
-            new CellPos(5, 64, 0), new CellPos(6, 64, 0)),
-            "+X by 1: Chebyshev 1");
-        assertEquals(1, (int) m.invoke(null,
-            new CellPos(5, 64, 0), new CellPos(4, 64, 0)),
-            "-X by 1: Chebyshev 1");
-        assertEquals(1, (int) m.invoke(null,
-            new CellPos(5, 64, 0), new CellPos(5, 65, 0)),
-            "+Y by 1: Chebyshev 1");
-        assertEquals(1, (int) m.invoke(null,
-            new CellPos(5, 64, 0), new CellPos(5, 63, 0)),
-            "-Y by 1: Chebyshev 1");
-        assertEquals(1, (int) m.invoke(null,
-            new CellPos(5, 64, 0), new CellPos(5, 64, 1)),
-            "+Z by 1: Chebyshev 1");
-
-        // Diagonal 1: max of 1, 1, 0 = 1. Still fresh.
-        assertEquals(1, (int) m.invoke(null,
-            new CellPos(5, 64, 0), new CellPos(6, 65, 0)),
-            "diagonal 1 (X+Y): Chebyshev 1, still fresh");
-
-        // 2-cell offset: stale.
-        assertEquals(2, (int) m.invoke(null,
-            new CellPos(5, 64, 0), new CellPos(7, 64, 0)),
-            "+X by 2: Chebyshev 2, stale");
-        assertEquals(2, (int) m.invoke(null,
-            new CellPos(5, 64, 0), new CellPos(5, 64, 2)),
-            "+Z by 2: Chebyshev 2, stale");
-        assertEquals(2, (int) m.invoke(null,
-            new CellPos(5, 64, 0), new CellPos(6, 66, 0)),
-            "X+1 Y+2: Chebyshev 2, stale");
-    }
 
     /**
      * Bot drifts 1 cell in Y (vertical). Chebyshev 1 still
