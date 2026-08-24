@@ -1,7 +1,11 @@
 ---
 title: Code Health Ledger
-last_verified: 2026-08-23
-covers: []
+last_verified: 2026-08-24
+covers:
+  - src/test/java/com/mcbot/mcbotserver/hygiene/EnglishOnlyScan.java
+  - src/test/java/com/mcbot/mcbotserver/hygiene/GametestInventoryCheck.java
+  - src/test/java/com/mcbot/mcbotserver/tickpipeline/PathingTestAccess.java
+  - src/test/java/com/mcbot/mcbotserver/tickpipeline/TickPipelineGateTest.java
 ---
 
 # Code Health Ledger
@@ -36,10 +40,46 @@ Refactor discipline (applies to every round recorded here):
 - Contract markers and Ruling comments travel with the code they
   anchor; a decomposition that drops one is a defect, not a shortcut.
 
-## Standing rules
+## Rule registry
 
-Durable outcomes of past rounds. Each is a review-enforced rule
-until a gate test automates it.
+Durable outcomes of past rounds, admitted one by one. Every rule
+carries the invariant it guards, the gate that enforces it, and a
+status:
+
+- **gated** - a mechanical check in the offline suite fails on
+  drift; the rule's manual obligations are retired.
+- **pending** - rule-only today; the gate column names the planned
+  check, and the row states what graduates it.
+- **review-only** - not mechanically checkable by nature (prose
+  quality, spectrum rationale); review-enforced forever.
+
+Admission protocol - one atomic commit per admission: the registry
+row, the gate test landing in the `architecture` (structure and
+boundary rot) or `hygiene` (source hygiene) test package with a
+Javadoc cross-reference back to the row, and the rewrite of
+any rule prose the gate has made true. A candidate must name an
+invariant it guards; a rule admitted with an unenforceable manual
+trigger and no graduation path is the failure mode this registry
+exists to prevent. Gate failure messages carry their own
+remediation - a gate that gets disabled when noisy is worse than
+no gate.
+
+Non-goal: line-count thresholds. The deep-clean round recorded
+-258 main-source lines as a win and the PathingBehavior
+decomposition recorded +383 total lines as a win - LOC cannot
+distinguish health from rot in either direction, and no gate
+admitted here may encode a size cap.
+
+| Rule | Invariant it guards | Gate | Status |
+|---|---|---|---|
+| H-R1 Reflection one door | Test-side reflective access to behavior internals exists only in `PathingTestAccess` | pending: scan `src/test` for `getDeclaredField` / `getDeclaredMethod` / `Class.forName` outside `PathingTestAccess` | pending |
+| H-R2 No inline FQNs | A type used in code is imported; FQNs appear only where Java demands them | none scheduled (textually checkable, lowest value) | review-only |
+| H-R3 English-only everywhere | Zero CJK codepoints in any `.md` file and any Java source | `hygiene.EnglishOnlyScan` | gated 2026-08-24 |
+| H-R4 Wire keys frozen | Serialized boundary-D keys survive field renames | key-set assertions in `TickPipelineGateTest` (keepalive attrs only) | pending: widen to all boundary-D payloads |
+| H-R5 Gametest inventory | The registered `@GameTest` set cannot silently shrink | `hygiene.GametestInventoryCheck` | gated |
+| H-R6 Geometry spectrum rationale | Threshold constants document their partial-top-spectrum reasoning | not mechanically checkable | review-only |
+
+### Rule detail
 
 - **H-R1 Reflection goes through one door.** Test-side reflective
   access to behavior internals is centralized in
@@ -53,8 +93,10 @@ until a gate test automates it.
 - **H-R3 English-only everywhere, not just markdown.** The zero-CJK
   mandate covers Java comments and Javadoc too. The first scrub
   covered `.md` only and missed Javadoc prose; both trees are now
-  regex-verified. Re-run the scan on any file touched after a
-  non-English reference source.
+  gated by `hygiene.EnglishOnlyScan`, which fails the offline suite
+  on any CJK codepoint in covered sources. A genuine data literal
+  goes through the gate's explicit allowlist - a review decision,
+  not an escape hatch.
 - **H-R4 Wire keys are frozen even when fields rename.** Renaming a
   state field must preserve its serialized key (the `pose` ->
   `position` rename kept the wire key `"pose"`); boundary-D payloads
@@ -149,7 +191,3 @@ without an anchor is a workplan item, not a row here.
   the candidate: a layer-1 test scanning every boundary-interface
   implementer for its contract marker. Optional for Stage 3; pair
   with the next boundary-touching change.
-- **OPEN H4 - automated English-only comment scan.** The CJK scrub
-  is manual regex today (H-R3). An automated per-package check is
-  the AGENTS.md 1.4.9 analogue; preventive only - add it when drift
-  reappears, not before.
