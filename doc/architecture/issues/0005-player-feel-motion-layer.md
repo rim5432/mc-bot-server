@@ -4,9 +4,11 @@ last_verified: 2026-08-24
 covers:
   - src/main/java/com/mcbot/mcbotserver/core/behavior/PathingBehavior.java
   - src/main/java/com/mcbot/mcbotserver/core/behavior/IdleLook.java
+  - src/main/java/com/mcbot/mcbotserver/core/behavior/PlanProgressFuse.java
+  - src/main/java/com/mcbot/mcbotserver/core/pathing/PlanSmoother.java
   - src/main/java/com/mcbot/mcbotserver/adapter/entity/BotBodyEntity.java
   - src/main/java/com/mcbot/mcbotserver/adapter/BindingActor.java
-status: open (P0 shipped)
+status: open (P0-P3 shipped; live acceptance run pending)
 related:
   - doc/architecture/boundaries.md
   - doc/architecture/function-map.md
@@ -132,6 +134,58 @@ swings through it would convert idle flavor into combat input. The
 swing call therefore lives in the adapter next to the body, driven by
 a seeded timer, and is suppressed while a combat process owns the
 arbiter (never swing idly mid-fight - that reads as attacking).
+
+**Implementation status (2026-08-24, P1+P2+P3 shipped)**:
+
+- P1.2 + P1.3 land as ONE post-pass, `core.pathing.PlanSmoother`,
+  applied at plan adoption (both sync and worker paths): rule 1
+  collapses collinear runs (constant step vector, no world read -
+  every edge was A*-validated), rule 2 greedily merges same-Y
+  waypoints over a standable corridor sampled every 0.5 blocks
+  (`BasicMoves.standable`, now package-visible). The staircase
+  collapse IS P1.3: one far-above waypoint for the whole climb keeps
+  the jump thrust held, turning per-step JumpUp waits into a
+  continuous hop cadence with zero extra mechanism. Pinned by
+  `PlanSmootherTest` (straight/staircase collapse, zigzag merge,
+  wall-keeps-corner, short-chain passthrough).
+- Ledger-20 hard re-test trigger fired and resolved (see the
+  amended entry in boundaries.md): drift is now XZ distance to the
+  walked SEGMENT (`WaypointCursor.previous()` to `current()`), the
+  criterion-3 latch resets on waypoint advance, and the arclength
+  upgrade was judged unnecessary (merged segments are straight).
+  Pinned by `PathingBehaviorFrameGateTest.replanDriftIsXZToSegment`
+  and `PlanProgressFuseSegmentTest`; limbo/detour coverage re-run.
+- P1.1 sprint is adapter-local per the 0004 D4 ruling:
+  `BindingActor.sprintClearAhead` - forward >= 0.95, not in fluid
+  (water sprint is the swim boost and would change crossing speed),
+  and a 5-block eye-height clip ahead misses (`SPRINT_CLEARANCE_BLOCKS`).
+  Single steps ahead do not read as walls at eye height, so
+  sprint-jump onto steps stays the gait. No Intent signature change.
+- P2.1 departure hold: `DEPARTURE_DELAY_TICKS = 4` in
+  `PathingBehavior`, re-armed on goal change (a mid-mission re-target
+  reads as stop-and-redecide); planning and cursor bookkeeping run
+  during the hold, only the drive claims wait. Pinned by
+  `DepartureBrakeGateTest`.
+- P2.2 arrival brake: drive scales as `endDist / BRAKE_DISTANCE`
+  (3.0 m) floored at `ARRIVE_MIN_DRIVE = 0.35`, measured XZ to the
+  plan's terminal waypoint - never zero, so the body always creeps
+  into the goal predicate. Pinned by `DepartureBrakeGateTest`.
+- P2.3 idle sweep: `IdleLook.SWEEP_INTERVAL_TICKS = 100`,
+  `SWEEP_AMPLITUDE_DEG = 60`; the adapter anchors the base yaw when
+  idleness begins and flips glance direction on the counter -
+  deterministic, no randomness. Pinned by
+  `IdleLookGateTest.sweepDefaultsPinned`.
+- P3 fidget: `BindingActor.tickWalkFidget`, one seeded
+  `Random(FIDGET_SEED)` owns the whole sequence; a burst fires every
+  40-120 WALKING ticks (the countdown only advances while a MOVE
+  claim flows), 1-in-3 bursts echo a second swing 8 ticks later.
+  Suppression is the USE-winner-or-combat-ROT-priority test
+  (`COMBAT_PRIORITY_BAND = 20`). Direct `body.swing` only - never
+  the USE channel (the P3 semantic boundary above).
+- Known ceiling (ponytail-marked in code): the LOS corridor is
+  point-sampled with no body-width inflation; the fuse criterion-3
+  analysis assumes merged segments stay straight, so any future
+  CURVED path vocabulary must do the arclength upgrade after all.
 
 ## 5. Rejected
 

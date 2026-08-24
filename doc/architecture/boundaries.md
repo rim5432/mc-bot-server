@@ -429,6 +429,18 @@ BotState getState();
     detour coverage (LimboCharacterizationGateTest plus the detour
     cases) and upgrade the criterion to arclength projection if
     waypoint gaps exceed one cell.
+    Trigger fired 2026-08-24 by issue 0005 P1.2 (PlanSmoother,
+    collinear-run collapse plus same-Y line-of-sight merge).
+    Resolution: the arclength upgrade is NOT needed - merged
+    segments are straight, so waypoint distance stays monotone
+    along a segment - but two follow-throughs landed in the same
+    change: off-path drift now measures XZ distance to the WALKED
+    SEGMENT (previous-to-current waypoint; mid-segment distance to
+    the endpoint is legitimate, not drift), and the criterion-3
+    latched minimum resets on waypoint advance (a stale minimum
+    would silence criterion 3 for a whole segment and false-STUCK
+    a moving body on a detour leg). Limbo and detour coverage
+    re-run green (offline suite plus runGameTest).
 
 ## Deferred, with reopen conditions
 
