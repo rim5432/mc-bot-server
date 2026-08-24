@@ -53,6 +53,14 @@ public final class BotSliceGameTests {
     private static final int TIMEOUT = 400;
     private static final int MISSION_BUDGET = 350;
 
+    /**
+     * Upper bound on ticks from mission start to a structural
+     * refusal: the refusal decision is made on the mission's first
+     * directive pass, so a healthy run lands in single digits - the
+     * window only exists to absorb sequence-overhead ticks.
+     */
+    private static final int REFUSAL_WINDOW_TICKS = 15;
+
     private BotSliceGameTests() {
     }
 
@@ -296,6 +304,15 @@ public final class BotSliceGameTests {
      * sees the structural mismatch (melee-only vs kite-and-shoot) and
      * fails the mission on the engage tick with a structured reason -
      * before the body spends a single tick under fire.
+     *
+     * <p>The skeleton sits at its natural ranged standoff (8 cells,
+     * outside {@code EngageOnHostileProximityRule}'s 6-cell trigger)
+     * - under the production rule set a skeleton that closed to
+     * melee range would trip the idle-combat reflex instead, which is
+     * the scenario 4 shape, not this one. The discriminative
+     * assertions are the structured refusal reason plus the tick
+     * window: a regression to chasing keeps the mission alive past
+     * the window and fails here, not at timeout.
      */
     @GameTest(template = "empty16x8x16", timeoutTicks = TIMEOUT)
     public static void refusesRangedItCannotAnswer(GameTestHelper helper) {
@@ -303,18 +320,21 @@ public final class BotSliceGameTests {
         var level = helper.getLevel();
         Skeleton skeleton = EntityType.SKELETON.create(level);
         check(skeleton != null, "skeleton creation failed");
-        var sAbs = helper.absolutePos(new BlockPos(7, GametestRig.WALK_Y, 8));
+        var sAbs = helper.absolutePos(new BlockPos(11, GametestRig.WALK_Y, 8));
         skeleton.moveTo(sAbs.getX() + 0.5, sAbs.getY(),
             sAbs.getZ() + 0.5, 0f, 0f);
         skeleton.setNoAi(true);
         level.addFreshEntity(skeleton);
 
         DefendProcess mission = submitDefend(rig);
+        int[] waited = {0};
 
         helper.startSequence()
-            .thenWaitUntil(driveUntil(rig,
-                () -> check(!mission.isActive(),
-                    "waiting for the refusal")))
+            .thenWaitUntil(driveUntil(rig, () -> {
+                waited[0]++;
+                check(!mission.isActive(),
+                    "waiting for the refusal");
+            }))
             .thenExecuteFor(3, driveOnly(rig))
             .thenExecuteAfter(0, () -> {
                 check(!mission.missionSucceeded(),
@@ -333,8 +353,15 @@ public final class BotSliceGameTests {
                 checkEquals("minecraft:skeleton",
                     failed.attrs().get("threatType"),
                     "the refused type must reach the harness");
-                checkEquals(20f, rig.body().getHealth(),
-                    "the body must refuse BEFORE taking arrows");
+                check(waited[0] <= REFUSAL_WINDOW_TICKS,
+                    "a structural refusal lands on the engage tick, not "
+                        + "after a chase; waited " + waited[0] + " ticks");
+                List<String> kinds = rig.events().statusSnapshot(0)
+                    .events().stream()
+                    .map(BotEvent::kind).toList();
+                check(!kinds.contains(EventKind.TASK_PAUSED),
+                    "a standoff-range skeleton must not trip the engage "
+                        + "reflex (no TASK_PAUSED expected)");
                 rig.body().discard();
             })
             .thenSucceed();
@@ -342,14 +369,21 @@ public final class BotSliceGameTests {
 
     /**
      * Scenario 4: an intruder inside the engage radius gets engaged,
-     * chased the last step, and beaten down. The defend mission ends
-     * with TARGET_ESCAPED once the target stops existing — the bot
-     * cannot distinguish a killed target from an escaped one (no death
-     * flag on EntitySnapshot; health=0 is not filtered), so it reports
-     * the conservative failure verdict. The behavioral assertions below
-     * (zombie dead, body alive) prove the bot actually won the fight;
-     * the mission verdict is the honest uncertainty signal, not a
-     * behavioral failure. See issue 0006.
+     * chased the last step, and beaten down - through the PRODUCTION
+     * path: no mission is submitted by the test; the idle-combat
+     * reflex ({@code EngageOnHostileProximityRule}, 6-cell trigger)
+     * notices the zombie and the controller's ENGAGE handling mints a
+     * reflex-owned defend mission from the wiring's factory. This is
+     * the exact chain whose absence caused the 2026-08-24 night-cave
+     * death, so it stays pinned in-engine end to end.
+     *
+     * <p>The reflex mission ends with TARGET_ESCAPED once the target
+     * stops existing — the bot cannot distinguish a killed target from
+     * an escaped one (no death flag on EntitySnapshot; health=0 is not
+     * filtered), so it reports the conservative failure verdict. The
+     * behavioral assertions below (zombie dead, body alive) prove the
+     * bot actually won the fight; the mission verdict is the honest
+     * uncertainty signal, not a behavioral failure. See issue 0006.
      */
     @GameTest(template = "empty16x8x16", timeoutTicks = TIMEOUT)
     public static void defendsByKillingZombie(GameTestHelper helper) {
@@ -363,21 +397,22 @@ public final class BotSliceGameTests {
         zombie.setNoAi(true);
         level.addFreshEntity(zombie);
 
-        DefendProcess mission = submitDefend(rig);
-
         helper.startSequence()
             .thenWaitUntil(driveUntil(rig,
-                () -> check(!mission.isActive(),
+                () -> check(zombie.isDeadOrDying() || zombie.isRemoved(),
                     "waiting for the fight to end")))
+            .thenWaitUntil(driveUntil(rig,
+                () -> check(reflexEngageVerdict(rig.events()) != null,
+                    "waiting for the reflex mission verdict")))
             .thenExecuteFor(3, driveOnly(rig))
             .thenExecuteAfter(0, () -> {
-                check(!mission.missionSucceeded(),
-                    "a killed target ends as TARGET_ESCAPED (bot cannot "
-                        + "confirm death vs escape)");
+                BotEvent verdict = reflexEngageVerdict(rig.events());
+                check(verdict != null,
+                    "the fight must be reflex-owned (a reflex-engage "
+                        + "mission verdict in the stream)");
                 checkEquals(DefendProcess.REASON_ESCAPED,
-                    mission.failureReasonOrNull(),
+                    verdict.attrs().get("reason"),
                     "the absence-after-grace verdict must be TARGET_ESCAPED");
-                assertEventSeen(rig.events(), EventKind.TASK_FAILED);
                 check(zombie.isDeadOrDying() || zombie.isRemoved(),
                     "the zombie must not survive the engagement");
                 check(rig.body().isAlive(),
@@ -483,6 +518,26 @@ public final class BotSliceGameTests {
         rig.arbiter().register(mission);
         rig.arbiter().requestControl(mission);
         return mission;
+    }
+
+    /**
+     * First terminal event of a reflex-owned engage mission, or null
+     * while the fight is still running. The wiring's factory mints
+     * task ids prefixed {@code reflex-engage-}, which is what makes
+     * the production engage chain observable from outside.
+     *
+     * @param events the rig's event stream; never null
+     * @return the verdict event, or null when no reflex mission has
+     *         retired yet
+     */
+    private static BotEvent reflexEngageVerdict(
+            com.mcbot.mcbotserver.core.event.InMemoryEventQueue events) {
+        return events.statusSnapshot(0).events().stream()
+            .filter(e -> EventKind.TASK_FAILED.equals(e.kind())
+                || EventKind.TASK_COMPLETED.equals(e.kind()))
+            .filter(e -> e.attrs().getOrDefault("task", "")
+                .startsWith("reflex-engage"))
+            .findFirst().orElse(null);
     }
 
     private static void assertEventSeen(

@@ -1,36 +1,17 @@
 package com.mcbot.mcbotserver;
 
-import com.mcbot.mcbotserver.adapter.BindingActor;
 import com.mcbot.mcbotserver.adapter.BindingWorldView;
 import com.mcbot.mcbotserver.adapter.BotCommands;
 import com.mcbot.mcbotserver.adapter.BotControlSocket;
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
-import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
-import com.mcbot.mcbotserver.api.actor.Actor;
-import com.mcbot.mcbotserver.api.behavior.Behavior;
-import com.mcbot.mcbotserver.api.state.BotState;
-import com.mcbot.mcbotserver.api.types.CellPos;
-import com.mcbot.mcbotserver.api.world.BlockTraits;
-import com.mcbot.mcbotserver.api.world.BlockTraitsRegistry;
-import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 import com.mcbot.mcbotserver.core.command.CommandBus;
 import com.mcbot.mcbotserver.core.command.GotoCommandHandler;
 import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
-import com.mcbot.mcbotserver.core.process.TaskArbiter;
-import com.mcbot.mcbotserver.core.reflex.FreezeOnLowHealthRule;
-import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
 import com.mcbot.mcbotserver.core.state.ChangeDetectingStateChannel;
 import com.mcbot.mcbotserver.core.tick.BotController;
-import com.mcbot.mcbotserver.core.tick.CrashReporter;
-import com.mcbot.mcbotserver.core.world.MapBlockTraitsRegistry;
 
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 import net.minecraft.commands.Commands;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
@@ -87,13 +68,6 @@ public class McBotServer {
     private CommandBus activeBus;
     private ChangeDetectingStateChannel activeState;
 
-    /**
-     * Tick budget for one reflex-owned engage mission: long enough
-     * for a melee fight plus its grace window, short enough that an
-     * unwinnable scrap cannot pin the body - the mission's own
-     * leash/escape verdicts usually land first.
-     */
-    private static final long ENGAGE_MISSION_TIMEOUT_TICKS = 600L;
     private final com.mcbot.mcbotserver.adapter.ReflexRuleReloader
         ruleReloader = new com.mcbot.mcbotserver.adapter.ReflexRuleReloader();
 
@@ -236,102 +210,23 @@ public class McBotServer {
                 body.moveTo(pos.x, pos.y, pos.z, 0f, 0f);
                 level.addFreshEntity(body);
 
-                InMemoryEventQueue events = new InMemoryEventQueue(
-                    () -> level.getDayTime() / 24000L,
-                    () -> level.getDayTime() % 24000L);
-                TaskArbiter arbiter = new TaskArbiter();
-                // Baseline trait annotations the swim vocabulary
-                // cannot work without. Code-level floor for now; the
-                // datapack JSON pipeline (decision 10) supersedes
-                // this when block traits get their reload listener -
-                // tracked as a workplan follow-up.
-                BlockTraitsRegistry traits =
-                    new MapBlockTraitsRegistry()
-                        .register("minecraft:water",
-                            BlockTraits.liquidOnly())
-                        .register("minecraft:lava",
-                            BlockTraits.dangerousLiquid())
-                        .seal();
-                BindingWorldView view =
-                    new BindingWorldView(level, traits);
-                Actor actor = new BindingActor(body);
+                // Single assembly source: the gametest rig builds the
+                // identical pipeline through the same factory, so
+                // wiring drift between production and in-engine tests
+                // is impossible by construction.
+                var a = com.mcbot.mcbotserver.adapter.BotAssembly
+                    .assemble(level, body);
+                // Future /reload swaps follow the datapack table; the
+                // reloader is mod-instance state, not pipeline state.
+                ruleReloader.bind(a.reflex());
 
-                SurvivalReflexLayer reflex = new SurvivalReflexLayer(
-                    new LevelThreatSensor(view,
-                        () -> poseOf(body), body::getAirSupply));
-                reflex.addRule(new FreezeOnLowHealthRule());
-                // Air reflex outranks the freeze rule by default
-                // (SURFACE_PRIORITY 110 vs FREEZE 100): freezing
-                // underwater converts one lethal condition into two.
-                reflex.addRule(
-                    new com.mcbot.mcbotserver.core.reflex
-                        .SurfaceOnLowAirRule());
-                // Idle-combat reflex (2026-08-24 night-cave death):
-                // engages a hostile that closes to melee range even
-                // when no mission is running. Sits BELOW the survival
-                // holds: at three health points the right reflex is
-                // to stop, not to start a fight.
-                reflex.addRule(
-                    new com.mcbot.mcbotserver.core.reflex
-                        .EngageOnHostileProximityRule());
-                // Future /reload swaps follow the datapack table.
-                ruleReloader.bind(reflex);
-
-                Behavior mover = new PathingBehavior("mover",
-                    () -> finePoseOf(body),
-                    () -> body.onGround(),
-                    com.mcbot.mcbotserver.core.pathing.BasicMoves::from,
-                    new com.mcbot.mcbotserver.core.pathing.PlanWorker());
-                // CombatBehavior must be seated here too: without it
-                // the engage reflex submits defend missions whose
-                // Attack overrides nobody executes - the production
-                // gap behind the idle night-cave death.
-                Behavior combat = new com.mcbot.mcbotserver.core.behavior
-                    .CombatBehavior("combat", () -> finePoseOf(body));
-
-                // One fresh reflex-owned defend per engage submission;
-                // the wiring owns identity, budget and type sets.
-                var engageCounter = new java.util.concurrent.atomic
-                    .AtomicInteger();
-                java.util.function.Supplier<
-                        com.mcbot.mcbotserver.api.process.BotProcess>
-                    engageFactory = () -> new com.mcbot.mcbotserver.core
-                        .process.DefendProcess(
-                            "reflex-engage-" + engageCounter
-                                .incrementAndGet(),
-                            com.mcbot.mcbotserver.api.process.PriorityBands
-                                .DEFEND_PRIORITY,
-                            ENGAGE_MISSION_TIMEOUT_TICKS,
-                            () -> poseOf(body),
-                            LevelThreatSensor.hostileTypes(),
-                            LevelThreatSensor.rangedTypes());
-
-                BotController controller = new BotController(reflex,
-                    arbiter, List.of(mover, combat), actor,
-                    () -> poseOf(body), body::getHealth,
-                    clockOf(level), events,
-                    CrashReporter.consoleFallback(), engageFactory);
-                CommandBus bus = new CommandBus(events);
-                GotoCommandHandler gotoHandler = new GotoCommandHandler(
-                    arbiter, events,
-                    () -> level.getDayTime() / 24000L,
-                    () -> level.getDayTime() % 24000L);
-                gotoHandler.attach(bus);
-                this.activeGotoHandler = gotoHandler;
-
-                ChangeDetectingStateChannel state =
-                    new ChangeDetectingStateChannel(
-                        () -> snapshotOf(body, gotoHandler, level),
-                        events,
-                        () -> level.getDayTime() / 24000L,
-                        () -> level.getDayTime() % 24000L);
-
-                this.activeEvents = events;
-                this.activeBus = bus;
-                this.activeState = state;
-                this.activeController = controller;
-                this.activeView = view;
+                this.activeEvents = a.events();
+                this.activeBus = a.bus();
+                this.activeState = a.state();
+                this.activeController = a.controller();
+                this.activeView = a.view();
                 this.activeBody = body;
+                this.activeGotoHandler = a.gotoHandler();
 
                 String spawned = "bot spawned at " + body.blockPosition()
                     + "; drive with /bot goto x y z tolerance timeoutTicks";
@@ -370,65 +265,12 @@ public class McBotServer {
      */
     private BotCommands.Channels channels() {
         if (activeEvents == null || activeBus == null
-            || activeState == null) {
+                || activeState == null) {
             return null;
         }
         return new BotCommands.Channels(activeEvents, activeBus,
             activeState,
             () -> activeGotoHandler != null
                 ? activeGotoHandler.stopAll() : 0);
-    }
-
-    /**
-     * Captures the boundary-D state snapshot from the live body.
-     *
-     * @param body        the spawned body; never null
-     * @param gotoHandler workload owner for the task summary; never
-     *                    null
-     * @param level       the body's level; never null
-     * @return fresh snapshot; never null
-     */
-    private static BotState snapshotOf(BotBodyEntity body,
-                                       GotoCommandHandler gotoHandler,
-                                       net.minecraft.server.level.ServerLevel level) {
-        // Item fields stay empty until an inventory mechanic exists -
-        // inventory skills are a function-map DEFERRED row, and an
-        // honest empty map beats a fake loadout.
-        Map<String, Integer> items = new LinkedHashMap<>();
-        Map<String, Integer> effects = new LinkedHashMap<>();
-        for (MobEffectInstance instance : body.getActiveEffects()) {
-            effects.put(BuiltInRegistries.MOB_EFFECT
-                    .getKey(instance.getEffect()).toString(),
-                instance.getAmplifier());
-        }
-        return new BotState(poseOf(body), body.getYRot(),
-            body.getXRot(), level.dimension().location().getPath(),
-            items, 0, effects, gotoHandler.activeTaskSummary());
-    }
-
-    private static CellPos poseOf(BotBodyEntity body) {
-        return new CellPos(body.getBlockX(), body.getBlockY(),
-            body.getBlockZ());
-    }
-
-    private static com.mcbot.mcbotserver.api.types.Vec3 finePoseOf(
-            BotBodyEntity body) {
-        return new com.mcbot.mcbotserver.api.types.Vec3(body.getX(),
-            body.getY(), body.getZ());
-    }
-
-    private static BotController.GameClock clockOf(
-            net.minecraft.server.level.ServerLevel level) {
-        return new BotController.GameClock() {
-            @Override
-            public long day() {
-                return level.getDayTime() / 24000L;
-            }
-
-            @Override
-            public long timeOfDayTicks() {
-                return level.getDayTime() % 24000L;
-            }
-        };
     }
 }

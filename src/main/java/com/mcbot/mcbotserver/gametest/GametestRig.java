@@ -1,24 +1,18 @@
 package com.mcbot.mcbotserver.gametest;
 
 import com.mcbot.mcbotserver.McBotServer;
-import com.mcbot.mcbotserver.adapter.BindingActor;
 import com.mcbot.mcbotserver.adapter.BindingWorldView;
+import com.mcbot.mcbotserver.adapter.BotAssembly;
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
-import com.mcbot.mcbotserver.api.behavior.Behavior;
-import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
-import com.mcbot.mcbotserver.core.behavior.CombatBehavior;
-import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
+import com.mcbot.mcbotserver.core.command.GotoCommandHandler;
 import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.process.GotoProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
-import com.mcbot.mcbotserver.core.reflex.FreezeOnLowHealthRule;
-import com.mcbot.mcbotserver.core.reflex.SurfaceOnLowAirRule;
-import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
+import com.mcbot.mcbotserver.core.state.ChangeDetectingStateChannel;
 import com.mcbot.mcbotserver.core.tick.BotController;
-import com.mcbot.mcbotserver.core.tick.CrashReporter;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestAssertException;
@@ -28,17 +22,20 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraftforge.registries.ForgeRegistries;
 
-import java.util.List;
 import java.util.Objects;
 
 /**
  * Shared in-engine harness for the gametest scenarios: one
- * pre-wired pipeline (body, view, arbiter, controller) per test,
- * plus the assertion and coordinate helpers every scenario needs.
+ * pre-wired pipeline per test, plus the assertion and coordinate
+ * helpers every scenario needs.
  *
- * <p>Contract: see workplan Stage 1 gate. Each scenario drives the
- * same {@code onTick} entry the server wiring uses - no test-private
- * shortcuts into the pipeline.
+ * <p>Contract: see workplan Stage 1 gate. The pipeline is built by
+ * {@link BotAssembly#assemble} - the exact factory the
+ * {@code /botspawn} server wiring uses - so a rig green means the
+ * production wiring shape, not a hand-copied lookalike of it. The
+ * per-tick drive ({@link #driveTick}) mirrors the server listener's
+ * tick order (goto handler, state pull-through, lava flag, onTick);
+ * keep the two in lockstep when either changes.
  *
  * <p>Assertion style: gametests live in the main source set where
  * JUnit is not on the classpath, so checks throw plain
@@ -58,16 +55,18 @@ final class GametestRig {
     private GametestRig() {
     }
 
-    /** Everything one scenario needs, pre-wired around one body. */
+    /** Everything one scenario needs, wired by the shared factory. */
     record Rig(BotBodyEntity body, BindingWorldView view,
                InMemoryEventQueue events,
                TaskArbiter arbiter,
-               BotController controller) {
+               BotController controller,
+               GotoCommandHandler gotoHandler,
+               ChangeDetectingStateChannel state) {
     }
 
     /**
      * Paves the 16x16 floor, spawns one body, wires the full
-     * pipeline around it.
+     * production pipeline around it via the shared assembly factory.
      *
      * @param helper     the running gametest; never null
      * @param spawnLocal template-local spawn cell; never null
@@ -98,46 +97,29 @@ final class GametestRig {
             0f);
         level.addFreshEntity(body);
 
-        InMemoryEventQueue events = new InMemoryEventQueue(
-            () -> level.getDayTime() / 24000L,
-            () -> level.getDayTime() % 24000L);
+        BotAssembly.Assembled a = BotAssembly.assemble(level, body);
+        return new Rig(a.body(), a.view(), a.events(), a.arbiter(),
+            a.controller(), a.gotoHandler(), a.state());
+    }
 
-        TaskArbiter arbiter = new TaskArbiter();
-        // Same baseline trait floor as the live wiring: water must
-        // read liquid or the swim vocabulary never engages.
-        BindingWorldView view = new BindingWorldView(level,
-            new com.mcbot.mcbotserver.core.world.MapBlockTraitsRegistry()
-                .register("minecraft:water",
-                    com.mcbot.mcbotserver.api.world.BlockTraits
-                        .liquidOnly())
-                .register("minecraft:lava",
-                    com.mcbot.mcbotserver.api.world.BlockTraits
-                        .dangerousLiquid())
-                .seal());
-        BindingActor actor = new BindingActor(body);
-
-        SurvivalReflexLayer reflex = new SurvivalReflexLayer(
-            (world, board) -> {
-                board.botHealth = body.getHealth();
-                board.airSupply = body.getAirSupply();
-            });
-        reflex.addRule(new FreezeOnLowHealthRule());
-        reflex.addRule(new SurfaceOnLowAirRule());
-
-        Behavior mover = new PathingBehavior("mover",
-            () -> finePositionOf(body),
-            () -> body.onGround(),
-            com.mcbot.mcbotserver.core.pathing.BasicMoves::from,
-            new com.mcbot.mcbotserver.core.pathing.PlanWorker());
-        Behavior combat = new CombatBehavior("combat",
-            () -> finePositionOf(body));
-
-        BotController controller = new BotController(reflex, arbiter,
-            List.of(mover, combat), actor,
-            () -> positionOf(body), body::getHealth,
-            clockOf(level), events, CrashReporter.consoleFallback());
-
-        return new Rig(body, view, events, arbiter, controller);
+    /**
+     * One production-shaped tick: the same call order the server
+     * listener runs (goto handler, state pull-through, lava flag,
+     * pipeline). Scenarios must tick through this - a bare
+     * {@code controller.onTick} skips the harness seams and reads
+     * green where production would not.
+     *
+     * @param rig the wired rig; never null
+     */
+    static void driveTick(Rig rig) {
+        rig.gotoHandler().tick();
+        rig.state().current();
+        // Feed the lava flag before the pipeline runs: MinimalReflex
+        // (crashed state) reads this to decide whether to jump
+        // (ADR-0005 D3); the normal reflex layer derives fluid state
+        // from ThreatBlackboard sensors instead.
+        rig.controller().setInLethalFluid(rig.body().isInLava());
+        rig.controller().onTick(rig.view());
     }
 
     /**
@@ -146,7 +128,7 @@ final class GametestRig {
      */
     static Runnable driveUntil(Rig rig, Runnable keepThrowing) {
         return () -> {
-            rig.controller().onTick(rig.view());
+            driveTick(rig);
             keepThrowing.run();
         };
     }
@@ -158,7 +140,7 @@ final class GametestRig {
      * exact race cost three debug rounds).
      */
     static Runnable driveOnly(Rig rig) {
-        return () -> rig.controller().onTick(rig.view());
+        return () -> driveTick(rig);
     }
 
     /**
@@ -227,19 +209,5 @@ final class GametestRig {
                                BlockPos local) {
         BlockPos abs = helper.absolutePos(local);
         return new CellPos(abs.getX(), abs.getY(), abs.getZ());
-    }
-
-    static BotController.GameClock clockOf(ServerLevel level) {
-        return new BotController.GameClock() {
-            @Override
-            public long day() {
-                return level.getDayTime() / 24000L;
-            }
-
-            @Override
-            public long timeOfDayTicks() {
-                return level.getDayTime() % 24000L;
-            }
-        };
     }
 }
