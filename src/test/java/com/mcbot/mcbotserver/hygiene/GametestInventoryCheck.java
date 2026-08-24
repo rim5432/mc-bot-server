@@ -63,7 +63,7 @@ class GametestInventoryCheck {
     /** Pulls the method name out of each
      * {@code @GameTest(...)} declaration in a source file. */
     private static final Pattern GAME_TEST_METHOD = Pattern.compile(
-        "@GameTest\\s*\\([^)]*\\)\\s*public\\s+static\\s+void"
+        "@GameTest[\\s\\S]*?public\\s+static\\s+void"
             + "\\s+(\\w+)\\s*\\(");
 
     /** Fails when the registered gametest set differs from the
