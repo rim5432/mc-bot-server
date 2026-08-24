@@ -50,7 +50,9 @@ class GametestInventoryCheck {
             "surfacesWhenAirRunsLow"),
         "GauntletGameTests", Set.of(
             "gauntletEndToEnd",
-            "routesThroughFenceGap"));
+            "routesThroughFenceGap"),
+        "CrashRecoveryGameTests", Set.of(
+            "latchesAndRecoversAfterCrash"));
 
     /** Pulls the method name out of each
      * {@code @GameTest(...)} declaration in a source file. */
