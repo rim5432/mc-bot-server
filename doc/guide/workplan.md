@@ -1,6 +1,6 @@
 ---
 title: Work Plan (effort-sized checklist)
-last_verified: 2026-08-24
+last_verified: 2026-08-25
 covers:
   - doc/architecture/boundaries.md
   - doc/decisions/0004-tick-pipeline-actor-channels.md
@@ -356,6 +356,19 @@ test count when red).
    so acceptance is a live rerun of the verif-1 scenario: floating
    goal must fail NO_PATH within seconds and the keepalive stream
    must show noPathWitnesses climbing to 3 first.
+7. OPEN 2026-08-25: gameTestServer shares the run/ game directory
+   with the server run (no gameDirectory configured in build.gradle
+   runs), so a live runServer holds run/world/session.lock and any
+   gametest attempt dies in DirectoryLock.create - observed when a
+   leftover soak server blocked runGameTest for an hour. The tool's
+   run.<task> lock namespaces assume game tasks only read shared
+   files; that holds for client (run/saves) but NOT for
+   gameTestServer (run/world, same as server). Fix direction: a
+   dedicated gameDirectory for the gameTestServer run (e.g.
+   run/gametest) in build.gradle; also decide whether the tool
+   should serialize run.runServer vs run.runGameTest as a
+   documentation note until then (a live server + gametest cannot
+   coexist today).
 
 ## Pre-Stage-3 survival gate - basic survival capability
 
