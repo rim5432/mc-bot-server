@@ -396,6 +396,20 @@ test count when red).
      defect class, masked by the || !isActive() escape) - fixed.
    - Suite 10 -> 15 scenarios, all green via build runGameTest;
      GametestInventoryCheck pins the new inventory.
+9. RESOLVED 2026-08-25 (threat visibility - user ruling): "the world
+   treats the bot as a player, otherwise how would crafting-table
+   interaction work later" - the ruling lands on the threat axis now:
+   BotBodyEntity runs a carrier-side presence pass (every 20 ticks;
+   free target slot + line of sight + the monster's own FOLLOW_RANGE;
+   no-AI mobs stay frozen) so hostiles acquire the body on sight and
+   unprovoked combat exists, which is what makes the survival gate's
+   night acceptance honest. Pinned in-engine by hostilesAggroOnSight
+   (zombie at 7 cells, outside the 6-cell engage trigger - only the
+   world can start that fight). The interaction axis of the same
+   ruling stays with the BotPlayerFacade plan (issue 0007 Path A):
+   menus ask through typed Player parameters, which entity scans
+   never see - the facade answers those, the presence pass answers
+   scans. Suite 16/16 green.
 
 ## Pre-Stage-3 survival gate - basic survival capability
 

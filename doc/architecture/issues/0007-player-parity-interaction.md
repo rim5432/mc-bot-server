@@ -146,8 +146,8 @@ state) turns out to be facade-hostile.
    Same discipline as issue 0004 F4: frozen boundary A territory;
    this issue is the backlog text until the review lifts it.
 2. **Menu transaction surface.** Menu operations are
-   request-response (open once, click at will, close once); they
-   are NOT per-tick declarative claims and must not ride the claim
+   request-response (open once, click at will, close once); they are
+   NOT per-tick declarative claims and must not ride the claim
    machinery (claims expire per tick and arbitrate - both wrong
    for transactions). Working hypothesis: `USE` stays
    entity-melee untouched (CombatBehavior zero change); a new
@@ -159,7 +159,16 @@ state) turns out to be facade-hostile.
    needs the review to sanction a second boundary-A write surface
    (AGENTS.md 2.4 calls unsanctioned mutation a violation).
 3. **Carrier ruling.** Path A facade on the ratified PathfinderMob
-   body vs reopening the Stage 1 ServerPlayer decision.
+   body vs reopening the Stage 1 ServerPlayer decision. Ruling
+   context added 2026-08-25: the user ruled the WORLD treats the
+   bot as a player; that resolved into two orthogonal axes - the
+   threat axis is already shipped (carrier-side presence pass in
+   BotBodyEntity: hostiles acquire the body on sight; workplan
+   follow-up 9) and the interaction axis is exactly this issue's
+   facade plan. The Stage 3 review weighs Path A vs Path B with
+   both axes live: presence keeps working either way (a real
+   ServerPlayer is visible to scans natively), so the ruling adds
+   no new Path B pressure.
 4. **Tick ordering.** Simplified but retained: menu transactions
    still run on the server thread at a defined point in the bot
    tick (after `actor.flush()`, before the next perception

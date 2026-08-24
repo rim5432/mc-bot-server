@@ -55,6 +55,12 @@ reopened on demand — **[DEFERRED]** outside v1.
 
 ### 3. Survive (reflex layer)
 
+- **[SHIPPED]** The world treats the bot as a player (ruling
+  2026-08-25): hostiles acquire the body on sight through a
+  carrier-side presence pass (line of sight, their own follow range,
+  only free target slots) - unprovoked combat is now possible and
+  the night-survival acceptance means what it says. Pinned in-engine
+  by hostilesAggroOnSight.
 - **[SHIPPED]** Freezes on low health, surfaces on low air (trigger 80
   of 300, decision 22; ASCEND holds jump, vanilla fluid physics does
   the swimming), and engages hostiles that close to melee range while
