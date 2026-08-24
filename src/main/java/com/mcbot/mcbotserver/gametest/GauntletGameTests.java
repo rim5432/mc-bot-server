@@ -34,9 +34,8 @@ import static com.mcbot.mcbotserver.gametest.GametestRig.submitGoto;
  * fence is the missing-post EMPTY cell). Swim/SwimUp vocabulary
  * shipped after this suite was built (workplan closeout follow-up
  * 5); water traversal is gametest-gated in BotSliceGameTests
- * (trench + three-deep pool). Lava execution landed (issue 0004
- * F2 + lava branch) but a lava gauntlet section has no in-engine
- * scenario yet — tracked as a follow-up, not a vocabulary gap.
+ * (trench + three-deep pool), and lava traversal has its own
+ * scenario there (crossesLavaTrench, fire-resistance harness).
  *
  * <p>Template: gameteststructures/empty16x8x16.snbt, paved by
  * {@link GametestRig#rig}.

@@ -13,6 +13,8 @@ import com.mcbot.mcbotserver.core.reflex.SurfaceOnLowAirRule;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.monster.Skeleton;
 import net.minecraft.world.entity.monster.Zombie;
@@ -101,6 +103,19 @@ public final class BotSliceGameTests {
      * vocabulary end to end: Walk to the edge, Drop/Swim through the
      * channel, JumpUp out. The trench spans all z so walking around
      * is impossible.
+     *
+     * <p>INVARIANT - the trench has NO floor under the water (unlike
+     * the deep pool, which digs down and paves stone at FLOOR_Y-3).
+     * Deliberate: any solid ground under shallow water keeps
+     * {@code onGround} true and lets the grounded-hop path clear the
+     * channel without ever engaging fluid locomotion - the masking
+     * the deep-pool comment records from its own two-deep first
+     * draft. Do not "fix" this by paving below the water; if a
+     * wading-with-floor scenario is ever wanted, it is a NEW scenario
+     * alongside this one, not a modification of it. The sources
+     * themselves stay put - a source block above air does not drain,
+     * the spill falls into the void below the arena and cannot reach
+     * the parallel structures.
      */
     @GameTest(template = "empty16x8x16", timeoutTicks = TIMEOUT)
     public static void crossesWaterTrench(GameTestHelper helper) {
@@ -652,6 +667,61 @@ public final class BotSliceGameTests {
                     "no swing may land through a full wall");
                 check(rig.body().isAlive(),
                     "the standoff must be harmless to the body too");
+                rig.body().discard();
+            })
+            .thenSucceed();
+    }
+
+    /**
+     * Scenario 1d: a lava trench spans the lane; the bot swims across
+     * under fire resistance and climbs out the far side.
+     *
+     * <p>Why: lava shares the Swim vocabulary (the
+     * {@code dangerousLiquid} trait keeps the liquid bit set) but has
+     * its own execution branch - {@code BotBodyEntity} ascends via
+     * {@code jumpInFluid(LAVA_TYPE)}, the more viscous cousin of the
+     * water path (issue 0004 F2 + lava branch). None of that had an
+     * in-engine scenario (GauntletGameTests javadoc tracked it).
+     *
+     * <p>Fire resistance is a HARNESS choice, not bot capability: the
+     * device has no lava-survival story yet, and the scenario pins
+     * LOCOMOTION through lava - the ascent branch, the crossing, the
+     * exit climb. The unscathed-health assertion doubles as proof the
+     * effect held for the whole crossing; without it the body would
+     * burn down mid-trench.
+     *
+     * <p>Same no-floor construction as the water trench and for the
+     * same reason: any floor under shallow lava keeps {@code onGround}
+     * true and lets ground-hop mask the fluid path entirely.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 600)
+    public static void crossesLavaTrench(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
+        rig.body().addEffect(new MobEffectInstance(
+            MobEffects.FIRE_RESISTANCE, 1200, 0, false, false));
+        for (int x = 6; x <= 8; x++) {
+            for (int z = 0; z < 16; z++) {
+                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y, z),
+                    Blocks.LAVA);
+            }
+        }
+        CellPos goalCell = localToCell(helper,
+            new BlockPos(12, GametestRig.WALK_Y, 8));
+        var mission = submitGoto(rig, goalCell, 500);
+
+        helper.startSequence()
+            .thenWaitUntil(driveUntil(rig,
+                () -> check(reached(rig.body(), goalCell),
+                    "waiting for arrival across the lava trench")))
+            .thenExecuteFor(3, driveOnly(rig))
+            .thenExecuteAfter(0, () -> {
+                check(!mission.isActive(),
+                    "mission must retire after the lava crossing");
+                check(mission.missionSucceeded(),
+                    "crossing lava must be a success");
+                assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
+                checkEquals(20f, rig.body().getHealth(),
+                    "fire resistance must hold for the whole crossing");
                 rig.body().discard();
             })
             .thenSucceed();

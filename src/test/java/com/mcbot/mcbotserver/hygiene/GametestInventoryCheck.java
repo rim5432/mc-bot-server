@@ -43,6 +43,7 @@ class GametestInventoryCheck {
             "walksToBlock",
             "crossesWaterTrench",
             "crossesDeepPool",
+            "crossesLavaTrench",
             "failsCleanlyWhenUnwalkable",
             "recoversWhenShoved",
             "refusesRangedItCannotAnswer",
