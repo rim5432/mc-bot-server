@@ -50,6 +50,8 @@ class EngageReflexGateTest {
         int tickCalls;
         int lostControlCalls;
         int resumedCalls;
+        int invalidatedCalls;
+        boolean resumeAnswer = true;
 
         @Override
         public boolean isActive() {
@@ -75,11 +77,12 @@ class EngageReflexGateTest {
         @Override
         public boolean resume(InterruptionContext c) {
             resumedCalls++;
-            return true;
+            return resumeAnswer;
         }
 
         @Override
         public void onContextInvalidated() {
+            invalidatedCalls++;
         }
 
         @Override
@@ -149,19 +152,29 @@ class EngageReflexGateTest {
 
     private static final class Rig {
         final ThreatInput threat = new ThreatInput();
+        /** Controllable health so FREEZE can be scripted against ENGAGE. */
+        final float[] health = {20f};
         final TaskArbiter arbiter = new TaskArbiter();
         final CountingMission mission = new CountingMission();
         final StubFight[] fights = new StubFight[1];
         int factoryCalls;
         private final BotController controller;
         private final InMemoryEventQueue events;
+        private final RecordingActor recordingActor;
 
         Rig() {
+            this(true);
+        }
+
+        Rig(boolean withFactory) {
             SurvivalReflexLayer layer = new SurvivalReflexLayer(
                 (world, board) -> {
                     board.nearestThreat = threat.threat;
                     board.nearestThreatDistance = threat.distance;
                 });
+            layer.addRule(
+                new com.mcbot.mcbotserver.core.reflex
+                    .FreezeOnLowHealthRule());
             layer.addRule(new EngageOnHostileProximityRule());
             arbiter.register(mission);
             arbiter.requestControl(mission);
@@ -169,14 +182,16 @@ class EngageReflexGateTest {
                 () -> new com.mcbot.mcbotserver.api.types.Vec3(
                     0.5, 64, 0.5),
                 BasicMoves::from);
-            Supplier<BotProcess> factory = () -> {
+            Supplier<BotProcess> factory = withFactory ? () -> {
                 factoryCalls++;
                 return fights[0] = new StubFight();
-            };
+            } : null;
+            recordingActor = withFactory ? null : new RecordingActor();
+            Actor actor = withFactory ? new SinkActor() : recordingActor;
             events = new InMemoryEventQueue(() -> 1L, () -> 0L);
             controller = new BotController(layer, arbiter,
-                List.of(mover), new SinkActor(),
-                () -> POS, () -> 20f,
+                List.of(mover), actor,
+                () -> POS, () -> health[0],
                 new BotController.GameClock() {
                     @Override
                     public long day() {
@@ -297,6 +312,181 @@ class EngageReflexGateTest {
         }
         assertEquals(1, rig.factoryCalls,
             "cooldown must block a fresh mission per tick");
+    }
+
+    /**
+     * Review Bug 1: FREEZE firing inside the submission's one-tick
+     * window (creeper-class damage spike the tick after submission,
+     * fight still in pending) must not strand the fight - after the
+     * freeze holds, the ARBITER selects the fight, the parked mission
+     * does not resume over it, and the combat reflex stays armed.
+     */
+    @Test
+    void freezeInSubmissionWindowDoesNotStrandTheFight() {
+        Rig rig = new Rig();
+        rig.tick();          // quiet: mission seats
+        rig.threat.at(5.0);
+        rig.tick();          // submission: mission parked, fight pending
+        assertEquals(1, rig.factoryCalls);
+
+        rig.health[0] = 3f;  // FREEZE (100) outranks ENGAGE (90)
+        rig.tick();
+        assertNull(rig.arbiter.current(),
+            "freeze with nothing seated parks no one");
+        assertNotNull(rig.arbiter.paused(),
+            "the original stays parked through the freeze");
+
+        // Freeze releases; the threat is still there, so ENGAGE
+        // keeps firing - the fight must win the seat, not the parked
+        // mission (the pre-fix code resumed the mission here and
+        // blocked all combat reflex until it finished).
+        rig.health[0] = 20f;
+        for (int i = 0;
+                i <= com.mcbot.mcbotserver.core.reflex
+                    .FreezeOnLowHealthRule.FREEZE_HOLD_TICKS;
+                i++) {
+            rig.tick();
+        }
+        assertSame(rig.fights[0], rig.arbiter.current(),
+            "the fight must be selected once the freeze lifts");
+        assertEquals(1, rig.factoryCalls,
+            "no resubmission while the live fight exists");
+        assertTrue(rig.mission.resumedCalls == 0,
+            "the parked mission must not resume over the fight");
+    }
+
+    /**
+     * The orphan sibling (found in this review pass): FREEZE parking
+     * the SEATED fight must not silently orphan the mission parked by
+     * the engage submission. The single paused slot evicts the
+     * original through revalidate-and-requeue; the freeze release
+     * resumes the FIGHT (even while ENGAGE keeps firing - the threat
+     * is present); the fight's verdict then hands the body back to
+     * the requeued original.
+     */
+    @Test
+    void freezeMidFightRequeuesOriginalAndResumesFight() {
+        Rig rig = new Rig();
+        rig.tick();
+        rig.threat.at(5.0);
+        rig.tick();          // submission
+        rig.tick();          // fight seats
+        assertSame(rig.fights[0], rig.arbiter.current());
+
+        rig.health[0] = 3f;
+        rig.tick();          // FREEZE parks the fight
+        assertSame(rig.fights[0], rig.arbiter.paused(),
+            "the fight itself is now the parked one");
+        assertTrue(rig.mission.resumedCalls >= 1,
+            "the evicted original must revalidate through resume()");
+        assertTrue(rig.mission.invalidatedCalls == 0,
+            "a revalidating original requeues, never drops");
+
+        // Freeze lifts but the threat persists: the resume guard must
+        // hand the body back to the FIGHT despite ENGAGE firing -
+        // gating on decision==null would seat the original and strand
+        // the fight in the paused slot while the zombie keeps chewing.
+        rig.health[0] = 20f;
+        boolean fightResumed = false;
+        for (int i = 0; i < 30 && !fightResumed; i++) {
+            rig.tick();
+            fightResumed = rig.arbiter.current() == rig.fights[0];
+        }
+        assertTrue(fightResumed,
+            "the fight must resume when the freeze lifts");
+        assertTrue(rig.fights[0].tickCalls >= 1);
+
+        // Fight resolves; the requeued original must NOT be orphaned.
+        int ticksBefore = rig.mission.tickCalls;
+        rig.threat.none();
+        rig.fights[0].active = false;
+        boolean originalSeated = false;
+        for (int i = 0; i < 60 && !originalSeated; i++) {
+            rig.tick();
+            originalSeated = rig.arbiter.current() == rig.mission;
+        }
+        assertTrue(originalSeated,
+            "the requeued original must run again after the fight");
+        assertTrue(rig.mission.tickCalls > ticksBefore);
+    }
+
+    /**
+     * An invalidated original (resume refuses) drops honestly: the
+     * eviction path emits TASK_DROPPED instead of silently leaking
+     * the mission.
+     */
+    @Test
+    void invalidatedOriginalDropsWithEventOnMidFightFreeze() {
+        Rig rig = new Rig();
+        rig.tick();
+        rig.threat.at(5.0);
+        rig.tick();
+        rig.tick();
+        rig.mission.resumeAnswer = false;
+        rig.health[0] = 3f;
+        rig.tick();
+        assertTrue(rig.mission.invalidatedCalls >= 1,
+            "a refusing original must be dropped via onContextInvalidated");
+        assertTrue(rig.eventsOf(EventKind.TASK_DROPPED).size() >= 1,
+            "the drop must reach the harness as TASK_DROPPED");
+        assertSame(rig.fights[0], rig.arbiter.paused(),
+            "the fight occupies the paused slot after the eviction");
+    }
+
+    /**
+     * The cooldown gates churn, not recovery: once a fight finished
+     * and the cooldown elapsed, a still-present threat legitimately
+     * mints the next fight.
+     */
+    @Test
+    void cooldownExpiryAllowsLegitimateResubmission() {
+        Rig rig = new Rig();
+        rig.threat.at(5.0);
+        rig.tick();
+        assertEquals(1, rig.factoryCalls);
+        rig.fights[0].active = false;
+        // Threat stays: rule keeps firing; cooldown counts up from 0.
+        for (int i = 0; i < 45; i++) {
+            rig.tick();
+        }
+        assertEquals(2, rig.factoryCalls,
+            "after ENGAGE_RESUBMIT_COOLDOWN a live threat re-engages");
+    }
+
+    /**
+     * No factory (rigs without combat wiring): ENGAGE degrades to the
+     * freeze hold - park the mission, halt the body, never crash and
+     * never fight blind.
+     */
+    @Test
+    void engageWithoutFactoryDegradesToFreezeHold() {
+        Rig rig = new Rig(false);
+        RecordingActor actor = rig.recordingActor;
+        rig.tick();          // mission seats
+        rig.threat.at(5.0);
+        rig.tick();
+        assertNotNull(rig.arbiter.paused(),
+            "degraded engage still parks the mission");
+        assertNull(rig.arbiter.current());
+        assertNull(rig.fights[0]);
+        Claim move = lastMoveOf(actor);
+        assertNotNull(move);
+        assertTrue(move.holder().startsWith("reflex:"),
+            "the hold claim comes from the reflex");
+        assertTrue(move.intent() instanceof
+                com.mcbot.mcbotserver.api.actor.Intent.Move hold
+                && !hold.jump() && hold.forward() == 0,
+            "the degraded hold is a plain halt");
+    }
+
+    private static Claim lastMoveOf(RecordingActor actor) {
+        Claim found = null;
+        for (Claim c : actor.submitted) {
+            if (c.channel() == Channel.MOVE) {
+                found = c;
+            }
+        }
+        return found;
     }
 
     /** Claim sink; the gates never assert on claim content. */
