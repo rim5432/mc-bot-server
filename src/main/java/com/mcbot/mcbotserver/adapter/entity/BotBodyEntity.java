@@ -34,6 +34,17 @@ import net.minecraft.world.level.Level;
  * patched by re-enabling one beside the binding.
  *
  * <p>Implementation note: constructed and ticked by the server only.
+ *
+ * <p>World treatment (user ruling 2026-08-25): the world treats the
+ * bot as a player wherever the engine asks "is this a player".
+ * Hostile targeting is one such place - vanilla sight-aggro goals
+ * match {@code Player.class} entity scans, which structurally cannot
+ * see a PathfinderMob. The presence pass below closes that gap from
+ * the carrier side: monsters with line of sight and no other target
+ * acquire this body exactly as they would acquire a player, at their
+ * own follow range. Menu/interaction player-ness is the OTHER axis
+ * and stays with the {@code BotPlayerFacade} plan (issue 0007 Path
+ * A) - the facade answers typed parameters, never entity scans.
  */
 // contract: see boundaries.md section A (Actor is intents-only) and
 // decision 2 as amended by the entity-binding spike follow-up
@@ -45,6 +56,22 @@ public final class BotBodyEntity extends PathfinderMob {
     private boolean hasPendingRotation;
     private float targetYaw;
     private float targetPitch;
+    private int presenceCooldown;
+
+    /**
+     * Ticks between presence scans. The scan queries a wide entity
+     * box and ray-traces one line of sight per candidate; hostile
+     * awareness does not need per-tick latency (vanilla targeting
+     * goals also re-scan on their own cadence).
+     */
+    public static final int PRESENCE_SCAN_INTERVAL_TICKS = 20;
+
+    /**
+     * Half-width of the presence scan box, in blocks. Above every
+     * vanilla follow range that matters (zombies 35, base attribute
+     * 32); the per-monster attribute check below is the authority.
+     */
+    private static final double PRESENCE_SCAN_HALF_WIDTH = 40.0;
 
     /**
      * Hotbar selection echoed from the SLOT channel. A mob carrier has
@@ -187,11 +214,48 @@ public final class BotBodyEntity extends PathfinderMob {
             // setRot does yaw%360 / pitch%360 normalization internally;
             // setYHeadRot aligns the head with the body so the model does
             // not lag one tick behind. Do NOT add a separate setYRot call
-            // after setRot — it would overwrite the normalized value with a
-            // raw angle and break the wrap-around for yaw outside [0,360).
+            // after setRot — it would overwrite the normalized value with
+            // a raw angle and break the wrap-around for yaw outside [0,360).
             setRot(targetYaw, targetPitch);
             setYHeadRot(targetYaw);
             hasPendingRotation = false;
+        }
+        tickPresence();
+    }
+
+    /**
+     * Carrier-side presence: monsters that can see this body treat it
+     * as a player-shaped target. Deliberately NOT an Intent and not
+     * on the Actor - being visible is a property of the body in the
+     * world (same category as its collision box or its fire ticks),
+     * not a decision any brain tier makes; the crashed latch keeps it
+     * running for exactly that reason (a crashed body still gets
+     * eaten). Only acquires targets that are currently unoccupied,
+     * skips no-AI mobs (a frozen mob must stay frozen), and honors
+     * each monster's own follow range plus a line-of-sight ray, so a
+     * wall between the body and a monster still hides it.
+     */
+    private void tickPresence() {
+        if (--presenceCooldown > 0) {
+            return;
+        }
+        presenceCooldown = PRESENCE_SCAN_INTERVAL_TICKS;
+        for (net.minecraft.world.entity.monster.Monster monster
+                : level().getEntitiesOfClass(
+                    net.minecraft.world.entity.monster.Monster.class,
+                    getBoundingBox().inflate(PRESENCE_SCAN_HALF_WIDTH),
+                    m -> m.isAlive() && !m.isNoAi()
+                        && m.getTarget() == null)) {
+            double follow = monster.getAttributeValue(
+                net.minecraft.world.entity.ai.attributes.Attributes
+                    .FOLLOW_RANGE);
+            if (monster.distanceToSqr(this) > follow * follow) {
+                continue;
+            }
+            if (!monster.getSensing().hasLineOfSight(this)) {
+                continue;
+            }
+            monster.setTarget(this);
         }
     }
 

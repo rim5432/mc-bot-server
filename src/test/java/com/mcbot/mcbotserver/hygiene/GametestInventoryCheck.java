@@ -49,6 +49,7 @@ class GametestInventoryCheck {
             "refusesRangedItCannotAnswer",
             "defendsByKillingZombie",
             "survivesRetaliatingZombie",
+            "hostilesAggroOnSight",
             "holdsFireWhenSightBlocked",
             "surfacesWhenAirRunsLow"),
         "GauntletGameTests", Set.of(

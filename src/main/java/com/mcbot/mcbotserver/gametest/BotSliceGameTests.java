@@ -558,14 +558,14 @@ public final class BotSliceGameTests {
     }
 
     /**
-     * Scenario 4b: the intruder fights BACK. The zombie keeps its AI -
-     * it ignores the bot until the first swing lands (vanilla zombies
-     * target players, not devices), then retaliates through
-     * HurtByTargetGoal - so the fight is two-sided for the first time
-     * in this suite. Weakened to 8 health on purpose: the pin is
-     * "engages, survives retaliation, wins", not a fair duel, and a
-     * short fight keeps the body comfortably above the freeze
-     * threshold.
+     * Scenario 4b: the intruder fights BACK. The zombie keeps its AI;
+     * with the carrier-side presence pass it acquires the body on
+     * sight (world-treatment ruling 2026-08-25) and attacks on its
+     * own, and any hit the body lands adds HurtByTargetGoal heat on
+     * top - the fight is two-sided from the start. Weakened to 8
+     * health on purpose: the pin is "engages, survives being fought,
+     * wins", not a fair duel, and a short fight keeps the body
+     * comfortably above the freeze threshold.
      *
      * <p>Roof: the whole floor gets a stone ceiling one layer below
      * the template top. The arena runs at daytime and an AI zombie is
@@ -722,6 +722,73 @@ public final class BotSliceGameTests {
                 assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
                 checkEquals(20f, rig.body().getHealth(),
                     "fire resistance must hold for the whole crossing");
+                rig.body().discard();
+            })
+            .thenSucceed();
+    }
+
+    /**
+     * Scenario 4d: the WORLD starts the fight. The zombie spawns 7
+     * cells out - outside the engage reflex's 6-cell trigger - with
+     * clear line of sight and its AI on. Nothing the bot does can
+     * start this engagement; the only path into the fight is the
+     * zombie acquiring the body through the carrier-side presence
+     * pass (world-treatment ruling 2026-08-25: monsters see the body
+     * the way they would see a player, at their own follow range,
+     * through their own line-of-sight ray).
+     *
+     * <p>Discriminative chain: target acquisition (z.getTarget is the
+     * body) proves the presence pass; the kill then proves the
+     * reflex-engage chain still fires when the threat closes in.
+     * Weakened to 8 health like the retaliation scenario - the pin is
+     * the acquisition and the fight, not a duel.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = TIMEOUT)
+    public static void hostilesAggroOnSight(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
+        var level = helper.getLevel();
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                helper.setBlock(
+                    new BlockPos(x, GametestRig.FLOOR_Y + 7, z),
+                    Blocks.SMOOTH_STONE);
+            }
+        }
+        Zombie zombie = EntityType.ZOMBIE.create(level);
+        check(zombie != null, "zombie creation failed");
+        var zAbs = helper.absolutePos(
+            new BlockPos(10, GametestRig.WALK_Y, 8));
+        zombie.moveTo(zAbs.getX() + 0.5, zAbs.getY(),
+            zAbs.getZ() + 0.5, 0f, 0f);
+        zombie.setHealth(8f);
+        level.addFreshEntity(zombie);
+
+        helper.startSequence()
+            .thenWaitUntil(driveUntil(rig,
+                () -> check(zombie.getTarget() == rig.body(),
+                    "waiting for the world to acquire the body")))
+            .thenWaitUntil(driveUntil(rig,
+                () -> check(zombie.isDeadOrDying() || zombie.isRemoved(),
+                    "waiting for the sight-started fight to end")))
+            .thenWaitUntil(driveUntil(rig,
+                () -> check(reflexEngageVerdict(rig.events()) != null,
+                    "waiting for the reflex mission verdict")))
+            .thenExecuteFor(3, driveOnly(rig))
+            .thenExecuteAfter(0, () -> {
+                BotEvent verdict = reflexEngageVerdict(rig.events());
+                check(verdict != null,
+                    "the sight-started fight must be reflex-owned");
+                checkEquals(DefendProcess.REASON_ESCAPED,
+                    verdict.attrs().get("reason"),
+                    "a killed target ends as TARGET_ESCAPED");
+                check(zombie.isDeadOrDying() || zombie.isRemoved(),
+                    "the aggressor must not survive");
+                check(rig.body().isAlive(),
+                    "the body must survive being hunted");
+                check(rig.body().getHealth()
+                        > FreezeOnLowHealthRule.FREEZE_THRESHOLD,
+                    "survival means staying above the freeze threshold, "
+                        + "got " + rig.body().getHealth());
                 rig.body().discard();
             })
             .thenSucceed();
