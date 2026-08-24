@@ -10,9 +10,13 @@ agent / 人都用这套 CLI 跑 build / test / 看日志 / 管进程 / 协调并
 设计要点：
   1. **hang-proof log**：用 Popen + 实时 readline 双写 console + 文件，
      gradle 跟 console 真实同步，不会因为 pipe buffer 满阻塞。
-  2. **跨进程文件锁**（`tool/.runtime/build.lock`）：同一时间只能有一个
-     build/test 跑；第二个 agent 立刻 fail-fast 而不是悄悄抢资源。
-  3. **stale lock takeover**：如果上家 PID 已死，自动接管或提示清掉。
+  2. **跨进程文件锁**（`tool/.runtime/<name>.lock`）：写 build/ 的任务
+     （compile/test/jar/build/clean/sync）共用全局 `build` 锁；每个长跑
+     任务（runClient / runServer / runGameTest / runData）持独立
+     `run.<task>` 锁——专用服和客户端可同时存活（它们只读构建产物）。
+     同一命名空间的第二个调用立刻 fail-fast 而不是悄悄抢资源。
+  3. **stale lock takeover**：如果上家 PID 已死，自动接管或提示清掉；
+     `lock status/clear/takeover` 遍历所有命名空间。
   4. **gradle 自动发现**：优先 $MCBOT_GRADLE > 本机 wrapper dist > PATH。
   5. **build / test 默认 --no-daemon**：避免 daemon 残留和锁冲突；
      跑 game / runClient / runServer 之类当然也不 daemon。
@@ -43,8 +47,14 @@ from typing import Optional
 TOOL_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = TOOL_DIR.parent
 RUNTIME_DIR = TOOL_DIR / ".runtime"
-LOCK_PATH = RUNTIME_DIR / "build.lock"
-LOCK_META = RUNTIME_DIR / "build.lock.meta.json"
+def _lock_paths(name: str = "build") -> tuple:
+    """Lock + meta file pair for one lock namespace.
+
+    ``build`` is the global namespace for anything that writes
+    build/ outputs; each long-running game task gets its own
+    ``run.<task>`` namespace so a server and a client can coexist.
+    """
+    return RUNTIME_DIR / f"{name}.lock", RUNTIME_DIR / f"{name}.lock.meta.json"
 LAST_LOG = RUNTIME_DIR / "build-last.log"
 
 # ---------------------------------------------------------------------------
@@ -169,17 +179,19 @@ def _pid_alive(pid: Optional[int]) -> bool:
 # ---------------------------------------------------------------------------
 # file lock
 # ---------------------------------------------------------------------------
-def _read_meta() -> Optional[dict]:
-    if not LOCK_META.exists():
+def _read_meta(name: str = "build") -> Optional[dict]:
+    _, meta_path = _lock_paths(name)
+    if not meta_path.exists():
         return None
     try:
-        return json.loads(LOCK_META.read_text(encoding="utf-8"))
+        return json.loads(meta_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
 
 
-def _force_clear_lock() -> None:
-    for p in (LOCK_PATH, LOCK_META):
+def _force_clear_lock(name: str = "build") -> None:
+    lock_path, meta_path = _lock_paths(name)
+    for p in (lock_path, meta_path):
         try:
             p.unlink()
         except OSError:
@@ -200,31 +212,39 @@ _INTRA_LOCK = threading.Lock()
 class BuildLock:
     """Non-blocking cross-process build lock.
 
+    Lock files are namespaced: the default ``build`` lock serializes
+    everything that writes build/ outputs (compile / test / jar ...),
+    while each long-running game task owns its own
+    ``run.<task>.lock`` so a dedicated server and a dev client can be
+    alive at the same time - they only read build outputs.
+
     Usage:
-        with BuildLock() as lock:
-            if not lock.acquire("build compile"):
-                return _print_busy()
+        with BuildLock("run.runServer") as lock:
+            if not lock.acquire("build runServer"):
+                return _print_busy("run.runServer")
             ... do work ...
     """
 
-    def __init__(self) -> None:
+    def __init__(self, name: str = "build") -> None:
         ensure_runtime_dir()
+        self._name = name
+        self._lock_path, self._meta_path = _lock_paths(name)
         self._fd: Optional[int] = None
         self._acquired = False
 
     def acquire(self, command: str) -> bool:
         # Stale check first (cheap, no side effects)
-        meta = _read_meta()
+        meta = _read_meta(self._name)
         if meta:
             holder_pid = meta.get("pid")
             if holder_pid and holder_pid != os.getpid():
                 if not _pid_alive(holder_pid):
                     print(
-                        f"[mcbot] stale lock from dead PID {holder_pid} "
+                        f"[mcbot] stale {self._name} lock from dead PID {holder_pid} "
                         f"({meta.get('command')}, started {meta.get('start_iso')}) — auto-takeover",
                         file=sys.stderr,
                     )
-                    _force_clear_lock()
+                    _force_clear_lock(self._name)
                     # fall through to atomic create
                 else:
                     return False
@@ -240,7 +260,7 @@ class BuildLock:
         with _INTRA_LOCK:
             try:
                 fd = os.open(
-                    str(LOCK_PATH),
+                    str(self._lock_path),
                     os.O_CREAT | os.O_EXCL | os.O_RDWR,
                     0o644,
                 )
@@ -271,7 +291,7 @@ class BuildLock:
             "cwd": str(PROJECT_ROOT),
         }
         try:
-            LOCK_META.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+            self._meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
         except OSError as e:
             print(f"[mcbot] WARN: failed to write lock meta: {e}", file=sys.stderr)
         return True
@@ -287,18 +307,18 @@ class BuildLock:
         self._fd = None
         # Only remove lock file if it's still ours (check PID written in it)
         try:
-            if LOCK_PATH.exists():
-                with open(LOCK_PATH, "rb") as f:
+            if self._lock_path.exists():
+                with open(self._lock_path, "rb") as f:
                     data = f.read().decode("utf-8", errors="replace").strip()
                 if data == str(os.getpid()):
-                    LOCK_PATH.unlink()
+                    self._lock_path.unlink()
         except OSError:
             pass
         # Same for meta
-        meta = _read_meta()
+        meta = _read_meta(self._name)
         if meta and meta.get("pid") == os.getpid():
             try:
-                LOCK_META.unlink()
+                self._meta_path.unlink()
             except OSError:
                 pass
         self._acquired = False
@@ -310,16 +330,30 @@ class BuildLock:
         self.release()
 
 
-def lock_status() -> dict:
-    meta = _read_meta()
-    if not meta:
-        return {"locked": False}
+def lock_status(name: str = "build") -> dict:
+    _, meta_path = _lock_paths(name)
+    if not meta_path.exists():
+        return {"locked": False, "name": name}
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"locked": False, "name": name}
     pid = meta.get("pid")
     return {
         "locked": True,
         "alive": _pid_alive(pid) if pid else False,
+        "name": name,
         **meta,
     }
+
+
+def all_locks() -> list:
+    """Every lock namespace currently present on disk, global first."""
+    names = sorted(p.name[: -len(".lock")] for p in RUNTIME_DIR.glob("*.lock"))
+    ordered = [n for n in ["build"] if n in names] + [
+        n for n in names if n != "build"
+    ]
+    return [lock_status(n) for n in ordered]
 
 
 # ---------------------------------------------------------------------------
@@ -494,13 +528,13 @@ def list_gradle_processes() -> list:
 # ---------------------------------------------------------------------------
 # commands
 # ---------------------------------------------------------------------------
-def _print_busy() -> int:
-    s = lock_status()
+def _print_busy(lock_name: str = "build") -> int:
+    s = lock_status(lock_name)
     if not s.get("locked"):
         return 1
     pid = s.get("pid")
     alive = s.get("alive", False)
-    print("[mcbot] BUSY: another build/test is in progress.", file=sys.stderr)
+    print(f"[mcbot] BUSY: '{lock_name}' lock is held by another run.", file=sys.stderr)
     print(f"  holder pid : {pid}  ({'alive' if alive else 'dead'})", file=sys.stderr)
     print(f"  command    : {s.get('command')}", file=sys.stderr)
     print(f"  started    : {s.get('start_iso')}", file=sys.stderr)
@@ -547,9 +581,17 @@ def cmd_build(args) -> int:
     no_daemon = args.no_daemon or tuple(gradle_args[: len(base)]) in NEEDS_NO_DAEMON
     with_cc = args.cc or os.environ.get("MCBOT_CC") == "1"
     command = f"build {sub}"
-    with BuildLock() as lock:
+    # Long-running game tasks only READ build outputs, so each gets
+    # its own lock namespace: a dedicated server and a dev client can
+    # be alive at the same time. Anything that writes build/ still
+    # serializes on the global "build" lock.
+    if sub in {"runClient", "runServer", "runGameTest", "runData"}:
+        lock_name = f"run.{sub}"
+    else:
+        lock_name = "build"
+    with BuildLock(lock_name) as lock:
         if not lock.acquire(command):
-            return _print_busy()
+            return _print_busy(lock_name)
         return run_gradle(g, gradle_args, no_daemon=no_daemon, with_cc=with_cc, log_name=sub)
 
 
@@ -588,14 +630,14 @@ def cmd_passthrough_no_lock(args) -> int:
 
 
 def cmd_status(args) -> int:
-    s = lock_status()
-    if s.get("locked"):
-        print(
-            f"lock: BUSY  pid={s.get('pid')} alive={s.get('alive')} "
-            f"cmd={s.get('command')} since={s.get('start_iso')}"
-        )
-    else:
-        print("lock: free")
+    for s in all_locks():
+        if s.get("locked"):
+            print(
+                f"lock[{s['name']}]: BUSY  pid={s.get('pid')} alive={s.get('alive')} "
+                f"cmd={s.get('command')} since={s.get('start_iso')}"
+            )
+        else:
+            print(f"lock[{s['name']}]: free")
     if LAST_LOG.exists():
         try:
             p = LAST_LOG.read_text(encoding="utf-8").strip()
@@ -692,45 +734,51 @@ def cmd_log(args) -> int:
 
 def cmd_lock(args) -> int:
     if args.action == "status":
-        s = lock_status()
-        if not s.get("locked"):
-            print("lock: free")
-            return 0
-        pid = s.get("pid")
-        alive = s.get("alive", False)
-        print(
-            f"lock: BUSY  pid={pid} alive={alive} "
-            f"cmd={s.get('command')} since={s.get('start_iso')}"
-        )
-        if not alive:
-            print("  (holder is dead — run `lock clear` to remove)")
+        for s in all_locks():
+            if not s.get("locked"):
+                print(f"lock[{s['name']}]: free")
+                continue
+            pid = s.get("pid")
+            alive = s.get("alive", False)
+            print(
+                f"lock[{s['name']}]: BUSY  pid={pid} alive={alive} "
+                f"cmd={s.get('command')} since={s.get('start_iso')}"
+            )
+            if not alive:
+                print(f"  (holder is dead — run `lock clear` to remove {s['name']})")
         return 0
     if args.action == "clear":
-        s = lock_status()
-        if s.get("locked") and s.get("alive"):
-            print(
-                f"[mcbot] refusing to clear: holder pid {s.get('pid')} is still alive",
-                file=sys.stderr,
-            )
-            print("[mcbot] if you really need to, kill the process first, then retry.", file=sys.stderr)
-            return 1
-        _force_clear_lock()
-        print("lock cleared")
-        return 0
+        refused = False
+        for s in all_locks():
+            if not s.get("locked"):
+                continue
+            if s.get("alive"):
+                print(
+                    f"[mcbot] refusing to clear '{s['name']}': holder pid {s.get('pid')} is still alive",
+                    file=sys.stderr,
+                )
+                refused = True
+                continue
+            _force_clear_lock(s["name"])
+            print(f"lock[{s['name']}] cleared")
+        return 1 if refused else 0
     if args.action == "takeover":
-        s = lock_status()
-        if not s.get("locked"):
-            print("lock: free, nothing to take over")
-            return 0
-        if s.get("alive"):
-            print(
-                f"[mcbot] refusing to takeover: holder pid {s.get('pid')} is still alive",
-                file=sys.stderr,
-            )
-            return 1
-        _force_clear_lock()
-        print("lock taken over (previous holder was dead)")
-        return 0
+        refused = False
+        for s in all_locks():
+            if not s.get("locked"):
+                continue
+            if s.get("alive"):
+                print(
+                    f"[mcbot] refusing to takeover '{s['name']}': holder pid {s.get('pid')} is still alive",
+                    file=sys.stderr,
+                )
+                refused = True
+                continue
+            _force_clear_lock(s["name"])
+            print(f"lock[{s['name']}] taken over (previous holder was dead)")
+        if not any(s.get("locked") for s in all_locks()) and not refused:
+            print("no locks present, nothing to take over")
+        return 1 if refused else 0
     print(f"[mcbot] unknown lock action: {args.action}", file=sys.stderr)
     return 2
 

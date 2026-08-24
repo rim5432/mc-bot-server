@@ -86,16 +86,23 @@ vocabulary lookup.
   - `python tool/mcbot_tool.py test`
   - `python tool/mcbot_tool.py build runServer` (long-running; Ctrl+C)
   - `python tool/mcbot_tool.py status` / `log tail` / `lock status`
-- **Concurrency etiquette**: one build / test / run at a time (lock at
-  `tool/.runtime/build.lock`). A second caller fails fast with
-  `BUSY: holder pid=...`; retry, or check the holder with `lock
-  status`. Dead holder → just re-run (auto takeover) or `lock clear`.
-  Never kill another agent's processes to grab the lock — it may hold
-  unsaved work.
-- **Long-running runs** (`runClient` / `runServer` / `runGameTest`)
-  hold the lock until MC exits. Verify with `build compile` / `jar`
-  first; for background + live-log runs use the Start-Process pattern
-  in `tool/README.md`.
+- **Concurrency etiquette**: everything that writes `build/`
+  (compile / test / jar / build / clean / sync) serializes on the
+  global `build` lock (`tool/.runtime/build.lock`); each long-running
+  game task (`runClient` / `runServer` / `runGameTest` / `runData`)
+  holds its own `run.<task>` lock, so a dedicated server and a dev
+  client can be alive at the same time — they only read build
+  outputs. A second caller of the SAME namespace fails fast with
+  `BUSY: holder pid=...`; retry, or check holders with `lock status`
+  (lists every namespace). Dead holder → just re-run (auto takeover)
+  or `lock clear`. Never kill another agent's processes to grab the
+  lock — it may hold unsaved work.
+- **Long-running runs** hold their own `run.<task>` lock until MC
+  exits. Verify with `build compile` / `jar` first; for background +
+  live-log runs use the Start-Process pattern in `tool/README.md`.
+  Compiling while a run is alive may fail on Windows file locks
+  (the running JVM holds the moddev jars open) — stop the run or
+  retry after it exits.
 - **Read-only checks** (`tasks`, `deps`, `status`, `log *`, `lock
   status`, `proc list`, `doc list/check/touch/index/new`) do not need
   the lock and can be called freely.
