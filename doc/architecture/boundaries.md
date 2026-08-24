@@ -1,6 +1,6 @@
 ---
 title: Boundary Contracts and Decision Ledger
-last_verified: 2026-08-23
+last_verified: 2026-08-24
 covers:
   - doc/decisions/0002-capability-model-task-arbiter.md
   - doc/decisions/0003-reflex-layer-preemption.md
@@ -404,6 +404,31 @@ BotState getState();
     the missing-post cell, which is EMPTY and already answers
     true. Pose-aware parameterization reopens via issue 0003
     without touching this entry.
+    20. Plan-progress fuse and vertical trigger gate (issue 0001,
+    adopted through its four-PR resolution chain). Stuck detection
+    measures PLAN-PROGRESS, never per-tick motion: three OR
+    criteria - waypoint index advanced, goal distance decreased,
+    3D distance to the current waypoint beat the latched minimum
+    by more than STUCK_EPSILON (a margin, not equality - in-place
+    jitter must not mint new minima). External replan triggers
+    (exhaustion, offPath, freshness drop) must not clear the
+    accumulator; only real progress or the fuse firing resets it.
+    The vertical gate complements the fuse: airborne ticks skip
+    trigger evaluation (a falling pose would score false progress
+    or request replans against snapshots the freshness check
+    discards), and the landing edge bypasses the replan cooldown
+    so the post-landing pose is the next plan's start cell. Fuse
+    without gate leaves the airborne replan waste; gate without
+    fuse leaves the free-fall limbo; both are required.
+    HARD RE-TEST TRIGGER: the 3D-distance criterion and the
+    motion-detector subsumption hold iff every waypoint gap is
+    <= 1 cell AND steering is move-at-waypoint. Any change to
+    BasicMoves.from (a long-range move), AStarPathFinder.reconstruct
+    (waypoint simplification), or a path-smoothing pass (issue
+    0005 P1.2 is the first queued one) must re-run the limbo and
+    detour coverage (LimboCharacterizationGateTest plus the detour
+    cases) and upgrade the criterion to arclength projection if
+    waypoint gaps exceed one cell.
 
 ## Deferred, with reopen conditions
 

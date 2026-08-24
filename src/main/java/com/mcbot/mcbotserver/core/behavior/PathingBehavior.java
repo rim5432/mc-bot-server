@@ -40,11 +40,11 @@ import java.util.Objects;
  * it in the package:
  * <ul>
  *   <li>{@link WaypointCursor} - the active plan chain and cursor</li>
- *   <li>{@link PlanProgressFuse} - issue 0001 §Ruling a progress
- *       criteria, the accumulator immune to replan triggers, and the
- *       repeat-report latch</li>
- *   <li>{@link ReplanGate} - cooldown rationing plus the issue 0001
- *       fix-6 vertical gate and landing-edge bypass</li>
+ *   <li>{@link PlanProgressFuse} - ledger 20 progress
+ *       criteria, the accumulator immune to replan triggers,
+ *       and the repeat-report latch</li>
+ *   <li>{@link ReplanGate} - cooldown rationing plus the ledger-20
+ *       vertical gate and landing-edge bypass</li>
  *   <li>{@link PlanLifecycle} - search request, synchronous compute,
  *       and the Chebyshev freshness guard (decision 17b)</li>
  * </ul>
@@ -290,7 +290,7 @@ public final class PathingBehavior implements Behavior {
         Vec3 position = positionSource.get();
         ticksSinceAdoption++;
 
-        // Vertical gate (issue 0001 fix 6): the gate owns ground
+        // Vertical gate (ledger 20): the gate owns ground
         // sampling, the landing edge, and cooldown rationing. Mid-air
         // ticks still steer toward the current waypoint (the bot moves
         // through the air on its trajectory), but they do not score
@@ -316,7 +316,7 @@ public final class PathingBehavior implements Behavior {
         applyAdoption(lifecycle.adoptIfReady(directive.goal(), cell));
 
         if (evaluateTriggers) {
-            // Plan-progress score (issue 0001 §Ruling a, Path A).
+            // Plan-progress score (ledger 20, Path A).
             // Three OR criteria; any one counts as progress and
             // resets the accumulator. External replan (exhaustion,
             // offPath, freshness drop) MUST NOT clear the

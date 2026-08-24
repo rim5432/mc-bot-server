@@ -8,8 +8,10 @@ covers:
   - src/main/java/com/mcbot/mcbotserver/gametest/BotSliceGameTests.java
   - src/test/java/com/mcbot/mcbotserver/tickpipeline/StuckFuseTest.java
   - src/test/java/com/mcbot/mcbotserver/tickpipeline/VerticalGateTest.java
-status: resolved (2026-08-23; promotion-to-ADR vs archive deferred
-  to the next stage review)
+status: archived (2026-08-24; fuse + gate semantics and the
+  Path-A hard-re-test trigger recorded as boundaries.md decision
+  ledger entry 20)
+superseded_by: architecture/boundaries.md
 related:
   - doc/decisions/0004-tick-pipeline-actor-channels.md
   - src/main/java/com/mcbot/mcbotserver/api/types/Vec3.java

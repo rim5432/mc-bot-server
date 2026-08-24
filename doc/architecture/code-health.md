@@ -168,7 +168,7 @@ without an anchor is a workplan item, not a row here.
 
 | Ruling | Anchor | Settled in |
 |---|---|---|
-| Plan-progress fuse: three OR criteria; accumulator immune to external replan | `PlanProgressFuse` Javadoc (invariants migrated verbatim from issue 0001) | issue 0001 |
+| Plan-progress fuse: three OR criteria; accumulator immune to external replan | `PlanProgressFuse` Javadoc (invariants migrated verbatim from issue 0001) | boundaries.md ledger 20 (issue 0001 archived 2026-08-24) |
 | Vertical trigger gate: airborne ticks skip trigger eval; landing edge bypasses cooldown | `ReplanGate` Javadoc + steering in `PathingBehavior` | 4c3f51f |
 | Park semantics: explicit ParkResult, atomic retire sweep, resume revalidation | `TaskArbiter.forcePauseAll` + `ParkResult` Javadoc | 17ba7a2 |
 | One-tick retirement lap: verdict announced on the reflex tick; no tail sweep inside arbiter tick | `TaskArbiter.tick` tail comment; function-map reflex-tick event semantics section | 17ba7a2 |
@@ -184,9 +184,6 @@ without an anchor is a workplan item, not a row here.
   Schedule: before Stage 3 vocabulary lands - pose parameterization
   touches the same collision predicates, and trimming afterwards
   would churn boundary-D consumers twice.
-- **OPEN H2 - issue 0001 migration decision.** Issue 0001 is
-  resolved but still open-as-file; promote its body to an ADR or
-  archive it with `superseded_by:`. Decided at the Stage 2 review.
 - **OPEN H3 - BoundaryContractMarkerTest.** AGENTS.md 1.4.9 names
   the candidate: a layer-1 test scanning every boundary-interface
   implementer for its contract marker. Optional for Stage 3; pair

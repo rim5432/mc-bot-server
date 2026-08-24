@@ -2,7 +2,8 @@ package com.mcbot.mcbotserver.core.behavior;
 
 /**
  * The replan trigger gate: cooldown rationing plus the vertical gate
- * (issue 0001 fix 6). Trigger evaluation runs only while the body is
+ * (boundaries.md decision ledger 20; landed as issue 0001 fix 6).
+ * Trigger evaluation runs only while the body is
  * in ground contact; the landing edge ({@code onGround} transitions
  * false -&gt; true) bypasses the cooldown so the post-landing position
  * is the basis for the next plan, not a stale pre-take-off plan.

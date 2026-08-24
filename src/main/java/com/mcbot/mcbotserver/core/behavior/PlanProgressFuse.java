@@ -4,9 +4,10 @@ import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
 
 /**
- * The plan-progress fuse (issue 0001 §Ruling a, Path A): three OR
- * criteria drive one accumulator, and {@link PathingBehavior#STUCK_WINDOW}
- * ticks without progress fire it.
+ * The plan-progress fuse (boundaries.md decision ledger 20; landed
+ * as issue 0001 Ruling a, Path A): three OR criteria drive one
+ * accumulator, and {@link PathingBehavior#STUCK_WINDOW} ticks
+ * without progress fire it.
  *
  * <p>Criteria, evaluated against latched minima:
  * <ol>
@@ -17,7 +18,7 @@ import com.mcbot.mcbotserver.api.types.Vec3;
  *       {@link PathingBehavior#STUCK_EPSILON} (latched-min tracked)</li>
  * </ol>
  *
- * <p>Invariants (issue 0001 §Ruling a - do not re-litigate here):
+ * <p>Invariants (ledger 20 - do not re-litigate here):
  * external replan triggers (exhaustion, offPath, freshness drop)
  * MUST NOT clear the accumulator - only real plan-progress
  * ({@link #onProgress()}) or the fuse itself firing resets it. Plan
@@ -26,8 +27,8 @@ import com.mcbot.mcbotserver.api.types.Vec3;
  * accumulator.
  *
  * <p>The 3D distance criterion 3 is correct under Path A (per-cell
- * waypoint gap, move-at-waypoint steering, both pinned in the
- * issue). If either assumption breaks, this class must be revisited
+ * waypoint gap, move-at-waypoint steering, both pinned in ledger
+ * 20). If either assumption breaks, this class must be revisited
  * (criterion 3 reverts to arclength-style polyline projection per
  * Path B).
  *
@@ -77,7 +78,7 @@ final class PlanProgressFuse {
         if (!cursor.exhausted()) {
             // Criterion 3 measures 3D, not XZ-only: vertical moves
             // (JumpUp, Drop) are real progress the latched min must
-            // capture (issue 0001 Ruling a).
+            // capture (ledger 20).
             CellPos wp = cursor.current();
             double wpDist = position.distanceTo(wp.x() + 0.5,
                 wp.y() + 0.5, wp.z() + 0.5);
@@ -143,7 +144,7 @@ final class PlanProgressFuse {
      * Reset the observation latches for an adopted plan so the new
      * plan starts a fresh observation window. The accumulator
      * (ticksWithoutProgress) is deliberately NOT reset - that is
-     * the issue 0001 §Ruling a invariant: external replan does not
+     * the ledger-20 invariant: external replan does not
      * clear the fuse. lastWaypointIndex takes the CURRENT index
      * (not a sentinel) so the next evaluate call does not fire
      * criterion 1 as a false positive. lastGoalDistance also stays -
