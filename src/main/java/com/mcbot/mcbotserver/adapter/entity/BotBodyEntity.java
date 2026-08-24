@@ -111,13 +111,17 @@ public final class BotBodyEntity extends PathfinderMob {
         // Deliberately no super call: goal selectors and MoveControl
         // would fight the binding for zza. Inputs are applied directly
         // through LivingEntity's own public drive setters.
-        setXxa(driveStrafe);
-        setZza(driveForward);
-        // travel()'s magnitude source: normal mobs get this from
-        // MoveControl.setSpeed(); with MoveControl swapped out, the
-        // binding must supply it or zza drives a speed-0 body.
+        //
+        // ORDER MATTERS: Mob.setSpeed() overrides LivingEntity.setSpeed()
+        // and additionally calls setZza(speed) — vanilla treats speed and
+        // drive as synonymous for ordinary mobs. If setXxa/setZza run
+        // before setSpeed, the speed write clobbers the binding's drive
+        // every tick (zza=0.25 instead of 0), so an idle body walks
+        // forward forever. setSpeed first, then re-apply drive values.
         setSpeed((float) getAttributeValue(
             net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED));
+        setXxa(driveStrafe);
+        setZza(driveForward);
         if (driveJump && isInLava() && !onGround()) {
             // Lava ascent: same direct-call deviation as the water branch
             // below — setJumping(true) produced zero vertical velocity on
