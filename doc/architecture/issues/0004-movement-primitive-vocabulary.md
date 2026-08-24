@@ -1,6 +1,6 @@
 ---
 title: Movement primitive vocabulary - misnomers, fluid propulsion, missing key semantics
-last_verified: 2026-08-24
+last_verified: 2026-08-25
 covers:
   - src/main/java/com/mcbot/mcbotserver/core/pathing/BasicMoves.java
   - src/main/java/com/mcbot/mcbotserver/api/actor/Intent.java
@@ -162,9 +162,11 @@ was silently consumed every tick. The branch also closes the crashed-state
 MinimalReflex lava path: `BotController.inLethalFluid` (previously a
 dead field with zero call sites) is now wired from `McBotServer.onServerTick`
 reading `activeBody.isInLava()`, so `MinimalReflex.tick(inLethalFluid=true,
-actor)` submits `jump=true` and the lava branch fires. No lava gametest
-yet — water has trench + deep-pool coverage; lava in-engine scenario is
-a tracked follow-up.
+actor)` submits `jump=true` and the lava branch fires. Lava gained its
+in-engine scenario 2026-08-25: `crossesLavaTrench` (BotSliceGameTests)
+swims the trench under a fire-resistance harness and pins the ascent
+branch, the crossing and the exit climb end to end - the harness isolates
+locomotion because the device has no lava-survival story yet.
 
 ### F3 - Vertical control: the yya axis gives real swim steering, not just rocket-up plus freefall
 

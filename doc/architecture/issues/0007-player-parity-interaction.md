@@ -171,6 +171,20 @@ state) turns out to be facade-hostile.
 
 ## 7. Risks
 
+- **Carrier-bound calibration debt (2026-08-25 note)**: the body's
+  locomotion is calibrated to THIS PathfinderMob carrier, and the
+  calibrations accumulate - direct `jumpFromGround` /
+  `jumpInFluid` calls (the flag path produced zero vertical
+  velocity on this carrier, issue 0004 F2), drive/sprint/brake
+  constants, the swapped-out move/look/jump controls, and the
+  eyeHeight delta (entity-default ~1.53 vs a player's 1.62, which
+  shifts every eye-line based check: melee clips, sprint
+  clearance, sight lines). None of this is wrong for Path A - the
+  device's physics are the carrier's physics - but every feature
+  landed on the mob carrier raises Path B's (FakeServerPlayer)
+  port cost. This feeds the section 6.3 carrier ruling: the
+  Stage 3 review should weigh the accumulated calibration surface,
+  not just the interaction-surface fit.
 - **Facade blast radius**: VERIFIED - `Player` declares exactly two
   abstract methods (`isSpectator`, `isCreative`); the risk is not
   "implement 150 methods" but default-method delegation: default

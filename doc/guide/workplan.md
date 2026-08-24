@@ -369,6 +369,33 @@ test count when red).
    should serialize run.runServer vs run.runGameTest as a
    documentation note until then (a live server + gametest cannot
    coexist today).
+8. RESOLVED 2026-08-25 (gametest fidelity hardening): the gametest
+   rig and the /botspawn wiring built the same pipeline by hand and
+   had drifted - the rig lacked the engage reflex, the engage
+   mission factory, the LevelThreatSensor feed and the pre-tick
+   lava flag. Both now assemble through one factory
+   (adapter.BotAssembly) and the rig's driveTick mirrors the server
+   listener's tick order, so wiring drift is impossible by
+   construction. Consequences and additions in the same pass:
+   - defendsByKillingZombie converted to the production reflex-
+     engage chain (no test-side mission submission); the refusal
+     scenario moved its skeleton to the 8-cell standoff so the
+     direct-submission refusal stays isolated from reflex churn,
+     and its vacuous NoAi health assertion became a 15-tick
+     refusal window.
+   - New scenarios (+5): crash-latch (ADR-0005 in-engine: latch,
+     MinimalReflex-only, reset recovery), production-path
+     integration (real /botspawn + /bot goto + ServerTickEvent,
+     no test-side pipeline access), retaliation (AI zombie fights
+     back under a sun-blocking roof), sight-blocked combat (wall-
+     blind engage, zero damage through a full wall, honest TIMEOUT),
+     and lava trench (fire-resistance harness; closes issue 0004's
+     tracked lava-scenario follow-up).
+   - gauntletEndToEnd's plateau checkpoint was dead code since
+     introduction (absolute Y vs relative constant, the f98bf9d
+     defect class, masked by the || !isActive() escape) - fixed.
+   - Suite 10 -> 15 scenarios, all green via build runGameTest;
+     GametestInventoryCheck pins the new inventory.
 
 ## Pre-Stage-3 survival gate - basic survival capability
 
