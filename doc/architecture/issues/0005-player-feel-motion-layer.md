@@ -3,9 +3,10 @@ title: Player-feel motion layer - eyes, start/stop, rhythm, cosmetic fidgets
 last_verified: 2026-08-24
 covers:
   - src/main/java/com/mcbot/mcbotserver/core/behavior/PathingBehavior.java
+  - src/main/java/com/mcbot/mcbotserver/core/behavior/IdleLook.java
   - src/main/java/com/mcbot/mcbotserver/adapter/entity/BotBodyEntity.java
   - src/main/java/com/mcbot/mcbotserver/adapter/BindingActor.java
-status: open
+status: open (P0 shipped)
 related:
   - doc/architecture/boundaries.md
   - doc/architecture/function-map.md
@@ -64,6 +65,36 @@ submitted by steering with pitch hard-coded to 0:
 
 No signature changes; steering and a small idle policy only.
 
+**Implementation status (2026-08-24, P0 shipped)**:
+
+- P0.1 (moving) lives in `PathingBehavior.steerPitch` -
+  feet-to-feet geometry toward the steer waypoint (eye heights
+  cancel on both ends), engine sign (negative = up), clamped at
+  `STEER_PITCH_LIMIT_DEG = 60`. Flat legs read exactly 0, so
+  plains behavior is byte-identical to before. Pinned by
+  `SteerPitchGateTest`: flat = 0, the JumpUp rig = exactly
+  `-atan2(1, 2)`, steep legs clamp both signs.
+- P0.2 + P0.3 collapsed into one fallback: arrival is just the
+  first idle tick after the mission retires, so both are the same
+  policy. Placement follows the P3 precedent below - NOT a
+  Behavior (boundary B freezes claim-free null-directive ticks),
+  but an adapter-local pass in `BindingActor.flush` that fires
+  only when the ROT channel is unclaimed that tick. Pathing
+  (priority 10) and combat (priority 20) ROT claims always
+  out-rank it, so it never fights a mission; combat holds ROT
+  every tick it is active, so mid-fight flicker is impossible by
+  construction.
+- The math and constants live in pure `core.behavior.IdleLook`
+  (zero MC imports) so layer-1 tests pin them:
+  `PLAYER_LOOK_RADIUS = 6.0` (inclusive, eye-to-eye, nearest wins,
+  ties to the earlier list entry), `TURN_PER_TICK_DEG = 15`
+  (wrap-aware shortest arc; the exact-180 tie resolves toward +
+  via IEEEremainder - deterministic), `PITCH_LIMIT_DEG = 60`.
+  Spectators and removed players are skipped. The head also tracks
+  during reflex freezes and the crashed latch: presentation only,
+  MinimalReflex still owns every motion channel. Pinned by
+  `IdleLookGateTest`.
+
 ### P1 - Gait (half cosmetic, half functional)
 
 1. Sprint-jump corridor policy: exactly the deferred candidate
@@ -119,6 +150,10 @@ this layer reproduces exactly that split.
 - P3 intentionally lives OUTSIDE boundary B/D semantics as
   adapter-local cosmetics; this note is the marker that prevents a
   future refactor from promoting it into Intent.Use.
+- P0.2/P0.3 idle look shipped adapter-local by the same rule (see
+  implementation status above): the marker prevents a future
+  refactor from promoting idle presence into a Behavior or an
+  Intent variant.
 
 ## 7. Placement
 

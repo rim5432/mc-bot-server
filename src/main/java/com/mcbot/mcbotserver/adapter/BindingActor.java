@@ -6,9 +6,13 @@ import com.mcbot.mcbotserver.api.actor.Actor;
 import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
+import com.mcbot.mcbotserver.api.types.Vec3;
+import com.mcbot.mcbotserver.core.behavior.IdleLook;
 
 import net.minecraft.world.InteractionHand;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -62,6 +66,15 @@ public final class BindingActor implements Actor {
         Claim rot = winners.get(Channel.ROT);
         if (rot != null && rot.intent() instanceof Intent.Look l) {
             body.setTargetRotation(l.yawDeg(), l.pitchDeg());
+        } else if (rot == null) {
+            // Idle presence (issue 0005 P0.2/P0.3): no behavior owns
+            // ROT this tick - between plans, after arrival, reflex
+            // freeze. Turn the head toward the nearest player. Pure
+            // presentation: it rides the same setTargetRotation write
+            // path as claim-resolved looks and never touches a
+            // mission channel. When pathing or combat claims ROT the
+            // same tick, that claim wins and this stays silent.
+            applyIdleLook();
         }
 
         Claim use = winners.get(Channel.USE);
@@ -86,6 +99,37 @@ public final class BindingActor implements Actor {
     public void clearAllIntents() {
         delegate.clearAllIntents();
         body.setDrive(0f, 0f, false);
+    }
+
+    /**
+     * Idle head-track pass: delegates target choice and turn pacing
+     * to {@link IdleLook} and echoes the result through the body's
+     * normal rotation write. Spectators and removed players are
+     * skipped; distance and selection semantics live in the policy
+     * so layer-1 tests pin them.
+     */
+    // contract: see issues/0005-player-feel-motion-layer.md P0 (idle
+    // look is adapter-local presentation, never an Intent)
+    private void applyIdleLook() {
+        var eye = body.getEyePosition();
+        List<Vec3> candidates = new ArrayList<>();
+        for (var player : body.level().players()) {
+            if (player.isRemoved() || player.isSpectator()) {
+                continue;
+            }
+            var playerEye = player.getEyePosition();
+            candidates.add(new Vec3(playerEye.x, playerEye.y,
+                playerEye.z));
+        }
+        IdleLook.Target target =
+            IdleLook.nearestTarget(new Vec3(eye.x, eye.y, eye.z),
+                candidates);
+        if (target == null) {
+            return;
+        }
+        body.setTargetRotation(
+            IdleLook.turnTowardYaw(body.getYRot(), target.yawDeg()),
+            IdleLook.turnTowardPitch(body.getXRot(), target.pitchDeg()));
     }
 
     /**
