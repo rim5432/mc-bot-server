@@ -357,3 +357,95 @@ test count when red).
    goal must fail NO_PATH within seconds and the keepalive stream
    must show noPathWitnesses climbing to 3 first.
 
+## Pre-Stage-3 survival gate - basic survival capability
+
+Unlocked by the Stage 2 backlog; blocks all Stage 3 work. The gate
+exists because convergence criterion 2 (10-minute unattended
+survival) is red by construction today: the 2026-08-24 live session
+(tool/sessions/20260824T135850Z-playerfeel-live) lost the body
+twice unattended - drowned in the spawn lake after ~20 min (air
+reflex reserved as issue 0004 F6(2)) and killed in a night cave
+while idle (nothing engages hostiles without a mission) - and the
+carrier has no health-recovery path at all (zero heal call sites
+in main today; a mob carrier does not regenerate, so damage is
+monotonic and "alive indefinitely" is impossible without a policy).
+
+- [ ] M  Air-supply reflex (issue 0004 F6(2)): surface the body's
+         air supply on ThreatBlackboard + adapter sensor wiring;
+         the rule itself is rule-table JSON (low air -> preempt
+         toward the surface; Swim/SwimUp vocabulary already makes
+         the surface plannable). MinimalReflex's jump-while-in-fluid
+         is the crashed-state precedent, not the mechanism here -
+         this is a normal reflex directive. Offline gate test +
+         in-engine drowning-recovery scenario.                [dep: none]
+- [ ] M  Idle hostile protection: today nothing engages a hostile
+         unless a DefendProcess mission is running. Design ruling
+         at pickup: standing idle-band DefendProcess (arbiter-side,
+         wins only when nothing else claims) vs reflex-carried
+         combat directive (boundary-C shaped, but reflexes are
+         stateless one-tick decisions and combat needs target
+         tracking - the arbiter-side shape is the working
+         hypothesis). Offline gate + in-engine night-idle
+         survival scenario.                                     [dep: none]
+- [ ] S  Body recovery policy: decide and implement the v1 health
+         floor. Working hypothesis: peaceful-style regeneration as
+         a documented carrier deviation; eating lands with Stage 3
+         UseItem, not here.                                     [dep: none]
+- [ ] M  10-minute acceptance rehearsal through the RCON bridge to
+         a recorded verdict in tool/sessions/. Programmatic driver,
+         boundary-D verbs only, mixed day/night overworld, at
+         least one reflex preemption and one failed-task recovery
+         observed. Closes criterion 2 + closeout follow-ups 4 and
+         5 + issue 0005's live acceptance run in one stroke.     [dep: air, idle, recovery]
+- [ ] S  H-R4 wire-key convergence pass (code-health ledger;
+         scheduled before any Stage 3 vocabulary lands so pose work
+         does not churn boundary-D consumers twice).            [dep: none]
+- [ ] S  Bookkeeping: archive resolved issue 0006 per the issue
+         workflow; rule issue 0004's disposition (keep open as the
+         Stage 3 vocabulary seed vs promote); let the datapack
+         water/lava trait JSON supersede the code baseline
+         (closeout follow-up 5 residue).                        [dep: none]
+
+## Stage 3 - player parity (unlocked only by the survival gate)
+
+Design review: doc/architecture/issues/0007-player-parity-
+interaction.md (raw analysis distilled 2026-08-24; vanilla-API
+claims spot-checked against the decompiled tree). Every item that
+grows a frozen surface (Intent kinds, Actor channels, the carrier
+decision, tick ordering) is backlog text until the Stage 3 review
+ratifies it - per AGENTS.md the stage review is the only place the
+freeze lifts.
+
+- [ ] L  Phase 1 - inventory sense + basic interaction: api
+         ItemView/InventoryView (String ids, zero MC imports),
+         SimpleContainer-backed BindingInventory, Intent.
+         InteractBlock (face + hitPos; placement depends on the
+         clicked face) with hold-to-mine semantics and the
+         adapter-side mining state machine (survival digging is
+         multi-tick progress, not single-shot), DropSelected.
+         Acceptance: bot digs a block, reads its own inventory,
+         drops an item.                                          [dep: gate]
+- [ ] L  Phase 2 - menu system + crafting-table disclosure: api
+         MenuView/CraftingView (2x2 InventoryMenu baseline, 3x3
+         table extension), core click-sequence planner over the
+         read-only view (core holds no menu state - all mutations
+         through the adapter's menu.clicked() so ResultSlot
+         material consumption is never bypassed), adapter
+         BindingMenu over AbstractContainerMenu with a no-op
+         ContainerSynchronizer, MenuOpener per block kind,
+         BotPlayerFacade (minimal Player adapter - see the carrier
+         ruling in 0007). Acceptance: walk to a crafting table,
+         open it, place materials via MenuClick, read the result
+         slot, take the product.                                 [dep: P1]
+- [ ] M  Phase 3 - crafting automation: recipe query service over
+         RecipeManager (adapter-side only - core stays
+         MC-clean), quick-move sequences. Acceptance: given a
+         recipe id, bot pulls materials, crafts, banks the
+         product.                                               [dep: P2]
+- [ ] XL Phase 4 - full player behaviour parity: remaining menu
+         kinds (enchanting, anvil, loom, villager, ...), Intent.
+         UseItem (eat / drink / bow / place), armor slots,
+         offhand, experience and hunger sense. Acceptance:
+         unattended survival loop (mine -> craft -> equip ->
+         fight -> eat).                                         [dep: P3]
+
