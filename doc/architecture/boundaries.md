@@ -441,6 +441,32 @@ BotState getState();
     would silence criterion 3 for a whole segment and false-STUCK
     a moving body on a detour leg). Limbo and detour coverage
     re-run green (offline suite plus runGameTest).
+    21. Unreachable-goal escalation (NoPathEscalator, PathingBehavior
+    package). A drained A* open set was always an immediate NO_PATH
+    (empty waypoints -> empty cursor -> FAILED same tick); the gap
+    was the budget-cut PARTIAL loop: each individual search
+    "succeeds" locally (confidence >= MIN_PARTIAL_CONFIDENCE), the
+    follower adopts, walks, exhausts, replans - and the mission
+    burns its whole tick budget on a goal it can never reach
+    (observed in the wild: a floating goal cell, 21s of planning
+    churn, TIMEOUT at 600 ticks). Semantics frozen here: every
+    adopted partial is a WITNESS; a witness whose terminal waypoint
+    fails to improve the best-ever terminal-to-goal distance by
+    more than 0.5 blocks (an axis step is 1.0) increments the
+    ledger, an improving witness resets it, and WITNESS_LIMIT (3)
+    consecutive non-improving witnesses declare FAILED(NO_PATH) -
+    the mission process keeps its existing verdict mapping, nothing
+    new crosses boundary B. Each witness also escalates the next
+    search's node budget (x4 per witness, capped at 320k; wall
+    clock unchanged), so the verdict only lands after the search
+    had a progressively fair chance: a plateau at maximum budget is
+    evidence of unreachability, not of a stingy search. Improvement
+    is measured against the BEST-EVER distance, never the previous
+    witness - a legitimate detour that temporarily moves the
+    terminal away cannot mint false witnesses. The ledger resets on
+    goal change and on any complete-route adoption; the count rides
+    the keepalive event as `noPathWitnesses` for harness-side
+    verdict anticipation.
 
 ## Deferred, with reopen conditions
 

@@ -346,4 +346,14 @@ test count when red).
    misleading partial instead of concluding NO_PATH. Verified by
    BasicMovesSwimTest offline and crossesWaterTrench in-engine;
    gametests 8/8.
+6. OPEN 2026-08-24: unreachable-goal escalation (NoPathEscalator,
+   boundaries.md decision 21) landed after the verif-1 live session
+   showed a floating goal burning the full 600-tick mission budget
+   through a budget-cut partial loop (21s planning churn, 1-2-cell
+   partial adoptions, TIMEOUT instead of NO_PATH). Offline-gated
+   (NoPathEscalatorTest + NoPathEscalationGateTest); the emergent
+   partial-loop shape itself is async/wall-clock field behaviour,
+   so acceptance is a live rerun of the verif-1 scenario: floating
+   goal must fail NO_PATH within seconds and the keepalive stream
+   must show noPathWitnesses climbing to 3 first.
 

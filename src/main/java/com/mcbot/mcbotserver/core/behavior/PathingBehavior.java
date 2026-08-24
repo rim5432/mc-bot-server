@@ -187,6 +187,9 @@ public final class PathingBehavior implements Behavior {
     private final WaypointCursor cursor = new WaypointCursor();
     private final PlanProgressFuse fuse = new PlanProgressFuse();
     private final ReplanGate gate = new ReplanGate();
+    private final NoPathEscalator noPath =
+        new NoPathEscalator(com.mcbot.mcbotserver.core.pathing
+            .AStarPathFinder.DEFAULT_NODE_BUDGET);
     private int ticksSinceAdoption;
     private Goal lastGoal;
     private int departHoldTicks;
@@ -326,6 +329,9 @@ public final class PathingBehavior implements Behavior {
         if (!directive.goal().equals(lastGoal)) {
             lastGoal = directive.goal();
             departHoldTicks = DEPARTURE_DELAY_TICKS;
+            // A new goal retires all unreachability evidence: partial
+            // witnesses are only comparable within one goal.
+            noPath.reset();
         }
 
         // Vertical gate (ledger 20): the gate owns ground
@@ -355,7 +361,11 @@ public final class PathingBehavior implements Behavior {
         // freshness check is the cell-based guard regardless of
         // ground state.
         applyAdoption(lifecycle.adoptIfReady(directive.goal(), cell),
-            world);
+            world, directive.goal());
+        if (noPath.tripped()) {
+            resetPlan();
+            return ExecutionReport.failed("NO_PATH");
+        }
 
         if (evaluateTriggers) {
             // Plan-progress score (ledger 20, Path A).
@@ -390,7 +400,12 @@ public final class PathingBehavior implements Behavior {
                 && gate.mayRequest(window)) {
                 gate.onRequest();
                 applyAdoption(lifecycle.request(world, cell,
-                    directive.goal()), world);
+                    directive.goal(), noPath.nextNodeBudget()),
+                    world, directive.goal());
+                if (noPath.tripped()) {
+                    resetPlan();
+                    return ExecutionReport.failed("NO_PATH");
+                }
             }
 
             if (cursor.isEmpty()) {
@@ -442,15 +457,17 @@ public final class PathingBehavior implements Behavior {
     /**
      * Apply an adoption verdict to the follower's collaborators.
      * Both arrival paths funnel here - the synchronous answer from
-     * {@code request} and the asynchronous one from
-     * {@code adoptIfReady} - so the application side effects
-     * (cursor install, adoption-age reset, fuse latch refresh) exist
-     * in exactly one place.
+     * {@code request} and the asynchronous one from {@code
+     * adoptIfReady} - so the application side effects (cursor install,
+     * adoption-age reset, fuse latch refresh) exist in exactly one
+     * place.
      *
      * @param adoption the verdict to apply; never null
+     * @param world    read-only perception for smoothing; never null
+     * @param goal     the goal the adoption answers; never null
      */
     private void applyAdoption(PlanLifecycle.Adoption adoption,
-                               WorldView world) {
+                               WorldView world, Goal goal) {
         switch (adoption.outcome()) {
             case ADOPTED -> {
                 // Skip index 0: it is the cell we are standing in.
@@ -462,6 +479,13 @@ public final class PathingBehavior implements Behavior {
                     adoption.plan()));
                 ticksSinceAdoption = 0;
                 fuse.onAdopted(cursor.index());
+                // Complete routes retire the unreachability ledger;
+                // partials become witnesses (see NoPathEscalator).
+                if (goal.isInGoal(cursor.last())) {
+                    noPath.onRouteComplete();
+                } else {
+                    noPath.onAdopted(goal, cursor.last());
+                }
             }
             case NO_ROUTE -> cursor.clear();
             case STALE -> {
@@ -481,6 +505,7 @@ public final class PathingBehavior implements Behavior {
         cursor.clear();
         gate.reset();
         lifecycle.discardPending();
+        noPath.reset();
     }
 
     /**
@@ -521,6 +546,12 @@ public final class PathingBehavior implements Behavior {
             String.valueOf(fuse.ticksWithoutProgress()));
         attrs.put("ticksSincePlan", String.valueOf(gate.ticksSinceRequest()));
         attrs.put("planAge", String.valueOf(ticksSinceAdoption));
+        // Unreachability evidence: how many consecutive partial
+        // adoptions stopped approaching the goal (NoPathEscalator).
+        // WITNESS_LIMIT of these precede a NO_PATH verdict - a
+        // harness watching a crawl can see the verdict coming.
+        attrs.put("noPathWitnesses",
+            String.valueOf(noPath.witnesses()));
         if (goalCell != null) {
             attrs.put("goalCell",
                 goalCell.x() + "," + goalCell.y() + "," + goalCell.z());

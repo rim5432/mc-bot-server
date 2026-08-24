@@ -51,6 +51,18 @@ final class PathingTestAccess {
         return (int) collaboratorField(mover, "gate", "ticksSincePlan");
     }
 
+    /** Whether no plan is installed (walking rigs skip steer reads). */
+    static boolean planEmpty(PathingBehavior mover) {
+        return waypoints(mover).isEmpty();
+    }
+
+    /** The cell steering currently aims at (cursor clamped to last). */
+    static CellPos steerTarget(PathingBehavior mover) {
+        List<CellPos> chain = waypoints(mover);
+        int index = Math.min(waypointIndex(mover), chain.size() - 1);
+        return chain.get(index);
+    }
+
     /** Ticks since the last plan-progress criterion fired. */
     static int ticksSincePlanProgress(PathingBehavior mover) {
         return (int) collaboratorField(mover, "fuse",

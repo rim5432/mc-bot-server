@@ -111,15 +111,21 @@ final class PlanLifecycle {
      * flight at a time - the cooldown gate spaces requests, this
      * guard absorbs same-tick re-triggers.
      *
-     * @param world the live view to snapshot from; never null
-     * @param start the cell to search from; never null
-     * @param goal  the goal to search toward; never null
+     * <p>The caller owns the node budget: the follower escalates it
+     * per non-improving partial witness so an unreachable goal gets
+     * progressively deeper searches before its NO_PATH verdict.
+     *
+     * @param world      the live view to snapshot from; never null
+     * @param start      the cell to search from; never null
+     * @param goal       the goal to search toward; never null
+     * @param nodeBudget safety-net cap on expansions; positive
      * @return the verdict for THIS tick (never the pending search)
      */
-    Adoption request(WorldView world, CellPos start, Goal goal) {
+    Adoption request(WorldView world, CellPos start, Goal goal,
+                     int nodeBudget) {
         CellPos anchor = PathingBehavior.anchorCell(goal);
         if (worker == null) {
-            var plan = computeSync(world, start, goal);
+            var plan = computeSync(world, start, goal, nodeBudget);
             return plan.isPresent()
                 ? new Adoption(Outcome.ADOPTED, plan.get())
                 : new Adoption(Outcome.NO_ROUTE, null);
@@ -134,7 +140,7 @@ final class PlanLifecycle {
         var snapshot = SnapshotWorldView.capture(world, start, anchor);
         pendingPlan = worker.submit(snapshot, graph, start, goal,
             Heuristic.euclideanTo(anchor),
-            AStarPathFinder.DEFAULT_NODE_BUDGET,
+            nodeBudget,
             PathingBehavior.PLAN_WALL_CLOCK_MS);
         return new Adoption(Outcome.NOT_READY, null);
     }
@@ -144,18 +150,20 @@ final class PlanLifecycle {
      * return the waypoint chain, or an empty optional when no route
      * exists. The caller applies the chain to its cursor.
      *
-     * @param world the live view to search over; never null
-     * @param start the cell to search from; never null
-     * @param goal  the goal to search toward; never null
+     * @param world      the live view to search over; never null
+     * @param start      the cell to search from; never null
+     * @param goal       the goal to search toward; never null
+     * @param nodeBudget safety-net cap on expansions; positive
      * @return the waypoint chain, or empty for no route
      */
     java.util.Optional<List<CellPos>> computeSync(WorldView world,
                                                   CellPos start,
-                                                  Goal goal) {
+                                                  Goal goal,
+                                                  int nodeBudget) {
         CellPos anchor = PathingBehavior.anchorCell(goal);
         var finder = new AStarPathFinder(graph,
             Heuristic.euclideanTo(anchor),
-            AStarPathFinder.DEFAULT_NODE_BUDGET);
+            nodeBudget);
         var result = finder.compute(world, start, goal,
             Heuristic.euclideanTo(anchor));
         if (!result.reachedGoal() && result.waypoints().isEmpty()) {
