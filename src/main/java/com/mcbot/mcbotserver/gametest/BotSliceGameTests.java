@@ -6,6 +6,7 @@ import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.process.DefendProcess;
+import com.mcbot.mcbotserver.core.reflex.SurfaceOnLowAirRule;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -381,6 +382,85 @@ public final class BotSliceGameTests {
                     "the zombie must not survive the engagement");
                 check(rig.body().isAlive(),
                     "the body must walk away from this fight");
+                rig.body().discard();
+            })
+            .thenSucceed();
+    }
+
+    /**
+     * Scenario 6: submerged with low air, the drowning reflex holds
+     * jump and the body surfaces. No mission is running — the only
+     * upward force is the reflex's ASCEND action, so an idle body
+     * without the reflex would sink to the pool floor and drown.
+     *
+     * <p>Why: issue 0004 F6(2) — the air-supply reflex is the
+     * survival gate's drowning defense. The offline test
+     * ({@code SurfaceOnLowAirRuleTest}) covers rule logic and
+     * hysteresis; this pins the full in-engine chain:
+     * {@code body.getAirSupply → sensor → ThreatBlackboard →
+     * SurfaceOnLowAirRule → ReflexAction.ASCEND → BotController
+     * jump=true → BotBodyEntity.setDrive → jumpInFluid(WATER_TYPE)
+     * → buoyancy → surface → air regen +4/tick}.
+     *
+     * <p>Pool: the entire 16x16 floor becomes a four-deep water
+     * column with a stone floor at FLOOR_Y-4. The body teleports
+     * to the bottom center and air is forced to 60 (below the
+     * trigger of 80) — natural drain from 300 takes 220 ticks,
+     * too slow for a gametest. {@code setAirSupply} is public on
+     * LivingEntity.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 200)
+    public static void surfacesWhenAirRunsLow(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+
+        // Four-deep pool over the whole floor; stone at the bottom.
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y, z),
+                    Blocks.WATER);
+                helper.setBlock(
+                    new BlockPos(x, GametestRig.FLOOR_Y - 1, z),
+                    Blocks.WATER);
+                helper.setBlock(
+                    new BlockPos(x, GametestRig.FLOOR_Y - 2, z),
+                    Blocks.WATER);
+                helper.setBlock(
+                    new BlockPos(x, GametestRig.FLOOR_Y - 3, z),
+                    Blocks.WATER);
+                helper.setBlock(
+                    new BlockPos(x, GametestRig.FLOOR_Y - 4, z),
+                    Blocks.SMOOTH_STONE);
+            }
+        }
+
+        // Teleport to the pool bottom and force low air. The body
+        // stands on the stone floor (onGround=true), so the first
+        // tick fires jumpFromGround; once airborne the jumpInFluid
+        // branch takes over for continuous buoyancy (issue 0004 F2).
+        var bottomAbs = helper.absolutePos(
+            new BlockPos(7, GametestRig.FLOOR_Y - 3, 7));
+        rig.body().moveTo(bottomAbs.getX() + 0.5, bottomAbs.getY(),
+            bottomAbs.getZ() + 0.5, 0f, 0f);
+        rig.body().setAirSupply(60);
+
+        helper.startSequence()
+            .thenWaitUntil(driveUntil(rig,
+                () -> check(rig.body().getY() >= GametestRig.FLOOR_Y,
+                    "waiting for the body to surface (current Y="
+                        + String.format("%.1f", rig.body().getY())
+                        + ")")))
+            // Let air regen (+4/tick) carry past the trigger and
+            // give the hysteresis hold window time to elapse.
+            .thenExecuteFor(40, driveOnly(rig))
+            .thenExecuteAfter(0, () -> {
+                check(rig.body().isAlive(),
+                    "the body must survive the submersion");
+                check(rig.body().getAirSupply()
+                        > SurfaceOnLowAirRule.TRIGGER_AIR,
+                    "air must recover above the trigger after "
+                        + "surfacing; got " + rig.body().getAirSupply());
+                check(rig.body().getY() >= GametestRig.FLOOR_Y,
+                    "the body must stay at or above the surface");
                 rig.body().discard();
             })
             .thenSucceed();

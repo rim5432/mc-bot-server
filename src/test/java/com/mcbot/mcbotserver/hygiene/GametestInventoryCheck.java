@@ -46,7 +46,8 @@ class GametestInventoryCheck {
             "failsCleanlyWhenUnwalkable",
             "recoversWhenShoved",
             "refusesRangedItCannotAnswer",
-            "defendsByKillingZombie"),
+            "defendsByKillingZombie",
+            "surfacesWhenAirRunsLow"),
         "GauntletGameTests", Set.of(
             "gauntletEndToEnd",
             "routesThroughFenceGap"));

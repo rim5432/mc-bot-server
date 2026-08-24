@@ -358,13 +358,26 @@ public final class BotController {
         }
 
         // Threat gone: hand control back through world revalidation.
-        // Guarded on both no reflex firing this tick (an engage
-        // fall-through tick must not hand the body to the parked
-        // mission before the fight even started) and no seated
-        // current (a live reflex-owned defend keeps the body until
-        // its own verdict retires it).
-        if (decision == null && arbiter.paused() != null
-                && arbiter.current() == null) {
+        // The guard dispatches on WHO occupies the paused slot:
+        // (a) the reflex-owned fight itself (a survival reflex parked
+        // it mid-fight): resume it whenever the seat is free - even
+        // while ENGAGE keeps firing (threat present is exactly when
+        // the fight must resume; gating on decision==null would seat
+        // the requeued original over it and strand the fight);
+        // (b) anything else (the mission an engage submission parked):
+        // resume only when no reflex fired this tick AND no mission
+        // is seated AND the reflex fight is not still awaiting its
+        // seat in pending - in that window the arbiter must SELECT
+        // the fight, not resume the parked mission over it.
+        boolean fightIsParked = reflexEngageMission != null
+            && reflexEngageMission.isActive()
+            && arbiter.paused() == reflexEngageMission;
+        boolean fightAwaitingSeat = reflexEngageMission != null
+            && reflexEngageMission.isActive()
+            && arbiter.paused() != reflexEngageMission;
+        if (arbiter.paused() != null && arbiter.current() == null
+                && (fightIsParked
+                    || (decision == null && !fightAwaitingSeat))) {
             String resumingTask = arbiter.paused().displayName();
             boolean resumed = arbiter.tryResume();
             emitMissionEvent(resumed
@@ -419,6 +432,25 @@ public final class BotController {
     private void preemptAndHold(
             SurvivalReflexLayer.ReflexDecision decision, Intent.Move hold,
             long day, long tod) {
+        // Single-slot eviction with an honest event: when this park
+        // will occupy the paused slot over an existing occupant (the
+        // reflex-chain shape: original parked by an engage submission,
+        // fight seated, now a survival reflex parks the fight), the
+        // controller requeues the occupant itself so a DROPPED
+        // revalidation reaches the harness as TASK_DROPPED - the
+        // arbiter's internal eviction is the safety net, not the
+        // reporter.
+        if (arbiter.paused() != null && arbiter.current() != null
+                && arbiter.current().isActive()
+                && arbiter.paused() != arbiter.current()) {
+            String evictedName = arbiter.paused().displayName();
+            if (arbiter.requeuePausedOrDrop()
+                    == TaskArbiter.PausedEviction.DROPPED) {
+                emitMissionEvent(EventKind.TASK_DROPPED, day, tod,
+                    evictedName,
+                    "context invalidated by reflex chain requeue");
+            }
+        }
         InterruptionContext ctx = new InterruptionContext(tickCounter,
             positionSource.get(), activeName(),
             "reflex-preempt:" + decision.ruleName(), "");

@@ -136,6 +136,18 @@ public final class TaskArbiter {
      * non-active current as already-decided ({@link #forcePauseAll}
      * does exactly that).
      *
+     * <p>Single-slot invariant: the paused slot holds ONE mission.
+     * Parking a new mission while another is parked (the reflex-chain
+     * shape: original parked by an engage submission, fight seated,
+     * then a survival reflex parks the fight) would silently orphan
+     * the old one - evicted from the slot, absent from pending, never
+     * resumed, never dropped. Occupying the slot therefore first
+     * requeues-or-drops the previous occupant through
+     * {@link #requeuePausedOrDrop}. That internal call is the
+     * invariant's safety net; callers that need the eviction outcome
+     * as an event call the method themselves first (the arbiter never
+     * emits).
+     *
      * @param context snapshot of the preemption moment; never null
      * @return the outcome; never null
      */
@@ -153,11 +165,52 @@ public final class TaskArbiter {
         }
         current.onLostControl(context);
         pending.remove(current);
+        requeuePausedOrDrop();
         paused = current;
         pauseContext = context;
         current = null;
         lastDirective = null;
         return ParkResult.PARKED;
+    }
+
+    /** Outcome of {@link #requeuePausedOrDrop}. */
+    public enum PausedEviction {
+
+        /** Nothing was parked; no state changed. */
+        NONE,
+
+        /** The parked mission revalidated and re-entered pending. */
+        REQUEUED,
+
+        /** The parked mission was dropped via onContextInvalidated. */
+        DROPPED
+    }
+
+    /**
+     * Move the parked mission out of the single paused slot without
+     * resuming it onto the body: it revalidates through its own
+     * {@code resume(ctx)} exactly like {@link #tryResume} would - a
+     * valid mission re-enters pending and competes again once the
+     * body frees, an invalidated or dead one is dropped with
+     * {@code onContextInvalidated}. Involuntary, but the same
+     * revalidation the voluntary path runs; nothing is ever orphaned.
+     *
+     * @return what happened to the parked mission; never null
+     */
+    public PausedEviction requeuePausedOrDrop() {
+        if (paused == null) {
+            return PausedEviction.NONE;
+        }
+        BotProcess candidate = paused;
+        InterruptionContext context = pauseContext;
+        paused = null;
+        pauseContext = null;
+        if (candidate.isActive() && candidate.resume(context)) {
+            pending.addLast(candidate);
+            return PausedEviction.REQUEUED;
+        }
+        candidate.onContextInvalidated();
+        return PausedEviction.DROPPED;
     }
 
     /**

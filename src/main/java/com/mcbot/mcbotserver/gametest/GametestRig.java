@@ -15,6 +15,7 @@ import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.process.GotoProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.core.reflex.FreezeOnLowHealthRule;
+import com.mcbot.mcbotserver.core.reflex.SurfaceOnLowAirRule;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
 import com.mcbot.mcbotserver.core.tick.BotController;
 import com.mcbot.mcbotserver.core.tick.CrashReporter;
@@ -116,8 +117,12 @@ final class GametestRig {
         BindingActor actor = new BindingActor(body);
 
         SurvivalReflexLayer reflex = new SurvivalReflexLayer(
-            (world, board) -> board.botHealth = body.getHealth());
+            (world, board) -> {
+                board.botHealth = body.getHealth();
+                board.airSupply = body.getAirSupply();
+            });
         reflex.addRule(new FreezeOnLowHealthRule());
+        reflex.addRule(new SurfaceOnLowAirRule());
 
         Behavior mover = new PathingBehavior("mover",
             () -> finePositionOf(body),

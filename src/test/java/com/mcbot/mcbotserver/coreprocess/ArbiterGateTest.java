@@ -194,4 +194,81 @@ class ArbiterGateTest {
         assertEquals(2, mission.tickCalls);
         assertEquals(1, mission.resumeCalls);
     }
+
+    /**
+     * Single-slot invariant (reflex chain): parking a second mission
+     * while one is parked evicts the old occupant through
+     * revalidate-and-requeue - it re-enters pending, revalidates via
+     * resume(), and is never orphaned.
+     */
+    @Test
+    void parkingOverAParkedMissionRequeuesTheOldOccupant() {
+        TaskArbiter arbiter = new TaskArbiter();
+        StubProcess original = new StubProcess("original", 50);
+        StubProcess fight = new StubProcess("fight", 150);
+        arbiter.register(original);
+        arbiter.tick(WORLD);
+        arbiter.forcePauseAll(CTX);            // original parked
+        arbiter.register(fight);
+        arbiter.tick(WORLD);                   // fight seated
+        assertSame(fight, arbiter.current());
+
+        assertEquals(TaskArbiter.ParkResult.PARKED,
+            arbiter.forcePauseAll(CTX));       // parks fight, evicts original
+        assertSame(fight, arbiter.paused());
+        assertEquals(1, original.resumeCalls,
+            "the evicted occupant revalidates through resume()");
+        assertEquals(0, original.invalidatedCalls);
+
+        arbiter.tick(WORLD);                   // fight paused; original wins pending
+        assertSame(original, arbiter.current(),
+            "the requeued original must not be orphaned");
+        assertEquals(2, original.tickCalls);
+    }
+
+    /** Eviction of a refusing or dead occupant drops it honestly. */
+    @Test
+    void parkingOverAParkedMissionDropsARefusingOccupant() {
+        TaskArbiter arbiter = new TaskArbiter();
+        StubProcess original = new StubProcess("original", 50);
+        StubProcess fight = new StubProcess("fight", 150);
+        arbiter.register(original);
+        arbiter.tick(WORLD);
+        arbiter.forcePauseAll(CTX);
+        arbiter.register(fight);
+        arbiter.tick(WORLD);
+
+        original.resumeAnswer = false;
+        arbiter.forcePauseAll(CTX);
+        assertEquals(1, original.invalidatedCalls,
+            "a refusing occupant is dropped via onContextInvalidated");
+        assertSame(fight, arbiter.paused());
+
+        arbiter.tick(WORLD);
+        assertNull(arbiter.current(),
+            "the dropped occupant must not re-enter selection");
+    }
+
+    /** The requeue call is a no-op without a parked mission. */
+    @Test
+    void requeueWithoutPausedIsNone() {
+        TaskArbiter arbiter = new TaskArbiter();
+        assertEquals(TaskArbiter.PausedEviction.NONE,
+            arbiter.requeuePausedOrDrop());
+    }
+
+    /** The explicit requeue path returns its outcome for callers. */
+    @Test
+    void explicitRequeueReturnsRequeuedForValidMission() {
+        TaskArbiter arbiter = new TaskArbiter();
+        StubProcess original = new StubProcess("original", 50);
+        arbiter.register(original);
+        arbiter.tick(WORLD);
+        arbiter.forcePauseAll(CTX);
+        assertEquals(TaskArbiter.PausedEviction.REQUEUED,
+            arbiter.requeuePausedOrDrop());
+        assertNull(arbiter.paused());
+        arbiter.tick(WORLD);
+        assertSame(original, arbiter.current());
+    }
 }

@@ -518,6 +518,30 @@ BotState getState();
     rule, because engaging it would only mint ENGAGEMENT_REFUSED
     churn (decision 11). Ranged idle threats remain an open gap
     (workplan survival gate).
+    23a. Engage-chain slot discipline (review-hardened follow-up to
+    23; three sibling holes shared one root - the controller created
+    a two-level control chain (parked original + reflex fight) that
+    TaskArbiter's single paused slot could not represent). Fixes,
+    frozen here: (a) SINGLE-SLOT INVARIANT in the arbiter - parking
+    over an occupied paused slot evicts the occupant through
+    revalidate-and-requeue (its own resume(ctx); valid -> back to
+    pending, invalid/dead -> onContextInvalidated), so no mission is
+    ever orphaned; the controller calls the eviction explicitly
+    before parking so a DROPPED revalidation reaches the harness as
+    TASK_DROPPED (the arbiter never emits). (b) RESUME-GUARD
+    DISPATCH on the paused occupant's identity: when the FIGHT is
+    the parked one (a survival reflex parked it mid-fight), resume
+    it whenever the seat is free - even while ENGAGE keeps firing,
+    because threat-present is exactly when the fight must resume
+    (gating on decision==null seats the requeued original over it
+    and strands the fight in the paused slot); when the ORIGINAL is
+    the parked one, resume only on a fully quiet tick with nothing
+    seated and no fight awaiting its pending seat (the submission's
+    one-tick window - there the arbiter must SELECT the fight).
+    (c) The hysteresis activation edge is <= (boundary value fires),
+    aligned with computePriority's documented "at or below" - a
+    strict < shifted every hysteretic rule's effective trigger one
+    tick late.
 
 ## Deferred, with reopen conditions
 
