@@ -79,6 +79,8 @@ public final class GauntletGameTests {
             new BlockPos(8, GametestRig.FLOOR_Y + 2, LANE_Z)).x();
         int plateauEastAbsX = localToCell(helper,
             new BlockPos(10, GametestRig.FLOOR_Y + 2, LANE_Z)).x();
+        int plateauAbsY = localToCell(helper,
+            new BlockPos(8, GametestRig.FLOOR_Y + 2, LANE_Z)).y();
         int dropDoneAbsX = localToCell(helper,
             new BlockPos(11, GametestRig.WALK_Y, LANE_Z)).x();
 
@@ -93,7 +95,8 @@ public final class GauntletGameTests {
             .thenExecuteFor(2, driveOnly(rig))
             .thenWaitUntil(driveUntil(rig, () -> {
                 checkBodyOnPlane(rig, floorAbsY);
-                check(onPlateau(rig, plateauWestAbsX, plateauEastAbsX)
+                check(onPlateau(rig, plateauAbsY,
+                    plateauWestAbsX, plateauEastAbsX)
                     || !mission.isActive(),
                     "waiting: mounting the plateau");
             }))
@@ -173,10 +176,13 @@ public final class GauntletGameTests {
     }
 
     /** Body stands anywhere on the plateau span (its top is the only
-     * walk surface between the two columns - the lane walls seal z). */
-    private static boolean onPlateau(GametestRig.Rig rig,
+     * walk surface between the two columns - the lane walls seal z).
+     * Y must arrive absolute via localToCell - the arena seats
+     * structures well below Y=0, so a raw FLOOR_Y+n compare never
+     * fires (same defect class the surfaces scenario fixed). */
+    private static boolean onPlateau(GametestRig.Rig rig, int plateauAbsY,
                                      int westAbsX, int eastAbsX) {
-        return rig.body().getBlockY() == GametestRig.FLOOR_Y + 2
+        return rig.body().getBlockY() == plateauAbsY
             && rig.body().getBlockX() >= westAbsX
             && rig.body().getBlockX() <= eastAbsX;
     }
