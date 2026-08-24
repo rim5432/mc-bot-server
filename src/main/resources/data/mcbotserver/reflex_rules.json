@@ -12,6 +12,14 @@
       "priority": 110
     },
     {
+      "type": "ASCEND_IN_LETHAL_FLUID",
+      "priority": 130
+    },
+    {
+      "type": "FREEZE_ON_SUFFOCATION",
+      "priority": 115
+    },
+    {
       "type": "ENGAGE_ON_HOSTILE_PROXIMITY",
       "trigger": 6.0,
       "release": 14.0,

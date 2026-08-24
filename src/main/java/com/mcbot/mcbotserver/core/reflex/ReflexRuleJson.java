@@ -93,6 +93,10 @@ public final class ReflexRuleJson {
                 entry.addProperty("trigger", engage.trigger());
                 entry.addProperty("release", engage.release());
                 entry.addProperty("priority", engage.priority());
+            } else if (rule instanceof AscendInLethalFluidRule lava) {
+                entry.addProperty("priority", lava.priority());
+            } else if (rule instanceof FreezeOnSuffocationRule wall) {
+                entry.addProperty("priority", wall.priority());
             } else {
                 throw new IllegalArgumentException(
                     "no JSON form for rule type: "
@@ -117,6 +121,12 @@ public final class ReflexRuleJson {
         }
         if ("ENGAGE_ON_HOSTILE_PROXIMITY".equals(type)) {
             return engageRule(rule);
+        }
+        if ("ASCEND_IN_LETHAL_FLUID".equals(type)) {
+            return lavaRule(rule);
+        }
+        if ("FREEZE_ON_SUFFOCATION".equals(type)) {
+            return suffocationRule(rule);
         }
         throw new IllegalArgumentException(
             "unknown rule type: " + type);
@@ -171,6 +181,36 @@ public final class ReflexRuleJson {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(
                 "ENGAGE_ON_HOSTILE_PROXIMITY: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Boolean-condition rules carry only their priority - trigger and
+     * release are code-level constants (the inverted 0/1 signal's
+     * thresholds are not tunable data), so the JSON form stays
+     * one field wide.
+     */
+    private static ReflexRule lavaRule(JsonObject rule) {
+        int priority = rule.has("priority")
+            ? rule.get("priority").getAsInt()
+            : AscendInLethalFluidRule.LAVA_PRIORITY;
+        try {
+            return new AscendInLethalFluidRule(priority);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                "ASCEND_IN_LETHAL_FLUID: " + e.getMessage(), e);
+        }
+    }
+
+    private static ReflexRule suffocationRule(JsonObject rule) {
+        int priority = rule.has("priority")
+            ? rule.get("priority").getAsInt()
+            : FreezeOnSuffocationRule.SUFFOCATION_PRIORITY;
+        try {
+            return new FreezeOnSuffocationRule(priority);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                "FREEZE_ON_SUFFOCATION: " + e.getMessage(), e);
         }
     }
 }

@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -127,6 +128,66 @@ class RuleTableGateTest {
             && engage.release() == reparsed.release()
             && engage.priority() == reparsed.priority(),
             "write->parse must preserve the engage configuration");
+    }
+
+    @Test
+    void booleanConditionRulesParseAndRoundTrip() {
+        List<ReflexRule> rules = ReflexRuleJson.parse("{\"rules\": ["
+            + "{\"type\": \"ASCEND_IN_LETHAL_FLUID\","
+            + " \"priority\": 130},"
+            + "{\"type\": \"FREEZE_ON_SUFFOCATION\","
+            + " \"priority\": 115}"
+            + "]}");
+        var lava = (com.mcbot.mcbotserver.core.reflex
+                .AscendInLethalFluidRule) rules.get(0);
+        var wall = (com.mcbot.mcbotserver.core.reflex
+                .FreezeOnSuffocationRule) rules.get(1);
+        assertEquals(130, lava.priority());
+        assertEquals(115, wall.priority());
+        List<ReflexRule> reparsed =
+            ReflexRuleJson.parse(ReflexRuleJson.write(rules));
+        assertEquals(lava.priority(),
+            ((com.mcbot.mcbotserver.core.reflex.AscendInLethalFluidRule)
+                reparsed.get(0)).priority());
+        assertEquals(wall.priority(),
+            ((com.mcbot.mcbotserver.core.reflex
+                    .FreezeOnSuffocationRule) reparsed.get(1))
+                .priority());
+    }
+
+    /**
+     * Reload-parity gate: the shipped datapack table must parse AND
+     * cover every reflex type the assembly registers by code. A
+     * code-registered rule missing from the JSON is silently DROPPED
+     * by the first /reload (replaceRules swaps the whole table) -
+     * exactly the "believing in a safety reflex it does not have"
+     * hazard the hard-error parser exists to prevent. Found live in
+     * review of 6ccdb3b: AscendInLethalFluidRule shipped without a
+     * JSON form; this gate keeps it from recurring.
+     */
+    @Test
+    void shippedDatapackTableCoversEveryCodeRegisteredRuleType() {
+        var stream = RuleTableGateTest.class.getResourceAsStream(
+            "/data/mcbotserver/reflex_rules.json");
+        assertNotNull(stream, "the default table ships in resources");
+        String json;
+        try (var reader = new java.io.InputStreamReader(stream,
+                java.nio.charset.StandardCharsets.UTF_8)) {
+            json = new java.io.BufferedReader(reader)
+                .lines().collect(java.util.stream.Collectors.joining());
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
+        }
+        List<ReflexRule> shipped = ReflexRuleJson.parse(json);
+        var names = shipped.stream().map(ReflexRule::name)
+            .collect(java.util.stream.Collectors.toSet());
+        assertEquals(
+            java.util.Set.of("FREEZE_ON_LOW_HEALTH",
+                "SURFACE_ON_LOW_AIR", "ASCEND_IN_LETHAL_FLUID",
+                "FREEZE_ON_SUFFOCATION", "ENGAGE_ON_HOSTILE_PROXIMITY"),
+            names,
+            "the datapack table and the code default table must stay "
+                + "in lockstep or /reload silently drops rules");
     }
 
     @Test
