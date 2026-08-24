@@ -1,6 +1,6 @@
 ---
 title: Build & Run Guide
-last_verified: 2026-08-23
+last_verified: 2026-08-24
 covers:
   - tool/mcbot_tool.py
 ---
@@ -33,8 +33,13 @@ Failed runs auto-print the last 30 lines already.
 
 ## Long-running game launches
 
-`runClient` / `runServer` hold the lock until the game window closes.
-Launch them in the background and follow logs instead of blocking:
+Locks are namespaced: everything that writes `build/` serializes on
+the global `build` lock, while each game task holds its own
+`run.<task>` lock — a dedicated server and a dev client can be alive
+at the same time (they only read build outputs). A run holds its
+lock until the game window closes; a compile while a run is alive
+may fail on Windows jar file locks, so stop the run first.
+Launch runs in the background and follow logs instead of blocking:
 
 ```powershell
 Start-Process python -ArgumentList 'tool\mcbot_tool.py','build','runClient' -WindowStyle Hidden
