@@ -35,4 +35,16 @@ public interface ReflexRule {
      *         never null or blank
      */
     String name();
+
+    /**
+     * What the controller should do with the body while this rule
+     * holds the reflex claim. The rule names a kind; the controller
+     * owns the intent mapping (see {@link ReflexAction}).
+     *
+     * @return the action kind; never null; defaults to
+     *         {@link ReflexAction#FREEZE}
+     */
+    default ReflexAction action() {
+        return ReflexAction.FREEZE;
+    }
 }

@@ -34,6 +34,20 @@ public final class ThreatBlackboard {
     public float botHealth = 20f;
 
     /**
+     * Vanilla body air supply at sensing time, 0..MAX_AIR_SUPPLY.
+     * Drains 1/tick while the eyes are submerged and regenerates
+     * 4/tick in air (LivingEntity#decreaseAirSupply /
+     * #increaseAirSupply, decompiled 1.20.1); at zero the body takes
+     * drowning damage every second. beginTick resets to full so a
+     * rig whose sensor never stamps air reads as breathing - no air
+     * data must not mint a drowning reflex.
+     */
+    public int airSupply = MAX_AIR_SUPPLY;
+
+    /** Vanilla ceiling on {@link #airSupply} (Entity#getMaxAirSupply). */
+    public static final int MAX_AIR_SUPPLY = 300;
+
+    /**
      * Nearest threatening entity within sensor range; null when none
      * was sensed this tick.
      */
@@ -54,6 +68,7 @@ public final class ThreatBlackboard {
         this.t = timeOfDayTicks;
         this.botPos = position;
         this.botHealth = health;
+        this.airSupply = MAX_AIR_SUPPLY;
         this.nearestThreat = null;
         this.nearestThreatDistance = Double.MAX_VALUE;
         this.inLethalFluid = false;

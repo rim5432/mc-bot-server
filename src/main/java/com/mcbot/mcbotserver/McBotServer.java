@@ -250,8 +250,14 @@ public class McBotServer {
 
                 SurvivalReflexLayer reflex = new SurvivalReflexLayer(
                     new LevelThreatSensor(view,
-                        () -> poseOf(body)));
+                        () -> poseOf(body), body::getAirSupply));
                 reflex.addRule(new FreezeOnLowHealthRule());
+                // Air reflex outranks the freeze rule by default
+                // (SURFACE_PRIORITY 110 vs FREEZE 100): freezing
+                // underwater converts one lethal condition into two.
+                reflex.addRule(
+                    new com.mcbot.mcbotserver.core.reflex
+                        .SurfaceOnLowAirRule());
                 // Future /reload swaps follow the datapack table.
                 ruleReloader.bind(reflex);
 

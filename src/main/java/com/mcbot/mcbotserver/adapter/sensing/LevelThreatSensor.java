@@ -73,26 +73,37 @@ public final class LevelThreatSensor implements ThreatSensor {
 
     private final com.mcbot.mcbotserver.adapter.BindingWorldView view;
     private final Supplier<CellPos> bodyPos;
+    private final Supplier<Integer> airSupply;
 
     /**
      * Creates a sensor scanning around the live body position.
      *
      * @param view    perception read; never null
      * @param bodyPos current body cell supplier; never null
+     * @param airSupply body air supplier (vanilla
+     *                  {@code body::getAirSupply}); never null - a
+     *                  null result is a wiring bug and must fail
+     *                  loudly, not read as "breathing"
      */
     public LevelThreatSensor(com.mcbot.mcbotserver.adapter.BindingWorldView
                                  view,
-                             Supplier<CellPos> bodyPos) {
-        if (view == null || bodyPos == null) {
+                             Supplier<CellPos> bodyPos,
+                             Supplier<Integer> airSupply) {
+        if (view == null || bodyPos == null || airSupply == null) {
             throw new IllegalArgumentException(
                 "arguments must not be null");
         }
         this.view = view;
         this.bodyPos = bodyPos;
+        this.airSupply = airSupply;
     }
 
     @Override
     public void sense(WorldView world, ThreatBlackboard board) {
+        // Air is body state, not world state - it cannot be read
+        // through WorldView, so the supplier is the only honest
+        // source (same category as botHealth's pipeline accessor).
+        board.airSupply = airSupply.get();
         CellPos center = bodyPos.get();
         List<EntitySnapshot> hits = world.getEntities(
             center, THREAT_RANGE,

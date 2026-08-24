@@ -56,6 +56,44 @@ class RuleTableGateTest {
     }
 
     @Test
+    void surfaceRuleParsesThresholdsAndRoundTrips() {
+        List<ReflexRule> rules = ReflexRuleJson.parse("{\"rules\": ["
+            + "{\"type\": \"SURFACE_ON_LOW_AIR\","
+            + " \"trigger\": 60, \"release\": 220, \"priority\": 120}"
+            + "]}");
+        var surface =
+            (com.mcbot.mcbotserver.core.reflex.SurfaceOnLowAirRule)
+                rules.get(0);
+        assertEquals(60, surface.trigger());
+        assertEquals(220, surface.release());
+        assertEquals(120, surface.priority());
+        var reparsed = (com.mcbot.mcbotserver.core.reflex
+                .SurfaceOnLowAirRule)
+            ReflexRuleJson.parse(ReflexRuleJson.write(rules)).get(0);
+        assertTrue(surface.trigger() == reparsed.trigger()
+            && surface.release() == reparsed.release()
+            && surface.priority() == reparsed.priority(),
+            "write->parse must preserve the surface configuration");
+    }
+
+    @Test
+    void surfaceDefaultsMatchCodeTable() {
+        List<ReflexRule> rules = ReflexRuleJson.parse(
+            "{\"rules\": [{\"type\": \"SURFACE_ON_LOW_AIR\"}]}");
+        var surface =
+            (com.mcbot.mcbotserver.core.reflex.SurfaceOnLowAirRule)
+                rules.get(0);
+        assertEquals(
+            com.mcbot.mcbotserver.core.reflex.SurfaceOnLowAirRule
+                .TRIGGER_AIR,
+            surface.trigger());
+        assertEquals(
+            com.mcbot.mcbotserver.core.reflex.SurfaceOnLowAirRule
+                .RELEASE_AIR,
+            surface.release());
+    }
+
+    @Test
     void unknownTypeAndBadValuesAreHardErrors() {
         assertThrows(IllegalArgumentException.class,
             () -> ReflexRuleJson.parse("{\"rules\": ["
@@ -65,6 +103,11 @@ class RuleTableGateTest {
             () -> ReflexRuleJson.parse("{\"rules\": ["
                 + "{\"type\": \"FREEZE_ON_LOW_HEALTH\", "
                 + "\"threshold\": 40.0}]}"));
+        assertThrows(IllegalArgumentException.class,
+            () -> ReflexRuleJson.parse("{\"rules\": ["
+                + "{\"type\": \"SURFACE_ON_LOW_AIR\","
+                + " \"trigger\": 80, \"release\": 80}]}"),
+            "release at trigger is a hard error, not a silent clamp");
         assertThrows(IllegalArgumentException.class,
             () -> ReflexRuleJson.parse("{\"no_rules_here\": []}"));
     }

@@ -4,6 +4,12 @@
       "type": "FREEZE_ON_LOW_HEALTH",
       "threshold": 10.0,
       "priority": 100
+    },
+    {
+      "type": "SURFACE_ON_LOW_AIR",
+      "trigger": 80,
+      "release": 200,
+      "priority": 110
     }
   ]
 }

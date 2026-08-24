@@ -196,6 +196,48 @@ class TickPipelineGateTest {
             "resumed mission runs again after revalidation");
     }
 
+    /**
+     * Drowning reflex drives the body up, not to a halt: the ASCEND
+     * action kind maps to a held jump so vanilla fluid physics swims
+     * the body to the surface (ReflexAction contract, issue 0004
+     * F6(2)).
+     */
+    @Test
+    void lowAirReflexHoldsJumpInsteadOfHalting() {
+        float[] health = {20f};
+        int[] air = {com.mcbot.mcbotserver.api.reflex.ThreatBlackboard
+            .MAX_AIR_SUPPLY};
+        SurvivalReflexLayer layer = new SurvivalReflexLayer(
+            (world, board) -> board.airSupply = air[0]);
+        layer.addRule(new com.mcbot.mcbotserver.core.reflex
+            .SurfaceOnLowAirRule());
+        TaskArbiter arbiter = new TaskArbiter();
+        CountingMission mission = new CountingMission();
+        arbiter.register(mission);
+        arbiter.requestControl(mission);
+        RecordingActor actor = new RecordingActor();
+        PathingBehavior mover = new PathingBehavior("mover",
+            () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5),
+            BasicMoves::from);
+        BotController controller = controller(health, layer, arbiter,
+            mover, actor, new InMemoryEventQueue(() -> 1L, () -> 0L));
+        MockWorldView world = flooredWorld();
+        controller.onTick(world);
+
+        air[0] = 50;
+        actor.submitted.clear();
+        controller.onTick(world);
+
+        Claim move = lastClaimOf(actor, Channel.MOVE);
+        assertNotNull(move);
+        assertTrue(move.holder().startsWith("reflex:"),
+            "ascend claim must come from the reflex");
+        assertTrue(move.intent() instanceof Intent.Move hold
+                && hold.jump(),
+            "drowning reflex must hold jump, not halt: "
+                + move.intent());
+    }
+
     private Claim lastClaimOf(RecordingActor actor, Channel channel) {
         Claim found = null;
         for (Claim c : actor.submitted) {

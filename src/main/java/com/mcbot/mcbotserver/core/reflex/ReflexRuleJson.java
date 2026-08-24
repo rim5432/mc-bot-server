@@ -79,15 +79,20 @@ public final class ReflexRuleJson {
         var root = new JsonObject();
         var array = new com.google.gson.JsonArray();
         for (ReflexRule rule : rules) {
-            if (!(rule instanceof FreezeOnLowHealthRule freeze)) {
+            var entry = new JsonObject();
+            entry.addProperty("type", rule.name());
+            if (rule instanceof FreezeOnLowHealthRule freeze) {
+                entry.addProperty("threshold", freeze.threshold());
+                entry.addProperty("priority", freeze.priority());
+            } else if (rule instanceof SurfaceOnLowAirRule surface) {
+                entry.addProperty("trigger", surface.trigger());
+                entry.addProperty("release", surface.release());
+                entry.addProperty("priority", surface.priority());
+            } else {
                 throw new IllegalArgumentException(
                     "no JSON form for rule type: "
                         + rule.getClass().getSimpleName());
             }
-            var entry = new JsonObject();
-            entry.addProperty("type", rule.name());
-            entry.addProperty("threshold", freeze.threshold());
-            entry.addProperty("priority", freeze.priority());
             array.add(entry);
         }
         root.add("rules", array);
@@ -99,10 +104,17 @@ public final class ReflexRuleJson {
             throw new IllegalArgumentException("rule needs a \"type\"");
         }
         String type = rule.get("type").getAsString();
-        if (!"FREEZE_ON_LOW_HEALTH".equals(type)) {
-            throw new IllegalArgumentException(
-                "unknown rule type: " + type);
+        if ("FREEZE_ON_LOW_HEALTH".equals(type)) {
+            return freezeRule(rule);
         }
+        if ("SURFACE_ON_LOW_AIR".equals(type)) {
+            return surfaceRule(rule);
+        }
+        throw new IllegalArgumentException(
+            "unknown rule type: " + type);
+    }
+
+    private static ReflexRule freezeRule(JsonObject rule) {
         float threshold = rule.has("threshold")
             ? rule.get("threshold").getAsFloat()
             : FreezeOnLowHealthRule.FREEZE_THRESHOLD;
@@ -114,6 +126,24 @@ public final class ReflexRuleJson {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(
                 "FREEZE_ON_LOW_HEALTH: " + e.getMessage(), e);
+        }
+    }
+
+    private static ReflexRule surfaceRule(JsonObject rule) {
+        int trigger = rule.has("trigger")
+            ? rule.get("trigger").getAsInt()
+            : SurfaceOnLowAirRule.TRIGGER_AIR;
+        int release = rule.has("release")
+            ? rule.get("release").getAsInt()
+            : SurfaceOnLowAirRule.RELEASE_AIR;
+        int priority = rule.has("priority")
+            ? rule.get("priority").getAsInt()
+            : SurfaceOnLowAirRule.SURFACE_PRIORITY;
+        try {
+            return new SurfaceOnLowAirRule(trigger, release, priority);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                "SURFACE_ON_LOW_AIR: " + e.getMessage(), e);
         }
     }
 }

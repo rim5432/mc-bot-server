@@ -467,6 +467,28 @@ BotState getState();
     goal change and on any complete-route adoption; the count rides
     the keepalive event as `noPathWitnesses` for harness-side
     verdict anticipation.
+    22. Reflex action vocabulary (ReflexAction, boundary C growth
+    within ADR-0003 section 2's "the layer decides WHAT the frozen
+    body does"). Rules name an action KIND; the controller owns the
+    kind-to-Intent mapping - rules stay pure blackboard functions
+    and Intent shapes stay owned by exactly one place. Kinds:
+    FREEZE (MOVE(0,0), the default) and ASCEND (held jump: vanilla
+    LivingEntity#aiStep routes a held jump in water deeper than the
+    fluid-jump threshold to jumpInFluid, +0.04/tick upward impulse;
+    the engine computes all motion, boundary A holds). The drowning
+    rule SURFACE_ON_LOW_AIR (issue 0004 F6(2), after the 2026-08-24
+    spawn-lake death) grounds its numbers in decompiled vanilla:
+    ThreatBlackboard.airSupply drains 1/tick from 300 and regenerates
+    4/tick; beginTick resets it to FULL so a rig whose sensor never
+    stamps air reads as breathing (no air data must not mint a
+    drowning reflex); the sensor (not the pipeline) stamps it -
+    air is body state with no WorldView expression, same category
+    as botHealth. Trigger 80 (~4s of air left; terminal swim-up is
+    ~0.16 blocks/tick against 0.8 vertical drag), release 200 (the
+    ascend holds through surface-bobbing regen instead of flapping
+    at the film). Priority ordering is part of the contract:
+    SURFACE (110) must outrank FREEZE (100) - freezing while
+    drowning converts one lethal condition into two.
 
 ## Deferred, with reopen conditions
 

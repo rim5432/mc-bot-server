@@ -286,9 +286,17 @@ public final class BotController {
                 case NO_CURRENT -> {
                 }
             }
+            // ReflexAction owns the intent shape (ADR-0003 section
+            // 2: rules say HOW URGENT, the controller says WHAT the
+            // held body does): FREEZE halts, ASCEND holds jump so
+            // vanilla fluid physics swims the body up (boundary A -
+            // intents only, the engine computes the motion).
+            Intent.Move hold = decision.action()
+                == com.mcbot.mcbotserver.api.reflex.ReflexAction.ASCEND
+                    ? new Intent.Move(0, 0, true, false)
+                    : new Intent.Move(0, 0, false, false);
             actor.submit(new Claim(Channel.MOVE, decision.priority(),
-                "reflex:" + decision.ruleName(),
-                new Intent.Move(0, 0, false, false)));
+                "reflex:" + decision.ruleName(), hold));
             actor.flush();
             if (announceVerdict) {
                 // Retirement-lap corpse: its verdict is announced here,

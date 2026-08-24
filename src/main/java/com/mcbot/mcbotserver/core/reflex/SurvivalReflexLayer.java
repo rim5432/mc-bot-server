@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.core.reflex;
 
+import com.mcbot.mcbotserver.api.reflex.ReflexAction;
 import com.mcbot.mcbotserver.api.reflex.ReflexHysteresis;
 import com.mcbot.mcbotserver.api.reflex.ReflexRule;
 import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
@@ -35,7 +36,8 @@ import java.util.Objects;
 public final class SurvivalReflexLayer {
 
     /** One fired reflex, resolved for this tick. */
-    public record ReflexDecision(String ruleName, int priority) {
+    public record ReflexDecision(String ruleName, int priority,
+                                 ReflexAction action) {
     }
 
     private final ThreatSensor sensor;
@@ -152,10 +154,10 @@ public final class SurvivalReflexLayer {
                 effectivePriority = rawPriority;
             }
             if (shouldFire
-                && (winner == null
-                    || effectivePriority > winner.priority())) {
+                    && (winner == null
+                        || effectivePriority > winner.priority())) {
                 winner = new ReflexDecision(rule.name(),
-                    effectivePriority);
+                    effectivePriority, rule.action());
             }
         }
         return winner;
