@@ -158,6 +158,25 @@ per poll), `commands.jsonl` (every issued command + response),
 run concludes. Copy a verdict out of the folder explicitly if it needs
 to be tracked.
 
+## Pinning the dev server in the client's server list
+
+The dev server listens on a custom port (see `server-port` in
+`run/server.properties`, currently 25585 - NOT the 25565 default), and
+the client's server list accumulates hidden direct-connect entries
+where a bare `localhost` connects to the default port. Joining a
+foreign saved server by mistake trips a Forge mod-mismatch crash.
+After changing the port or once per world, run with the client
+CLOSED:
+
+```bash
+python tool/dev_server_entry.py            # defaults to localhost:25585
+python tool/dev_server_entry.py myhost:25585
+```
+
+It pins one visible `mcbot-dev` entry at slot 0, folds duplicate
+loopback spellings, writes a `.bak` next to the original, and leaves
+every non-loopback entry untouched.
+
 ## Troubleshooting checklist
 
 - `gradle not found` → set `MCBOT_GRADLE` or fix PATH
