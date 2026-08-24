@@ -442,10 +442,17 @@ public final class BotSliceGameTests {
         rig.body().moveTo(bottomAbs.getX() + 0.5, bottomAbs.getY(),
             bottomAbs.getZ() + 0.5, 0f, 0f);
         rig.body().setAirSupply(60);
+        // Body Y is ABSOLUTE; FLOOR_Y is structure-relative. The
+        // gametest arena seats structures well below Y=0, so a raw
+        // FLOOR_Y comparison can never pass - compare against the
+        // absolute surface level instead (same convention as every
+        // other position check in this suite: absolutePos first).
+        int surfaceAbsY = helper.absolutePos(
+            new BlockPos(0, GametestRig.FLOOR_Y, 0)).getY();
 
         helper.startSequence()
             .thenWaitUntil(driveUntil(rig,
-                () -> check(rig.body().getY() >= GametestRig.FLOOR_Y,
+                () -> check(rig.body().getY() >= surfaceAbsY,
                     "waiting for the body to surface (current Y="
                         + String.format("%.1f", rig.body().getY())
                         + ")")))
@@ -459,7 +466,7 @@ public final class BotSliceGameTests {
                         > SurfaceOnLowAirRule.TRIGGER_AIR,
                     "air must recover above the trigger after "
                         + "surfacing; got " + rig.body().getAirSupply());
-                check(rig.body().getY() >= GametestRig.FLOOR_Y,
+                check(rig.body().getY() >= surfaceAbsY,
                     "the body must stay at or above the surface");
                 rig.body().discard();
             })
