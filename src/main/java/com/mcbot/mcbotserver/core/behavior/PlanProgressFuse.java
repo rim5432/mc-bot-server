@@ -67,6 +67,14 @@ final class PlanProgressFuse {
         boolean p1 = cursor.index() > lastWaypointIndex;
         if (p1) {
             lastWaypointIndex = cursor.index();
+            // The latched criterion-3 minimum is bound to the waypoint
+            // it was measured against; after an advance it must not
+            // shadow the new, farther waypoint. Without this reset a
+            // smoothed plan (issue 0005 P1.2, waypoint gaps > 1 cell)
+            // leaves criterion 3 dormant for a whole segment, and a
+            // detour leg that also opens the goal distance would
+            // false-STUCK a moving body.
+            lastWaypoint3DDistance = Double.POSITIVE_INFINITY;
         }
 
         boolean p2 = goalDist < lastGoalDistance - PathingBehavior.STUCK_EPSILON;

@@ -154,8 +154,13 @@ class TickPipelineGateTest {
             mover, actor, new InMemoryEventQueue(() -> 1L, () -> 0L));
         MockWorldView world = flooredWorld();
 
-        controller.onTick(world);
-        assertEquals(1, mission.tickCalls);
+        // Warm past the P2.1 departure hold so the mover claims MOVE;
+        // the pin is the healthy pipeline, not the first tick.
+        int warmup = PathingBehavior.DEPARTURE_DELAY_TICKS + 1;
+        for (int i = 0; i < warmup; i++) {
+            controller.onTick(world);
+        }
+        assertEquals(warmup, mission.tickCalls);
         Claim healthyMove = lastClaimOf(actor, Channel.MOVE);
         assertNotNull(healthyMove);
         assertEquals("mover", healthyMove.holder(),
@@ -166,7 +171,7 @@ class TickPipelineGateTest {
         actor.submitted.clear();
         controller.onTick(world);
 
-        assertEquals(1, mission.tickCalls,
+        assertEquals(warmup, mission.tickCalls,
             "mission stage must be skipped while a reflex fires");
         assertNotNull(arbiter.paused(),
             "the running mission must be parked with its context");
@@ -187,7 +192,7 @@ class TickPipelineGateTest {
         actor.submitted.clear();
         controller.onTick(world);
         assertNull(arbiter.paused());
-        assertEquals(2, mission.tickCalls,
+        assertEquals(warmup + 1, mission.tickCalls,
             "resumed mission runs again after revalidation");
     }
 
@@ -235,10 +240,17 @@ class TickPipelineGateTest {
         BotController controller = controller(health, layer, arbiter,
             mover, actor, new InMemoryEventQueue(() -> 1L, () -> 0L));
 
-        controller.onTick(flooredWorld());
+        MockWorldView world = flooredWorld();
+
+        // Warm past the P2.1 departure hold so the mover claims MOVE.
+        for (int i = 0; i <= PathingBehavior.DEPARTURE_DELAY_TICKS;
+             i++) {
+            controller.onTick(world);
+        }
 
         assertFalse(controller.isCrashed());
-        assertEquals(1, mission.tickCalls);
+        assertEquals(PathingBehavior.DEPARTURE_DELAY_TICKS + 1,
+            mission.tickCalls);
         Claim move = lastClaimOf(actor, Channel.MOVE);
         assertNotNull(move);
         assertEquals("mover", move.holder());

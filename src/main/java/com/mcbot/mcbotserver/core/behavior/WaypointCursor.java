@@ -100,6 +100,30 @@ final class WaypointCursor {
     }
 
     /**
+     * The waypoint behind the cursor: the far end of the segment
+     * currently being walked. Smoothing (issue 0005 P1.2) makes
+     * segments span many cells, so drift is measured against the
+     * segment, not the endpoint; this accessor supplies that far
+     * end. Reads as the current waypoint itself when no predecessor
+     * exists (single-cell plan).
+     *
+     * @return the walked segment's origin; never null
+     */
+    CellPos previous() {
+        return waypoints.get(Math.max(0, waypointIndex - 1));
+    }
+
+    /**
+     * The terminal waypoint of the chain - the arrival brake scales
+     * drive by remaining distance to it (issue 0005 P2.2).
+     *
+     * @return the last waypoint; never null on an installed plan
+     */
+    CellPos last() {
+        return waypoints.get(waypoints.size() - 1);
+    }
+
+    /**
      * Consume every waypoint the body has reached. A waypoint counts
      * as touched when the body stands in its cell OR its XZ distance
      * to the waypoint centre is within

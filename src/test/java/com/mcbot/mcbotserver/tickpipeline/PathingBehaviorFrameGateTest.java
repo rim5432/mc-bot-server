@@ -189,6 +189,52 @@ class PathingBehaviorFrameGateTest {
     }
 
     /**
+     * REPLAN_DISTANCE is XZ distance to the WALKED SEGMENT (previous
+     * to current waypoint), not to the current waypoint: smoothing
+     * (issue 0005 P1.2) makes mid-leg waypoint distances large and
+     * legitimate. A body mid-segment, ON the line, farther from the
+     * current waypoint than REPLAN_DISTANCE must NOT trigger a
+     * replan; a lateral departure beyond it must.
+     */
+    @Test
+    void replanDriftIsXZToSegment()
+        throws ReflectiveOperationException {
+        MockWorldView world = floorTo(60);
+        Vec3[] position = { new Vec3(0.5, 64, 0.5) };
+        PathingBehavior mover = new PathingBehavior("mover",
+            () -> position[0], BasicMoves::from);
+        RecordingActor actor = new RecordingActor();
+        Directive directive = Directive.of(
+            new GoalBlock(new CellPos(40, 64, 0)));
+
+        // Walk 11 ticks: past the departure hold and the replan
+        // cooldown since the initial request, still making progress.
+        for (int i = 1; i <= 11; i++) {
+            position[0] = new Vec3(0.5 + i * 0.1, 64, 0.5);
+            mover.tick(world, directive, actor);
+        }
+        int before = PathingTestAccess.ticksSincePlan(mover);
+        assertTrue(before >= PathingBehavior.REPLAN_COOLDOWN,
+            "cooldown must have expired for a request to be possible");
+
+        // On the segment, 38 cells from the current waypoint (the
+        // goal): not drift under segment semantics; under the old
+        // waypoint semantics this distance would force a replan.
+        position[0] = new Vec3(2.6, 64, 0.5);
+        mover.tick(world, directive, actor);
+        assertEquals(before + 1,
+            PathingTestAccess.ticksSincePlan(mover),
+            "mid-segment on the line is not drift");
+
+        // Lateral departure beyond REPLAN_DISTANCE: replan fires.
+        position[0] = new Vec3(2.6, 64, 4.5);
+        mover.tick(world, directive, actor);
+        assertEquals(0, PathingTestAccess.ticksSincePlan(mover),
+            "lateral departure from the walked segment must trigger "
+                + "a replan");
+    }
+
+    /**
      * GoalBlock.isInGoal is 3D cell equality: the goal predicate
      * treats a body one cell above the target as NOT at the goal.
      * If a future "fix" relaxed the predicate to "same XZ is

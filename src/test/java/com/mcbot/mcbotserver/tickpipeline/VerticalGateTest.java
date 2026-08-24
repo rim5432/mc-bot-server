@@ -164,11 +164,13 @@ class VerticalGateTest {
             "5 ticks after first replan: ticksSincePlan should be 5, "
             + "in the REPLAN_COOLDOWN=10 window");
 
-        // Now jump sideways 5m from the current position. The active
-        // waypoint is far behind; offPath is true. But
-        // ticksSincePlan=5 < 10 so a normal-tick replan is blocked
-        // by the cooldown.
-        position[0] = new Vec3(position[0].x() + 5, 64, position[0].z());
+        // Now jump 5m LATERALLY off the plan line. The smoothed plan
+        // is one long segment [(0,64,0),(40,64,0)], so an along-track
+        // push stays on the segment and is NOT drift; a lateral push
+        // puts the body outside REPLAN_DISTANCE of the walked
+        // segment and offPath is true. But ticksSincePlan=5 < 10 so
+        // a normal-tick replan is blocked by the cooldown.
+        position[0] = new Vec3(position[0].x(), 64, position[0].z() + 5);
         mover.tick(world, directive, actor);
         // Verify: no replan fired (ticksSincePlan still 6, not 0).
         assertEquals(6, PathingTestAccess.ticksSincePlan(mover),

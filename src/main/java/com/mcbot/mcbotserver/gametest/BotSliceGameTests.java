@@ -192,14 +192,12 @@ public final class BotSliceGameTests {
         var mission = submitGoto(rig, goalCell);
         int startAbsX = helper.absolutePos(start).getX();
 
-        // Pre-shove body X. Used by the post-shove displacement
+        // Pre-shove body Z. Used by the post-shove displacement
         // assertion to confirm the test landed in branch 1 of
-        // issue 0001 §3 (offPath fires because XZ drift > 3.0),
-        // not branch 2 (XZ drift 0.8~3.0, offPath would NOT fire
-        // and the test would silently regress to limbo). The 3.5
-        // margin is REPLAN_DISTANCE 3.0 plus 0.5 to absorb friction
-        // and tick-order variance.
-        double[] xAtShove = {0.0};
+        // issue 0001 §3 (offPath fires), not branch 2 (silent
+        // limbo). The 3.5 margin is REPLAN_DISTANCE 3.0 plus 0.5
+        // to absorb friction and tick-order variance.
+        double[] zAtShove = {0.0};
 
         helper.startSequence()
             .thenWaitUntil(driveUntil(rig,
@@ -207,36 +205,38 @@ public final class BotSliceGameTests {
                     - startAbsX >= 4,
                     "waiting to pass mid-point")))
             .thenExecute(() -> {
-                // Strong horizontal knockback in -X. The body is
-                // mid-path, so the planner must re-route after
-                // the shove lands.
-                xAtShove[0] = rig.body().getX();
+                // Knock the body LATERALLY off the plan line. Since
+                // the ledger-20 follow-through (issue 0005 P1.2),
+                // drift is measured against the WALKED SEGMENT, not
+                // the current waypoint: an axial shove stays on the
+                // segment forever, so branch 1 now requires lateral
+                // departure. The stale drive from the last pipeline
+                // tick is neutralized first - the fields persist
+                // through the no-op window below, and a stale +X
+                // drive (sprint-amplified since P1.1) would fight
+                // the impulse and muddy the displacement reading.
+                zAtShove[0] = rig.body().getZ();
+                rig.body().setDrive(0f, 0f, false);
+                rig.body().setSprinting(false);
                 rig.body().setDeltaMovement(new Vec3(
-                    -1.8, 0.0, 0.0));
+                    0.0, 0.0, -1.8));
             })
             .thenExecuteFor(5, () -> {
                 // 5 vanilla physics ticks without pipeline
                 // intervention - MC integrates the impulse.
             })
             .thenExecute(() -> {
-                // Sanity: displacement must exceed the 3.5-cell
-                // floor (REPLAN_DISTANCE + friction margin) so the
-                // test stays in branch 1 of issue 0001 §3 (offPath
-                // fires on XZ drift > 3.0 from the remaining
-                // waypoints), not branch 2 where offPath would NOT
-                // fire and the test silently regresses to limbo.
-                // Direction past the SPAWN point is deliberately not
-                // asserted: a knockback integrated near its full
-                // ~4-cell series can legally land the body back at or
-                // before spawn when the mid-point gate fired early,
-                // and branch 1 holds either way - drift is measured
-                // from the body's position at shove time, not from
-                // spawn.
-                double dx = xAtShove[0] - rig.body().getX();
-                check(dx > 3.5,
-                    "shove must displace the body > 3.5 cells in -X "
+                // Sanity: lateral displacement must exceed the
+                // 3.5-cell floor (REPLAN_DISTANCE + friction margin)
+                // so the test stays in branch 1 (offPath fires on
+                // departure from the walked segment), not branch 2
+                // where offPath would NOT fire and the test silently
+                // regresses to limbo.
+                double dz = zAtShove[0] - rig.body().getZ();
+                check(dz > 3.5,
+                    "shove must displace the body > 3.5 cells in -Z "
                     + "so the test stays in branch 1 (offPath fires), "
-                    + "not branch 2 (silent limbo). Got dx=" + dx
+                    + "not branch 2 (silent limbo). Got dz=" + dz
                     + " - if friction or impulse changed, retune "
                     + "the impulse or extend the vanilla-tick window; "
                     + "do not relax the 3.5 margin silently.");

@@ -124,6 +124,8 @@ class StuckFuseTest {
 
     /**
      * While executing, the mover owns MOVE and ROT claims each tick.
+     * Ticks past the P2.1 departure hold first - the pin is about
+     * steady execution, not the first tick.
      */
     @Test
     void moverClaimsMoveAndRotChannels() {
@@ -135,7 +137,10 @@ class StuckFuseTest {
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(30, 64, 0)));
 
-        mover.tick(world, directive, actor);
+        for (int i = 0; i <= PathingBehavior.DEPARTURE_DELAY_TICKS;
+             i++) {
+            mover.tick(world, directive, actor);
+        }
         var winners = actor.flush();
         assertTrue(winners.containsKey(Channel.MOVE));
         assertEquals("mover", winners.get(Channel.MOVE).holder());

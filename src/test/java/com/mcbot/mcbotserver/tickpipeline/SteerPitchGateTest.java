@@ -70,8 +70,12 @@ class SteerPitchGateTest {
             () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
 
-        mover.tick(floorTo(8), Directive.of(
-            new GoalBlock(new CellPos(7, 64, 0))), actor);
+        // Tick past the P2.1 departure hold first.
+        for (int i = 0; i <= PathingBehavior.DEPARTURE_DELAY_TICKS;
+             i++) {
+            mover.tick(floorTo(8), Directive.of(
+                new GoalBlock(new CellPos(7, 64, 0))), actor);
+        }
 
         assertEquals(0f, lastLookClaim(actor).pitchDeg(), 1e-6,
             "a same-level waypoint must pitch exactly 0");
@@ -93,8 +97,11 @@ class SteerPitchGateTest {
         RecordingActor actor = new RecordingActor();
 
         MockWorldView world = worldWithPlatform();
-        mover.tick(world, Directive.of(
-            new GoalBlock(new CellPos(3, 65, 0))), actor);
+        for (int i = 0; i <= PathingBehavior.DEPARTURE_DELAY_TICKS;
+             i++) {
+            mover.tick(world, Directive.of(
+                new GoalBlock(new CellPos(3, 65, 0))), actor);
+        }
 
         List<CellPos> waypoints = PathingTestAccess.waypoints(mover);
         int jumpUpIndex = waypoints.indexOf(new CellPos(2, 65, 0));

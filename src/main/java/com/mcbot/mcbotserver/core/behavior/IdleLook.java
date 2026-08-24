@@ -38,11 +38,25 @@ public final class IdleLook {
     public static final float TURN_PER_TICK_DEG = 15f;
 
     /**
-     * Pitch clamp while tracking, in degrees, engine sign (negative
-     * = up). A player directly above a stairwell should not pull the
+     * Pitch clamp while tracking, in degrees, engine sign (negative =
+     * up). A player directly above a stairwell should not pull the
      * view to -90; past this limit the glance stops climbing.
      */
     public static final float PITCH_LIMIT_DEG = 60f;
+
+    /**
+     * Idle ticks between sweep direction flips when no player is in
+     * range (issue 0005 P2.3). Purely deterministic - the sweep is a
+     * direction flip on a counter, no randomness.
+     */
+    public static final int SWEEP_INTERVAL_TICKS = 100;
+
+    /**
+     * How far left/right of the idle base yaw a sweep glance reaches,
+     * in degrees (issue 0005 P2.3). The base is the yaw at the moment
+     * idleness began, so sweeps stay anchored instead of drifting.
+     */
+    public static final float SWEEP_AMPLITUDE_DEG = 60f;
 
     /** Look angles toward one candidate; engine conventions. */
     public record Target(float yawDeg, float pitchDeg) {

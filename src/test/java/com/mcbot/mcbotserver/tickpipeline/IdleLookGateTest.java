@@ -124,4 +124,17 @@ class IdleLookGateTest {
         assertEquals(-20f, IdleLook.turnTowardPitch(-5f, -30f), 1e-4,
             "a 25-degree downward correction advances one cap of -15");
     }
+
+    /**
+     * Sweep defaults pinned (issue 0005 P2.3 / section 7): the
+     * interval and amplitude are presentation constants and must not
+     * drift silently.
+     */
+    @Test
+    void sweepDefaultsPinned() {
+        assertEquals(100, IdleLook.SWEEP_INTERVAL_TICKS,
+            "sweep direction flips every 100 idle ticks (~5 s)");
+        assertEquals(60f, IdleLook.SWEEP_AMPLITUDE_DEG, 1e-6,
+            "sweep glances reach 60 degrees off the idle base yaw");
+    }
 }

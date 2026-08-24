@@ -75,7 +75,12 @@ class JumpEmissionGateTest {
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(7, 64, 0)));
 
-        mover.tick(worldWithPlatform(), directive, actor);
+        // Tick past the P2.1 departure hold: claims only start once
+        // the hold has drained.
+        for (int i = 0; i <= PathingBehavior.DEPARTURE_DELAY_TICKS;
+             i++) {
+            mover.tick(worldWithPlatform(), directive, actor);
+        }
 
         assertFalse(lastMoveClaim(actor).jump(),
             "a same-level waypoint must not set the jump flag");
@@ -96,7 +101,10 @@ class JumpEmissionGateTest {
             new GoalBlock(new CellPos(3, 65, 0)));
 
         MockWorldView world = worldWithPlatform();
-        mover.tick(world, directive, actor);
+        for (int i = 0; i <= PathingBehavior.DEPARTURE_DELAY_TICKS;
+             i++) {
+            mover.tick(world, directive, actor);
+        }
         assertFalse(lastMoveClaim(actor).jump(),
             "the approach waypoint is flat; no jump yet");
 

@@ -14,6 +14,7 @@ import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.api.world.WorldView;
 import com.mcbot.mcbotserver.core.pathing.MoveGraph;
+import com.mcbot.mcbotserver.core.pathing.PlanSmoother;
 import com.mcbot.mcbotserver.core.pathing.PlanWorker;
 
 import java.util.LinkedHashMap;
@@ -98,12 +99,16 @@ public final class PathingBehavior implements Behavior {
     public static final double WAYPOINT_REACH = 0.8;
 
     /**
-     * Drift from the active waypoint that forces a fresh plan, in
-     * metres. Frame: XZ only (same {@code Math.hypot(dx, dz)} as
-     * {@code WAYPOINT_REACH}). Y drift is intentionally ignored;
+     * Drift from the walked segment (previous to current waypoint)
+     * that forces a fresh plan, in metres. Frame: XZ only. Before
+     * smoothing, this measured distance to the current waypoint -
+     * equivalent while waypoints were one cell apart. Smoothing
+     * (issue 0005 P1.2) makes mid-segment waypoint distances large
+     * and legitimate, so the drift signal moved to the segment the
+     * body is actually walking. Y drift is intentionally ignored;
      * the three-branch failure mode documented in issue 0001 §3
      * rides on this XZ-only choice. Pinned by
-     * {@code PathingBehaviorFrameGateTest.replanDistanceIsXZOnly}.
+     * {@code PathingBehaviorFrameGateTest.replanDriftIsXZToSegment}.
      */
     public static final double REPLAN_DISTANCE = 3.0;
 
@@ -150,6 +155,31 @@ public final class PathingBehavior implements Behavior {
      */
     public static final int FRESHNESS_CELLS = 1;
 
+    /**
+     * Ticks a fresh (or re-targeted) mission holds before the first
+     * drive claim (issue 0005 P2.1). Zero-to-full motion on the
+     * directive tick is the device-read the issue diagnoses; a short
+     * stand-still reads as deciding-then-going. Planning still runs
+     * during the hold, so the plan is ready the moment the body
+     * moves.
+     */
+    public static final int DEPARTURE_DELAY_TICKS = 4;
+
+    /**
+     * Remaining XZ distance to the plan's terminal waypoint at which
+     * the arrival brake starts scaling drive down (issue 0005
+     * P2.2). Friction plus reduced drive replaces the brake-free
+     * full-speed stop.
+     */
+    public static final double BRAKE_DISTANCE = 3.0;
+
+    /**
+     * Floor for the scaled drive near the goal - never zero, or the
+     * body could stall short of the goal predicate with no claim
+     * pushing it in (issue 0005 P2.2).
+     */
+    public static final double ARRIVE_MIN_DRIVE = 0.35;
+
     private final String name;
     private final PositionSource positionSource;
     private final OnGroundSource onGroundSource;
@@ -158,6 +188,8 @@ public final class PathingBehavior implements Behavior {
     private final PlanProgressFuse fuse = new PlanProgressFuse();
     private final ReplanGate gate = new ReplanGate();
     private int ticksSinceAdoption;
+    private Goal lastGoal;
+    private int departHoldTicks;
     /**
      * Fine-grained body position. Doubles are load-bearing here: the
      * stuck fuse measures sub-cell motion, and a block-cell source
@@ -285,10 +317,16 @@ public final class PathingBehavior implements Behavior {
     public ExecutionReport tick(WorldView world, Directive directive,
                                 Actor actor) {
         if (directive == null) {
+            lastGoal = null;
+            departHoldTicks = 0;
             return ExecutionReport.running();
         }
         Vec3 position = positionSource.get();
         ticksSinceAdoption++;
+        if (!directive.goal().equals(lastGoal)) {
+            lastGoal = directive.goal();
+            departHoldTicks = DEPARTURE_DELAY_TICKS;
+        }
 
         // Vertical gate (ledger 20): the gate owns ground
         // sampling, the landing edge, and cooldown rationing. Mid-air
@@ -302,6 +340,9 @@ public final class PathingBehavior implements Behavior {
 
         CellPos cell = floorOf(position);
         if (directive.goal().isInGoal(cell)) {
+            // Forget the goal so an immediately re-issued goto to the
+            // same cell is a new departure and re-arms the P2.1 hold.
+            lastGoal = null;
             resetPlan();
             return ExecutionReport.success();
         }
@@ -313,7 +354,8 @@ public final class PathingBehavior implements Behavior {
         // ground tick immediately has a usable plan), and the
         // freshness check is the cell-based guard regardless of
         // ground state.
-        applyAdoption(lifecycle.adoptIfReady(directive.goal(), cell));
+        applyAdoption(lifecycle.adoptIfReady(directive.goal(), cell),
+            world);
 
         if (evaluateTriggers) {
             // Plan-progress score (ledger 20, Path A).
@@ -335,7 +377,7 @@ public final class PathingBehavior implements Behavior {
 
             boolean fuseCondition = fuse.shouldFire();
             boolean offPath = !cursor.exhausted()
-                && distanceToWaypoint(position,
+                && distanceToSegment(position, cursor.previous(),
                     cursor.current()) > REPLAN_DISTANCE;
             boolean exhausted = cursor.exhausted();
 
@@ -348,7 +390,7 @@ public final class PathingBehavior implements Behavior {
                 && gate.mayRequest(window)) {
                 gate.onRequest();
                 applyAdoption(lifecycle.request(world, cell,
-                    directive.goal()));
+                    directive.goal()), world);
             }
 
             if (cursor.isEmpty()) {
@@ -385,6 +427,14 @@ public final class PathingBehavior implements Behavior {
         if (cursor.exhausted()) {
             return ExecutionReport.running();
         }
+        if (departHoldTicks > 0) {
+            // Departure hold (issue 0005 P2.1): planning and cursor
+            // bookkeeping above already ran; only the drive claims
+            // wait. A body standing briefly before moving is the
+            // point.
+            departHoldTicks--;
+            return ExecutionReport.running();
+        }
         steerTowardCurrentWaypoint(position, actor);
         return ExecutionReport.running();
     }
@@ -399,11 +449,17 @@ public final class PathingBehavior implements Behavior {
      *
      * @param adoption the verdict to apply; never null
      */
-    private void applyAdoption(PlanLifecycle.Adoption adoption) {
+    private void applyAdoption(PlanLifecycle.Adoption adoption,
+                               WorldView world) {
         switch (adoption.outcome()) {
             case ADOPTED -> {
                 // Skip index 0: it is the cell we are standing in.
-                cursor.set(adoption.plan());
+                // Smoothing runs here (issue 0005 P1.2/P1.3) so both
+                // adoption paths (sync and worker) get the simplified
+                // chain, and the corridor checks read the CURRENT
+                // world, not the search snapshot.
+                cursor.set(PlanSmoother.smooth(world,
+                    adoption.plan()));
                 ticksSinceAdoption = 0;
                 fuse.onAdopted(cursor.index());
             }
@@ -472,9 +528,33 @@ public final class PathingBehavior implements Behavior {
         return attrs;
     }
 
-    private double distanceToWaypoint(Vec3 position, CellPos wp) {
-        return Math.hypot(position.x() - (wp.x() + 0.5),
-            position.z() - (wp.z() + 0.5));
+    /**
+     * XZ distance from the body to the walked segment (previous to
+     * current waypoint), clamped to the segment ends. Replaces the
+     * pre-smoothing distance-to-waypoint drift measure: with merged
+     * segments, a body mid-leg is legitimately far from the current
+     * waypoint, and only lateral departure from the segment means
+     * the plan no longer describes reality. Frame: XZ only, same
+     * convention as {@code WAYPOINT_REACH}.
+     *
+     * @param position the body's current fine position; never null
+     * @param from     the segment origin; never null
+     * @param to       the segment's far end; never null
+     * @return non-negative distance in metres
+     */
+    private static double distanceToSegment(Vec3 position, CellPos from,
+                                            CellPos to) {
+        double ax = from.x() + 0.5;
+        double az = from.z() + 0.5;
+        double abx = to.x() + 0.5 - ax;
+        double abz = to.z() + 0.5 - az;
+        double lenSq = abx * abx + abz * abz;
+        double t = lenSq == 0 ? 0
+            : ((position.x() - ax) * abx + (position.z() - az) * abz)
+                / lenSq;
+        t = Math.max(0, Math.min(1, t));
+        return Math.hypot(position.x() - (ax + abx * t),
+            position.z() - (az + abz * t));
     }
 
     private void steerTowardCurrentWaypoint(Vec3 position, Actor actor) {
@@ -483,12 +563,23 @@ public final class PathingBehavior implements Behavior {
         double dz = wp.z() + 0.5 - position.z();
         float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
         // Jump only when the current waypoint sits above the body's
-        // floor cell - the execution half of a JumpUp edge.
+        // floor cell - the execution half of a JumpUp edge. On a
+        // smoothed staircase run (issue 0005 P1.3) the single far
+        // waypoint stays above the floor for the whole climb, so the
+        // held thrust reads as a continuous hop cadence.
         // Auto-step clears rises <= 0.5 (slabs); taller steps need
         // this thrust to leave the ground.
         boolean jumpForWaypoint = wp.y() > floorOf(position).y();
+        // Arrival brake (issue 0005 P2.2): scale drive down as the
+        // terminal waypoint closes, floored at ARRIVE_MIN_DRIVE so
+        // the body always creeps into the goal predicate.
+        CellPos end = cursor.last();
+        double endDist = Math.hypot(end.x() + 0.5 - position.x(),
+            end.z() + 0.5 - position.z());
+        double forward = Math.min(1.0,
+            Math.max(ARRIVE_MIN_DRIVE, endDist / BRAKE_DISTANCE));
         actor.submit(new Claim(Channel.MOVE, 10, name,
-            new Intent.Move(1.0, 0, jumpForWaypoint, false)));
+            new Intent.Move(forward, 0, jumpForWaypoint, false)));
         actor.submit(new Claim(Channel.ROT, 10, name,
             new Intent.Look(yaw, steerPitch(position, wp))));
     }

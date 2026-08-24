@@ -133,7 +133,9 @@ public final class BasicMoves {
             ViewMode.LIVE).walkableTop();
     }
 
-    private static boolean standable(WorldView world, CellPos cell) {
+    // Package-visible so PlanSmoother's corridor check reuses the
+    // exact same body-fit predicate the move viability uses.
+    static boolean standable(WorldView world, CellPos cell) {
         return passable(world, cell)
             && passable(world,
                 new CellPos(cell.x(), cell.y() + 1, cell.z()))
