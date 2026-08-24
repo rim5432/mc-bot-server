@@ -90,7 +90,7 @@ class DefendProcessTest {
      * trips ticksSinceSeen > TARGET_GRACE_TICKS → succeed().
      */
     @Test
-    void genuineAbsenceFiresSuccessAfterGrace() {
+    void genuineAbsenceFiresEscapedAfterGrace() {
         MockWorldView world = new MockWorldView();
         DefendProcess m = mission();
 
@@ -108,8 +108,8 @@ class DefendProcessTest {
         }
         m.onTick(world);
         assertFalse(m.isActive(), "11th tick must retire the mission");
-        assertTrue(m.missionSucceeded());
-        assertNull(m.failureReasonOrNull());
+        assertFalse(m.missionSucceeded());
+        assertEquals(DefendProcess.REASON_ESCAPED, m.failureReasonOrNull());
     }
 
     /**
@@ -117,9 +117,11 @@ class DefendProcessTest {
      * valid engagement targets. BindingWorldView does not filter by
      * health (verified at adapter layer), so a dying entity in its
      * ~20-tick death animation is still returned by getEntities and
-     * matched by id. SUCCESS is delayed until actual removal, not until
-     * health hits zero. The sensor-side no-filter contract requires an
-     * adapter-layer test; this test pins only the process behavior.
+     * matched by id. Terminal state is delayed until actual removal,
+     * not until health hits zero. The sensor-side no-filter contract
+     * requires an adapter-layer test; this test pins only the process
+     * behavior. After removal the bot cannot distinguish death from
+     * escape, so it reports TARGET_ESCAPED (issue 0006).
      */
     @Test
     void dyingEntityRemainsEngagedUntilRemoved() {
@@ -142,7 +144,8 @@ class DefendProcessTest {
             assertFalse(m.missionSucceeded());
         }
 
-        // Actual removal → grace → SUCCESS
+        // Actual removal → grace → TARGET_ESCAPED (bot cannot tell
+        // death from escape; conservative failure verdict per issue 0006)
         world.removeEntity("A");
         for (int i = 0; i < 10; i++) {
             m.onTick(world);
@@ -150,7 +153,8 @@ class DefendProcessTest {
         }
         m.onTick(world);
         assertFalse(m.isActive());
-        assertTrue(m.missionSucceeded());
+        assertFalse(m.missionSucceeded());
+        assertEquals(DefendProcess.REASON_ESCAPED, m.failureReasonOrNull());
     }
 
     /**
@@ -209,14 +213,15 @@ class DefendProcessTest {
 
     /**
      * R2 / A-decision executable spec: target beyond scan radius (16 >
-     * 14) is absent from findTarget → grace → 11th tick SUCCESS. This
-     * pins the 14/12 gap semantics documented in the class Javadoc and
-     * tracked in issue 0006; when that issue resolves (raise radius or
-     * add ESCAPED terminal), this test must flip and force explicit
-     * acknowledgment.
+     * 14) is absent from findTarget → grace → 11th tick TARGET_ESCAPED
+     * failure. The bot cannot distinguish death from escape (no death
+     * flag on EntitySnapshot), so the conservative failure verdict is
+     * reported; the harness re-scans to confirm. Resolves issue 0006
+     * (scan-radius / leash gap): a target that leaves the scan area no
+     * longer produces a false SUCCESS that reads as "neutralized".
      */
     @Test
-    void targetBeyondScanRadiusFiresSuccess() {
+    void targetBeyondScanRadiusFiresEscaped() {
         MockWorldView world = new MockWorldView();
         DefendProcess m = mission();
 
@@ -234,8 +239,8 @@ class DefendProcessTest {
         }
         m.onTick(world);
         assertFalse(m.isActive());
-        assertTrue(m.missionSucceeded());
-        assertNull(m.failureReasonOrNull());
+        assertFalse(m.missionSucceeded());
+        assertEquals(DefendProcess.REASON_ESCAPED, m.failureReasonOrNull());
     }
 
     /**
@@ -268,10 +273,9 @@ class DefendProcessTest {
     /**
      * Non-engaged branch: a ranged hostile within ENGAGE_RADIUS is
      * REFUSED immediately (melee-only cannot answer kite-and-shoot).
-     * Pins that the non-engaged scan radius is ENGAGE_RADIUS=8 (the
-     * ternary preserved from old nearestHostile) and that REFUSED fires
-     * before engage. A ranged type beyond 8 blocks yields immediate
-     * SUCCESS (nothing in engage range), not REFUSED — see class Javadoc.
+     * Pins that REFUSED fires before engage. Ranged hostiles between
+     * ENGAGE_RADIUS (8) and DETECTION_RADIUS (16) are also REFUSED —
+     * see rangedHostileBeyondEngageWithinDetectionIsRefused.
      */
     @Test
     void rangedHostileWithinEngageRadiusIsRefused() {
@@ -290,5 +294,32 @@ class DefendProcessTest {
         assertFalse(m.isActive());
         assertFalse(m.missionSucceeded());
         assertEquals("ENGAGEMENT_REFUSED", m.failureReasonOrNull());
+    }
+
+    /**
+     * Non-engaged branch: a ranged hostile between ENGAGE_RADIUS (8)
+     * and DETECTION_RADIUS (16) is seen by the wider detection scan
+     * and REFUSED, rather than missed and reported as SUCCESS ("area
+     * clear"). This is the fix for the non-engaged sister of issue
+     * 0006: a skeleton kiting at 10 blocks can shoot the bot but the
+     * bot cannot reach it — refusing is the honest verdict.
+     */
+    @Test
+    void rangedHostileBeyondEngageWithinDetectionIsRefused() {
+        MockWorldView world = new MockWorldView();
+        DefendProcess m = new DefendProcess("t1",
+            PriorityBands.DEFEND_PRIORITY, 1000L, () -> BOT,
+            Set.of(ZOMBIE, SKELETON),
+            Set.of(SKELETON));
+
+        // Skeleton at 10: beyond ENGAGE_RADIUS (8), inside DETECTION_RADIUS (16).
+        world.addEntity(new EntitySnapshot("S1", SKELETON,
+            new CellPos(10, 64, 0), 20f, 20f));
+
+        m.onTick(world);
+        assertFalse(m.isActive());
+        assertFalse(m.missionSucceeded());
+        assertEquals("ENGAGEMENT_REFUSED", m.failureReasonOrNull());
+        assertEquals(SKELETON, m.verdictAttrs().get("threatType"));
     }
 }

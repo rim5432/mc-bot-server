@@ -28,11 +28,14 @@ import java.util.Map;
  * <p>Contract: see ADR-0002 section 1 and decision 10 (no per-mob
  * processes - the hostile-type set is injected data, one process
  * serves every enemy). Terminal semantics: an area with no hostile at
- * submission time completes immediately; an engaged target that stays
- * absent from the hostile scan past the grace window completes as
- * SUCCESS — "absent" includes both death and escape beyond scan range,
- * so the harness must not treat SUCCESS as a confirmed kill; leaving
- * the leash or the tick budget fails the mission.
+ * submission time completes immediately as SUCCESS; an engaged target
+ * that stays absent from the hostile scan past the grace window fails
+ * as TARGET_ESCAPED — "absent" includes both death and escape beyond
+ * scan range, and the bot cannot distinguish the two (EntitySnapshot
+ * carries no death flag), so the conservative failure verdict is
+ * reported; the harness re-scans to confirm. Leaving the leash or the
+ * tick budget fails the mission with LOST_TARGET or TIMEOUT; a
+ * melee-incompatible hostile is refused with ENGAGEMENT_REFUSED.
  *
  * <p>Implementation note: runs on the server tick thread only.
  */
@@ -41,6 +44,19 @@ public final class DefendProcess implements BotProcess, TerminalMission {
 
     /** Hostiles closer than this many blocks get engaged. */
     public static final double ENGAGE_RADIUS = 8.0;
+
+    /**
+     * Non-engaged threat detection radius. Before a target is locked,
+     * the process scans this far to decide whether there is anything
+     * worth engaging or refusing. Matches LevelThreatSensor.THREAT_RANGE
+     * (16.0): the reflex layer and the combat planner share the same
+     * perception envelope. Kept as a local constant rather than
+     * referencing the adapter-layer value because core/ must not
+     * import adapter/ (layer direction is adapter → core, never the
+     * reverse). A hostile beyond this radius is not the bot's immediate
+     * concern; an empty scan inside it means the area is genuinely clear.
+     */
+    public static final double DETECTION_RADIUS = 16.0;
 
     /**
      * An engaged target farther away than this escapes - the fight is
@@ -84,6 +100,17 @@ public final class DefendProcess implements BotProcess, TerminalMission {
      * travels in event attrs as {@code threatType}.
      */
     public static final String REASON_REFUSED = "ENGAGEMENT_REFUSED";
+
+    /**
+     * Failure reason: an engaged target stayed absent from the hostile
+     * scan past the grace window. The bot cannot distinguish death from
+     * escape (EntitySnapshot carries no death flag; health=0 is not
+     * filtered by the sensor), so it reports the conservative verdict:
+     * a failure rather than SUCCESS. A false ESCAPED costs the harness
+     * one re-scan; a false SUCCESS costs a missed threat. See issue
+     * 0006 for the scan-radius / leash gap that motivated this.
+     */
+    public static final String REASON_ESCAPED = "TARGET_ESCAPED";
 
     private final String taskId;
     private final int priority;
@@ -220,9 +247,10 @@ public final class DefendProcess implements BotProcess, TerminalMission {
         }
 
         // Target genuinely absent from the hostile scan: grace, then
-        // SUCCESS. "Absent" = dead OR out of scan range — see class
-        // Javadoc. The scan-radius / leash gap (14 vs 12) is tracked
-        // in issue 0006 and is not changed by this commit.
+        // TARGET_ESCAPED. "Absent" = dead OR out of scan range — the
+        // bot cannot tell which, so it reports the conservative failure
+        // verdict (issue 0006). The harness re-scans to confirm; a
+        // false ESCAPED is cheap, a false SUCCESS is a missed threat.
         //
         // ORDER IS LOAD-BEARING: the seen-branch above resets
         // ticksSinceSeen to zero BEFORE this check runs. resume()
@@ -232,10 +260,10 @@ public final class DefendProcess implements BotProcess, TerminalMission {
         // continues; an absent one trips 11 > 10 immediately. Reordering
         // these two blocks would unconditionally kill every resumed fight
         // whose target is still present — the absent-target case is
-        // unaffected (both orders → SUCCESS).
+        // unaffected (both orders → TARGET_ESCAPED).
         ticksSinceSeen++;
         if (ticksSinceSeen > TARGET_GRACE_TICKS) {
-            succeed();
+            fail(REASON_ESCAPED);
             return lastDirective;
         }
         return directiveFor(position);
@@ -283,7 +311,7 @@ public final class DefendProcess implements BotProcess, TerminalMission {
         // Blind-trust guard: resume() has no world access, so instead
         // of trusting the pre-pause target we spend ALL grace credit
         // here - the very next onTick scan adjudicates. Target gone =>
-        // immediate TARGET_DOWN success; present => normal leash and
+        // immediate TARGET_ESCAPED failure; present => normal leash and
         // refresh logic. Worst-case stale steering collapses from a
         // full grace window to exactly one tick.
         ticksSinceSeen = TARGET_GRACE_TICKS;
@@ -361,12 +389,15 @@ public final class DefendProcess implements BotProcess, TerminalMission {
      */
     private List<EntitySnapshot> scanHostiles(WorldView world,
                                                CellPos center) {
-        // Tracking must see farther than engaging: an already-locked
-        // target between ENGAGE and LEASH stays visible here, which is
-        // what makes the leash break observable at all.
+        // Engaged: tracking must see farther than engaging — an already-
+        // locked target between ENGAGE and LEASH stays visible here, which
+        // is what makes the leash break observable at all.
+        // Non-engaged: use the full detection envelope (16) so a ranged
+        // hostile kiting at 9–15 blocks is seen and REFUSED, not missed
+        // and reported as SUCCESS ("area clear").
         double scanRadius = engaged()
             ? Math.max(ENGAGE_RADIUS, LEASH_RADIUS + 2)
-            : ENGAGE_RADIUS;
+            : DETECTION_RADIUS;
         List<EntitySnapshot> hits = world.getEntities(center, scanRadius,
             ViewMode.LIVE);
         List<EntitySnapshot> out = new ArrayList<>();

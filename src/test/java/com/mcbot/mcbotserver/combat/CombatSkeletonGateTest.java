@@ -83,9 +83,9 @@ class CombatSkeletonGateTest {
         assertNull(defend.failureReasonOrNull());
     }
 
-    /** Target vanishing starts the grace; staying gone ends it well. */
+    /** Target vanishing starts the grace; staying gone ends as ESCAPED. */
     @Test
-    void vanishedTargetCountsAsNeutralizedAfterGrace() {
+    void vanishedTargetCountsAsEscapedAfterGrace() {
         MockWorldView world = new MockWorldView();
         world.addEntity(zombie("z1", new CellPos(2, 64, 0)));
         DefendProcess defend = new DefendProcess("gt-def", 60, 400,
@@ -98,8 +98,10 @@ class CombatSkeletonGateTest {
         }
 
         assertFalse(defend.isActive());
-        assertTrue(defend.missionSucceeded(),
-            "a target absent past grace is neutralized");
+        assertFalse(defend.missionSucceeded(),
+            "a target absent past grace is ESCAPED, not neutralized");
+        assertEquals(DefendProcess.REASON_ESCAPED,
+            defend.failureReasonOrNull());
     }
 
     /** An engaged target beyond the leash escapes: FAILED, not chase. */
@@ -128,7 +130,9 @@ class CombatSkeletonGateTest {
      * Resume after a freeze must NOT blindly trust the pre-pause
      * target: grace credit is spent at resume, so the very next scan
      * adjudicates - a vanished target ends the fight immediately
-     * instead of chasing a ghost until timeout.
+     * as TARGET_ESCAPED instead of chasing a ghost until timeout.
+     * The bot cannot distinguish death from escape, so the conservative
+     * failure verdict is reported (issue 0006).
      */
     @Test
     void resumeSpendsGraceCreditForImmediateAdjudication() {
@@ -149,8 +153,10 @@ class CombatSkeletonGateTest {
 
         assertFalse(defend.isActive(),
             "the first post-resume scan must decide");
-        assertTrue(defend.missionSucceeded(),
-            "a target absent at reattach is TARGET_DOWN, not a chase");
+        assertFalse(defend.missionSucceeded(),
+            "a target absent at reattach is TARGET_ESCAPED, not a chase");
+        assertEquals(DefendProcess.REASON_ESCAPED,
+            defend.failureReasonOrNull());
     }
 
     /**
