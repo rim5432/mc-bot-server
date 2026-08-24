@@ -18,18 +18,20 @@ import net.minecraft.world.level.Level;
  * — boundary A holds because every write below is an intent echo of an
  * Actor claim, never self-computed physics.
  *
- * <p>Why the default AI cannot coexist with input driving
+ * <p>Why the default AI controls cannot coexist with input driving
  * (empirically confirmed via body-probe, do not re-derive from
- * memory): Mob.serverAiStep runs navigation.tick(), then
- * customServerAiStep() (our write point), THEN moveControl.tick().
- * A default MoveControl sitting in WAIT executes setZza(0) in that
- * last slot, silently erasing the binding's drive every tick while
- * gravity keeps working - so the body falls but never walks. The
- * constructor therefore swaps in a no-op MoveControl; the binding is
- * the only locomotion writer. Stage 2 landmine: if A* or follow goals
- * ever need vanilla pathing again, the swap must be revisited as a
- * whole (drive through MoveControl instead of around it), not patched
- * by re-enabling it beside the binding.
+ * memory): Mob.aiStep() runs goalSelector.tick(), navigation.tick(),
+ * customServerAiStep() (our write point), THEN moveControl.tick(),
+ * lookControl.tick(), jumpControl.tick(). Each default control sits
+ * in a slot AFTER the binding's write and silently clobbers shared
+ * state: MoveControl.WAIT does setZza(0); LookControl.resetXRotOnTick
+ * forces setXRot(0) (wipes non-zero pitch); JumpControl does
+ * setJumping(false). The constructor therefore swaps all three for
+ * no-ops; the binding is the sole writer of locomotion, look, and
+ * jump state. Stage 2 landmine: if A* or follow goals ever need
+ * vanilla pathing again, all three swaps must be revisited as a
+ * whole (drive through the controls instead of around them), not
+ * patched by re-enabling one beside the binding.
  *
  * <p>Implementation note: constructed and ticked by the server only.
  */
@@ -60,16 +62,37 @@ public final class BotBodyEntity extends PathfinderMob {
     public BotBodyEntity(EntityType<? extends PathfinderMob> type,
                          Level level) {
         super(type, level);
-        // Neutralize MoveControl: Mob.serverAiStep runs moveControl.tick()
-        // AFTER customServerAiStep, and its WAIT branch does
-        // setZza(0) every tick - it would silently clobber the
-        // binding's drive before travel ever sees it (confirmed
-        // empirically: body-probe read zza=1 inside the AI step,
-        // deltaMovement.x stayed 0). The binding is the only writer.
+        // Neutralize all three vanilla controls: the binding is the sole
+        // writer of locomotion, look, and jump state. Each control runs
+        // in Mob.aiStep() AFTER customServerAiStep() and would silently
+        // clobber the binding's writes:
+        //   - MoveControl.tick() WAIT branch: setZza(0) every tick
+        //   - LookControl.tick(): resetXRotOnTick() forces setXRot(0),
+        //     wiping any non-zero pitch the binding set (pitch-aim landmine)
+        //   - JumpControl.tick(): setJumping(false) every tick, would
+        //     zero a setJumping(true) before LivingEntity.aiStep() sees it
+        // All three are Goal-system executors; with no goals registered and
+        // the binding owning every input channel, they are concurrent writers
+        // on shared state, not helpers. Anonymous no-ops match the existing
+        // MoveControl pattern.
         this.moveControl = new MoveControl(this) {
             @Override
             public void tick() {
                 // binding owns locomotion inputs; nothing to do
+            }
+        };
+        this.lookControl = new net.minecraft.world.entity.ai.control
+            .LookControl(this) {
+            @Override
+            public void tick() {
+                // binding owns rotation via setRot/setYHeadRot; nothing to do
+            }
+        };
+        this.jumpControl = new net.minecraft.world.entity.ai.control
+            .JumpControl(this) {
+            @Override
+            public void tick() {
+                // binding owns jump via jumpFromGround/jumpInFluid; nothing to do
             }
         };
         setPersistenceRequired();
@@ -161,8 +184,12 @@ public final class BotBodyEntity extends PathfinderMob {
             driveJump = false;
         }
         if (hasPendingRotation) {
+            // setRot does yaw%360 / pitch%360 normalization internally;
+            // setYHeadRot aligns the head with the body so the model does
+            // not lag one tick behind. Do NOT add a separate setYRot call
+            // after setRot — it would overwrite the normalized value with a
+            // raw angle and break the wrap-around for yaw outside [0,360).
             setRot(targetYaw, targetPitch);
-            setYRot(targetYaw);
             setYHeadRot(targetYaw);
             hasPendingRotation = false;
         }
