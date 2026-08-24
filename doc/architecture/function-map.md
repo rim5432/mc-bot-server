@@ -1,6 +1,6 @@
 ---
 title: Functional Convergence Map (device-layer capability envelope)
-last_verified: 2026-08-24
+last_verified: 2026-08-25
 covers:
   - doc/guide/workplan.md
   - doc/architecture/boundaries.md
@@ -45,22 +45,32 @@ reopened on demand — **[DEFERRED]** outside v1.
 - **[SHIPPED]** Walk, diagonal, jump up one block, drop up to 3 blocks,
   swim horizontally and upward. Lava execution is vocabulary-complete
   but has no in-engine scenario yet. Pathfinding reroutes on
-  obstruction, recovers when shoved, and reports clean failure on
-  unreachable goals.
+  obstruction, recovers when shoved, reports clean failure on
+  unreachable goals, and escalates stalled budget-cut partial
+  searches to NO_PATH instead of burning the mission timeout
+  (decision 21; live verification queued in workplan follow-up 6).
 - **[GAP]** Parkour jumps, pillar-up, door handling, sneak-walk along
   1-wide edges.
 - **[DEFERRED]** Climb (ladders / vines) — trait exists, no move yet.
 
 ### 3. Survive (reflex layer)
 
-- **[SHIPPED]** Freezes on low health (single rule, offline-gated;
-  in-engine scenario pending). Reflex rules are datapack JSON; new
-  survival scenarios are data, not code. A reflex preemption skips
-  all mission work for that tick.
+- **[SHIPPED]** Freezes on low health, surfaces on low air (trigger 80
+  of 300, decision 22; ASCEND holds jump, vanilla fluid physics does
+  the swimming), and engages hostiles that close to melee range while
+  idle (decision 23: one preemption tick, then a reflex-owned defend
+  mission runs the fight through the arbiter). Reflex rules are
+  datapack JSON; new survival scenarios are data, not code. A reflex
+  preemption skips all mission work for that tick - except ENGAGE,
+  which spends exactly one tick preempting.
 - **[SHIPPED]** After any pipeline crash the bot latches into a minimal
   state: only ascend from lethal fluid, nothing else. The latch clears
   on harness reset or death+respawn (crash counter preserved).
-- **[GAP]** Fall protection, projectile dodge, automatic eating.
+- **[GAP]** Fall protection, projectile dodge, automatic eating, ranged
+  idle threats (a skeleton kiting at standoff never trips the melee
+  engage trigger - responding needs ranged tactics or retreat policy),
+  fighting while at low health (the freeze hold currently wins that
+  arbitration).
 - **[DEFERRED]** Process-suppressed reflexes (a mission pauses a reflex).
 
 ### 4. Fight
