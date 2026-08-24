@@ -68,9 +68,10 @@ public final class BotAssembly {
      * Tick budget for one reflex-owned engage mission: long enough for
      * a melee fight plus its grace window, short enough that an
      * unwinnable scrap cannot pin the body - the mission's own
-     * leash/escape verdicts usually land first.
+     * leash/escape verdicts usually land first. Public because
+     * gametest scenarios size their timeoutTicks against it.
      */
-    private static final long ENGAGE_MISSION_TIMEOUT_TICKS = 600L;
+    public static final long ENGAGE_MISSION_TIMEOUT_TICKS = 600L;
 
     private BotAssembly() {
     }

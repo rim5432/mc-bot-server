@@ -1,11 +1,13 @@
 package com.mcbot.mcbotserver.gametest;
 
 import com.mcbot.mcbotserver.McBotServer;
+import com.mcbot.mcbotserver.adapter.BotAssembly;
 import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
 import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.process.DefendProcess;
+import com.mcbot.mcbotserver.core.reflex.FreezeOnLowHealthRule;
 import com.mcbot.mcbotserver.core.reflex.SurfaceOnLowAirRule;
 
 import net.minecraft.core.BlockPos;
@@ -538,6 +540,121 @@ public final class BotSliceGameTests {
             .filter(e -> e.attrs().getOrDefault("task", "")
                 .startsWith("reflex-engage"))
             .findFirst().orElse(null);
+    }
+
+    /**
+     * Scenario 4b: the intruder fights BACK. The zombie keeps its AI -
+     * it ignores the bot until the first swing lands (vanilla zombies
+     * target players, not devices), then retaliates through
+     * HurtByTargetGoal - so the fight is two-sided for the first time
+     * in this suite. Weakened to 8 health on purpose: the pin is
+     * "engages, survives retaliation, wins", not a fair duel, and a
+     * short fight keeps the body comfortably above the freeze
+     * threshold.
+     *
+     * <p>Roof: the whole floor gets a stone ceiling one layer below
+     * the template top. The arena runs at daytime and an AI zombie is
+     * sun-sensitive - without the roof the target burns instead of
+     * fighting, which would test daylight, not retaliation.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = TIMEOUT)
+    public static void survivesRetaliatingZombie(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
+        var level = helper.getLevel();
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                helper.setBlock(
+                    new BlockPos(x, GametestRig.FLOOR_Y + 7, z),
+                    Blocks.SMOOTH_STONE);
+            }
+        }
+        Zombie zombie = EntityType.ZOMBIE.create(level);
+        check(zombie != null, "zombie creation failed");
+        var zAbs = helper.absolutePos(new BlockPos(7, GametestRig.WALK_Y, 8));
+        zombie.moveTo(zAbs.getX() + 0.5, zAbs.getY(),
+            zAbs.getZ() + 0.5, 0f, 0f);
+        zombie.setHealth(8f);
+        level.addFreshEntity(zombie);
+
+        helper.startSequence()
+            .thenWaitUntil(driveUntil(rig,
+                () -> check(zombie.isDeadOrDying() || zombie.isRemoved(),
+                    "waiting for the retaliation fight to end")))
+            .thenWaitUntil(driveUntil(rig,
+                () -> check(reflexEngageVerdict(rig.events()) != null,
+                    "waiting for the reflex mission verdict")))
+            .thenExecuteFor(3, driveOnly(rig))
+            .thenExecuteAfter(0, () -> {
+                BotEvent verdict = reflexEngageVerdict(rig.events());
+                check(verdict != null,
+                    "the retaliation fight must be reflex-owned");
+                checkEquals(DefendProcess.REASON_ESCAPED,
+                    verdict.attrs().get("reason"),
+                    "a killed target ends as TARGET_ESCAPED");
+                check(zombie.isDeadOrDying() || zombie.isRemoved(),
+                    "the retaliating zombie must not survive");
+                check(rig.body().isAlive(),
+                    "the body must survive being fought back");
+                check(rig.body().getHealth()
+                        > FreezeOnLowHealthRule.FREEZE_THRESHOLD,
+                    "survival means staying above the freeze threshold, "
+                        + "got " + rig.body().getHealth());
+                rig.body().discard();
+            })
+            .thenSucceed();
+    }
+
+    /**
+     * Scenario 4c: a target behind a full wall is engaged (the threat
+     * scan is distance-based and wall-blind - by design, see
+     * LevelThreatSensor) but cannot be damaged: the bot closes to its
+     * standoff, swings on cooldown, and every swing is eaten by
+     * {@code BindingActor.sightBlocked}. The mission then fails
+     * honestly by its own tick budget instead of pretending to win.
+     *
+     * <p>The zombie stays at exactly 20 health for the whole scenario
+     * - that zero-damage fact is the pin. If the LOS clip regresses,
+     * swings land and this fails with a damaged zombie.
+     */
+    @GameTest(template = "empty16x8x16",
+        timeoutTicks = (int) BotAssembly.ENGAGE_MISSION_TIMEOUT_TICKS
+            + 100)
+    public static void holdsFireWhenSightBlocked(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(4, GametestRig.WALK_Y, 8));
+        var level = helper.getLevel();
+        for (int z = 0; z < 16; z++) {
+            for (int y = 1; y <= 3; y++) {
+                helper.setBlock(new BlockPos(8, GametestRig.FLOOR_Y + y, z),
+                    Blocks.SMOOTH_STONE);
+            }
+        }
+        Zombie zombie = EntityType.ZOMBIE.create(level);
+        check(zombie != null, "zombie creation failed");
+        var zAbs = helper.absolutePos(new BlockPos(9, GametestRig.WALK_Y, 8));
+        zombie.moveTo(zAbs.getX() + 0.5, zAbs.getY(),
+            zAbs.getZ() + 0.5, 0f, 0f);
+        zombie.setNoAi(true);
+        level.addFreshEntity(zombie);
+
+        helper.startSequence()
+            .thenWaitUntil(driveUntil(rig,
+                () -> check(reflexEngageVerdict(rig.events()) != null,
+                    "waiting for the walled-off engagement to time out")))
+            .thenExecuteFor(3, driveOnly(rig))
+            .thenExecuteAfter(0, () -> {
+                BotEvent verdict = reflexEngageVerdict(rig.events());
+                check(verdict != null, "a verdict must be present");
+                checkEquals(DefendProcess.REASON_TIMEOUT,
+                    verdict.attrs().get("reason"),
+                    "an undamageable target must fail by budget, "
+                        + "not by success or escape");
+                checkEquals(20f, zombie.getHealth(),
+                    "no swing may land through a full wall");
+                check(rig.body().isAlive(),
+                    "the standoff must be harmless to the body too");
+                rig.body().discard();
+            })
+            .thenSucceed();
     }
 
     private static void assertEventSeen(
