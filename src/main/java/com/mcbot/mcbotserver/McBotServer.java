@@ -168,12 +168,14 @@ public class McBotServer {
                 // actually moved, so a per-tick drive cannot flood it.
                 activeState.current();
             }
-            // Feed the lava flag before the pipeline runs: MinimalReflex
-            // (crashed state) reads this to decide whether to jump. The
-            // normal reflex layer derives fluid state from ThreatBlackboard
-            // sensors; this flag is the crashed-state parallel that cannot
-            // depend on the sensor stack (ADR-0005 D3).
+            // Feed the crashed-state vitals before the pipeline runs:
+            // MinimalReflex reads these to decide whether to jump
+            // (lava or low air). The normal reflex layer derives
+            // fluid/air state from ThreatBlackboard sensors; these
+            // flags are the crashed-state parallel that cannot depend
+            // on the sensor stack (ADR-0005 D3).
             activeController.setInLethalFluid(activeBody.isInLava());
+            activeController.setAirSupply(activeBody.getAirSupply());
             activeController.onTick(activeView);
         } catch (RuntimeException e) {
             LOGGER.error("mcbotserver tick harness failed; "

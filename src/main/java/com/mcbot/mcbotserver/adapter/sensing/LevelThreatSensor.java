@@ -74,36 +74,64 @@ public final class LevelThreatSensor implements ThreatSensor {
     private final com.mcbot.mcbotserver.adapter.BindingWorldView view;
     private final Supplier<CellPos> bodyPos;
     private final Supplier<Integer> airSupply;
+    private final Supplier<Boolean> inLava;
+    private final Supplier<Integer> fireTicks;
+    private final Supplier<Integer> freezeTicks;
+    private final Supplier<Boolean> inWall;
 
     /**
      * Creates a sensor scanning around the live body position.
      *
-     * @param view    perception read; never null
-     * @param bodyPos current body cell supplier; never null
-     * @param airSupply body air supplier (vanilla
-     *                  {@code body::getAirSupply}); never null - a
-     *                  null result is a wiring bug and must fail
-     *                  loudly, not read as "breathing"
+     * @param view       perception read; never null
+     * @param bodyPos    current body cell supplier; never null
+     * @param airSupply  body air supplier (vanilla
+     *                   {@code body::getAirSupply}); never null - a
+     *                   null result is a wiring bug and must fail
+     *                   loudly, not read as "breathing"
+     * @param inLava     body lava supplier ({@code body::isInLava});
+     *                   never null - writes board.inLethalFluid, the
+     *                   field that was dead since ADR-0003 (issue 0008
+     *                   F2) until this vitals pass
+     * @param fireTicks  body fire supplier ({@code body::getRemainingFireTicks});
+     *                   never null
+     * @param freezeTicks body freeze supplier ({@code body::getTicksFrozen});
+     *                    never null
+     * @param inWall     body suffocation supplier ({@code body::isInWall});
+     *                   never null
      */
     public LevelThreatSensor(com.mcbot.mcbotserver.adapter.BindingWorldView
                                  view,
                              Supplier<CellPos> bodyPos,
-                             Supplier<Integer> airSupply) {
-        if (view == null || bodyPos == null || airSupply == null) {
+                             Supplier<Integer> airSupply,
+                             Supplier<Boolean> inLava,
+                             Supplier<Integer> fireTicks,
+                             Supplier<Integer> freezeTicks,
+                             Supplier<Boolean> inWall) {
+        if (view == null || bodyPos == null || airSupply == null
+                || inLava == null || fireTicks == null
+                || freezeTicks == null || inWall == null) {
             throw new IllegalArgumentException(
                 "arguments must not be null");
         }
         this.view = view;
         this.bodyPos = bodyPos;
         this.airSupply = airSupply;
+        this.inLava = inLava;
+        this.fireTicks = fireTicks;
+        this.freezeTicks = freezeTicks;
+        this.inWall = inWall;
     }
 
     @Override
     public void sense(WorldView world, ThreatBlackboard board) {
-        // Air is body state, not world state - it cannot be read
-        // through WorldView, so the supplier is the only honest
-        // source (same category as botHealth's pipeline accessor).
+        // Vitals are body state, not world state - they cannot be read
+        // through WorldView, so suppliers are the only honest source
+        // (same category as botHealth's pipeline accessor).
         board.airSupply = airSupply.get();
+        board.inLethalFluid = inLava.get();
+        board.fireTicks = fireTicks.get();
+        board.freezeTicks = freezeTicks.get();
+        board.inWall = inWall.get();
         CellPos center = bodyPos.get();
         List<EntitySnapshot> hits = world.getEntities(
             center, THREAT_RANGE,

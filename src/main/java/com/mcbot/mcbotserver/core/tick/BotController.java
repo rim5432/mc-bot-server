@@ -16,6 +16,7 @@ import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
 import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.reflex.ReflexAction;
+import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.api.world.WorldView;
@@ -116,6 +117,7 @@ public final class BotController {
     private boolean crashed;
     private int crashCounter;
     private boolean inLethalFluid;
+    private int airSupply = ThreatBlackboard.MAX_AIR_SUPPLY;
     private BotProcess previousCurrent;
     private int ticksSinceKeepalive;
     /** Live reflex-owned defend mission, if any; null otherwise. */
@@ -220,6 +222,19 @@ public final class BotController {
     }
 
     /**
+     * Feed the air supply for this tick; read by MinimalReflex only
+     * (the normal pipeline derives air through the reflex sensor).
+     * Defaults to full air so a rig that never calls this reads as
+     * breathing — missing data must not mint a crashed-state ascend.
+     *
+     * @param value current body air supply (vanilla
+     *              {@code getAirSupply()}, 0..300)
+     */
+    public void setAirSupply(int value) {
+        this.airSupply = value;
+    }
+
+    /**
      * Whether the crash latch is currently set.
      *
      * @return true from first caught RuntimeException until a full
@@ -299,7 +314,7 @@ public final class BotController {
             // invariant: see ADR-0005 D3 (MinimalReflex may throw too;
             // the same latch fires again and both channels re-report)
             try {
-                MinimalReflex.tick(inLethalFluid, actor);
+                MinimalReflex.tick(inLethalFluid, airSupply, actor);
                 actor.flush();
             } catch (RuntimeException e) {
                 handleCrash(e);

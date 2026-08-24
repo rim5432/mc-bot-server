@@ -73,7 +73,7 @@ readable" and "dead from full health":
 | Suffocation | 1.0F **every tick** eye-in-wall, no interval (LivingEntity.baseTick:387) | **instant** — 20 ticks | `isInWall()` | nothing |
 | Void | 4.0F every tick below `minBuildHeight - 64` (LivingEntity:1859) | **instant, unanswerable** — nothing rescues below the line | `getY()` vs level min | nothing (planner-side Drop<=3 is the only guard) |
 | Cactus | 1.0F/tick on AABB contact (CactusBlock.entityInside) | instant-ish, tiny per-tick | no getter — needs contact check | nothing |
-| Fire | 1.0F per second (every 20 ticks), self-limiting at 300 ticks = 15 HP max; extinguished by water/rain/powder snow (Entity.baseTick:483) | **gauged** — seconds, survivable by waiting | `getRemainingFireTicks()` | nothing |
+| Fire | 1.0F per second (every 20 ticks); lava-origin fire caps at 300 ticks = 15 HP (`setSecondsOnFire(15)`); other sources (fire aspect, lightning, blaze) vary; extinguished by water/rain/powder snow (Entity.baseTick:483) | **gauged** — seconds, survivable by waiting | `getRemainingFireTicks()` | nothing |
 | Drowning | air 300, drain 1/tick, damage 2.0F/s once air <= -20 (Forge LivingDrownEvent) | **gauged** — 300 ticks + 1 s | `getAirSupply()` | SHIPPED (ledger 22) |
 | Freezing | freeze +1/tick in powder snow to 140, decay 2/tick; at 140: 1.0F per 40 ticks (LivingEntity.aiStep:2666-2680) | **gauged** — 140 ticks to first damage, slow after | `getTicksFrozen()`, `isInPowderSnow` | nothing (carrier not FREEZE_IMMUNE-tagged, so it can freeze) |
 | Cramming | 6.0F, avg every 4 ticks over the 24-entity rule | instant-ish | rule + nearby count | N/A for a solo bot |
@@ -115,8 +115,10 @@ until an unattended run actually dies in lava?
 
 ### F3 - Fire: probably rule NOTHING v1
 
-Fire is self-limiting (15 HP worst case, 1 HP/s) and self-answering
-the moment the bot's ongoing route touches water (extinguish on
+Fire is self-limiting in practice (lava-origin caps at 15 HP worst
+case, 1 HP/s; the engine has no hard cap on remainingFireTicks but
+lava is the dominant source for this bot) and self-answering the
+moment the bot's ongoing route touches water (extinguish on
 `isInWaterRainOrBubble`). A FIRE reflex that freezes the bot would
 REDUCE survival (stop moving = never reach water). Proposal:
 sense-only (F1), no rule; revisit if a harness wants an event. The

@@ -15,6 +15,7 @@ import com.mcbot.mcbotserver.core.command.GotoCommandHandler;
 import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.process.DefendProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
+import com.mcbot.mcbotserver.core.reflex.AscendInLethalFluidRule;
 import com.mcbot.mcbotserver.core.reflex.EngageOnHostileProximityRule;
 import com.mcbot.mcbotserver.core.reflex.FreezeOnLowHealthRule;
 import com.mcbot.mcbotserver.core.reflex.SurfaceOnLowAirRule;
@@ -117,12 +118,20 @@ public final class BotAssembly {
 
         SurvivalReflexLayer reflex = new SurvivalReflexLayer(
             new LevelThreatSensor(view,
-                () -> poseOf(body), body::getAirSupply));
+                () -> poseOf(body), body::getAirSupply,
+                body::isInLava, body::getRemainingFireTicks,
+                body::getTicksFrozen, body::isInWall));
         reflex.addRule(new FreezeOnLowHealthRule());
         // Air reflex outranks the freeze rule by default (SURFACE
         // _PRIORITY 110 vs FREEZE 100): freezing underwater converts
         // one lethal condition into two.
         reflex.addRule(new SurfaceOnLowAirRule());
+        // Lava reflex outranks air (LAVA_PRIORITY 130 vs 110): lava is
+        // 4 HP/tick with no interval vs drowning's 2 HP/tick after
+        // air exhaustion. The board.inLethalFluid field was dead
+        // since ADR-0003 (issue 0008 F2); this rule + the vitals
+        // sensor pass close the live-pipeline lava blind spot.
+        reflex.addRule(new AscendInLethalFluidRule());
         // Idle-combat reflex (2026-08-24 night-cave death): engages a
         // hostile that closes to melee range even when no mission is
         // running. Sits BELOW the survival holds: at three health

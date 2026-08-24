@@ -59,6 +59,29 @@ public final class ThreatBlackboard {
     /** True while the body stands in lava or another lethal fluid. */
     public boolean inLethalFluid;
 
+    /**
+     * Remaining fire ticks at sensing time; 0 when not burning.
+     * Vanilla {@code Entity.getRemainingFireTicks()}; damage is 1.0 per
+     * 20 ticks while positive (decompiled 1.20.1, Entity.baseTick).
+     * beginTick resets to 0 so an un-stamped rig reads as not burning.
+     */
+    public int fireTicks;
+
+    /**
+     * Freeze progress at sensing time, 0..140. Vanilla
+     * {@code Entity.getTicksFrozen()}; at 140 the body is fully frozen
+     * and takes 1.0 per 40 ticks (LivingEntity.baseTick "freezing"
+     * phase). beginTick resets to 0.
+     */
+    public int freezeTicks;
+
+    /**
+     * True while the body's eye is inside a solid block (suffocation).
+     * Vanilla {@code LivingEntity.isInWall()}; deals 1.0 per tick with
+     * no interval. beginTick resets to false.
+     */
+    public boolean inWall;
+
     /** Reset all fields to a fresh-tick baseline before sensing. */
     public void beginTick(long tickCounter, long gameDay,
                           long timeOfDayTicks, CellPos position,
@@ -72,5 +95,8 @@ public final class ThreatBlackboard {
         this.nearestThreat = null;
         this.nearestThreatDistance = Double.MAX_VALUE;
         this.inLethalFluid = false;
+        this.fireTicks = 0;
+        this.freezeTicks = 0;
+        this.inWall = false;
     }
 }
