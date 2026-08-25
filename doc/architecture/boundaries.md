@@ -631,6 +631,26 @@ BotState getState();
     reaches dry ground) and `findsWaterWhenBurning` (health=5,
     fireTicks=100, water 4 blocks east, fire extinguished by
     contact).
+    27. Powder-snow climb reflex (issue 0008 F6; user ruling
+    2026-08-25 "this how to solve"). `ClimbOutOfPowderSnowRule`
+    (CLIMB_OUT_OF_POWDER_SNOW, priority 95, trigger freezeTicks=100)
+    emits ASCEND (held jump). Powder snow is climbable
+    (Entity.isStateClimbable returns true, decompiled Entity.java:764
+    — same class as ladders/vines), so the held-jump impulse walks
+    the body up and out of the snow; no mission handoff needed.
+    Trigger at 100 leaves 40 ticks (2s) before the fully-frozen
+    damage phase (1 HP/40t at freezeTicks>=140). Priority 95 slots
+    below FREEZE(100) and above ENGAGE(90): at 3 HP the bot freezes
+    rather than climbs (the climb takes ticks; freeze damage is
+    slow enough that FREEZE+harness is safer). Design constraint:
+    `ReflexHysteresis` is direction-locked to "lower signal = more
+    dangerous" (the air-supply shape in SurvivalReflexLayer.decideHysteresis);
+    freezeTicks is "higher = more dangerous", so the rule uses pure
+    `computePriority` (same shape as EscapeLavaRule/ExtinguishFireRule).
+    Thaw is -2/tick once clear, so the freeze budget recovers fast.
+    Reload-parity: JSON branch + datapack row + lockstep gate
+    (7 rule types). In-engine: `climbsOutOfPowderSnow` (3x3 two-deep
+    pit, body climbs out, no freeze damage taken).
 
 ## Deferred, with reopen conditions
 

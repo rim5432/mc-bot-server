@@ -77,12 +77,15 @@ reopened on demand — **[DEFERRED]** outside v1.
   survival twin of ENGAGE (decision 26): one preemption tick + a
   rescue GotoProcess to the nearest safe cell (lava shore or water
   source), then the mission stage owns the route. Triage ladder
-  frozen at six rungs: LAVA 130 > SUFFOCATION 115 > SURFACE 110 >
-  FIRE_ESCAPE 105 > FREEZE 100 > ENGAGE 90 (decision 24 + 26).
-  Non-lethal fire and freeze are sensed but ruleless by ruling
-  (issue 0008 D5-original/F6 - fire is self-answering below the
-  kill threshold, freezing is the slowest gauge); lethal fire
-  (fireTicks/20 >= health) triggers EXTINGUISH_FIRE. Reflex rules
+  frozen at seven rungs: LAVA 130 > SUFFOCATION 115 > SURFACE 110 >
+  FIRE_ESCAPE 105 > FREEZE 100 > POWDER_SNOW_CLIMB 95 > ENGAGE 90
+  (decision 24 + 26 + 27).
+  Non-lethal fire is sensed but ruleless by ruling (issue 0008
+  D5-original - fire is self-answering below the kill threshold);
+  lethal fire (fireTicks/20 >= health) triggers EXTINGUISH_FIRE.
+  Powder snow freezing triggers CLIMB_OUT_OF_POWDER_SNOW at
+  freezeTicks=100 (ASCEND = held jump; powder snow is climbable,
+  decision 27). Reflex rules
   are datapack JSON; new survival scenarios are data, not code; a
   code-registered rule type must land with its JSON branch and
   datapack row in the same change or the first /reload silently

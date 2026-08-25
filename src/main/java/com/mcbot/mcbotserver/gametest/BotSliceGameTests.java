@@ -954,6 +954,100 @@ public final class BotSliceGameTests {
     }
 
     /**
+     * Scenario 7c: a body trapped in a powder-snow pit accumulates
+     * freeze progress; at the trigger threshold the climb reflex fires
+     * (ASCEND = held jump), and vanilla climbable-block physics walks
+     * the body up and out of the snow.
+     *
+     * <p>Why: issue 0008 F3. Powder snow is the least urgent vital
+     * (140-tick freeze budget, 1 HP/40t after), but a body left
+     * untended in a snow drift will eventually die. The reflex fires
+     * at freezeTicks=100 (2 seconds before damage starts) and holds
+     * jump; powder snow is climbable (Entity.isStateClimbable,
+     * decompiled 1.20.1 Entity.java:764) so the held jump applies
+     * the same upward impulse as a ladder. Thaw is -2/tick once the
+     * body steps clear, so the freeze budget recovers fast.
+     *
+     * <p>Setup: a 3x3 two-deep powder-snow pit with a stone floor;
+     * the body starts at the bottom layer (inside snow). No mission
+     * is submitted - this is a pure reflex scenario. Assert: the body
+     * climbs out (isFreezing goes false, freezeTicks starts
+     * decreasing) and survives with no freeze damage taken (the
+     * trigger fires before the fully-frozen damage phase).
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 300)
+    public static void climbsOutOfPowderSnow(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+
+        // Stone floor under the pit.
+        for (int x = 6; x <= 8; x++) {
+            for (int z = 6; z <= 8; z++) {
+                helper.setBlock(
+                    new BlockPos(x, GametestRig.FLOOR_Y - 1, z),
+                    Blocks.SMOOTH_STONE);
+            }
+        }
+        // Two-deep powder snow pit (3x3). The body starts at WALK_Y
+        // (y=1), inside the top snow layer.
+        for (int x = 6; x <= 8; x++) {
+            for (int z = 6; z <= 8; z++) {
+                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y, z),
+                    Blocks.POWDER_SNOW);
+                helper.setBlock(new BlockPos(x, GametestRig.WALK_Y, z),
+                    Blocks.POWDER_SNOW);
+            }
+        }
+        // Surrounding floor at FLOOR_Y-1 (stone) so the body has
+        // somewhere to step after climbing out.
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                if (x >= 6 && x <= 8 && z >= 6 && z <= 8) {
+                    continue;
+                }
+                helper.setBlock(
+                    new BlockPos(x, GametestRig.FLOOR_Y - 1, z),
+                    Blocks.SMOOTH_STONE);
+            }
+        }
+
+        // Teleport into the bottom snow layer so freeze starts
+        // immediately (the rig's default spawn is on the floor above).
+        var pitAbs = helper.absolutePos(
+            new BlockPos(7, GametestRig.FLOOR_Y, 7));
+        rig.body().moveTo(pitAbs.getX() + 0.5, pitAbs.getY(),
+            pitAbs.getZ() + 0.5, 0f, 0f);
+
+        helper.startSequence()
+            // Wait for the reflex to fire and the body to climb out.
+            // isFreezing() goes false once the body leaves the snow
+            // (wasInPowderSnow clears after one tick).
+            .thenWaitUntil(driveUntil(rig,
+                () -> check(!rig.body().isFreezing()
+                        || rig.body().getTicksFrozen() < 80,
+                    "waiting for the body to climb out of powder snow "
+                        + "(freezeTicks="
+                        + rig.body().getTicksFrozen()
+                        + ", isFreezing=" + rig.body().isFreezing()
+                        + ", Y=" + String.format("%.1f",
+                            rig.body().getY()) + ")")))
+            // Let thaw run for a bit so freezeTicks drops well below
+            // the trigger, proving the body is genuinely clear.
+            .thenExecuteFor(30, driveOnly(rig))
+            .thenExecuteAfter(0, () -> {
+                check(rig.body().isAlive(),
+                    "the body must survive the powder-snow escape");
+                check(rig.body().getTicksFrozen() < 100,
+                    "freezeTicks must be below the trigger after escape, "
+                        + "got " + rig.body().getTicksFrozen());
+                checkEquals(20f, rig.body().getHealth(),
+                    "no freeze damage should be taken (the reflex fires "
+                        + "before the fully-frozen damage phase)");
+                rig.body().discard();
+            })
+            .thenSucceed();
+    }
+
+    /**
      * Scenario 8: a solid block placed at the body's eye triggers the
      * suffocation reflex, which now DIGS the eye block out itself
      * (issue 0009 upgrade of the 0008 D3 stopgap), then lets the hold

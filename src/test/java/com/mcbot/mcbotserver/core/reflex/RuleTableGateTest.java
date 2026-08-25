@@ -224,6 +224,7 @@ class RuleTableGateTest {
             java.util.Set.of("FREEZE_ON_LOW_HEALTH",
                 "SURFACE_ON_LOW_AIR", "ESCAPE_ON_LAVA",
                 "DIG_ON_SUFFOCATION", "EXTINGUISH_FIRE",
+                "CLIMB_OUT_OF_POWDER_SNOW",
                 "ENGAGE_ON_HOSTILE_PROXIMITY"),
             names,
             "the datapack table and the code default table must stay "

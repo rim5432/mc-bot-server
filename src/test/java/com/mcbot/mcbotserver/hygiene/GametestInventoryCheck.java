@@ -54,6 +54,7 @@ class GametestInventoryCheck {
             "surfacesWhenAirRunsLow",
             "escapesLavaToShore",
             "findsWaterWhenBurning",
+            "climbsOutOfPowderSnow",
             "digsFreeWhenSuffocating"),
         "GauntletGameTests", Set.of(
             "gauntletEndToEnd",

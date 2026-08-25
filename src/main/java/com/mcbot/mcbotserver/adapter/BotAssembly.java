@@ -16,6 +16,7 @@ import com.mcbot.mcbotserver.core.command.GotoCommandHandler;
 import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.process.DefendProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
+import com.mcbot.mcbotserver.core.reflex.ClimbOutOfPowderSnowRule;
 import com.mcbot.mcbotserver.core.reflex.DigOnSuffocationRule;
 import com.mcbot.mcbotserver.core.reflex.EngageOnHostileProximityRule;
 import com.mcbot.mcbotserver.core.reflex.EscapeLavaRule;
@@ -155,6 +156,15 @@ public final class BotAssembly {
         // FREEZE (100): burning to death outranks low-health freeze
         // because freezing does not stop the burn.
         reflex.addRule(new ExtinguishFireRule());
+        // Powder-snow freeze climb (issue 0008 F3): the least urgent
+        // vital (140-tick freeze budget, 1 HP/40t after). ASCEND holds
+        // jump; powder snow is climbable (Entity.isStateClimbable) so
+        // the same intent that surfaces a drowning body climbs a
+        // freezing one out. Priority 95 sits below FREEZE (100): a
+        // low-health freezing body parks for harness triage (47s
+        // budget is ample response time); above ENGAGE (90) so a
+        // freezing bot climbs instead of continuing a fight.
+        reflex.addRule(new ClimbOutOfPowderSnowRule());
         // Idle-combat reflex (2026-08-24 night-cave death): engages a
         // hostile that closes to melee range even when no mission is
         // running. Sits BELOW the survival holds: at three health

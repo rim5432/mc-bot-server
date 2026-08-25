@@ -99,6 +99,9 @@ public final class ReflexRuleJson {
                 entry.addProperty("priority", fire.priority());
             } else if (rule instanceof DigOnSuffocationRule wall) {
                 entry.addProperty("priority", wall.priority());
+            } else if (rule instanceof ClimbOutOfPowderSnowRule snow) {
+                entry.addProperty("trigger", snow.trigger());
+                entry.addProperty("priority", snow.priority());
             } else {
                 throw new IllegalArgumentException(
                     "no JSON form for rule type: "
@@ -132,6 +135,9 @@ public final class ReflexRuleJson {
         }
         if ("DIG_ON_SUFFOCATION".equals(type)) {
             return suffocationRule(rule);
+        }
+        if ("CLIMB_OUT_OF_POWDER_SNOW".equals(type)) {
+            return climbPowderSnowRule(rule);
         }
         throw new IllegalArgumentException(
             "unknown rule type: " + type);
@@ -233,6 +239,26 @@ public final class ReflexRuleJson {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(
                 "DIG_ON_SUFFOCATION: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Powder-snow freeze climb carries trigger + priority only -
+     * freezeTicks changes at most 2/tick so no hysteresis deadband
+     * is needed (same flat-priority shape as EscapeLavaRule).
+     */
+    private static ReflexRule climbPowderSnowRule(JsonObject rule) {
+        int trigger = rule.has("trigger")
+            ? rule.get("trigger").getAsInt()
+            : ClimbOutOfPowderSnowRule.TRIGGER_FREEZE;
+        int priority = rule.has("priority")
+            ? rule.get("priority").getAsInt()
+            : ClimbOutOfPowderSnowRule.CLIMB_PRIORITY;
+        try {
+            return new ClimbOutOfPowderSnowRule(trigger, priority);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                "CLIMB_OUT_OF_POWDER_SNOW: " + e.getMessage(), e);
         }
     }
 }

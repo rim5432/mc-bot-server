@@ -56,11 +56,12 @@ Four pieces per vital, one triage ladder across all of them:
    - **Park and escalate**: the bot cannot fix it; FREEZE holds the
      body and TASK_PAUSED tells the harness it must decide.
 
-Triage ladder is contract, not taste: SURFACE(110) > FREEZE(100) >
-ENGAGE(90) — one lethal condition must not become two (surface
-before freeze underwater); at three health points do not start a
-fight (freeze before engage). Every new rule must state where it
-slots into this ladder and why.
+Triage ladder is contract, not taste: LAVA(130) > SUFFOCATE(115)
+> SURFACE(110) > FIRE_ESCAPE(105) > FREEZE(100) >
+POWDER_SNOW_CLIMB(95) > ENGAGE(90) — one lethal condition must not
+become two (surface before freeze underwater); at three health points
+do not start a fight (freeze before engage). Every new rule must
+state where it slots into this ladder and why.
 
 ## 3. The lethality catalog (all numbers from the decompiled tree)
 
@@ -75,7 +76,7 @@ readable" and "dead from full health":
 | Cactus | 1.0F/tick on AABB contact (CactusBlock.entityInside) | instant-ish, tiny per-tick | no getter — needs contact check | nothing |
 | Fire | 1.0F per second (every 20 ticks); lava-origin fire caps at 300 ticks = 15 HP (`setSecondsOnFire(15)`); other sources (fire aspect, lightning, blaze) vary; extinguished by water/rain/powder snow (Entity.baseTick:483) | **gauged** — seconds, survivable by waiting | `getRemainingFireTicks()` | SHIPPED (ledger 26): EXTINGUISH_FIRE 105, lethal-band only (fireTicks/20 >= health), rescue to nearest water |
 | Drowning | air 300, drain 1/tick, damage 2.0F/s once air <= -20 (Forge LivingDrownEvent) | **gauged** — 300 ticks + 1 s | `getAirSupply()` | SHIPPED (ledger 22) |
-| Freezing | freeze +1/tick in powder snow to 140, decay 2/tick; at 140: 1.0F per 40 ticks (LivingEntity.aiStep:2666-2680) | **gauged** — 140 ticks to first damage, slow after | `getTicksFrozen()`, `isInPowderSnow` | nothing (carrier not FREEZE_IMMUNE-tagged, so it can freeze) |
+| Freezing | freeze +1/tick in powder snow to 140, decay 2/tick; at 140: 1.0F per 40 ticks (LivingEntity.aiStep:2666-2680) | **gauged** — 140 ticks to first damage, slow after | `getTicksFrozen()`, `isInPowderSnow` | SHIPPED (ledger 27): CLIMB_OUT_OF_POWDER_SNOW 95, ASCEND (held jump — powder snow is climbable, Entity.isStateClimbable:764), trigger=100 (2s before damage) |
 | Cramming | 6.0F, avg every 4 ticks over the 24-entity rule | instant-ish | rule + nearby count | N/A for a solo bot |
 | Starvation | Player-only: `FoodData` exists solely on Player (Player.java:168); Mob has no hunger at all (confirmed: zero FoodData references outside Player) | n/a on this carrier | `getFoodData()` — player only | blocked on the 0007 carrier ruling |
 | Fall | `ceil((fallDistance - 3) * multiplier)` on landing | **event** — no gauge to sense pre-impact | `fallDistance` (public) | planner-side only (Drop<=3 matches the 3-block safe fall) |
@@ -149,13 +150,30 @@ future edge-guard vocabulary (function-map GAP already lists fall
 protection). Proposal: no reflex rules; this issue records the
 verdict so nobody re-derives it.
 
-### F6 - Freezing: gauged, slow, rare; deferred with numbers
+### F6 - Freezing: gauged, slow, rare; shipped as pure ASCEND
 
 140 ticks of budget and 1 HP/2s after — the least urgent gauge in
-the catalog, and powder snow does not exist in the current test
-scenarios. Sense-only rides F1 (`freezeTicks`); a LEAVE response is
-mission-shaped (same as lava's exit) and can share that machinery
-if F2's escape mission lands. Deferred.
+the catalog. Sense-only rides F1 (`freezeTicks`). The response is
+the cheapest self-rescue shape: powder snow is climbable
+(`Entity.isStateClimbable` returns true for powder snow, same as
+ladders/vines — decompiled Entity.java:764), so holding jump
+(`ASCEND`) applies the same upward impulse as climbing a ladder and
+walks the body out. No mission handoff needed — the reflex's own
+action removes the cause. Trigger at freezeTicks=100 leaves 40
+ticks (2 seconds) before the fully-frozen damage phase starts.
+Priority 95 (below FREEZE 100, above ENGAGE 90): a bot at 3 HP
+should freeze rather than climb, because the climb takes ticks and
+the freeze damage is slow enough that FREEZE+harness is safer.
+Shipped (ledger 27): `ClimbOutOfPowderSnowRule`, in-engine
+`climbsOutOfPowderSnow`.
+
+Design note: `ReflexHysteresis` cannot be used here — the layer's
+`decideHysteresis` assumes "lower signal = more dangerous" (the air
+supply shape), but freezeTicks is "higher = more dangerous". The
+direction inversion would keep the rule off at the trigger. Pure
+`computePriority` (same shape as `EscapeLavaRule`/`ExtinguishFireRule`)
+is correct: freezeTicks changes at most 2/tick on thaw, so boundary
+flapping is sub-perceptible and a hysteresis dead-band is unnecessary.
 
 ### F7 - Starvation: the shape is pre-ruled, the carrier is not
 
@@ -200,6 +218,10 @@ ruling must add its row before implementation.
 | FIRE_ESCAPE + FREEZE | FIRE_ESCAPE (105 > 100, ledger 26) | freezing does not stop the burn; finding water does |
 | FIRE_ESCAPE + ENGAGE | FIRE_ESCAPE (105 > 90) | burning to death outranks starting a fight |
 | FIRE_ESCAPE + LAVA | LAVA (130 > 105) | lava escape also leaves the fire source; 4 HP/tick outranks 1 HP/sec |
+| POWDER_SNOW_CLIMB + FREEZE | FREEZE (100 > 95, ledger 27) | at 3 HP the climb takes ticks; freeze damage is 1 HP/2s, so FREEZE+harness is safer than a slow climb |
+| POWDER_SNOW_CLIMB + ENGAGE | POWDER_SNOW_CLIMB (95 > 90) | freezing to death outranks starting a fight |
+| POWDER_SNOW_CLIMB + SURFACE | SURFACE (110 > 95) | drowning is 2 HP/sec; freezing is 1 HP/2s — surface first |
+| POWDER_SNOW_CLIMB + LAVA/SUFFOCATE/FIRE_ESCAPE | the faster killer (all > 95) | powder snow is the slowest gauge; every other lethal reflex outranks it |
 
 ## 5. Sequencing (as ruled)
 
@@ -228,6 +250,13 @@ ruling must add its row before implementation.
    band is now covered by D5-revised.
 5. **With 0007 Phase 1**: F7's sensing groundwork (hunger is
    Player-only, FoodData on Player.java:168).
+6. **Shipped 2026-08-25 (ledger 27, F6)**: POWDER_SNOW_CLIMB 95,
+   pure ASCEND (held jump — powder snow is climbable), trigger=100.
+   In-engine `climbsOutOfPowderSnow`. Design constraint:
+   `ReflexHysteresis` is direction-locked to "lower = more dangerous"
+   (air supply shape); freezeTicks is "higher = more dangerous", so
+   the rule uses pure `computePriority` (same as lava/fire escape).
+   Reload-parity: JSON branch + datapack row + lockstep gate.
 6. **Deferred with numbers recorded**: F5 (void/fall - no rule,
    planner's job), F6 (freezing - slowest gauge, shares the ESCAPE
    machinery now that it lands).

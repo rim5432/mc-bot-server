@@ -24,6 +24,11 @@
       "priority": 105
     },
     {
+      "type": "CLIMB_OUT_OF_POWDER_SNOW",
+      "trigger": 100,
+      "priority": 95
+    },
+    {
       "type": "ENGAGE_ON_HOSTILE_PROXIMITY",
       "trigger": 6.0,
       "release": 14.0,
