@@ -51,7 +51,9 @@ class GametestInventoryCheck {
             "survivesRetaliatingZombie",
             "hostilesAggroOnSight",
             "holdsFireWhenSightBlocked",
-            "surfacesWhenAirRunsLow"),
+            "surfacesWhenAirRunsLow",
+            "ascendsFromLavaOnReflex",
+            "freezesWhenSuffocating"),
         "GauntletGameTests", Set.of(
             "gauntletEndToEnd",
             "routesThroughFenceGap"),

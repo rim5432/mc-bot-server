@@ -7,7 +7,9 @@ import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.process.DefendProcess;
+import com.mcbot.mcbotserver.core.reflex.AscendInLethalFluidRule;
 import com.mcbot.mcbotserver.core.reflex.FreezeOnLowHealthRule;
+import com.mcbot.mcbotserver.core.reflex.FreezeOnSuffocationRule;
 import com.mcbot.mcbotserver.core.reflex.SurfaceOnLowAirRule;
 
 import net.minecraft.core.BlockPos;
@@ -789,6 +791,182 @@ public final class BotSliceGameTests {
                         > FreezeOnLowHealthRule.FREEZE_THRESHOLD,
                     "survival means staying above the freeze threshold, "
                         + "got " + rig.body().getHealth());
+                rig.body().discard();
+            })
+            .thenSucceed();
+    }
+
+    /**
+     * Scenario 7: submerged in lava, the lava reflex holds jump and the
+     * body surfaces. No mission is running - the only upward force is
+     * the reflex's ASCEND action, so an idle body without the reflex
+     * would sink to the pool floor (lava has no natural buoyancy) and
+     * burn; fire resistance prevents damage but not sinking.
+     *
+     * <p>Why: issue 0008 F2/D2 - the lava reflex is the survival
+     * gate's fastest-killer defense (4 HP/tick, 5 ticks from full
+     * health per decompiled Entity.lavaHurt). The offline test
+     * ({@code AscendInLethalFluidRuleTest}) covers rule logic and
+     * hysteresis; this pins the full in-engine chain:
+     * {@code body.isInLava → sensor → ThreatBlackboard.inLethalFluid
+     * → AscendInLethalFluidRule → ReflexAction.ASCEND → BotController
+     * jump=true → BotBodyEntity.setDrive → jumpInFluid(LAVA_TYPE)
+     * → +0.3/tick upward impulse → surface}.
+     *
+     * <p>Pool: the entire 16x16 floor becomes a four-deep lava column
+     * with a stone floor at FLOOR_Y-4. The body teleports to the
+     * bottom center. Fire resistance (1200 ticks) prevents lava damage
+     * for the whole scenario - the pin is the ascend, not survival.
+     * Same no-floor-above-stone construction as the deep pool: the
+     * stone at FLOOR_Y-4 is the only ground, so the body cannot
+     * ground-hop and must use fluid buoyancy.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 200)
+    public static void ascendsFromLavaOnReflex(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+        rig.body().addEffect(new MobEffectInstance(
+            MobEffects.FIRE_RESISTANCE, 1200, 0, false, false));
+
+        // Four-deep lava pool over the whole floor; stone at the bottom.
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y, z),
+                    Blocks.LAVA);
+                helper.setBlock(
+                    new BlockPos(x, GametestRig.FLOOR_Y - 1, z),
+                    Blocks.LAVA);
+                helper.setBlock(
+                    new BlockPos(x, GametestRig.FLOOR_Y - 2, z),
+                    Blocks.LAVA);
+                helper.setBlock(
+                    new BlockPos(x, GametestRig.FLOOR_Y - 3, z),
+                    Blocks.LAVA);
+                helper.setBlock(
+                    new BlockPos(x, GametestRig.FLOOR_Y - 4, z),
+                    Blocks.SMOOTH_STONE);
+            }
+        }
+
+        // Teleport to the pool bottom. Lava has no natural buoyancy -
+        // the body sinks without the reflex's held-jump ascend.
+        var bottomAbs = helper.absolutePos(
+            new BlockPos(7, GametestRig.FLOOR_Y - 3, 7));
+        rig.body().moveTo(bottomAbs.getX() + 0.5, bottomAbs.getY(),
+            bottomAbs.getZ() + 0.5, 0f, 0f);
+        int surfaceAbsY = helper.absolutePos(
+            new BlockPos(0, GametestRig.FLOOR_Y, 0)).getY();
+
+        helper.startSequence()
+            .thenWaitUntil(driveUntil(rig,
+                () -> check(rig.body().getY() >= surfaceAbsY,
+                    "waiting for the body to surface from lava (current Y="
+                        + String.format("%.1f", rig.body().getY())
+                        + ")")))
+            // Give the hysteresis hold window time to elapse after
+            // clearing the lava surface, then a few ticks to confirm
+            // the body stays up (no re-submersion).
+            .thenExecuteFor(
+                AscendInLethalFluidRule.LAVA_HOLD_TICKS + 5,
+                driveOnly(rig))
+            .thenExecuteAfter(0, () -> {
+                check(rig.body().isAlive(),
+                    "the body must survive the lava submersion");
+                checkEquals(20f, rig.body().getHealth(),
+                    "fire resistance must hold for the whole ascend");
+                check(rig.body().getY() >= surfaceAbsY,
+                    "the body must stay at or above the lava surface");
+                rig.body().discard();
+            })
+            .thenSucceed();
+    }
+
+    /**
+     * Scenario 8: a solid block placed at the body's eye triggers the
+     * suffocation reflex, which FREEZEs the body and pauses the active
+     * mission. Removing the block lets the hold window elapse, the
+     * reflex releases, and the mission resumes to completion.
+     *
+     * <p>Why: issue 0008 F4/D3 - suffocation is the one vital where
+     * the rescue direction is UNKNOWN (a reflex guessing movement can
+     * push the body deeper into glitch geometry), so FREEZE is
+     * strictly correct. 1 HP/tick with no interval (LivingEntity.baseTick
+     * decompiled 1.20.1), 20 ticks from full health. Priority 115 sits
+     * between SURFACE (110) and LAVA (130) per the F9 triage table.
+     *
+     * <p>Discriminative chain: (1) the mission starts and the body
+     * begins walking; (2) a block at eye level causes inWall=true and
+     * the reflex fires FREEZE, preempting the mission (TASK_PAUSED);
+     * (3) the block is removed, the 10-tick hold window elapses, the
+     * reflex releases, and world revalidation resumes the mission
+     * (TASK_RESUMED); (4) the body reaches the goal (TASK_COMPLETED).
+     * Without the reflex, a body walking into a wall would keep
+     * pathing and potentially glitch deeper - the FREEZE is the siren.
+     *
+     * <p>Suffocation damage is 1/tick; the wall is placed for well
+     * under 20 ticks, so the body survives with health to spare. The
+     * pin is the event sequence (PAUSED → RESUMED → COMPLETED), not a
+     * damage number.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = TIMEOUT)
+    public static void freezesWhenSuffocating(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(4, GametestRig.WALK_Y, 8));
+        CellPos goalCell = localToCell(helper,
+            new BlockPos(12, GametestRig.WALK_Y, 8));
+        var mission = submitGoto(rig, goalCell);
+
+        // Let the mission start and the body take a step or two before
+        // we seal its eye - proves the mission was genuinely running,
+        // not parked from the start.
+        int startX = rig.body().getBlockX();
+        helper.startSequence()
+            .thenWaitUntil(driveUntil(rig,
+                () -> check(rig.body().getBlockX() > startX,
+                    "waiting for the mission to start walking")))
+            .thenExecute(() -> {
+                // Seal the eye: a full solid block at the eye's block
+                // position makes LivingEntity.isInWall() return true.
+                // The body cannot walk through it, so it stays pinned
+                // with its eye inside the block - exactly the glitch
+                // geometry this reflex exists to catch.
+                int eyeBlockY = (int) Math.floor(rig.body().getEyeY());
+                helper.setBlock(new BlockPos(rig.body().getBlockX(),
+                    eyeBlockY, rig.body().getBlockZ()), Blocks.SMOOTH_STONE);
+            })
+            .thenWaitUntil(driveUntil(rig,
+                () -> assertEventSeen(rig.events(), EventKind.TASK_PAUSED)))
+            .thenExecute(() -> {
+                // The body must still be alive - suffocation is 1/tick
+                // and the wall has been up for well under 20 ticks.
+                check(rig.body().isAlive(),
+                    "the body must survive the suffocation window");
+                check(rig.body().getHealth() > 0,
+                    "health must be positive after suffocation; got "
+                        + rig.body().getHealth());
+                // Remove the block so the eye clears and the reflex can
+                // release after its hold window.
+                int eyeBlockY = (int) Math.floor(rig.body().getEyeY());
+                helper.setBlock(new BlockPos(rig.body().getBlockX(),
+                    eyeBlockY, rig.body().getBlockZ()), Blocks.AIR);
+            })
+            // Hold window (10 ticks) + a few for revalidation and
+            // mission re-seating.
+            .thenExecuteFor(
+                FreezeOnSuffocationRule.SUFFOCATION_HOLD_TICKS + 15,
+                driveOnly(rig))
+            .thenWaitUntil(driveUntil(rig,
+                () -> assertEventSeen(rig.events(), EventKind.TASK_RESUMED)))
+            .thenWaitUntil(driveUntil(rig,
+                () -> check(reached(rig.body(), goalCell),
+                    "waiting for arrival after suffocation clears")))
+            .thenExecuteFor(3, driveOnly(rig))
+            .thenExecuteAfter(0, () -> {
+                check(!mission.isActive(),
+                    "mission must retire after the resumed walk");
+                check(mission.missionSucceeded(),
+                    "the resumed walk must be a success");
+                assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
+                check(rig.body().isAlive(),
+                    "the body must survive the whole scenario");
                 rig.body().discard();
             })
             .thenSucceed();
