@@ -1,6 +1,7 @@
 package com.mcbot.mcbotserver.adapter;
 
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
+import com.mcbot.mcbotserver.adapter.rescue.RescueMissionFactory;
 import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
 import com.mcbot.mcbotserver.api.behavior.Behavior;
 import com.mcbot.mcbotserver.api.process.PriorityBands;
@@ -15,9 +16,10 @@ import com.mcbot.mcbotserver.core.command.GotoCommandHandler;
 import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.process.DefendProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
-import com.mcbot.mcbotserver.core.reflex.AscendInLethalFluidRule;
 import com.mcbot.mcbotserver.core.reflex.DigOnSuffocationRule;
 import com.mcbot.mcbotserver.core.reflex.EngageOnHostileProximityRule;
+import com.mcbot.mcbotserver.core.reflex.EscapeLavaRule;
+import com.mcbot.mcbotserver.core.reflex.ExtinguishFireRule;
 import com.mcbot.mcbotserver.core.reflex.FreezeOnLowHealthRule;
 import com.mcbot.mcbotserver.core.reflex.SurfaceOnLowAirRule;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
@@ -128,12 +130,14 @@ public final class BotAssembly {
         // _PRIORITY 110 vs FREEZE 100): freezing underwater converts
         // one lethal condition into two.
         reflex.addRule(new SurfaceOnLowAirRule());
-        // Lava reflex outranks air (LAVA_PRIORITY 130 vs 110): lava is
-        // 4 HP/tick with no interval vs drowning's 2 HP/tick after
-        // air exhaustion. The board.inLethalFluid field was dead
-        // since ADR-0003 (issue 0008 F2); this rule + the vitals
-        // sensor pass close the live-pipeline lava blind spot.
-        reflex.addRule(new AscendInLethalFluidRule());
+        // Lava escape outranks air (LAVA_ESCAPE_PRIORITY 130 vs 110):
+        // lava is 4 HP/tick with no interval vs drowning's 2 HP/tick
+        // after air exhaustion. ESCAPE handoff (not pure ASCEND): the
+        // reflex submits a rescue GotoProcess to the nearest shore
+        // cell; the pathing behavior handles ascent + horizontal swim.
+        // Replaces the earlier AscendInLethalFluidRule (ASCEND-only
+        // floated the body to the surface but never reached shore).
+        reflex.addRule(new EscapeLavaRule());
         // Suffocation self-rescue dig (issue 0008 D3, upgraded by
         // issue 0009): 1 HP/tick instant-class, but with dig
         // capability the rescue direction is KNOWN - the eye block -
@@ -143,6 +147,14 @@ public final class BotAssembly {
         // preemption is still the siren for the unbreakable-wall case
         // the dig cannot answer.
         reflex.addRule(new DigOnSuffocationRule());
+        // Fire find-water (issue 0008 D5-revised): fires only when
+        // remaining fire damage >= current health (burn-to-death
+        // band). Non-lethal fire is left to the route and natural
+        // expiry, exactly as the original D5 "sense-only" ruling
+        // intended. Priority 105 sits between SURFACE (110) and
+        // FREEZE (100): burning to death outranks low-health freeze
+        // because freezing does not stop the burn.
+        reflex.addRule(new ExtinguishFireRule());
         // Idle-combat reflex (2026-08-24 night-cave death): engages a
         // hostile that closes to melee range even when no mission is
         // running. Sits BELOW the survival holds: at three health
@@ -173,11 +185,20 @@ public final class BotAssembly {
                 LevelThreatSensor.hostileTypes(),
                 LevelThreatSensor.rangedTypes());
 
+        // One fresh reflex-owned rescue per ESCAPE submission: the
+        // factory reads body state (lava vs fire) and scans for the
+        // nearest shore / water-adjacent cell. Returns null when no
+        // target is in range; the controller then degrades ESCAPE to
+        // the FREEZE hold (park and escalate).
+        Supplier<com.mcbot.mcbotserver.api.process.BotProcess>
+            rescueFactory = new RescueMissionFactory(view, body);
+
         BotController controller = new BotController(reflex, arbiter,
             List.of(mover, combat), actor,
             () -> poseOf(body), body::getHealth,
             clockOf(level), events,
-            CrashReporter.consoleFallback(), engageFactory);
+            CrashReporter.consoleFallback(), engageFactory,
+            rescueFactory);
         CommandBus bus = new CommandBus(events);
         GotoCommandHandler gotoHandler = new GotoCommandHandler(
             arbiter, events,

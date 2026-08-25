@@ -52,7 +52,8 @@ class GametestInventoryCheck {
             "hostilesAggroOnSight",
             "holdsFireWhenSightBlocked",
             "surfacesWhenAirRunsLow",
-            "ascendsFromLavaOnReflex",
+            "escapesLavaToShore",
+            "findsWaterWhenBurning",
             "digsFreeWhenSuffocating"),
         "GauntletGameTests", Set.of(
             "gauntletEndToEnd",

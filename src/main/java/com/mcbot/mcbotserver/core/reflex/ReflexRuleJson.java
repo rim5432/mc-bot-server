@@ -93,8 +93,10 @@ public final class ReflexRuleJson {
                 entry.addProperty("trigger", engage.trigger());
                 entry.addProperty("release", engage.release());
                 entry.addProperty("priority", engage.priority());
-            } else if (rule instanceof AscendInLethalFluidRule lava) {
+            } else if (rule instanceof EscapeLavaRule lava) {
                 entry.addProperty("priority", lava.priority());
+            } else if (rule instanceof ExtinguishFireRule fire) {
+                entry.addProperty("priority", fire.priority());
             } else if (rule instanceof DigOnSuffocationRule wall) {
                 entry.addProperty("priority", wall.priority());
             } else {
@@ -122,8 +124,11 @@ public final class ReflexRuleJson {
         if ("ENGAGE_ON_HOSTILE_PROXIMITY".equals(type)) {
             return engageRule(rule);
         }
-        if ("ASCEND_IN_LETHAL_FLUID".equals(type)) {
-            return lavaRule(rule);
+        if ("ESCAPE_ON_LAVA".equals(type)) {
+            return escapeLavaRule(rule);
+        }
+        if ("EXTINGUISH_FIRE".equals(type)) {
+            return extinguishFireRule(rule);
         }
         if ("DIG_ON_SUFFOCATION".equals(type)) {
             return suffocationRule(rule);
@@ -185,23 +190,37 @@ public final class ReflexRuleJson {
     }
 
     /**
-     * Boolean-condition rules carry only their priority - trigger and
-     * release are code-level constants (the inverted 0/1 signal's
-     * thresholds are not tunable data), so the JSON form stays
-     * one field wide. DIG_ON_SUFFOCATION is the renamed successor of
-     * the FREEZE_ON_SUFFOCATION stopgap (issue 0009): the old type
-     * string is intentionally a hard parse error now - a datapack
-     * still naming it must be updated, never silently ignored.
+     * Boolean-condition ESCAPE rules carry only their priority -
+     * trigger and release are code-level constants (the inverted 0/1
+     * signal's thresholds are not tunable data), so the JSON form
+     * stays one field wide. ESCAPE_ON_LAVA is the renamed successor
+     * of ASCEND_IN_LETHAL_FLUID (issue 0008 D2): the old type string
+     * is intentionally a hard parse error now - a datapack still
+     * naming it must be updated, never silently ignored.
+     * EXTINGUISH_FIRE is the D5-revised fire find-water rule (issue
+     * 0008 D5): fires only in the burn-to-death band.
      */
-    private static ReflexRule lavaRule(JsonObject rule) {
+    private static ReflexRule escapeLavaRule(JsonObject rule) {
         int priority = rule.has("priority")
             ? rule.get("priority").getAsInt()
-            : AscendInLethalFluidRule.LAVA_PRIORITY;
+            : EscapeLavaRule.LAVA_ESCAPE_PRIORITY;
         try {
-            return new AscendInLethalFluidRule(priority);
+            return new EscapeLavaRule(priority);
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(
-                "ASCEND_IN_LETHAL_FLUID: " + e.getMessage(), e);
+                "ESCAPE_ON_LAVA: " + e.getMessage(), e);
+        }
+    }
+
+    private static ReflexRule extinguishFireRule(JsonObject rule) {
+        int priority = rule.has("priority")
+            ? rule.get("priority").getAsInt()
+            : ExtinguishFireRule.FIRE_EXTINGUISH_PRIORITY;
+        try {
+            return new ExtinguishFireRule(priority);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                "EXTINGUISH_FIRE: " + e.getMessage(), e);
         }
     }
 

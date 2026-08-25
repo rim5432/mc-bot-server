@@ -470,6 +470,21 @@ monotonic and "alive indefinitely" is impossible without a policy).
          DigOnSuffocationRuleTest, controller claim mapping,
          reload-parity) + in-engine digsFreeWhenSuffocating
          (self-rescue, no scenario-side removal).               [dep: none]
+- [x] M  Reflex ESCAPE action + rescue mission handoff (issue 0008
+         D2-upgraded + D5-revised; user ruling 2026-08-25 "must have
+         shortest-shore escape" + "fire find-water by burn-to-death
+         threshold"): ReflexAction.ESCAPE (mission-handoff twin of
+         ENGAGE), ReflexRescueSeat (80-tick cooldown),
+         RescueMissionFactory (adapter; inLava -> nearest shore,
+         fire -> nearest water-adjacent, 12-block scan), BotController
+         rescue branch + resume guard dispatch. Two rules:
+         ESCAPE_ON_LAVA (130, replaces ASCEND_IN_LETHAL_FLUID) and
+         EXTINGUISH_FIRE (105, lethal-band only: fireTicks/20 >=
+         health). Both carry reload-parity JSON + datapack rows.
+         Offline gates (EscapeLavaRuleTest, RuleTableGateTest
+         lockstep, controller ESCAPE mapping) + in-engine
+         escapesLavaToShore + findsWaterWhenBurning. Ledger 26.
+                                                                 [dep: none]
 
 ## Stage 3 - player parity (unlocked only by the survival gate)
 

@@ -133,26 +133,49 @@ class RuleTableGateTest {
     @Test
     void booleanConditionRulesParseAndRoundTrip() {
         List<ReflexRule> rules = ReflexRuleJson.parse("{\"rules\": ["
-            + "{\"type\": \"ASCEND_IN_LETHAL_FLUID\","
+            + "{\"type\": \"ESCAPE_ON_LAVA\","
             + " \"priority\": 130},"
+            + "{\"type\": \"EXTINGUISH_FIRE\","
+            + " \"priority\": 105},"
             + "{\"type\": \"DIG_ON_SUFFOCATION\","
             + " \"priority\": 115}"
             + "]}");
         var lava = (com.mcbot.mcbotserver.core.reflex
-                .AscendInLethalFluidRule) rules.get(0);
+                .EscapeLavaRule) rules.get(0);
+        var fire = (com.mcbot.mcbotserver.core.reflex
+                .ExtinguishFireRule) rules.get(1);
         var wall = (com.mcbot.mcbotserver.core.reflex
-                .DigOnSuffocationRule) rules.get(1);
+                .DigOnSuffocationRule) rules.get(2);
         assertEquals(130, lava.priority());
+        assertEquals(105, fire.priority());
         assertEquals(115, wall.priority());
         List<ReflexRule> reparsed =
             ReflexRuleJson.parse(ReflexRuleJson.write(rules));
         assertEquals(lava.priority(),
-            ((com.mcbot.mcbotserver.core.reflex.AscendInLethalFluidRule)
+            ((com.mcbot.mcbotserver.core.reflex.EscapeLavaRule)
                 reparsed.get(0)).priority());
+        assertEquals(fire.priority(),
+            ((com.mcbot.mcbotserver.core.reflex.ExtinguishFireRule)
+                reparsed.get(1)).priority());
         assertEquals(wall.priority(),
             ((com.mcbot.mcbotserver.core.reflex
-                    .DigOnSuffocationRule) reparsed.get(1))
+                    .DigOnSuffocationRule) reparsed.get(2))
                 .priority());
+    }
+
+    /**
+     * The renamed lava type is a hard error under its old spelling:
+     * a datapack still naming ASCEND_IN_LETHAL_FLUID (the 0008 D2
+     * ASCEND-only rule superseded by ESCAPE_ON_LAVA) must be updated
+     * loudly, never silently ignored.
+     */
+    @Test
+    void supersededLavaTypeIsAHardParseError() {
+        assertThrows(IllegalArgumentException.class,
+            () -> ReflexRuleJson.parse("{\"rules\": ["
+                + "{\"type\": \"ASCEND_IN_LETHAL_FLUID\","
+                + " \"priority\": 130}]}"),
+            "the ASCEND-only type must not parse after the ESCAPE rename");
     }
 
     /**
@@ -199,8 +222,9 @@ class RuleTableGateTest {
             .collect(java.util.stream.Collectors.toSet());
         assertEquals(
             java.util.Set.of("FREEZE_ON_LOW_HEALTH",
-                "SURFACE_ON_LOW_AIR", "ASCEND_IN_LETHAL_FLUID",
-                "DIG_ON_SUFFOCATION", "ENGAGE_ON_HOSTILE_PROXIMITY"),
+                "SURFACE_ON_LOW_AIR", "ESCAPE_ON_LAVA",
+                "DIG_ON_SUFFOCATION", "EXTINGUISH_FIRE",
+                "ENGAGE_ON_HOSTILE_PROXIMITY"),
             names,
             "the datapack table and the code default table must stay "
                 + "in lockstep or /reload silently drops rules");

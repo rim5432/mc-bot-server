@@ -12,12 +12,16 @@
       "priority": 110
     },
     {
-      "type": "ASCEND_IN_LETHAL_FLUID",
+      "type": "ESCAPE_ON_LAVA",
       "priority": 130
     },
     {
       "type": "DIG_ON_SUFFOCATION",
       "priority": 115
+    },
+    {
+      "type": "EXTINGUISH_FIRE",
+      "priority": 105
     },
     {
       "type": "ENGAGE_ON_HOSTILE_PROXIMITY",

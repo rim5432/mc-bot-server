@@ -69,11 +69,11 @@ readable" and "dead from full health":
 
 | Scenario | Mechanic (site) | Budget class | Readable via | Today |
 |---|---|---|---|---|
-| Lava | 4.0F **every tick** in lava, no interval + `setSecondsOnFire(15)` (Entity.baseTick:548-549) | **instant** — 5 ticks from full HP | `isInLava()` | crashed-state only (MinimalReflex); live pipeline BLIND — `board.inLethalFluid` exists with zero writers |
-| Suffocation | 1.0F **every tick** eye-in-wall, no interval (LivingEntity.baseTick:387) | **instant** — 20 ticks | `isInWall()` | nothing |
+| Lava | 4.0F **every tick** in lava, no interval + `setSecondsOnFire(15)` (Entity.baseTick:548-549) | **instant** — 5 ticks from full HP | `isInLava()` | SHIPPED (ledger 26): ESCAPE_ON_LAVA 130, rescue GotoProcess to nearest shore; crashed-state MinimalReflex also handles |
+| Suffocation | 1.0F **every tick** eye-in-wall, no interval (LivingEntity.baseTick:387) | **instant** — 20 ticks | `isInWall()` | SHIPPED (ledger 24, upgraded by 0009): DIG_ON_SUFFOCATION 115, digs eye block |
 | Void | 4.0F every tick below `minBuildHeight - 64` (LivingEntity:1859) | **instant, unanswerable** — nothing rescues below the line | `getY()` vs level min | nothing (planner-side Drop<=3 is the only guard) |
 | Cactus | 1.0F/tick on AABB contact (CactusBlock.entityInside) | instant-ish, tiny per-tick | no getter — needs contact check | nothing |
-| Fire | 1.0F per second (every 20 ticks); lava-origin fire caps at 300 ticks = 15 HP (`setSecondsOnFire(15)`); other sources (fire aspect, lightning, blaze) vary; extinguished by water/rain/powder snow (Entity.baseTick:483) | **gauged** — seconds, survivable by waiting | `getRemainingFireTicks()` | nothing |
+| Fire | 1.0F per second (every 20 ticks); lava-origin fire caps at 300 ticks = 15 HP (`setSecondsOnFire(15)`); other sources (fire aspect, lightning, blaze) vary; extinguished by water/rain/powder snow (Entity.baseTick:483) | **gauged** — seconds, survivable by waiting | `getRemainingFireTicks()` | SHIPPED (ledger 26): EXTINGUISH_FIRE 105, lethal-band only (fireTicks/20 >= health), rescue to nearest water |
 | Drowning | air 300, drain 1/tick, damage 2.0F/s once air <= -20 (Forge LivingDrownEvent) | **gauged** — 300 ticks + 1 s | `getAirSupply()` | SHIPPED (ledger 22) |
 | Freezing | freeze +1/tick in powder snow to 140, decay 2/tick; at 140: 1.0F per 40 ticks (LivingEntity.aiStep:2666-2680) | **gauged** — 140 ticks to first damage, slow after | `getTicksFrozen()`, `isInPowderSnow` | nothing (carrier not FREEZE_IMMUNE-tagged, so it can freeze) |
 | Cramming | 6.0F, avg every 4 ticks over the 24-entity rule | instant-ish | rule + nearby count | N/A for a solo bot |
@@ -193,37 +193,51 @@ ruling must add its row before implementation.
 |---|---|---|
 | SURFACE + FREEZE | SURFACE (shipped, ledger 22) | freezing underwater doubles the death |
 | FREEZE + ENGAGE | FREEZE (shipped, ledger 23) | no fights at 3 HP |
-| LAVA + any | LAVA (shipped, ledger 24) | 4 HP/tick does not negotiate |
-| SUFFOCATE + SURFACE/FREEZE/ENGAGE | SUFFOCATE (shipped, ledger 24) | 1 HP/tick, and movement may worsen it |
-| SUFFOCATE + LAVA | LAVA (shipped, ledger 24) | both instant-class; lava is faster and ASCEND is the only exit |
-| FIRE + SURFACE | SURFACE; fire then dies in water (no rule, D4) | water extinguishes |
+| LAVA + any | LAVA (shipped, ledger 24; upgraded to ESCAPE, ledger 26) | 4 HP/tick does not negotiate; ESCAPE submits shore rescue |
+| SUFFOCATE + SURFACE/FREEZE/ENGAGE | SUFFOCATE (shipped, ledger 24; DIG, ledger 0009) | 1 HP/tick, and the eye block is the known dig target |
+| SUFFOCATE + LAVA | LAVA (shipped, ledger 24) | both instant-class; lava is faster and ESCAPE is the only exit |
+| FIRE_ESCAPE + SURFACE | SURFACE; fire then dies in water | water extinguishes; drowning is 2 HP/sec vs fire 1 HP/sec |
+| FIRE_ESCAPE + FREEZE | FIRE_ESCAPE (105 > 100, ledger 26) | freezing does not stop the burn; finding water does |
+| FIRE_ESCAPE + ENGAGE | FIRE_ESCAPE (105 > 90) | burning to death outranks starting a fight |
+| FIRE_ESCAPE + LAVA | LAVA (130 > 105) | lava escape also leaves the fire source; 4 HP/tick outranks 1 HP/sec |
 
 ## 5. Sequencing (as ruled)
 
 1. **Shipped 2026-08-25 (ledger 24)**: D1 vitals pass + D2 lava
-   ASCEND + D5 crashed-state air (6ccdb3b), D3 suffocation FREEZE
+   ASCEND + D4 crashed-state air (6ccdb3b), D3 suffocation FREEZE
    and the reload-parity repair (review follow-up: 6ccdb3b shipped
    the lava rule without a JSON form or datapack row - the first
    /reload would have silently dropped it; ReflexRuleJson branches
    + default table rows +
    `shippedDatapackTableCoversEveryCodeRegisteredRuleType` now pin
-   the lockstep). D2's escape mission stays deferred: ASCEND buys
-   seconds at the surface, the horizontal exit is ENGAGE-pattern
-   machinery awaiting an unattended run that actually dies in lava.
-2. **Adopted without code (D4)**: fire is sense-only; the sensing
-   fields landed in D1.
-3. **With 0007 Phase 1**: F7's sensing groundwork (hunger is
+   the lockstep).
+2. **Shipped 2026-08-25 (ledger 24, D3 upgraded by issue 0009)**:
+   suffocation FREEZE renamed DIG_ON_SUFFOCATION with dig
+   self-rescue; in-engine `digsFreeWhenSuffocating`.
+3. **Shipped 2026-08-25 (ledger 26, D2 upgraded + D5 revised)**:
+   D2 lava ASCEND replaced by ESCAPE_ON_LAVA (rescue GotoProcess
+   to nearest shore, in-engine `escapesLavaToShore`); D5 fire
+   sense-only revised to EXTINGUISH_FIRE (lethal-band trigger,
+   rescue to nearest water, in-engine `findsWaterWhenBurning`).
+   New infrastructure: ReflexAction.ESCAPE, ReflexRescueSeat,
+   RescueMissionFactory, BotController rescue handoff (mirrors
+   ENGAGE). Both rules carry reload-parity JSON forms + datapack
+   rows.
+4. **Adopted without code (original D4)**: fire is sense-only for
+   non-lethal fire; the sensing fields landed in D1. The lethal
+   band is now covered by D5-revised.
+5. **With 0007 Phase 1**: F7's sensing groundwork (hunger is
    Player-only, FoodData on Player.java:168).
-4. **Deferred with numbers recorded**: F5 (void/fall - no rule,
-   planner's job), F6 (freezing - slowest gauge, shares F2's escape
-   machinery if that lands).
+6. **Deferred with numbers recorded**: F5 (void/fall - no rule,
+   planner's job), F6 (freezing - slowest gauge, shares the ESCAPE
+   machinery now that it lands).
 
 ## 6. Decision log
 
 | # | Question | Ruling |
 |---|---|---|
 | D1 | Vitals sensing pass (F1)? | RULED YES - shipped 2026-08-25 (6ccdb3b, ledger 24): fireTicks / freezeTicks / inWall / inLethalFluid all sensor-stamped with safe beginTick defaults |
-| D2 | Live-pipeline lava: ASCEND-only vs + escape mission (F2)? | RULED ASCEND-only first (6ccdb3b): 130/ASCEND buys surface seconds; the ENGAGE-pattern escape mission stays deferred until an unattended run dies in lava for real. Review follow-up repaired the missing JSON form + datapack row (reload-parity, ledger 24) |
+| D2 | Live-pipeline lava: ASCEND-only vs + escape mission (F2)? | RULED ASCEND-only first (6ccdb3b): 130/ASCEND buys surface seconds. **UPGRADED 2026-08-25**: user ruling "must have shortest-shore escape" — replaced by ESCAPE_ON_LAVA (ESCAPE action, same priority 130, same hold 10). The reflex submits a rescue GotoProcess to the nearest shore cell (RescueMissionFactory, 12-block radius scan); the pathing behavior handles ascent + horizontal swim. The old ASCEND_IN_LETHAL_FLUID type is a hard parse error now. In-engine: `escapesLavaToShore` (5x5 pool, fire-resist, body reaches dry ground). Ledger 26 |
 | D3 | Suffocation FREEZE rule at 115 (F4)? | RULED YES - shipped 2026-08-25 (ledger 24): FREEZE_ON_SUFFOCATION 115/hold 10, FREEZE action; ladder-gated between SURFACE and LAVA. SUPERSEDED same day by issue 0009: with dig capability the rescue direction is known (the eye block), so the rule is renamed DIG_ON_SUFFOCATION with the DIG self-rescue action - same priority, same hold, same ladder slot; the FREEZE survives only as the targetless-degrade path and the crashed-state behavior |
 | D4 | Widen MinimalReflex with an air check (F8)? | RULED YES - shipped 2026-08-25 (6ccdb3b): one more if, air < 80 holds jump; ADR-0005 D3 dependency class intact |
-| D5 | Fire: sense-only, no rule (F3)? | RULED ADOPTED - no rule; sensing fields arrived with D1 |
+| D5 | Fire: sense-only, no rule (F3)? | RULED ADOPTED initially (no rule; sensing fields arrived with D1). **REVISED 2026-08-25**: user ruling "fire find-water is needed, urgency by burn-to-death threshold" — EXTINGUISH_FIRE rule added (ESCAPE action, priority 105 between SURFACE and FREEZE). Triggers only when remainingFireTicks/20 >= health (lethal band; integer division matching engine's 1.0F-per-20-ticks cadence, decompiled Entity.baseTick:483). Non-lethal fire stays sense-only per the original D5 intent. Rescue factory paths to nearest water-adjacent cell; water contact extinguishes. In-engine: `findsWaterWhenBurning` (health=5, fireTicks=100, water 4 blocks east). Ledger 26 |

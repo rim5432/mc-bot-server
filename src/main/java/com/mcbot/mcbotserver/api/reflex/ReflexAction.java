@@ -50,5 +50,24 @@ public enum ReflexAction {
      * state). A DIG decision without a target degrades to the freeze
      * hold: missing position data must not mint a dig-at-null.
      */
-    DIG
+    DIG,
+
+    /**
+     * Submit a reflex-owned rescue mission: the controller parks the
+     * current mission for one tick (FREEZE hold) and submits a
+     * rescue mission (a GotoProcess to a safe cell) to the arbiter;
+     * from the next tick the rescue runs through the normal mission
+     * stage - the same handoff shape as ENGAGE, but the mission is a
+     * pathing goal rather than a fight.
+     *
+     * <p>Used by lava escape (nearest non-liquid shore cell) and fire
+     * find-water (nearest water-adjacent cell). The rescue factory
+     * reads the body state to decide which target to scan for; an
+     * ESCAPE decision whose factory finds no reachable target degrades
+     * to the freeze hold (park and escalate) rather than submitting a
+     * doomed mission. Priority is carried by the rule, not the kind:
+     * lava escape outranks everything (4 HP/tick does not negotiate),
+     * fire find-water slots between FREEZE and ENGAGE.
+     */
+    ESCAPE
 }

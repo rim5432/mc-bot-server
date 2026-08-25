@@ -117,6 +117,15 @@ public final class BotController {
     private final MissionReporter missions;
     /** Reflex-owned ENGAGE fight seat bookkeeping. */
     private final ReflexEngageSeat engageSeat;
+    /**
+     * Reflex-owned ESCAPE rescue mission factory; null degrades ESCAPE
+     * decisions to the freeze hold (rigs without rescue wiring park
+     * the mission instead of routing to safety).
+     */
+    private final java.util.function.Supplier<BotProcess>
+        rescueMissionFactory;
+    /** Reflex-owned ESCAPE rescue seat bookkeeping. */
+    private final ReflexRescueSeat rescueSeat;
 
     private long tickCounter;
     private boolean crashed;
@@ -135,9 +144,9 @@ public final class BotController {
     private static final int KEEPALIVE_INTERVAL = 20;
 
     /**
-     * Assembles the pipeline without combat wiring: ENGAGE reflex
-     * decisions degrade to the freeze hold. Delegates to the
-     * ten-argument constructor.
+     * Assembles the pipeline without combat or rescue wiring: ENGAGE
+     * and ESCAPE reflex decisions degrade to the freeze hold.
+     * Delegates to the twelve-argument constructor.
      *
      * @param reflex        survival bypass; never null
      * @param arbiter       task-channel winner selector; never null
@@ -156,7 +165,7 @@ public final class BotController {
                          GameClock clock, EventQueue events,
                          CrashReporter crashReporter) {
         this(reflex, arbiter, behaviors, actor, positionSource,
-            healthSource, clock, events, crashReporter, null);
+            healthSource, clock, events, crashReporter, null, null);
     }
 
     /**
@@ -186,6 +195,43 @@ public final class BotController {
                          CrashReporter crashReporter,
                          Supplier<BotProcess>
                              engageMissionFactory) {
+        this(reflex, arbiter, behaviors, actor, positionSource,
+            healthSource, clock, events, crashReporter,
+            engageMissionFactory, null);
+    }
+
+    /**
+     * Assembles the pipeline with combat and rescue wiring. All
+     * collaborators stay plain constructor arguments - no service
+     * lookup, no optional wiring.
+     *
+     * @param reflex        survival bypass; never null
+     * @param arbiter       task-channel winner selector; never null
+     * @param behaviors     execution tier; never null, may be empty
+     * @param actor         claim surface; never null
+     * @param positionSource    body position accessor; never null
+     * @param healthSource  body health accessor; never null
+     * @param clock         game-time accessor; never null
+     * @param events        event stream for the primary crash channel;
+     *                      never null
+     * @param crashReporter fallback reporter; never null
+     * @param engageMissionFactory supplies one fresh defend mission
+     *                      per reflex engage submission; may be null -
+     *                      ENGAGE then degrades to the freeze hold
+     * @param rescueMissionFactory supplies one fresh rescue mission
+     *                      (GotoProcess to a safe cell) per reflex
+     *                      escape submission; the factory reads body
+     *                      state to decide lava-shore vs water-target;
+     *                      may be null - ESCAPE then degrades to the
+     *                      freeze hold
+     */
+    public BotController(SurvivalReflexLayer reflex, TaskArbiter arbiter,
+                         List<Behavior> behaviors, Actor actor,
+                         PositionSource positionSource, HealthSource healthSource,
+                         GameClock clock, EventQueue events,
+                         CrashReporter crashReporter,
+                         Supplier<BotProcess> engageMissionFactory,
+                         Supplier<BotProcess> rescueMissionFactory) {
         this.reflex = Objects.requireNonNull(reflex, "reflex");
         this.arbiter = Objects.requireNonNull(arbiter, "arbiter");
         this.behaviors = List.copyOf(behaviors);
@@ -198,8 +244,10 @@ public final class BotController {
         this.crashReporter =
             Objects.requireNonNull(crashReporter, "crashReporter");
         this.engageMissionFactory = engageMissionFactory;
+        this.rescueMissionFactory = rescueMissionFactory;
         this.missions = new MissionReporter(arbiter, events);
         this.engageSeat = new ReflexEngageSeat(arbiter);
+        this.rescueSeat = new ReflexRescueSeat(arbiter);
     }
 
     /**
@@ -325,6 +373,7 @@ public final class BotController {
         long day = clock.day();
         long tod = clock.timeOfDayTicks();
         engageSeat.tickCooldown();
+        rescueSeat.tickCooldown();
 
         // Stage 1: reflex bypass — non-null decision skips the mission,
         // except the ENGAGE kind, which spends exactly one tick on the
@@ -351,6 +400,35 @@ public final class BotController {
                 // fall through to the mission stage so the fight keeps
                 // running - preempting it every tick would starve the
                 // very mission this reflex submitted.
+            } else if (decision.action() == ReflexAction.ESCAPE
+                    && rescueMissionFactory != null) {
+                // ESCAPE: same handoff shape as ENGAGE but the mission
+                // is a pathing goal (lava shore, water source) rather
+                // than a fight. The factory reads body state to decide
+                // which target to scan for; a factory that finds no
+                // reachable target returns null and the preemption
+                // degrades to the freeze hold (park and escalate) -
+                // no escape route means the harness must decide.
+                rescueSeat.retireFinished();
+                if (rescueSeat.maySubmit()) {
+                    preemptAndHold(decision,
+                        new Intent.Move(0, 0, false, false), day, tod);
+                    BotProcess mission = rescueMissionFactory.get();
+                    if (mission != null) {
+                        arbiter.register(mission);
+                        arbiter.requestControl(mission);
+                        rescueSeat.submitted(mission);
+                    }
+                    // If mission is null: the body is already parked
+                    // for this tick by preemptAndHold; from the next
+                    // tick the reflex fires again and the factory
+                    // retries (no cooldown started, maySubmit stays
+                    // true). This is the degrade-to-freeze path.
+                    return;
+                }
+                // Live reflex-owned rescue mission (or cooldown): fall
+                // through to the mission stage so the route keeps
+                // walking - same rationale as ENGAGE.
             } else {
                 // ReflexAction owns the intent shape (ADR-0003 section
                 // 2: rules say HOW URGENT, the controller says WHAT the
@@ -381,9 +459,14 @@ public final class BotController {
         // the fight, not resume the parked mission over it.
         boolean fightIsParked = engageSeat.fightIsParked();
         boolean fightAwaitingSeat = engageSeat.fightAwaitingSeat();
+        boolean rescueIsParked = rescueSeat.rescueIsParked();
+        boolean rescueAwaitingSeat = rescueSeat.rescueAwaitingSeat();
         if (arbiter.paused() != null && arbiter.current() == null
                 && (fightIsParked
-                    || (decision == null && !fightAwaitingSeat))) {
+                    || rescueIsParked
+                    || (decision == null
+                        && !fightAwaitingSeat
+                        && !rescueAwaitingSeat))) {
             String resumingTask = arbiter.paused().displayName();
             boolean resumed = arbiter.tryResume();
             missions.resumeVerdict(resumed, resumingTask, day, tod);

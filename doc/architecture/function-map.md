@@ -73,17 +73,22 @@ reopened on demand — **[DEFERRED]** outside v1.
   TASK_PAUSED is the siren either way), and engages hostiles that
   close to melee range while
   idle (decision 23: one preemption tick, then a reflex-owned defend
-  mission runs the fight through the arbiter). Triage ladder frozen
-  at five rungs: LAVA 130 > SUFFOCATION 115 > SURFACE 110 > FREEZE
-  100 > ENGAGE 90 (decision 24). Fire and freeze are sensed but
-  ruleless by ruling (issue 0008 D4/F6 - fire is self-answering,
-  freezing is the slowest gauge). Reflex rules are datapack JSON;
-  new survival scenarios are data, not code; a code-registered rule
-  type must land with its JSON branch and datapack row in the same
-  change or the first /reload silently drops it (ledger 24
-  reload-parity rule). A reflex preemption skips all mission work
-  for that tick - except ENGAGE, which spends exactly one tick
-  preempting.
+  mission runs the fight through the arbiter). ESCAPE is the
+  survival twin of ENGAGE (decision 26): one preemption tick + a
+  rescue GotoProcess to the nearest safe cell (lava shore or water
+  source), then the mission stage owns the route. Triage ladder
+  frozen at six rungs: LAVA 130 > SUFFOCATION 115 > SURFACE 110 >
+  FIRE_ESCAPE 105 > FREEZE 100 > ENGAGE 90 (decision 24 + 26).
+  Non-lethal fire and freeze are sensed but ruleless by ruling
+  (issue 0008 D5-original/F6 - fire is self-answering below the
+  kill threshold, freezing is the slowest gauge); lethal fire
+  (fireTicks/20 >= health) triggers EXTINGUISH_FIRE. Reflex rules
+  are datapack JSON; new survival scenarios are data, not code; a
+  code-registered rule type must land with its JSON branch and
+  datapack row in the same change or the first /reload silently
+  drops it (ledger 24 reload-parity rule). A reflex preemption
+  skips all mission work for that tick - except ENGAGE and ESCAPE,
+  which each spend exactly one tick preempting.
 - **[SHIPPED]** After any pipeline crash the bot latches into a minimal
   state: ascend from lethal fluid or critically low air, otherwise
   nothing (decision 24 widened the air check; still one if-flag per

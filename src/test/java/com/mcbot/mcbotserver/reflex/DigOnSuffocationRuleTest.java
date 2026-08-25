@@ -4,7 +4,7 @@ import com.mcbot.mcbotserver.api.reflex.ReflexAction;
 import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.WorldView;
-import com.mcbot.mcbotserver.core.reflex.AscendInLethalFluidRule;
+import com.mcbot.mcbotserver.core.reflex.EscapeLavaRule;
 import com.mcbot.mcbotserver.core.reflex.DigOnSuffocationRule;
 import com.mcbot.mcbotserver.core.reflex.SurfaceOnLowAirRule;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
@@ -112,7 +112,7 @@ class DigOnSuffocationRuleTest {
             });
         layer.addRule(new SurfaceOnLowAirRule());
         layer.addRule(new DigOnSuffocationRule());
-        layer.addRule(new AscendInLethalFluidRule());
+        layer.addRule(new EscapeLavaRule());
         var d = layer.tick(WORLD, 1L, 0L, 0L, POS, 20f);
         assertEquals("DIG_ON_SUFFOCATION", d.ruleName());
         assertEquals(ReflexAction.DIG, d.action());
@@ -121,7 +121,7 @@ class DigOnSuffocationRuleTest {
 
         inLava[0] = true;
         d = layer.tick(WORLD, 2L, 0L, 0L, POS, 20f);
-        assertEquals("ASCEND_IN_LETHAL_FLUID", d.ruleName(),
+        assertEquals("ESCAPE_ON_LAVA", d.ruleName(),
             "lava does not negotiate with anything");
     }
 

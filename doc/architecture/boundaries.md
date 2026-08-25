@@ -601,6 +601,36 @@ BotState getState();
     drop); the reload-parity gate pins the lockstep. Crashed-state
     suffocation stays freeze-class - MinimalReflex keeps "a few ifs"
     (issue 0009 F1).
+    26. Reflex ESCAPE action and rescue mission handoff (issue 0008
+    D2-upgraded + D5-revised; user ruling 2026-08-25 "must have
+    shortest-shore escape" and "fire find-water by burn-to-death
+    threshold"). `ReflexAction.ESCAPE` is the mission-handoff twin of
+    ENGAGE: the controller spends one preemption tick (FREEZE hold),
+    calls `rescueMissionFactory.get()` to mint a GotoProcess to a
+    safe cell, registers + requests control, and from the next tick
+    the rescue runs through the normal mission stage. Bookkeeping
+    mirrors ReflexEngageSeat in ReflexRescueSeat (maySubmit /
+    submitted / retireFinished / rescueIsParked /
+    rescueAwaitingSeat, 80-tick resubmit cooldown — longer than
+    ENGAGE's 40 because a swim/walk route takes longer to resolve
+    than a fight). The resume guard dispatches on both fight and
+    rescue seat states (a reflex-owned rescue parked by another
+    reflex resumes whenever its seat is free, same as ENGAGE).
+    RescueMissionFactory (adapter) reads body state at call time:
+    inLava -> nearest non-liquid shore cell (passable + walkable top
+    below, 12-block radius scan); remainingFireTicks > 0 -> nearest
+    water-adjacent cell; neither -> null (degrades ESCAPE to FREEZE).
+    Two rules: ESCAPE_ON_LAVA (130, replaces ASCEND_IN_LETHAL_FLUID
+    — the old type string is a hard parse error; pure ASCEND floated
+    the body to the surface but never reached shore, so the bot
+    still burned) and EXTINGUISH_FIRE (105, between SURFACE 110 and
+    FREEZE 100; triggers only when fireTicks/20 >= health — the
+    lethal band; non-lethal fire stays sense-only per the original
+    D5 intent). Both carry reload-parity JSON forms + datapack rows.
+    In-engine: `escapesLavaToShore` (5x5 pool, fire-resist, body
+    reaches dry ground) and `findsWaterWhenBurning` (health=5,
+    fireTicks=100, water 4 blocks east, fire extinguished by
+    contact).
 
 ## Deferred, with reopen conditions
 

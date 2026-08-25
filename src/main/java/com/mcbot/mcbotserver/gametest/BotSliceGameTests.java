@@ -7,7 +7,7 @@ import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.process.DefendProcess;
-import com.mcbot.mcbotserver.core.reflex.AscendInLethalFluidRule;
+import com.mcbot.mcbotserver.core.reflex.EscapeLavaRule;
 import com.mcbot.mcbotserver.core.reflex.DigOnSuffocationRule;
 import com.mcbot.mcbotserver.core.reflex.FreezeOnLowHealthRule;
 import com.mcbot.mcbotserver.core.reflex.SurfaceOnLowAirRule;
@@ -797,39 +797,43 @@ public final class BotSliceGameTests {
     }
 
     /**
-     * Scenario 7: submerged in lava, the lava reflex holds jump and the
-     * body surfaces. No mission is running - the only upward force is
-     * the reflex's ASCEND action, so an idle body without the reflex
-     * would sink to the pool floor (lava has no natural buoyancy) and
-     * burn; fire resistance prevents damage but not sinking.
+     * Scenario 7: submerged in lava, the lava escape reflex submits a
+     * rescue GotoProcess to the nearest shore cell, and the pathing
+     * behavior swims the body out of the fluid to dry ground. No
+     * harness mission is running — the reflex owns the rescue from
+     * trigger to arrival.
      *
-     * <p>Why: issue 0008 F2/D2 - the lava reflex is the survival
-     * gate's fastest-killer defense (4 HP/tick, 5 ticks from full
-     * health per decompiled Entity.lavaHurt). The offline test
-     * ({@code AscendInLethalFluidRuleTest}) covers rule logic and
-     * hysteresis; this pins the full in-engine chain:
+     * <p>Why: issue 0008 D2 (upgraded from ASCEND-only). The earlier
+     * ascendsFromLavaOnReflex pinned the held-jump surface half:
+     * necessary but not sufficient — a body floating on the lava
+     * surface still burns and goes nowhere horizontally. The ESCAPE
+     * handoff unifies ascent and shore-reach under one pathing
+     * mission (ReflexAction#ESCAPE, same shape as ENGAGE). This
+     * scenario pins the full in-engine chain:
      * {@code body.isInLava → sensor → ThreatBlackboard.inLethalFluid
-     * → AscendInLethalFluidRule → ReflexAction.ASCEND → BotController
-     * jump=true → BotBodyEntity.setDrive → jumpInFluid(LAVA_TYPE)
-     * → +0.3/tick upward impulse → surface}.
+     * → EscapeLavaRule → ReflexAction.ESCAPE → BotController
+     * preemptAndHold + rescueMissionFactory.get() → GotoProcess to
+     * nearest shore → PathingBehavior swims through lava → arrival}.
      *
-     * <p>Pool: the entire 16x16 floor becomes a four-deep lava column
-     * with a stone floor at FLOOR_Y-4. The body teleports to the
-     * bottom center. Fire resistance (1200 ticks) prevents lava damage
-     * for the whole scenario - the pin is the ascend, not survival.
-     * Same no-floor-above-stone construction as the deep pool: the
-     * stone at FLOOR_Y-4 is the only ground, so the body cannot
-     * ground-hop and must use fluid buoyancy.
+     * <p>Pool: a 5x5 two-deep lava column centered in the 16-wide
+     * box, stone floor below, stone shore on all sides (the rest of
+     * the floor). The body teleports to the pool center. Fire
+     * resistance (1200 ticks) prevents lava damage — the pin is the
+     * escape route, not survival. The shore is within the factory's
+     * 12-block scan radius and is a valid isShore cell (non-liquid,
+     * passable, walkable top below).
      */
-    @GameTest(template = "empty16x8x16", timeoutTicks = 200)
-    public static void ascendsFromLavaOnReflex(GameTestHelper helper) {
+    @GameTest(template = "empty16x8x16", timeoutTicks = 300)
+    public static void escapesLavaToShore(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
         rig.body().addEffect(new MobEffectInstance(
             MobEffects.FIRE_RESISTANCE, 1200, 0, false, false));
 
-        // Four-deep lava pool over the whole floor; stone at the bottom.
-        for (int x = 0; x < 16; x++) {
-            for (int z = 0; z < 16; z++) {
+        // 5x5 two-deep lava pool centered at (7, FLOOR_Y, 7); stone
+        // floor at FLOOR_Y-2. The surrounding floor stays the
+        // template's default (air above stone) — that is the shore.
+        for (int x = 5; x <= 9; x++) {
+            for (int z = 5; z <= 9; z++) {
                 helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y, z),
                     Blocks.LAVA);
                 helper.setBlock(
@@ -837,44 +841,113 @@ public final class BotSliceGameTests {
                     Blocks.LAVA);
                 helper.setBlock(
                     new BlockPos(x, GametestRig.FLOOR_Y - 2, z),
-                    Blocks.LAVA);
+                    Blocks.SMOOTH_STONE);
+            }
+        }
+        // Ensure the shore ring has a solid floor (the template may
+        // leave it air-only).
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                if (x >= 5 && x <= 9 && z >= 5 && z <= 9) {
+                    continue;
+                }
                 helper.setBlock(
-                    new BlockPos(x, GametestRig.FLOOR_Y - 3, z),
-                    Blocks.LAVA);
-                helper.setBlock(
-                    new BlockPos(x, GametestRig.FLOOR_Y - 4, z),
+                    new BlockPos(x, GametestRig.FLOOR_Y - 1, z),
                     Blocks.SMOOTH_STONE);
             }
         }
 
-        // Teleport to the pool bottom. Lava has no natural buoyancy -
-        // the body sinks without the reflex's held-jump ascend.
-        var bottomAbs = helper.absolutePos(
-            new BlockPos(7, GametestRig.FLOOR_Y - 3, 7));
-        rig.body().moveTo(bottomAbs.getX() + 0.5, bottomAbs.getY(),
-            bottomAbs.getZ() + 0.5, 0f, 0f);
-        int surfaceAbsY = helper.absolutePos(
-            new BlockPos(0, GametestRig.FLOOR_Y, 0)).getY();
+        // Teleport to the pool center, one block below the surface.
+        var centerAbs = helper.absolutePos(
+            new BlockPos(7, GametestRig.FLOOR_Y - 1, 7));
+        rig.body().moveTo(centerAbs.getX() + 0.5, centerAbs.getY(),
+            centerAbs.getZ() + 0.5, 0f, 0f);
 
         helper.startSequence()
             .thenWaitUntil(driveUntil(rig,
-                () -> check(rig.body().getY() >= surfaceAbsY,
-                    "waiting for the body to surface from lava (current Y="
+                () -> check(!rig.body().isInLava(),
+                    "waiting for the body to escape lava (current Y="
                         + String.format("%.1f", rig.body().getY())
-                        + ")")))
-            // Give the hysteresis hold window time to elapse after
-            // clearing the lava surface, then a few ticks to confirm
-            // the body stays up (no re-submersion).
+                        + ", inLava=" + rig.body().isInLava() + ")")))
+            // Give the rescue mission time to settle on the shore
+            // and the reflex hold window to elapse.
             .thenExecuteFor(
-                AscendInLethalFluidRule.LAVA_HOLD_TICKS + 5,
+                EscapeLavaRule.LAVA_ESCAPE_HOLD_TICKS + 10,
                 driveOnly(rig))
             .thenExecuteAfter(0, () -> {
                 check(rig.body().isAlive(),
-                    "the body must survive the lava submersion");
+                    "the body must survive the lava escape");
                 checkEquals(20f, rig.body().getHealth(),
-                    "fire resistance must hold for the whole ascend");
-                check(rig.body().getY() >= surfaceAbsY,
-                    "the body must stay at or above the lava surface");
+                    "fire resistance must hold for the whole escape");
+                check(!rig.body().isInLava(),
+                    "the body must end on dry ground, not in lava");
+                rig.body().discard();
+            })
+            .thenSucceed();
+    }
+
+    /**
+     * Scenario 7b: burning to death, the fire-extinguish reflex submits
+     * a rescue GotoProcess to the nearest water-adjacent cell, and the
+     * pathing behavior walks the body into water contact, which
+     * extinguishes the fire.
+     *
+     * <p>Why: issue 0008 D5-revised. The original D5 ruling was
+     * "sense-only, no rule" on the assumption that fire is self-
+     * limiting and self-answering. That holds for non-lethal fire,
+     * but when remaining damage exceeds current health, waiting is a
+     * death sentence. This rule fires only in that lethal band:
+     * fireTicks/20 >= health (integer division, matching the engine's
+     * 1.0F-per-20-ticks cadence — decompiled Entity.baseTick:483).
+     *
+     * <p>Setup: health=15, fireTicks=300 (15 damage remaining = lethal,
+     * matching the lava-origin setSecondsOnFire(15) cap).
+     * A water source sits 4 blocks east, contained in a stone basin so
+     * it does not flow away. The reflex (priority 105) fires
+     * immediately, submits a rescue to the nearest water-adjacent
+     * cell, and the body walks to water. Water contact
+     * (isInWaterRainOrBubble) clears remainingFireTicks. Assert:
+     * fire extinguished, body survives above the freeze threshold.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 200)
+    public static void findsWaterWhenBurning(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+
+        // Stone basin at x=11 to contain the water source. Water at
+        // WALK_Y (bot's feet level) so the AABB overlaps the fluid and
+        // isInWaterRainOrBubble extinguishes on contact.
+        helper.setBlock(new BlockPos(11, GametestRig.FLOOR_Y, 7),
+            Blocks.SMOOTH_STONE);
+        helper.setBlock(new BlockPos(11, GametestRig.WALK_Y, 7),
+            Blocks.WATER);
+        helper.setBlock(new BlockPos(12, GametestRig.WALK_Y, 7),
+            Blocks.SMOOTH_STONE);
+
+        // Lethal fire: 300 ticks = 15 damage remaining; health=15 means
+        // the burn will kill if it runs to completion (15 >= 15).
+        // setHealth must precede setRemainingFireTicks so the sensor
+        // reads the reduced health on the first drive tick.
+        rig.body().setHealth(15f);
+        rig.body().setRemainingFireTicks(300);
+
+        helper.startSequence()
+            .thenWaitUntil(driveUntil(rig,
+                () -> check(rig.body().getRemainingFireTicks() <= 0,
+                    "waiting for fire extinguish (ticks="
+                        + rig.body().getRemainingFireTicks()
+                        + ", health="
+                        + String.format("%.1f", rig.body().getHealth())
+                        + ")")))
+            .thenExecuteFor(10, driveOnly(rig))
+            .thenExecuteAfter(0, () -> {
+                check(rig.body().isAlive(),
+                    "the body must survive the burn");
+                check(rig.body().getRemainingFireTicks() <= 0,
+                    "the fire must be extinguished by water contact");
+                check(rig.body().getHealth()
+                        > FreezeOnLowHealthRule.FREEZE_THRESHOLD,
+                    "survival means staying above the freeze threshold, "
+                        + "got " + rig.body().getHealth());
                 rig.body().discard();
             })
             .thenSucceed();
