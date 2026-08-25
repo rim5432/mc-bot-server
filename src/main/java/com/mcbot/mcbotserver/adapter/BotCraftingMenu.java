@@ -3,6 +3,7 @@ package com.mcbot.mcbotserver.adapter;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.CraftingContainer;
 import net.minecraft.world.inventory.CraftingMenu;
@@ -76,28 +77,42 @@ public final class BotCraftingMenu extends CraftingMenu {
     /**
      * Recompute the crafting result when the grid changes. Bypasses the
      * vanilla {@code slotChangedCraftingGrid} (which casts to
-     * ServerPlayer) and resolves the recipe directly against the server
-     * recipe manager. The result is written into slot 0's container
-     * (the {@link ResultContainer}) and the remote-slot mirror is
-     * updated so subsequent {@code clicked} calls see the correct state.
+     * ServerPlayer) and delegates to the shared
+     * {@link #recomputeResult} used by every bot crafting grid.
      *
      * @param container the container that changed (unused; the grid is
      *                  reached through the slots list)
      */
     @Override
     public void slotsChanged(Container container) {
+        recomputeResult(this, player);
+    }
+
+    /**
+     * Shared result recomputation for bot crafting grids, used by this
+     * menu (3x3 table) and by {@code BotInventoryMenu} (2x2 grid) —
+     * both vanilla owners route through
+     * {@code CraftingMenu.slotChangedCraftingGrid}, which casts the
+     * player to {@code ServerPlayer}. Resolves the recipe against the
+     * server recipe manager and writes the result into slot 0's
+     * container (the {@link ResultContainer}).
+     *
+     * <p>Layout assumption: menu slot 0 is the result slot, menu slot
+     * 1 the first grid slot — true for both CraftingMenu and
+     * InventoryMenu.
+     *
+     * @param menu   the crafting menu whose grid changed; never null
+     * @param player the player context (the facade); never null
+     */
+    static void recomputeResult(AbstractContainerMenu menu, Player player) {
         Level level = player.level();
-        if (level.isClientSide) {
+        if (level.isClientSide()) {
             return;
         }
-        // Slot 0 is the ResultSlot whose container is the ResultContainer;
-        // slot 1 is the first crafting-grid slot whose container is the
-        // CraftingContainer. Both are reachable through the public slots
-        // list — no reflection needed.
         ResultContainer resultSlots =
-            (ResultContainer) slots.get(0).container;
+            (ResultContainer) menu.slots.get(0).container;
         CraftingContainer craftSlots =
-            (CraftingContainer) slots.get(1).container;
+            (CraftingContainer) menu.slots.get(1).container;
 
         ItemStack result = ItemStack.EMPTY;
         Optional<CraftingRecipe> recipe = level.getServer()
@@ -115,11 +130,12 @@ public final class BotCraftingMenu extends CraftingMenu {
             }
         }
         resultSlots.setItem(0, result);
-        // Note: remoteSlots is intentionally NOT updated here. In vanilla
-        // it mirrors slot state for client-server diff sync; the bot drives
-        // the menu server-side with a no-op ContainerSynchronizer, and
-        // AbstractContainerMenu.clicked() never reads remoteSlots (verified
-        // against the 1.20.1 decompiled tree). The Slot itself reads from
-        // resultSlots, so click/take paths see the correct result.
+        // Note: remoteSlots is intentionally NOT updated. In vanilla
+        // it mirrors slot state for client-server diff sync; the bot
+        // drives the menu server-side with a no-op
+        // ContainerSynchronizer, and AbstractContainerMenu.clicked()
+        // never reads remoteSlots (verified against the 1.20.1
+        // decompiled tree). The Slot itself reads from resultSlots, so
+        // click/take paths see the correct result.
     }
 }

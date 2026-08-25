@@ -62,6 +62,15 @@ public final class BotPlayerFacade extends Player {
     private final InventoryMenu facadeInventoryMenu;
 
     /**
+     * The binding for the menu this facade currently has open, or null
+     * when only the inventory menu is active. Owned by the facade the
+     * same way ServerPlayer owns {@code containerMenu}: MenuOpener
+     * closes this binding before opening a new menu, mirroring
+     * vanilla's openMenu (which closes the previous container first).
+     */
+    private BindingMenu openMenu;
+
+    /**
      * Creates a facade bound to one body. The facade is not spawned —
      * it is a context object for menu operations.
      *
@@ -82,7 +91,9 @@ public final class BotPlayerFacade extends Player {
         this.bridgeInventory = new BridgeInventory(this, body);
         // active=true on the server side (mirrors InventoryMenu's
         // !level.isClientSide flag in the Player constructor).
-        this.facadeInventoryMenu = new InventoryMenu(
+        // BotInventoryMenu bypasses the vanilla slotsChanged
+        // ServerPlayer cast — see its class Javadoc.
+        this.facadeInventoryMenu = new BotInventoryMenu(
             bridgeInventory, true, this);
         this.containerMenu = facadeInventoryMenu;
     }
@@ -138,6 +149,40 @@ public final class BotPlayerFacade extends Player {
     @Override
     public void closeContainer() {
         this.containerMenu = this.facadeInventoryMenu;
+    }
+
+    /**
+     * Attach a freshly constructed menu binding as the facade's open
+     * menu. Package-private: only {@link BindingMenu}'s constructor
+     * calls this, at attach time — the opener closes the previous
+     * binding before constructing the new one.
+     *
+     * @param menu the new open binding; never null
+     */
+    void setOpenMenu(BindingMenu menu) {
+        this.openMenu = menu;
+    }
+
+    /**
+     * The currently open menu binding, if any.
+     *
+     * @return the open binding, or null when no world menu is open
+     */
+    BindingMenu openMenu() {
+        return openMenu;
+    }
+
+    /**
+     * Detach a closed binding. Only clears when the closed binding is
+     * still the current one — a stale binding closed after a newer
+     * menu opened must not detach the live one.
+     *
+     * @param menu the binding that just closed; never null
+     */
+    void menuClosed(BindingMenu menu) {
+        if (this.openMenu == menu) {
+            this.openMenu = null;
+        }
     }
 
     /**

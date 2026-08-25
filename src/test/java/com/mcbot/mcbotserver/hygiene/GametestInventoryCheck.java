@@ -64,7 +64,11 @@ class GametestInventoryCheck {
             "returnsCraftingGridOnClose",
             "rejectsMenuBeyondReach",
             "returnsGridWithoutCorruptingOccupiedSlot0",
-            "dropsGridMaterialsWhenInventoryFull"),
+            "dropsGridMaterialsWhenInventoryFull",
+            "returnsInventoryMenuGridOnClose",
+            "openingNewMenuClosesPrevious",
+            "rejectsDoubleChestMenu",
+            "clickThrowsWhenBotWalksAway"),
         "GauntletGameTests", Set.of(
             "gauntletEndToEnd",
             "routesThroughFenceGap"),

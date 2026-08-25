@@ -13,6 +13,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.ContainerSynchronizer;
 import net.minecraft.world.inventory.CraftingMenu;
+import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
@@ -36,6 +37,16 @@ import java.util.Objects;
  * directly. {@code ResultSlot.onTake} consumes crafting-grid materials
  * on take — bypassing {@code clicked()} would duplicate items.
  *
+ * <p>Lifecycle: open (constructor) → snapshot/click at will →
+ * {@link #close()} once; close is terminal and idempotent. The
+ * constructor attaches the binding to the facade as its open menu, so
+ * {@code MenuOpener} can close the previous menu before opening a new
+ * one (vanilla parity — {@code ServerPlayer.openMenu} closes first).
+ * Every click re-runs the menu's own {@code stillValid} predicate
+ * against the freshly synced facade position: vanilla enforces that
+ * predicate every tick on the server, but the facade is never ticked,
+ * so the gate lives at the only write surface instead.
+ *
  * <p>Thread safety: server tick thread only, same as the body and the
  * facade. The menu holds mutable state (slots, carried item, data
  * values); concurrent access would corrupt it.
@@ -53,10 +64,22 @@ public final class BindingMenu {
     private final String type;
 
     /**
+     * Terminal-state latch: set by {@link #close()}, never cleared.
+     * Clicks and snapshots on a closed menu are programming errors —
+     * the underlying container references still resolve, so without
+     * the latch a stale binding would keep "working" silently against
+     * a menu the world considers closed.
+     */
+    private boolean closed;
+
+    /**
      * Creates a binding around an open menu. Installs a no-op
      * synchronizer immediately — the menu may try to send slot updates
      * during construction or the first click, and a null synchronizer
-     * would NPE.
+     * would NPE. When the player is a {@link BotPlayerFacade}, the
+     * binding also registers itself as the facade's open menu, so a
+     * later {@code MenuOpener.open} closes this one first (vanilla
+     * parity).
      *
      * @param menu   the open vanilla menu; never null
      * @param player the player context (the facade); never null
@@ -72,6 +95,9 @@ public final class BindingMenu {
             throw new IllegalArgumentException("type must not be blank");
         }
         menu.setSynchronizer(NO_OP_SYNCHRONIZER);
+        if (player instanceof BotPlayerFacade facade) {
+            facade.setOpenMenu(this);
+        }
     }
 
     /**
@@ -81,9 +107,10 @@ public final class BindingMenu {
      * menu through it.
      *
      * @return fresh snapshot; never null
+     * @throws IllegalStateException if the menu is closed
      */
     public MenuView snapshot() {
-        syncPositionIfFacade();
+        ensureOpen();
         int size = menu.slots.size();
         List<SlotView> slots = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
@@ -99,8 +126,10 @@ public final class BindingMenu {
      *
      * @return the carried item view; {@link ItemView#EMPTY} if nothing
      *         is carried
+     * @throws IllegalStateException if the menu is closed
      */
     public ItemView getCarried() {
+        ensureOpen();
         return toView(menu.getCarried());
     }
 
@@ -116,74 +145,84 @@ public final class BindingMenu {
      * @param button   the mouse button (0 = left, 1 = right; for
      *                 {@link ClickType#SWAP} this is the hotbar index 0..8)
      * @param clickType the click type; never null
+     * @throws IllegalStateException if the menu is closed, or if the
+     *         menu's stillValid predicate fails (bot out of the vanilla
+     *         keep-open range, or the source block changed or broke)
      */
     public void click(int slot, int button, ClickType clickType) {
-        syncPositionIfFacade();
+        ensureOpen();
+        ensureStillValid();
         menu.clicked(slot, button, clickType, player);
     }
 
     /**
-     * The wrapped vanilla menu. Exposed for advanced operations that
-     * need direct access (e.g. checking a specific slot's mayPlace
-     * predicate). Prefer {@link #snapshot()} and {@link #click} for
-     * normal planning.
-     *
-     * @return the vanilla menu; never null
-     */
-    /**
      * Close this menu and revert the facade to its inventory menu.
+     * Terminal and idempotent: a second call is a no-op, so an
+     * at-least-once harness retry cannot double-run
+     * {@code container.stopOpen} (chest lid counter underflow).
      *
      * <p>Why this exists: vanilla closes menus through the ServerPlayer
      * network path, which triggers {@code containerMenu.removed(player)}.
      * BotPlayerFacade is not a ServerPlayer, so that path never runs.
-     * Furthermore, both {@link AbstractContainerMenu#removed} and
-     * {@code CraftingMenu.removed -> clearContainer} gate item return on
+     * Furthermore, both {@link AbstractContainerMenu#removed} and the
+     * crafting-grid returns inside {@code CraftingMenu.removed} /
+     * {@code InventoryMenu.removed} gate item return on
      * {@code player instanceof ServerPlayer}; for a non-ServerPlayer the
-     * carried item and crafting-grid materials are silently lost. This
-     * method performs the return manually before calling removed().
+     * carried item and grid materials are silently lost. This method
+     * performs the return manually before calling removed().
      *
-     * <p>Order: (1) save carried, (2) return crafting-grid materials
-     * manually, (3) call menu.removed() (clears carried, stops chest
-     * open, clearContainer is no-op since grid is empty), (4) return
-     * carried to inventory, (5) facade.closeContainer().
+     * <p>Order: (1) latch closed, (2) save carried, (3) return grid
+     * materials manually, (4) call menu.removed() (clears carried,
+     * stops chest open), (5) return carried to inventory, (6) detach
+     * from the facade and revert to the inventory menu.
      */
     public void close() {
+        if (closed) {
+            return;
+        }
+        closed = true;
+
         ItemStack carried = menu.getCarried().copy();
 
-        if (menu instanceof CraftingMenu) {
-            returnCraftingGridToInventory();
-        }
+        returnGridToInventory();
 
         // contract: see ADR-0004 (menu is request-response; close is the
         // terminal request). removed() clears carried and calls
-        // container.stopOpen (chest lid). For CraftingMenu it also calls
-        // clearContainer, which is a no-op here because the grid was
-        // already emptied above.
+        // container.stopOpen (chest lid). Its ServerPlayer-gated returns
+        // are no-ops here because the returns ran manually above.
         menu.removed(player);
 
         if (!carried.isEmpty()) {
-            // placeItemBackInInventory works for non-ServerPlayer (it only
-            // skips the network packet, which we don't need with the
-            // no-op synchronizer). If the inventory is full it drops the
-            // remainder at the body location via player.drop().
+            // placeItemBackInInventory works for non-ServerPlayer (it
+            // only skips the network packet, which we don't need with
+            // the no-op synchronizer). A full inventory drops the
+            // remainder at the body via the facade's drop override.
             player.getInventory().placeItemBackInInventory(carried);
         }
 
         if (player instanceof BotPlayerFacade facade) {
+            facade.menuClosed(this);
             facade.closeContainer();
         }
     }
 
     /**
-     * Extract all items from the 3x3 crafting grid and place them in the
-     * player inventory. CraftingMenu layout: slot 0 = result, slots 1-9
-     * = grid. Uses removeItemNoUpdate to avoid triggering slotsChanged
-     * (which would recompute the recipe mid-close).
+     * Extract all items from the crafting grid and place them in the
+     * player inventory, before menu.removed() runs. Both grid menus
+     * gate their vanilla return on ServerPlayer, so the bridge returns
+     * them manually: CraftingMenu (3x3, menu slots 1-9) and the
+     * facade's InventoryMenu (2x2, menu slots 1-4). Slot 0 is the
+     * (virtual) result in both layouts and is discarded by removed(),
+     * matching vanilla. removeItemNoUpdate avoids slotsChanged (no
+     * mid-close recipe recompute).
      */
-    private void returnCraftingGridToInventory() {
-        for (int i = 1; i <= 9; i++) {
+    private void returnGridToInventory() {
+        int lastGridSlot = menu instanceof CraftingMenu ? 9
+            : menu instanceof InventoryMenu ? 4 : 0;
+        for (int i = 1; i <= lastGridSlot; i++) {
             Slot slot = menu.slots.get(i);
-            ItemStack removed = slot.container.removeItemNoUpdate(slot.getContainerSlot());
+            ItemStack removed =
+                slot.container.removeItemNoUpdate(slot.getContainerSlot());
             if (!removed.isEmpty()) {
                 player.getInventory().placeItemBackInInventory(removed);
             }
@@ -191,19 +230,50 @@ public final class BindingMenu {
     }
 
     /**
-     * Sync facade position to the body before every menu operation.
-     * Entity.getX/Y/Z are final and cannot be overridden, so the facade
-     * holds a stale position unless syncPosition() is called. Without
-     * this, ChestMenu.stillValid (which checks player distance to the
-     * container) would use the position frozen at open-time and never
-     * invalidate when the bot walks away.
+     * Guard: operations on a closed menu are programming errors. The
+     * menu's container references still resolve after close, so a stale
+     * binding would keep "working" silently against a menu the world
+     * considers closed — the latch turns that into a loud failure.
      */
-    private void syncPositionIfFacade() {
-        if (player instanceof BotPlayerFacade facade) {
-            facade.syncPosition();
+    private void ensureOpen() {
+        if (closed) {
+            throw new IllegalStateException(
+                "menu is closed; open a new menu instead");
         }
     }
 
+    /**
+     * Guard: the menu's own stillValid predicate (vanilla distance /
+     * block-state check), evaluated against the freshly synced facade
+     * position. In vanilla the server runs this predicate every tick
+     * and closes the menu when it fails; the facade is never ticked,
+     * so the gate runs here instead — per click, the only write
+     * surface. The facade carries the default player BLOCK_REACH
+     * attribute, so the gate distance is the vanilla 8.0 blocks for
+     * container menus (open is separately gated at 4.5 in MenuOpener;
+     * the asymmetry mirrors vanilla open-reach vs keep-open
+     * tolerance).
+     */
+    private void ensureStillValid() {
+        if (player instanceof BotPlayerFacade facade) {
+            facade.syncPosition();
+            if (!menu.stillValid(facade)) {
+                throw new IllegalStateException(
+                    "menu no longer valid (bot out of range or block "
+                        + "changed); close and reopen");
+            }
+        }
+    }
+
+    /**
+     * The wrapped vanilla menu. Exposed for advanced operations that
+     * need direct access (e.g. reading a specific slot's container
+     * while setting up a test). Prefer {@link #snapshot()} and
+     * {@link #click} for normal planning — this bypasses the open and
+     * validity guards.
+     *
+     * @return the vanilla menu; never null
+     */
     public AbstractContainerMenu rawMenu() {
         return menu;
     }

@@ -20,6 +20,7 @@ import com.mcbot.mcbotserver.core.reflex.FreezeOnLowHealthRule;
 import com.mcbot.mcbotserver.core.reflex.SurfaceOnLowAirRule;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -33,6 +34,9 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.CraftingContainer;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
@@ -1732,6 +1736,180 @@ public final class BotSliceGameTests {
                 rig.body().discard();
             })
             .thenSucceed();
+    }
+
+    /**
+     * Scenario: closing the facade's inventory menu returns the 2x2
+     * crafting-grid materials. Vanilla InventoryMenu.removed gates its
+     * grid return on ServerPlayer, and until BotInventoryMenu existed
+     * the facade's grid could not even hold materials (the vanilla
+     * slotsChanged cast would throw). This test exercises both: setItem
+     * into the 2x2 (no crash) and close (materials back).
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void returnsInventoryMenuGridOnClose(
+            GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+
+        var facade = new BotPlayerFacade(rig.body());
+        var opener = new MenuOpener(facade);
+        var menu = opener.openInventory();
+
+        // Fill the 2x2 grid (menu slots 1-4, container slots 0-3).
+        var rawMenu = menu.rawMenu();
+        CraftingContainer craftSlots =
+            (CraftingContainer) rawMenu.slots.get(1).container;
+        for (int i = 0; i < 4; i++) {
+            craftSlots.setItem(i, new ItemStack(Items.DIAMOND, 1));
+        }
+
+        menu.close();
+
+        for (int i = 0; i < 4; i++) {
+            check(craftSlots.getItem(i).isEmpty(),
+                "inventory-menu grid slot " + i
+                    + " must be empty after close");
+        }
+        checkEquals(4, countItems(rig, Items.DIAMOND),
+            "the 4 grid diamonds must return to the inventory");
+
+        rig.body().discard();
+        helper.succeed();
+    }
+
+    /**
+     * Scenario: opening a second menu closes the first — vanilla
+     * parity (ServerPlayer.openMenu closes the previous container). The
+     * old binding must return its crafting-grid materials, become
+     * terminal (clicks throw), and the new menu must take over.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void openingNewMenuClosesPrevious(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+
+        BlockPos tableLocal = new BlockPos(7, GametestRig.WALK_Y, 8);
+        helper.setBlock(tableLocal, Blocks.CRAFTING_TABLE);
+        BlockPos chestLocal = new BlockPos(6, GametestRig.WALK_Y, 8);
+        helper.setBlock(chestLocal, Blocks.CHEST);
+        BlockPos tableAbs = helper.absolutePos(tableLocal);
+        BlockPos chestAbs = helper.absolutePos(chestLocal);
+
+        var facade = new BotPlayerFacade(rig.body());
+        var opener = new MenuOpener(facade);
+        var tableMenu = opener.open(tableAbs).orElseThrow();
+
+        // 9 diamonds into the table grid.
+        var rawMenu = tableMenu.rawMenu();
+        CraftingContainer craftSlots =
+            (CraftingContainer) rawMenu.slots.get(1).container;
+        for (int i = 0; i < 9; i++) {
+            craftSlots.setItem(i, new ItemStack(Items.DIAMOND, 1));
+        }
+
+        var chestMenu = opener.open(chestAbs).orElseThrow();
+        checkEquals("chest", chestMenu.snapshot().type(),
+            "the second open must yield the chest menu");
+
+        checkEquals(9, countItems(rig, Items.DIAMOND),
+            "opening the chest must return the table-grid diamonds");
+        for (int i = 0; i < 9; i++) {
+            check(craftSlots.getItem(i).isEmpty(),
+                "table grid slot " + i + " must be empty after the "
+                    + "menu was closed by the next open");
+        }
+
+        boolean threw = false;
+        try {
+            tableMenu.click(1, 0, ClickType.PICKUP);
+        } catch (IllegalStateException expected) {
+            threw = true;
+        }
+        check(threw, "clicking a binding displaced by a newer menu "
+            + "must throw (terminal state)");
+
+        rig.body().discard();
+        helper.succeed();
+    }
+
+    /**
+     * Scenario: the opener explicitly rejects double chests. Vanilla
+     * merges the two halves into a CompoundContainer; binding a single
+     * half would silently expose 27 of 54 slots with no error. Both
+     * halves must return empty.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void rejectsDoubleChestMenu(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+
+        // A west-east pair facing north: LEFT at x=6 connects east.
+        BlockState left = Blocks.CHEST.defaultBlockState()
+            .setValue(ChestBlock.FACING, Direction.NORTH)
+            .setValue(ChestBlock.TYPE, ChestType.LEFT);
+        BlockState right = Blocks.CHEST.defaultBlockState()
+            .setValue(ChestBlock.FACING, Direction.NORTH)
+            .setValue(ChestBlock.TYPE, ChestType.RIGHT);
+        BlockPos leftLocal = new BlockPos(6, GametestRig.WALK_Y, 8);
+        BlockPos rightLocal = new BlockPos(7, GametestRig.WALK_Y, 8);
+        helper.setBlock(leftLocal, left);
+        helper.setBlock(rightLocal, right);
+
+        // Setup guard: neighbor updates must not have collapsed the
+        // pair back to singles — otherwise the test proves nothing.
+        check(helper.getLevel().getBlockState(
+                helper.absolutePos(leftLocal))
+                .getValue(ChestBlock.TYPE) != ChestType.SINGLE,
+            "setup: the left half must stay a double-chest half");
+
+        var facade = new BotPlayerFacade(rig.body());
+        var opener = new MenuOpener(facade);
+        check(opener.open(helper.absolutePos(leftLocal)).isEmpty(),
+            "opening the left half of a double chest must be rejected");
+        check(opener.open(helper.absolutePos(rightLocal)).isEmpty(),
+            "opening the right half of a double chest must be rejected");
+
+        rig.body().discard();
+        helper.succeed();
+    }
+
+    /**
+     * Scenario: clicks on a world menu fail loudly once the bot is out
+     * of the vanilla keep-open range. Vanilla enforces stillValid every
+     * tick via the ServerPlayer; the facade is never ticked, so
+     * BindingMenu re-runs the predicate per click against the synced
+     * position. close() must keep working (returns items, lowers the
+     * lid) regardless of distance.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void clickThrowsWhenBotWalksAway(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+
+        BlockPos chestLocal = new BlockPos(7, GametestRig.WALK_Y, 8);
+        helper.setBlock(chestLocal, Blocks.CHEST);
+        BlockPos chestAbs = helper.absolutePos(chestLocal);
+
+        var facade = new BotPlayerFacade(rig.body());
+        var opener = new MenuOpener(facade);
+        var menu = opener.open(chestAbs).orElseThrow();
+
+        // ~9.2 blocks from the chest center: beyond the 8-block
+        // keep-open range (BLOCK_REACH 4.5 + 3.5), well inside the
+        // structure.
+        rig.body().setPos(1.5, GametestRig.WALK_Y, 1.5);
+
+        boolean threw = false;
+        try {
+            menu.click(0, 0, ClickType.PICKUP);
+        } catch (IllegalStateException expected) {
+            threw = true;
+        }
+        check(threw, "clicking a chest menu from beyond keep-open range "
+            + "must throw, not silently act on the container");
+
+        // close is the terminal cleanup path and stays usable.
+        menu.close();
+
+        rig.body().discard();
+        helper.succeed();
     }
 
     /** Total count of one item kind across the whole binding
