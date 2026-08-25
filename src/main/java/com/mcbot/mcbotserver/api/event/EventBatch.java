@@ -45,4 +45,37 @@ public record EventBatch(
             throw new IllegalArgumentException("resetAt starts at 1");
         }
     }
+
+    /**
+     * A copy narrowed to events whose kind starts with the given
+     * prefix. Cursor-integrity events ({@link EventKind#EVENT_GAP},
+     * {@link EventKind#EVENT_DROPPED}) always survive: they describe
+     * the stream, not the world, and filtering them out would turn a
+     * missed batch into a silent gap. The cursor fields
+     * ({@code latestEventId}, {@code resetAt}, {@code droppedCount})
+     * are the TRUE stream values, never the filtered subset's - the
+     * caller's next poll must advance by what existed, not by what
+     * was shown.
+     *
+     * @param kindPrefix prefix such as {@code "TASK_"}; empty or
+     *                   blank returns this batch unchanged
+     * @return the narrowed view; never null
+     */
+    // contract: see issues/0011-harness-surface-convergence.md D3
+    //            (narrowing never lies about cursor position)
+    public EventBatch narrowedToKindPrefix(String kindPrefix) {
+        if (kindPrefix == null || kindPrefix.isBlank()) {
+            return this;
+        }
+        var kept = new java.util.ArrayList<BotEvent>(events.size());
+        for (BotEvent event : events) {
+            if (event.kind().startsWith(kindPrefix)
+                    || EventKind.EVENT_GAP.equals(event.kind())
+                    || EventKind.EVENT_DROPPED.equals(event.kind())) {
+                kept.add(event);
+            }
+        }
+        return new EventBatch(kept, droppedCount, latestEventId,
+            resetAt);
+    }
 }

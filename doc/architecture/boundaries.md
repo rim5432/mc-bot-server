@@ -651,6 +651,34 @@ BotState getState();
     Reload-parity: JSON branch + datapack row + lockstep gate
     (7 rule types). In-engine: `climbsOutOfPowderSnow` (3x3 two-deep
     pit, body climbs out, no freeze damage taken).
+    28. Harness surface convergence (issue 0011; user ruling
+    2026-08-25 "the harness-interaction side is getting messy"). The
+    CONSOLE verb layer is frozen contract surface, not convenience:
+    six verbs (status / goto / cancel / stop / events / reset), one
+    JSON object per answer, machine-readable `reason` on failure -
+    the table lives in the issue and grows by one row per new
+    process kind, decided in the shipping issue, never as an ad-hoc
+    brigadier branch. Known wart, documented not fixed: `/bot events
+    since` is a console Integer while the cursor contract is long
+    (repair rides the first non-RCON transport). RESET is the
+    ADR-0005 5a promise finally wired - clears latch + counter,
+    echoes `crashed` so a harness resetting a healthy bot learns it
+    did nothing. EVENTS narrowing (`[only] <kindPrefix>`, e.g.
+    TASK_) lives on EventBatch.narrowedToKindPrefix so every
+    transport shares it; two non-negotiables: the cursor fields
+    (latestEventId, resetAt, droppedCount) stay the TRUE stream
+    values - the harness's next poll advances by what existed, not
+    what was shown - and the cursor-integrity kinds (EVENT_GAP,
+    EVENT_DROPPED) survive every filter, because hiding a gap is a
+    silent lie. The STATE_PUSH-vs-status-vs-KEEPALIVE responsibility
+    table (issue 0011 section 3) binds disclosure growth: state
+    channels answer "what is the model now", keepalives answer "is
+    the plan progressing", and no fourth overlap may appear. Session
+    runtime (a tool/harness subpackage: rcon transport + cursor/reconnect state
+    + auto-journal) is QUEUED with its first customer - the survival
+    rehearsal driver - not built speculatively; MCP/HTTP stays
+    deferred until a non-RCON consumer exists (the boundary-D
+    reopen trigger).
 
 ## Deferred, with reopen conditions
 

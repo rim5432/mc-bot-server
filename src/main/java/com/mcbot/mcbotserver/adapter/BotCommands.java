@@ -15,6 +15,7 @@ import com.mojang.brigadier.context.CommandContext;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 import net.minecraft.commands.CommandSourceStack;
@@ -22,35 +23,46 @@ import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 
 /**
- * Boundary-D command surface over the server console: four verbs that
+ * Boundary-D command surface over the server console: six verbs that
  * map one-to-one onto the in-JVM channels and answer in single-line
  * JSON, so an external harness can drive the bot through RCON without
  * the bot knowing anything about the transport.
+ *
+ * <p>The verb table is frozen contract surface (issue 0011 section
+ * 2): status / goto / cancel / stop / events / reset. Every answer is
+ * one JSON object with an {@code ok} boolean; failures carry a
+ * machine-readable {@code reason}; output text is wire surface, same
+ * status as the serializers' wire keys. New process kinds grow the
+ * table by one row in the same shape, decided in the issue that ships
+ * the process - never as an ad-hoc brigadier branch.
  *
  * <p>Threading evidence: DedicatedServer.runCommand dispatches every
  * RCON command through executeBlocking, so each executes lambda below
  * runs on the server tick thread - exactly the thread policy every
  * channel documents - and the answer travels back synchronously.
- *
- * <p>Every response is one JSON object with an {@code ok} boolean;
- * failures carry a machine-readable {@code reason}. Output text is
- * contract surface, same status as the serializers' wire keys.
  */
 // contract: see boundaries.md Boundary D protocol (sync error path)
+//            + decision 28 (the console verb table is a contract)
 public final class BotCommands {
 
     /**
-     * Live channel triple of one spawned bot, plus the stop lever.
+     * Live channel triple of one spawned bot, plus the stop lever and
+     * the crash-latch reset.
      *
      * @param events the boundary-D event stream to poll; never null
      * @param bus    the command channel to submit through; never null
      * @param state  the state channel backing /bot status; never null
      * @param stopAllTasks cancels every live task and returns how
      *                     many; backs /bot stop; never null
+     * @param resetCrashLatch clears the crash latch and counter
+     *                     (ADR-0005 5a) and returns whether a latch
+     *                     was actually set; backs /bot reset;
+     *                     never null
      */
     public record Channels(EventQueue events, CommandBus bus,
                            StateChannel state,
-                           IntSupplier stopAllTasks) {
+                           IntSupplier stopAllTasks,
+                           BooleanSupplier resetCrashLatch) {
     }
 
     /**
@@ -68,7 +80,8 @@ public final class BotCommands {
             .then(gotoBranch(live))
             .then(cancelBranch(live))
             .then(stopBranch(live))
-            .then(eventsBranch(live)));
+            .then(eventsBranch(live))
+            .then(resetBranch(live)));
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> statusBranch(
@@ -184,24 +197,57 @@ public final class BotCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> eventsBranch(
             Supplier<Channels> live) {
+        // `only` is a kind PREFIX (TASK_, BOT_, STATE_...), not an
+        // exact kind - the named use case is "task lifecycle only".
+        // Unquoted single word by brigadier rules; no commas. The
+        // narrowing keeps EVENT_GAP / EVENT_DROPPED and the true
+        // cursor fields - see EventBatch.narrowedToKindPrefix.
         return Commands.literal("events")
-            .executes(ctx -> runEvents(ctx, live, 0L))
+            .executes(ctx -> runEvents(ctx, live, 0L, ""))
             .then(Commands.argument("since",
                         IntegerArgumentType.integer(0))
                 .executes(ctx -> runEvents(ctx, live,
-                    IntegerArgumentType.getInteger(ctx, "since"))));
+                    IntegerArgumentType.getInteger(ctx, "since"), ""))
+                .then(Commands.argument("only",
+                            StringArgumentType.word())
+                    .executes(ctx -> runEvents(ctx, live,
+                        IntegerArgumentType.getInteger(ctx, "since"),
+                        StringArgumentType.getString(ctx, "only")))));
     }
 
     private static int runEvents(CommandContext<CommandSourceStack> ctx,
-                                 Supplier<Channels> live, long since) {
+                                 Supplier<Channels> live, long since,
+                                 String onlyPrefix) {
         Channels ch = live.get();
         if (ch == null) {
             return answer(ctx.getSource(), err("no active bot"));
         }
         JsonObject root = ok();
-        root.add("batch",
-            EventBatchJson.toJsonObject(ch.events().statusSnapshot(since)));
+        root.add("batch", EventBatchJson.toJsonObject(
+            ch.events().statusSnapshot(since)
+                .narrowedToKindPrefix(onlyPrefix)));
         return answer(ctx.getSource(), root);
+    }
+
+    /**
+     * The crash-latch reset ADR-0005 5a always promised the harness:
+     * clears latch and counter, next tick runs the full pipeline
+     * again. {@code crashed} echoes whether a latch was actually set,
+     * so a harness resetting a healthy bot learns it did nothing.
+     */
+    // contract: see ADR-0005 5a (reset clears latch + counter)
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> resetBranch(
+            Supplier<Channels> live) {
+        return Commands.literal("reset").executes(ctx -> {
+            Channels ch = live.get();
+            if (ch == null) {
+                return answer(ctx.getSource(), err("no active bot"));
+            }
+            boolean wasCrashed = ch.resetCrashLatch().getAsBoolean();
+            JsonObject root = ok();
+            root.addProperty("crashed", wasCrashed);
+            return answer(ctx.getSource(), root);
+        });
     }
 
     private static JsonObject ok() {

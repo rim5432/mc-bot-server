@@ -484,6 +484,15 @@ the H-R4 convergence pass, and bookkeeping.
          least one reflex preemption and one failed-task recovery
          observed. Closes criterion 2 + closeout follow-ups 4 and
          5 + issue 0005's live acceptance run in one stroke.     [dep: air, idle, recovery]
+- [x] S  Harness surface convergence slice 1 (issue 0011 D2/D3/D4/
+         D5): /bot reset (the ADR-0005 5a promise finally wired,
+         echoes `crashed`), /bot events [since] [only] kind-prefix
+         narrowing via EventBatch.narrowedToKindPrefix (cursor
+         fields stay true; EVENT_GAP/EVENT_DROPPED survive every
+         filter), the console verb table + disclosure responsibility
+         table frozen as contract (ledger 28). D1 session runtime
+         rides the rehearsal item above; D6 MCP/HTTP deferred to the
+         boundary-D reopen trigger.                                 [dep: none]
 - [ ] S  H-R4 wire-key convergence pass (code-health ledger;
          scheduled before any Stage 3 vocabulary lands so pose work
          does not churn boundary-D consumers twice).            [dep: none]

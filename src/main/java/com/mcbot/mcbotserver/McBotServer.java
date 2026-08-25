@@ -273,6 +273,17 @@ public class McBotServer {
         return new BotCommands.Channels(activeEvents, activeBus,
             activeState,
             () -> activeGotoHandler != null
-                ? activeGotoHandler.stopAll() : 0);
+                ? activeGotoHandler.stopAll() : 0,
+            () -> {
+                // ADR-0005 5a through the console verb: report whether
+                // a latch was actually cleared so a harness resetting
+                // a healthy bot learns it did nothing.
+                boolean wasCrashed = activeController != null
+                    && activeController.isCrashed();
+                if (activeController != null) {
+                    activeController.reset();
+                }
+                return wasCrashed;
+            });
     }
 }
