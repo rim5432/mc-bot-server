@@ -1912,6 +1912,58 @@ public final class BotSliceGameTests {
         helper.succeed();
     }
 
+    /**
+     * Scenario: armor placed through the inventory menu lands in the
+     * correct equipment storage. Vanilla flat armor indices run
+     * feet..head while the binding runs head..feet; before the bridge
+     * translation, a helmet clicked into the menu's head slot
+     * (containerSlot 39) silently landed in the feet storage slot.
+     * Helmet goes to head storage (36), boots to feet storage (39),
+     * and InventoryView reports them at armor[0]/armor[3].
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void equipsArmorThroughMenuClicks(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+        var container = rig.body().getInventory().container();
+        container.setItem(0, new ItemStack(Items.DIAMOND_HELMET));
+        container.setItem(1, new ItemStack(Items.DIAMOND_BOOTS));
+
+        var facade = new BotPlayerFacade(rig.body());
+        var opener = new MenuOpener(facade);
+        var menu = opener.openInventory();
+
+        // Inventory-menu layout: armor slots 5-8 (5=head, 8=feet),
+        // hotbar slots 36-44 (hotbar 0 = menu 36, hotbar 1 = 37).
+        menu.click(36, 0, ClickType.PICKUP);
+        checkEquals("minecraft:diamond_helmet",
+            menu.getCarried().itemId(),
+            "pickup must lift the helmet from hotbar 0");
+        menu.click(5, 0, ClickType.PICKUP);
+        check(menu.getCarried().isEmpty(),
+            "the helmet must land on the head armor slot");
+        menu.click(37, 0, ClickType.PICKUP);
+        menu.click(8, 0, ClickType.PICKUP);
+        check(menu.getCarried().isEmpty(),
+            "the boots must land on the feet armor slot");
+
+        check(Items.DIAMOND_HELMET.equals(container.getItem(36).getItem()),
+            "head storage (binding 36) must hold the helmet");
+        check(Items.DIAMOND_BOOTS.equals(container.getItem(39).getItem()),
+            "feet storage (binding 39) must hold the boots");
+
+        var view = rig.body().getInventory().snapshot();
+        checkEquals("minecraft:diamond_helmet",
+            view.armor().get(0).itemId(),
+            "InventoryView armor[0] (head) must report the helmet");
+        checkEquals("minecraft:diamond_boots",
+            view.armor().get(3).itemId(),
+            "InventoryView armor[3] (feet) must report the boots");
+
+        menu.close();
+        rig.body().discard();
+        helper.succeed();
+    }
+
     /** Total count of one item kind across the whole binding
      * container (all 41 slots). */
     private static int countItems(GametestRig.Rig rig,

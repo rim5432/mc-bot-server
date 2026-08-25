@@ -68,7 +68,8 @@ class GametestInventoryCheck {
             "returnsInventoryMenuGridOnClose",
             "openingNewMenuClosesPrevious",
             "rejectsDoubleChestMenu",
-            "clickThrowsWhenBotWalksAway"),
+            "clickThrowsWhenBotWalksAway",
+            "equipsArmorThroughMenuClicks"),
         "GauntletGameTests", Set.of(
             "gauntletEndToEnd",
             "routesThroughFenceGap"),

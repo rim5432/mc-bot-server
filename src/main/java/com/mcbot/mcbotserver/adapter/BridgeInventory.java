@@ -33,12 +33,17 @@ import net.minecraft.world.item.ItemStack;
  * check (corruption) and made its "inventory full -> drop" branch
  * unreachable (infinite loop on the server tick thread).
  *
- * <p>Contract: see issue 0007 §4 Path A and §7 risk. The slot layout
- * matches exactly: Inventory's compartment iteration is
- * {@code [items(36), armor(4), offhand(1)]} = flat indices 0..40,
- * which is identical to BindingInventory's SimpleContainer layout. So
- * a flat index {@code i} maps 1:1 to the binding slot — no translation
- * needed.
+ * <p>Contract: see issue 0007 §4 Path A and §7 (armor order ruling).
+ * Flat index mapping: vanilla Inventory compartments are
+ * {@code [items(36), armor(4), offhand(1)]}. Main slots 0..35 and the
+ * offhand 40 map 1:1 to binding slots, but the armor compartment is
+ * REVERSED: vanilla flat 36..39 runs feet..head (the armor list index
+ * is {@code EquipmentSlot.getIndex()}, FEET=0; InventoryMenu addresses
+ * container slots 39..36 for head..feet) while BindingInventory and
+ * InventoryView run head..feet. Every flat-index accessor below
+ * translates armor slots at this seam, so menu armor slots read and
+ * write the correct equipment piece without either api surface
+ * changing its own order.
  *
  * <p>Selected slot: {@code Inventory.selected} is a public field that
  * defaults to 0 and is never written by the bridge. Instead,
@@ -65,6 +70,12 @@ public final class BridgeInventory extends Inventory {
     /** Flat index of the offhand slot in the binding container. */
     private static final int OFFHAND_SLOT = 40;
 
+    /** First vanilla armor flat index (feet in vanilla order). */
+    private static final int ARMOR_FLAT_FIRST = 36;
+
+    /** Last vanilla armor flat index (head in vanilla order). */
+    private static final int ARMOR_FLAT_LAST = 39;
+
     private final BotBodyEntity body;
 
     /**
@@ -81,26 +92,29 @@ public final class BridgeInventory extends Inventory {
     }
 
     /**
-     * Read a slot from the binding container. Flat index 0..40 maps
-     * 1:1 to BindingInventory slots (36 main + 4 armor + 1 offhand).
+     * Read a slot from the binding container. Main slots 0..35 and the
+     * offhand 40 map 1:1; armor flat 36..39 is reversed at this seam
+     * (vanilla feet..head vs binding head..feet — see the class
+     * Javadoc).
      *
      * @param slot flat slot index 0..40
      * @return the item in that slot; never null (empty stack for empty)
      */
     @Override
     public ItemStack getItem(int slot) {
-        return body.getInventory().container().getItem(slot);
+        return body.getInventory().container().getItem(toBindingSlot(slot));
     }
 
     /**
-     * Write a slot to the binding container.
+     * Write a slot to the binding container (armor flat indices
+     * reversed — see {@link #getItem}).
      *
      * @param slot  flat slot index 0..40
      * @param stack the item to set; never null
      */
     @Override
     public void setItem(int slot, ItemStack stack) {
-        body.getInventory().container().setItem(slot, stack);
+        body.getInventory().container().setItem(toBindingSlot(slot), stack);
     }
 
     /**
@@ -153,7 +167,8 @@ public final class BridgeInventory extends Inventory {
      */
     @Override
     public ItemStack removeItem(int slot, int amount) {
-        return body.getInventory().container().removeItem(slot, amount);
+        return body.getInventory().container()
+            .removeItem(toBindingSlot(slot), amount);
     }
 
     /**
@@ -166,7 +181,24 @@ public final class BridgeInventory extends Inventory {
      */
     @Override
     public ItemStack removeItemNoUpdate(int slot) {
-        return body.getInventory().container().removeItemNoUpdate(slot);
+        return body.getInventory().container()
+            .removeItemNoUpdate(toBindingSlot(slot));
+    }
+
+    /**
+     * Map a vanilla Inventory flat index to the binding slot. Main
+     * (0..35) and offhand (40) map 1:1; armor 36..39 is reversed
+     * because vanilla runs feet..head while the binding runs
+     * head..feet (see the class Javadoc).
+     *
+     * @param slot vanilla flat index 0..40
+     * @return the binding container slot index
+     */
+    private static int toBindingSlot(int slot) {
+        if (slot >= ARMOR_FLAT_FIRST && slot <= ARMOR_FLAT_LAST) {
+            return ARMOR_FLAT_FIRST + ARMOR_FLAT_LAST - slot;
+        }
+        return slot;
     }
 
     /**
