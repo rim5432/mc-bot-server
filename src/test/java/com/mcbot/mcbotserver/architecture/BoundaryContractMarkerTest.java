@@ -40,7 +40,7 @@ class BoundaryContractMarkerTest {
      */
     private static final List<String> BOUNDARY_INTERFACES = List.of(
         "Actor", "Behavior", "BotProcess", "WorldView", "EventQueue",
-        "CommandChannel");
+        "CommandChannel", "MenuTransactions");
 
     /**
      * One known implementer per interface - proves the scan sees
@@ -52,7 +52,8 @@ class BoundaryContractMarkerTest {
         "BotProcess", "core/process/GotoProcess.java",
         "WorldView", "core/world/SnapshotWorldView.java",
         "EventQueue", "core/event/InMemoryEventQueue.java",
-        "CommandChannel", "core/command/CommandBus.java");
+        "CommandChannel", "core/command/CommandBus.java",
+        "MenuTransactions", "adapter/BindingActor.java");
 
     /**
      * Marker shapes: the inline form and the Javadoc form. The

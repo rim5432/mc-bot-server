@@ -5,8 +5,13 @@ import com.mcbot.mcbotserver.api.actor.Actor;
 import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
+import com.mcbot.mcbotserver.api.menu.MenuClick;
+import com.mcbot.mcbotserver.api.menu.MenuTransactions;
+import com.mcbot.mcbotserver.api.menu.MenuView;
+import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.actor.ChannelArbiter;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
@@ -23,12 +28,16 @@ import java.util.Objects;
  * MOVE channel means halt — a body with no client must be told to
  * stand still every tick (numen-notes.md section 4). USE swings on the
  * rising press edge; SLOT writes the hotbar selection directly.
+ * Menu transactions (issue 0007 §6.2, ledger 29) ride the same write
+ * surface as imperative request-response methods — the facade and
+ * opener live here so every mutation stays behind one boundary-A
+ * implementer.
  *
  * <p>Implementation note: server tick thread only; flush is called
  * exactly once per tick by the pipeline's stage 4.
  */
 // contract: see ADR-0004 D2 (four channels, per-tick expiring claims)
-public final class BindingActor implements Actor {
+public final class BindingActor implements Actor, MenuTransactions {
 
     private final ChannelArbiter delegate = new ChannelArbiter();
     private final BotBodyEntity body;
@@ -40,6 +49,8 @@ public final class BindingActor implements Actor {
     private final DigExecutor dig;
     /** One-shot block placement from the selected hotbar slot (0007). */
     private final InteractBlockExecutor interact;
+    /** Menu transactions: one facade+opener pair per body (0007 A1). */
+    private final MenuOpener menus;
     private boolean lastUsePressing;
     private boolean lastDropClaimed;
     private boolean lastInteractClaimed;
@@ -55,6 +66,7 @@ public final class BindingActor implements Actor {
         this.presence = new PresenceLayer(body);
         this.dig = new DigExecutor(body);
         this.interact = new InteractBlockExecutor(body);
+        this.menus = new MenuOpener(new BotPlayerFacade(body));
     }
 
     @Override
@@ -173,6 +185,49 @@ public final class BindingActor implements Actor {
         dig.release();
         lastDropClaimed = false;
         lastInteractClaimed = false;
+    }
+
+    // ===== Menu transactions (issue 0007 §6.2, ledger 29) =====
+    // Imperative request-response methods, NOT per-tick claims. They
+    // run between ticks on the server thread; the claim machinery
+    // above is untouched. The facade and opener live in this actor so
+    // every boundary-A mutation stays behind one implementer.
+
+    // contract: see boundaries.md §A (menu transaction surface, ledger 29)
+    @Override
+    public MenuView openMenu(CellPos target) {
+        return menus.open(new BlockPos(target.x(), target.y(), target.z()))
+            .map(BindingMenu::snapshot)
+            .orElse(null);
+    }
+
+    @Override
+    public MenuView openInventoryMenu() {
+        return menus.openInventory().snapshot();
+    }
+
+    @Override
+    public MenuView menuSnapshot() {
+        BindingMenu current = menus.currentMenu();
+        return current == null ? null : current.snapshot();
+    }
+
+    @Override
+    public MenuView menuClick(int slot, int button, MenuClick type) {
+        BindingMenu current = menus.currentMenu();
+        if (current == null) {
+            throw new IllegalStateException("no menu is open");
+        }
+        current.click(slot, button, type);
+        return current.snapshot();
+    }
+
+    @Override
+    public void closeMenu() {
+        BindingMenu current = menus.currentMenu();
+        if (current != null) {
+            current.close();
+        }
     }
 
     /**

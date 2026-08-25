@@ -1980,6 +1980,70 @@ public final class BotSliceGameTests {
         helper.succeed();
     }
 
+    /**
+     * Scenario: a full craft through the sanctioned boundary-A
+     * surface — the actor's menu transactions (ledger 29), clicks
+     * only, no raw container writes. This is the chain a core
+     * click-sequence planner will ride: openMenu → place materials
+     * via PICKUP right-clicks → take the result → closeMenu.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void craftsViaMenuTransactions(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+
+        BlockPos tableLocal = new BlockPos(7, GametestRig.WALK_Y, 8);
+        helper.setBlock(tableLocal, Blocks.CRAFTING_TABLE);
+        BlockPos tableAbs = helper.absolutePos(tableLocal);
+
+        // 9 diamonds in hotbar 0; they reach the grid through clicks.
+        rig.body().getInventory().container().setItem(0,
+            new ItemStack(Items.DIAMOND, 9));
+
+        var actor = rig.actor();
+        var view = actor.openMenu(new CellPos(tableAbs.getX(),
+            tableAbs.getY(), tableAbs.getZ()));
+        check(view != null, "openMenu must succeed at the table");
+        checkEquals("crafting_table", view.type(),
+            "the opened menu must be the crafting table");
+        checkEquals(new CellPos(tableAbs.getX(), tableAbs.getY(),
+                tableAbs.getZ()), view.sourcePos(),
+            "the snapshot must carry the table's position");
+
+        // Pick up the whole stack from hotbar 0 (crafting-menu slot
+        // 37), then place one diamond per grid slot (right-click
+        // deposits a single item).
+        view = actor.menuClick(37, 0, MenuClick.PICKUP);
+        checkEquals(9, view.carried().count(),
+            "carried must be the 9 diamonds");
+        for (int gridSlot = 1; gridSlot <= 9; gridSlot++) {
+            view = actor.menuClick(gridSlot, 1, MenuClick.PICKUP);
+        }
+        check(view.carried().isEmpty(),
+            "carried must be empty after nine single-item places");
+        checkEquals("minecraft:diamond_block",
+            view.slot(0).item().itemId(),
+            "the result slot must recompute to diamond_block");
+
+        // Take the result, land it in hotbar 1, close.
+        view = actor.menuClick(0, 0, MenuClick.PICKUP);
+        checkEquals("minecraft:diamond_block", view.carried().itemId(),
+            "the take must lift the diamond_block");
+        view = actor.menuClick(38, 0, MenuClick.PICKUP);
+        check(view.carried().isEmpty(),
+            "the result must land in hotbar 1");
+        actor.closeMenu();
+        check(actor.menuSnapshot() == null,
+            "no menu session may survive closeMenu");
+
+        ItemStack placed = rig.body().getInventory().container().getItem(1);
+        check(placed.is(Items.DIAMOND_BLOCK) && placed.getCount() == 1,
+            "hotbar 1 must hold exactly 1 diamond_block, got "
+                + placed);
+
+        rig.body().discard();
+        helper.succeed();
+    }
+
     /** Total count of one item kind across the whole binding
      * container (all 41 slots). */
     private static int countItems(GametestRig.Rig rig,

@@ -155,6 +155,17 @@ public final class MenuOpener {
         }
     }
 
+    /**
+     * The facade's currently open menu binding, if any. The actor's
+     * menu transaction methods read this to answer menuSnapshot and
+     * to route clicks.
+     *
+     * @return the open binding, or null when no menu is open
+     */
+    BindingMenu currentMenu() {
+        return facade.openMenu();
+    }
+
     // ---- Internal openers ----
 
     private BindingMenu openCraftingTable(BlockPos pos) {
