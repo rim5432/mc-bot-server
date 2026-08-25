@@ -11,8 +11,8 @@ covers:
   - src/main/java/com/mcbot/mcbotserver/core/behavior/PathingBehavior.java
   - src/test/java/com/mcbot/mcbotserver/hygiene/EnglishOnlyScan.java
   - src/test/java/com/mcbot/mcbotserver/hygiene/GametestInventoryCheck.java
-  - src/test/java/com/mcbot/mcbotserver/tickpipeline/PathingTestAccess.java
-  - src/test/java/com/mcbot/mcbotserver/tickpipeline/TickPipelineGateTest.java
+  - src/test/java/com/mcbot/mcbotserver/core/tick/PathingTestAccess.java
+  - src/test/java/com/mcbot/mcbotserver/core/tick/TickPipelineGateTest.java
 ---
 
 # Code Health Ledger
@@ -85,6 +85,7 @@ admitted here may encode a size cap.
 | H-R4 Wire keys frozen | Serialized boundary-D keys survive field renames | `boundaryd.WireVocabularyGateTest` (kind inventory, attr-key vocabulary, record component pins) | gated 2026-08-25 |
 | H-R5 Gametest inventory | The registered `@GameTest` set cannot silently shrink | `hygiene.GametestInventoryCheck` | gated |
 | H-R6 Geometry spectrum rationale | Threshold constants document their partial-top-spectrum reasoning | not mechanically checkable | review-only |
+| H-R7 Package structure | Main modules single-level, module names never reused as subpackages; test packages mirror main or are sanctioned metas | `architecture.PackageStructureGateTest` | gated 2026-08-25 |
 
 ### Rule detail
 
@@ -217,6 +218,21 @@ imports, and DefendProcess's default-only report switch flattened
 into the comment block it always was. Zero behaviour change;
 compile + full suite green.
 
+### Test-package mirroring (2026-08-25)
+
+H8 closed alongside the H-R7 admission. The flat test
+pseudo-packages folded into mirrored main packages: tickpipeline
+into core.tick (16 files, the PathingTestAccess door included and
+its SKIPPED path repointed), corepathing plus pathing into
+core.pathing, coreprocess into core.process, reflex plus
+reflexlayer into core.reflex, world into core.world, combat into
+core.behavior (CombatBehavior's own package), and perception into
+boundarya - the boundary-A contract gates, symmetric with
+boundaryd. The test tree is now five top-level packages -
+architecture, boundarya, boundaryd, core, hygiene - every one
+either a main mirror or a sanctioned meta. Zero behaviour change:
+same classes, same tests, new homes.
+
 ## Ruling anchors in code
 
 Where the live architectural rulings physically live, so "why is it
@@ -246,12 +262,6 @@ without an anchor is a workplan item, not a row here.
   the candidate: a layer-1 test scanning every boundary-interface
   implementer for its contract marker. Optional for Stage 3; pair
   with the next boundary-touching change.
-- **OPEN H8 - test-package mirroring.** Test packages
-  (`corepathing`, `coreprocess`, `tickpipeline`, `reflexlayer`,
-  `boundaryd`) do not mirror main-source packages, so test-to-code
-  mapping needs mental translation. The rename should land together
-  with the package-structure registry admission (queued behind
-  H-R4) so the gate pins the final shape, not an intermediate one.
 - **OPEN H9 - sensor functional-interface consolidation.**
   PositionSource / HealthSource / GameClock (BotController) and
   PositionSource / OnGroundSource (PathingBehavior) are five

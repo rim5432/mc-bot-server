@@ -41,7 +41,7 @@ class ReflectionDoorCheck {
      * would self-match). Paths are package-relative under
      * src/test/java. */
     private static final Set<String> SKIPPED = Set.of(
-        "com/mcbot/mcbotserver/tickpipeline/PathingTestAccess.java",
+        "com/mcbot/mcbotserver/core/tick/PathingTestAccess.java",
         "com/mcbot/mcbotserver/hygiene/ReflectionDoorCheck.java");
 
     /** Each pattern marks a reflection entry point; any hit outside
