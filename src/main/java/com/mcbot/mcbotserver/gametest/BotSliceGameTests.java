@@ -6,6 +6,7 @@ import com.mcbot.mcbotserver.adapter.BotAssembly;
 import com.mcbot.mcbotserver.adapter.BotCraftingMenu;
 import com.mcbot.mcbotserver.adapter.BotPlayerFacade;
 import com.mcbot.mcbotserver.adapter.MenuOpener;
+import com.mcbot.mcbotserver.api.menu.CraftingView;
 import com.mcbot.mcbotserver.api.menu.MenuClick;
 import com.mcbot.mcbotserver.api.menu.MenuView;
 import com.mcbot.mcbotserver.api.menu.SlotRole;
@@ -16,6 +17,7 @@ import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.core.menu.MenuPlanner;
 import com.mcbot.mcbotserver.core.process.DefendProcess;
 import com.mcbot.mcbotserver.core.reflex.EscapeLavaRule;
 import com.mcbot.mcbotserver.core.reflex.DigOnSuffocationRule;
@@ -2050,10 +2052,12 @@ public final class BotSliceGameTests {
 
     /**
      * Scenario: a full craft through the sanctioned boundary-A
-     * surface — the actor's menu transactions (ledger 29), clicks
-     * only, no raw container writes. This is the chain a core
-     * click-sequence planner will ride: openMenu → place materials
-     * via PICKUP right-clicks → take the result → closeMenu.
+     * surface — the actor's menu transactions (ledger 29) driven by
+     * the core click-sequence planner. Clicks only, no raw container
+     * writes, and no flat-layout arithmetic in the scenario: grid,
+     * result and source slots are addressed through the roles the
+     * adapter discloses. Chain: openMenu → planGridFill → planTakeResult
+     * → closeMenu.
      */
     @GameTest(template = "empty16x8x16", timeoutTicks = 100)
     public static void craftsViaMenuTransactions(GameTestHelper helper) {
@@ -2077,36 +2081,37 @@ public final class BotSliceGameTests {
                 tableAbs.getZ()), view.sourcePos(),
             "the snapshot must carry the table's position");
 
-        // Pick up the whole stack from hotbar 0 (crafting-menu slot
-        // 37), then place one diamond per grid slot (right-click
-        // deposits a single item).
-        view = actor.menuClick(37, 0, MenuClick.PICKUP);
-        checkEquals(9, view.carried().count(),
-            "carried must be the 9 diamonds");
-        for (int gridSlot = 1; gridSlot <= 9; gridSlot++) {
-            view = actor.menuClick(gridSlot, 1, MenuClick.PICKUP);
+        // Fill all nine cells from the hotbar stack; the planner
+        // resolves sources by role, so the scenario never names a
+        // flat index.
+        CraftingView craft = CraftingView.of(view);
+        for (MenuPlanner.Step step : MenuPlanner.planGridFill(craft,
+                "minecraft:diamond", 0, 1, 2, 3, 4, 5, 6, 7, 8)) {
+            view = actor.menuClick(step.slot(), step.button(),
+                step.kind());
         }
         check(view.carried().isEmpty(),
-            "carried must be empty after nine single-item places");
+            "cursor must be spent after the fill");
         checkEquals("minecraft:diamond_block",
-            view.slot(0).item().itemId(),
+            view.slot(craft.result().index()).item().itemId(),
             "the result slot must recompute to diamond_block");
 
-        // Take the result, land it in hotbar 1, close.
-        view = actor.menuClick(0, 0, MenuClick.PICKUP);
-        checkEquals("minecraft:diamond_block", view.carried().itemId(),
-            "the take must lift the diamond_block");
-        view = actor.menuClick(38, 0, MenuClick.PICKUP);
+        // Shift-click take: the product lands in the player region
+        // and ResultSlot.onTake consumes the nine grid materials.
+        for (MenuPlanner.Step step : MenuPlanner.planTakeResult(
+                CraftingView.of(view))) {
+            view = actor.menuClick(step.slot(), step.button(),
+                step.kind());
+        }
         check(view.carried().isEmpty(),
-            "the result must land in hotbar 1");
+            "the product must leave the cursor via quick-move");
         actor.closeMenu();
         check(actor.menuSnapshot() == null,
             "no menu session may survive closeMenu");
 
-        ItemStack placed = rig.body().getInventory().container().getItem(1);
-        check(placed.is(Items.DIAMOND_BLOCK) && placed.getCount() == 1,
-            "hotbar 1 must hold exactly 1 diamond_block, got "
-                + placed);
+        check(countItems(rig, Items.DIAMOND_BLOCK) == 1,
+            "exactly one diamond_block must sit in the binding "
+                + "container after the craft");
 
         rig.body().discard();
         helper.succeed();
