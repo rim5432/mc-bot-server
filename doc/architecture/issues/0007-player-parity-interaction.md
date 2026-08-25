@@ -255,7 +255,32 @@ state) turns out to be facade-hostile.
    ResultSlot.onTake consumes all 9 grid materials → place result in
    hotbar 1). 24/24 gametests pass. Remaining in Phase 2: core
    click-sequence PLANNER (places materials via clicks instead of
-   direct container writes), chest gametest, CraftingView api type.
+   direct container writes), CraftingView api type.
+   Post-review hardening 2026-08-25 (e5545f6, 28229e0; 33/33
+   gametests): the P2 design review found the phantom slot-search
+   family unsealed on `BridgeInventory` — vanilla
+   `placeItemBackInInventory` searched the phantom `items` list, so
+   `close()` corrupted an occupied slot 0 (wrong-stack merge without
+   an identity check) and hung the tick thread when slot 0 was full
+   (drop branch unreachable). `getFreeSlot` /
+   `getSlotWithRemainingSpace` / `add` now delegate to the binding
+   container. Lifecycle contract: the facade owns its open
+   `BindingMenu` (as ServerPlayer owns containerMenu) and
+   `MenuOpener` closes it before opening a new one; close is
+   terminal + idempotent, and every click re-runs the menu's own
+   `stillValid` predicate against the synced position (vanilla does
+   this per tick via ServerPlayer; the facade is never ticked).
+   Distance policy recorded: open gate 4.5 blocks (project
+   interaction reach), keep-open gate vanilla 8.0 (BLOCK_REACH 4.5 +
+   3.5; the facade carries default player attributes). The facade's
+   inventory menu is `BotInventoryMenu` — vanilla
+   `InventoryMenu.slotsChanged` routes through the same ServerPlayer
+   cast as the 3x3, so the 2x2 grid used to CCE on any material;
+   result recomputation is shared via
+   `BotCraftingMenu.recomputeResult`, and close() returns 2x2
+   materials like the 3x3. Double chests are explicitly rejected
+   (vanilla merges halves into CompoundContainer; binding one half
+   silently exposed 27 of 54 slots).
 3. **Phase 3 (M)** crafting automation - `RecipeManager` query
    service, quick-move sequences.
 4. **Phase 4 (XL)** full parity - remaining menu kinds, `UseItem`
@@ -324,6 +349,17 @@ state) turns out to be facade-hostile.
   `sendSystemMessage` NPE). The audit enumerates which Player
   methods the menu call graph actually touches before writing the
   facade.
+- **Armor index order (ruled 2026-08-25, deferred to Phase 4)**:
+  vanilla `Inventory` flat slots 36-39 run feet→head (the armor
+  list index is `EquipmentSlot.getIndex()` with FEET=0, and
+  `InventoryMenu`'s armor slots address container slots 39..36 for
+  head..feet), while `BindingInventory` and `InventoryView` run
+  head→feet. `BridgeInventory`'s "flat index maps 1:1" claim holds
+  for 0-35 and 40 only. No current menu path addresses armor, but
+  menus must not touch armor through the bridge until translation
+  lands: the ruled fix is bridge-side (reverse flat 36-39 at the
+  seam) and ships with the Phase 4 armor interaction item together
+  with its own test, not as a silent index flip.
 - **Core never writes menu state.** `ResultSlot.onTake` consumes
   grid materials on take; a core-side slot writer bypasses that
   and duplicates items. All menu mutations go through the
