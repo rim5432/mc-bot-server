@@ -7,6 +7,7 @@ import com.mcbot.mcbotserver.adapter.BotCraftingMenu;
 import com.mcbot.mcbotserver.adapter.BotPlayerFacade;
 import com.mcbot.mcbotserver.adapter.MenuOpener;
 import com.mcbot.mcbotserver.api.menu.MenuClick;
+import com.mcbot.mcbotserver.api.menu.MenuView;
 import com.mcbot.mcbotserver.api.menu.SlotRole;
 import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
 import com.mcbot.mcbotserver.api.actor.Claim;
@@ -1848,13 +1849,14 @@ public final class BotSliceGameTests {
     }
 
     /**
-     * Scenario: the opener explicitly rejects double chests. Vanilla
-     * merges the two halves into a CompoundContainer; binding a single
-     * half would silently expose 27 of 54 slots with no error. Both
-     * halves must return empty.
+     * Scenario: a double chest opens as the full vanilla 54-slot
+     * CompoundContainer merge (ChestBlock.getContainer, the same
+     * helper the vanilla open path uses). The old behavior — one
+     * half, 27 of 54 slots, no error — was the silent half-open the
+     * review flagged.
      */
     @GameTest(template = "empty16x8x16", timeoutTicks = 100)
-    public static void rejectsDoubleChestMenu(GameTestHelper helper) {
+    public static void opensDoubleChestFullWidth(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
 
         // A west-east pair facing north: LEFT at x=6 connects east.
@@ -1876,12 +1878,78 @@ public final class BotSliceGameTests {
                 .getValue(ChestBlock.TYPE) != ChestType.SINGLE,
             "setup: the left half must stay a double-chest half");
 
-        var facade = new BotPlayerFacade(rig.body());
-        var opener = new MenuOpener(facade);
-        check(opener.open(helper.absolutePos(leftLocal)).isEmpty(),
-            "opening the left half of a double chest must be rejected");
-        check(opener.open(helper.absolutePos(rightLocal)).isEmpty(),
-            "opening the right half of a double chest must be rejected");
+        var actor = rig.actor();
+        BlockPos leftAbs = helper.absolutePos(leftLocal);
+        var view = actor.openMenu(new CellPos(leftAbs.getX(),
+            leftAbs.getY(), leftAbs.getZ()));
+        check(view != null,
+            "opening either half of a double chest must succeed");
+        checkEquals(54, containerSlotsOf(view),
+            "a double chest must expose all 54 container slots");
+        checkEquals(SlotRole.CONTAINER, view.slot(53).role(),
+            "slot 53 (last chest slot) must be CONTAINER");
+        checkEquals(SlotRole.MAIN, view.slot(54).role(),
+            "slot 54 (first player slot) must be MAIN");
+        actor.closeMenu();
+
+        rig.body().discard();
+        helper.succeed();
+    }
+
+    /**
+     * Scenario: the deposit/retrieve round trip through the actor's
+     * menu transactions — QUICK_MOVE a stack into the chest, close,
+     * reopen (state survived the close), PICKUP it back out. Proves
+     * the chest container is the real block entity, not a menu-side
+     * copy, and that close/reopen is lossless.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void storesAndRetrievesFromChest(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+
+        BlockPos chestLocal = new BlockPos(7, GametestRig.WALK_Y, 8);
+        helper.setBlock(chestLocal, Blocks.CHEST);
+        BlockPos chestAbs = helper.absolutePos(chestLocal);
+
+        rig.body().getInventory().container().setItem(0,
+            new ItemStack(Items.DIAMOND, 32));
+
+        var actor = rig.actor();
+        var view = actor.openMenu(new CellPos(chestAbs.getX(),
+            chestAbs.getY(), chestAbs.getZ()));
+        check(view != null, "the chest must open");
+        checkEquals(27, containerSlotsOf(view),
+            "a single chest exposes 27 container slots");
+
+        // Role-based addressing: hotbar 0 is the FIRST HOTBAR-role
+        // slot - its flat index differs per menu kind (54 here, 37 in
+        // a crafting table). The role lookup is exactly the knowledge
+        // the harness must never re-derive.
+        int hotbar0 = firstSlotWithRole(view, SlotRole.HOTBAR);
+        view = actor.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
+        checkEquals(32, view.slot(0).item().count(),
+            "the chest's first slot must hold the 32 diamonds");
+        check(view.slot(hotbar0).isEmpty(),
+            "hotbar 0 must be empty after the quick-move");
+        actor.closeMenu();
+
+        // Reopen: the deposit survived the close (real block entity).
+        view = actor.openMenu(new CellPos(chestAbs.getX(),
+            chestAbs.getY(), chestAbs.getZ()));
+        checkEquals(32, view.slot(0).item().count(),
+            "the deposit must survive close and reopen");
+        hotbar0 = firstSlotWithRole(view, SlotRole.HOTBAR);
+        view = actor.menuClick(0, 0, MenuClick.PICKUP);
+        checkEquals(32, view.carried().count(),
+            "the pickup must lift all 32 diamonds");
+        view = actor.menuClick(hotbar0, 0, MenuClick.PICKUP);
+        check(view.carried().isEmpty(),
+            "the stack must land back in hotbar 0");
+        actor.closeMenu();
+
+        checkEquals(32, rig.body().getInventory().container()
+            .getItem(0).getCount(),
+            "hotbar 0 must hold the 32 diamonds again");
 
         rig.body().discard();
         helper.succeed();
@@ -2057,6 +2125,30 @@ public final class BotSliceGameTests {
             }
         }
         return total;
+    }
+
+    /** Count of CONTAINER-role slots in a menu snapshot (the opened
+     * world container's width, independent of the player region). */
+    private static int containerSlotsOf(MenuView view) {
+        int total = 0;
+        for (var slot : view.slots()) {
+            if (slot.role() == SlotRole.CONTAINER) {
+                total++;
+            }
+        }
+        return total;
+    }
+
+    /** First flat slot index carrying the given role (e.g. the first
+     * HOTBAR slot). Role-based addressing - flat layouts differ per
+     * menu kind. */
+    private static int firstSlotWithRole(MenuView view, SlotRole role) {
+        for (var slot : view.slots()) {
+            if (slot.role() == role) {
+                return slot.index();
+            }
+        }
+        throw new IllegalStateException("no slot with role " + role);
     }
 
     private static void assertEventSeen(

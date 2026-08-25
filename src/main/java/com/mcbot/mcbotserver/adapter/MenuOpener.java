@@ -3,6 +3,7 @@ package com.mcbot.mcbotserver.adapter;
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.ContainerLevelAccess;
@@ -10,10 +11,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.CraftingTableBlock;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.Optional;
@@ -36,13 +34,12 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <ul>
  *   <li>{@code crafting_table} — {@link BotCraftingMenu} (3x3 grid,
  *       bypasses the vanilla ServerPlayer cast in slotsChanged).</li>
- *   <li>{@code chest} (single, including trapped) —
- *       {@link ChestMenu#threeRows} backed by the chest's
- *       {@link ChestBlockEntity} container. Double chests are
- *       explicitly rejected (empty result): vanilla merges the two
- *       halves into a CompoundContainer, and binding one half would
- *       silently expose 27 of 54 slots. CompoundContainer support is
- *       a follow-up.</li>
+ *   <li>{@code chest} (single, double, trapped) —
+ *       {@link ChestMenu#threeRows} backed by the vanilla
+ *       {@code ChestBlock.getContainer} merge: a double chest opens
+ *       as the full 54-slot CompoundContainer, never one half; a
+ *       blocked chest (solid block or cat above a half) is rejected
+ *       exactly like vanilla.</li>
  * </ul>
  *
  * <p>Distance policy: the open gate is 4.5 blocks (the project
@@ -83,13 +80,15 @@ public final class MenuOpener {
 
     /**
      * Open a menu for the block at the given position. Returns empty when
-     * the block is not a supported menu kind, the block entity is
-     * missing, or the block is a double chest. The facade's position is
-     * synced before the menu is created so any reach or sound checks
-     * inside the menu see the body's live position. Any menu the facade
-     * currently has open is closed first (grid materials returned,
-     * chest lid lowered) — vanilla parity: ServerPlayer.openMenu closes
-     * the previous container before opening the new one.
+     * the block is not a supported menu kind or its container is missing
+     * or blocked (solid block or cat above a chest half). Double chests
+     * open as the full vanilla CompoundContainer merge. The facade's
+     * position is synced before the menu is created so any reach or
+     * sound checks inside the menu see the body's live position. Any
+     * menu the facade currently has open is closed first (grid
+     * materials returned, chest lid lowered) — vanilla parity:
+     * ServerPlayer.openMenu closes the previous container before
+     * opening the new one.
      *
      * @param pos the target block position (world-absolute); never null
      * @return the opened menu binding, or empty if unsupported
@@ -114,14 +113,8 @@ public final class MenuOpener {
         if (block instanceof CraftingTableBlock) {
             return Optional.of(openCraftingTable(pos));
         }
-        if (block instanceof ChestBlock) {
-            if (state.getValue(ChestBlock.TYPE) != ChestType.SINGLE) {
-                // double chest: needs the vanilla CompoundContainer
-                // merge; opening one half would silently expose 27 of
-                // 54 slots with no error to the caller
-                return Optional.empty();
-            }
-            return openChest(pos);
+        if (block instanceof ChestBlock chestBlock) {
+            return openChest(chestBlock, state, pos);
         }
         return Optional.empty();
     }
@@ -180,18 +173,28 @@ public final class MenuOpener {
             toCellPos(pos));
     }
 
-    private Optional<BindingMenu> openChest(BlockPos pos) {
+    private Optional<BindingMenu> openChest(ChestBlock block,
+                                            BlockState state,
+                                            BlockPos pos) {
         Level level = facade.body().level();
-        BlockEntity be = level.getBlockEntity(pos);
-        if (!(be instanceof ChestBlockEntity chest)) {
-            // Block says chest but the entity is gone (exploded, /setblock
-            // without entity) — cannot open.
+        // Vanilla's own merge (the same helper ChestBlock.use routes
+        // through): CompoundContainer for a double pair, the single
+        // block entity otherwise, null when blocked (solid block or
+        // cat above a half). validate=false keeps the blocked check
+        // ACTIVE, matching the vanilla open path.
+        Container chest = ChestBlock.getContainer(
+            block, state, level, pos, false);
+        if (chest == null) {
             return Optional.empty();
         }
         facade.syncPosition();
         Inventory inv = facade.getInventory();
-        ChestMenu menu = ChestMenu.threeRows(
-            NEXT_ID.getAndIncrement(), inv, chest);
+        // Menu width follows the container (vanilla parity: a double
+        // chest opens the six-row GUI). Only 27/54 exist today; other
+        // widths mean a different menu kind entirely.
+        ChestMenu menu = chest.getContainerSize() == 54
+            ? ChestMenu.sixRows(NEXT_ID.getAndIncrement(), inv, chest)
+            : ChestMenu.threeRows(NEXT_ID.getAndIncrement(), inv, chest);
         facade.containerMenu = menu;
         return Optional.of(new BindingMenu(menu, facade, "chest",
             toCellPos(pos)));
