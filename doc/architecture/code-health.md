@@ -82,7 +82,7 @@ admitted here may encode a size cap.
 | H-R1 Reflection is the exception | Collaborator unit tests live same-package with direct package-private access; reflection exists only in `PathingTestAccess`, only for integration-level mid-drive state | `hygiene.ReflectionDoorCheck` | gated 2026-08-24 |
 | H-R2 No inline FQNs | A type used in code is imported; FQNs appear only where Java demands them | none scheduled (textually checkable, lowest value) | review-only |
 | H-R3 English-only everywhere | Zero CJK codepoints in any `.md` file and any Java source | `hygiene.EnglishOnlyScan` | gated 2026-08-24 |
-| H-R4 Wire keys frozen | Serialized boundary-D keys survive field renames | key-set assertions in `TickPipelineGateTest` (keepalive attrs only) | pending: widen to all boundary-D payloads |
+| H-R4 Wire keys frozen | Serialized boundary-D keys survive field renames | `boundaryd.WireVocabularyGateTest` (kind inventory, attr-key vocabulary, record component pins) | gated 2026-08-25 |
 | H-R5 Gametest inventory | The registered `@GameTest` set cannot silently shrink | `hygiene.GametestInventoryCheck` | gated |
 | H-R6 Geometry spectrum rationale | Threshold constants document their partial-top-spectrum reasoning | not mechanically checkable | review-only |
 
@@ -115,7 +115,14 @@ admitted here may encode a size cap.
 - **H-R4 Wire keys are frozen even when fields rename.** Renaming a
   state field must preserve its serialized key (the `pose` ->
   `position` rename kept the wire key `"pose"`); boundary-D payloads
-  are consumed outside the repo.
+  are consumed outside the repo. Mechanical half:
+  `boundaryd.WireVocabularyGateTest` pins three layers - the
+  EventKind constant set against a registered attr contract per
+  kind, every producer attr-key literal against that vocabulary
+  (both directions, so stale pins fail too), and the wire-carrying
+  record component names in declaration order. Mission-owned
+  verdict attrs on TASK_COMPLETED / TASK_FAILED stay open; their
+  freeze belongs to each process's own tests.
 - **H-R5 Gametest edits are engine-verified before commit.** The
   offline suite cannot see gametest registration: a probe-cleanup
   regex once deleted `routesThroughFenceGap` silently and every
