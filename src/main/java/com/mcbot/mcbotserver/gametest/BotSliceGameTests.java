@@ -6,9 +6,11 @@ import com.mcbot.mcbotserver.adapter.BotAssembly;
 import com.mcbot.mcbotserver.adapter.BotCraftingMenu;
 import com.mcbot.mcbotserver.adapter.BotPlayerFacade;
 import com.mcbot.mcbotserver.adapter.MenuOpener;
+import com.mcbot.mcbotserver.adapter.RecipeCatalog;
 import com.mcbot.mcbotserver.api.menu.CraftingView;
 import com.mcbot.mcbotserver.api.menu.MenuClick;
 import com.mcbot.mcbotserver.api.menu.MenuView;
+import com.mcbot.mcbotserver.api.menu.RecipeView;
 import com.mcbot.mcbotserver.api.menu.SlotRole;
 import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
 import com.mcbot.mcbotserver.api.actor.Claim;
@@ -2180,6 +2182,65 @@ public final class BotSliceGameTests {
                 rig.body().discard();
             })
             .thenSucceed();
+    }
+
+    /**
+     * Scenario: the recipe catalog translates real RecipeManager
+     * entries into pure descriptions — shaped only, tag-expanded,
+     * pattern-relative coordinates. Pins the Phase 3 query service
+     * against the live server datapack (the same lockstep discipline
+     * as RuleTableGateTest: shipped data must match code
+     * expectations).
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void catalogsShapedRecipes(GameTestHelper helper) {
+        var catalog = new RecipeCatalog(helper.getLevel());
+
+        // 1.20.1 data: the recipe file is stick.json — singular.
+        var sticksOpt = catalog.byId("minecraft:stick");
+        check(sticksOpt.isPresent(), "stick must be cataloged");
+        RecipeView sticks = sticksOpt.get();
+        checkEquals("minecraft:stick", sticks.resultItemId(),
+            "sticks product id");
+        checkEquals(4, sticks.resultCount(), "sticks yield per craft");
+        checkEquals(1, sticks.patternWidth(),
+            "sticks is a 1-wide column");
+        check(sticks.fitsInventoryGrid(),
+            "sticks must fit the inventory menu's 2x2 grid");
+        // #minecraft:planks arrives expanded to every plank kind.
+        check(sticks.placements().get(0)
+                .contains("minecraft:oak_planks"),
+            "tag expansion must list oak planks");
+        check(sticks.placements().get(1)
+                .contains("minecraft:birch_planks"),
+            "tag expansion must list birch planks");
+        check(!sticks.placements().containsKey(2),
+            "a 1x2 pattern must not grow a phantom third cell");
+
+        var blockOpt = catalog.byId("minecraft:diamond_block");
+        check(blockOpt.isPresent(), "diamond_block must be cataloged");
+        RecipeView block = blockOpt.get();
+        checkEquals(3, block.patternWidth(), "diamond_block width");
+        check(!block.fitsInventoryGrid(),
+            "diamond_block needs a crafting table");
+        for (int pos = 0; pos < 9; pos++) {
+            checkEquals(List.of("minecraft:diamond"),
+                block.placements().get(pos),
+                "cell " + pos + " accepts exactly diamond");
+        }
+
+        check(catalog.byId("minecraft:mushroom_stew").isEmpty(),
+            "shapeless recipes are not representable - empty, not "
+                + "garbage");
+        check(catalog.byId("minecraft:no_such_recipe").isEmpty(),
+            "unknown ids resolve empty");
+
+        var stickRecipes = catalog.byResult("minecraft:stick");
+        check(stickRecipes.stream().anyMatch(r ->
+                r.recipeId().equals("minecraft:stick")),
+            "byResult must find the stick recipe among producers");
+
+        helper.succeed();
     }
 
     /** Total count of one item kind across the whole binding

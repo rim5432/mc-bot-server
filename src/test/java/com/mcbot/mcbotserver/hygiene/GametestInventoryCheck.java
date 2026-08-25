@@ -72,7 +72,8 @@ class GametestInventoryCheck {
             "clickThrowsWhenBotWalksAway",
             "equipsArmorThroughMenuClicks",
             "craftsViaMenuTransactions",
-            "walksToTableAndCrafts"),
+            "walksToTableAndCrafts",
+            "catalogsShapedRecipes"),
         "GauntletGameTests", Set.of(
             "gauntletEndToEnd",
             "routesThroughFenceGap"),
