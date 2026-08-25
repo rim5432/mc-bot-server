@@ -62,7 +62,9 @@ class GametestInventoryCheck {
             "craftsDiamondBlockAtTable",
             "picksUpFromBackpackSlot",
             "returnsCraftingGridOnClose",
-            "rejectsMenuBeyondReach"),
+            "rejectsMenuBeyondReach",
+            "returnsGridWithoutCorruptingOccupiedSlot0",
+            "dropsGridMaterialsWhenInventoryFull"),
         "GauntletGameTests", Set.of(
             "gauntletEndToEnd",
             "routesThroughFenceGap"),

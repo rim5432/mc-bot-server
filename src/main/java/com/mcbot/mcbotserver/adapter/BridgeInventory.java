@@ -2,6 +2,7 @@ package com.mcbot.mcbotserver.adapter;
 
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
 
+import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -18,14 +19,19 @@ import net.minecraft.world.item.ItemStack;
  * are only reachable if someone bypasses these overrides (no 1.20.1
  * menu code does).
  *
- * <p>Why removeItem must be overridden: the vanilla extraction path is
- * {@code AbstractContainerMenu.doClick} → {@code Slot.tryRemove} →
- * {@code Slot.remove} → {@code container.removeItem(slot, amount)}.
- * The inherited {@code Inventory.removeItem} operates on the phantom
- * {@code items} list and returns EMPTY even when the binding slot is
- * full — a click on a backpack slot would silently pick up nothing.
- * Overriding it (and {@code removeItemNoUpdate}) routes the extraction
- * to the real binding container.
+ * <p>Phantom compartments: the Inventory's own internal lists
+ * ({@code items}, {@code armor}, {@code offhand}) are created empty by
+ * the super constructor and never used for storage. Every accessor
+ * that vanilla slot-search or item-return logic can reach through the
+ * facade is overridden below to delegate to the binding container:
+ * the slot accessors, the remove family, the search family
+ * ({@link #getFreeSlot}, {@link #getSlotWithRemainingSpace}), and
+ * {@link #add(int, ItemStack)}. Leaving any of them inherited lets
+ * vanilla read the phantom lists: the search family returning 0 /
+ * -1 unconditionally made {@code placeItemBackInInventory} merge
+ * returned items into an occupied real slot without an item-identity
+ * check (corruption) and made its "inventory full -> drop" branch
+ * unreachable (infinite loop on the server tick thread).
  *
  * <p>Contract: see issue 0007 §4 Path A and §7 risk. The slot layout
  * matches exactly: Inventory's compartment iteration is
@@ -48,6 +54,16 @@ import net.minecraft.world.item.ItemStack;
  */
 // contract: see issue 0007 §4 Path A (inventory bridge on SimpleContainer)
 public final class BridgeInventory extends Inventory {
+
+    /** Main-slot count (hotbar + backpack), matching vanilla's
+     * {@code Inventory.items} compartment that the search family
+     * scans. Armor and offhand are excluded from auto-fill, same as
+     * vanilla: equipment slots only change through explicit slot
+     * operations. */
+    private static final int MAIN_SLOTS = 36;
+
+    /** Flat index of the offhand slot in the binding container. */
+    private static final int OFFHAND_SLOT = 40;
 
     private final BotBodyEntity body;
 
@@ -151,6 +167,109 @@ public final class BridgeInventory extends Inventory {
     @Override
     public ItemStack removeItemNoUpdate(int slot) {
         return body.getInventory().container().removeItemNoUpdate(slot);
+    }
+
+    /**
+     * First free main slot (0..35) in the binding container. Overridden
+     * because the inherited scan reads the phantom {@code items} list,
+     * which is always empty, and would return 0 unconditionally — even
+     * with every real main slot occupied, so the caller's "full -> drop"
+     * fallback never fires.
+     *
+     * @return the first empty main slot, or -1 when 0..35 are occupied
+     */
+    @Override
+    public int getFreeSlot() {
+        SimpleContainer container = body.getInventory().container();
+        for (int i = 0; i < MAIN_SLOTS; i++) {
+            if (container.getItem(i).isEmpty()) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * First slot with room to merge the stack: the live selected slot,
+     * the offhand, then main slots 0..35 in order — vanilla's search
+     * order. Overridden because the inherited main loop reads the
+     * phantom {@code items} list and never finds real merge space;
+     * {@code placeItemBackInInventory} would then fall through to
+     * {@link #getFreeSlot} and merge into an occupied slot without an
+     * item-identity check (the identity check lives in this search, not
+     * in the merge itself).
+     *
+     * @param stack the stack to find merge space for; never null
+     * @return a slot index, or -1 when no main/offhand slot can absorb
+     */
+    @Override
+    public int getSlotWithRemainingSpace(ItemStack stack) {
+        SimpleContainer container = body.getInventory().container();
+        int selected = body.selectedSlot;
+        if (hasRemainingSpace(container.getItem(selected), stack,
+                container)) {
+            return selected;
+        }
+        if (hasRemainingSpace(container.getItem(OFFHAND_SLOT), stack,
+                container)) {
+            return OFFHAND_SLOT;
+        }
+        for (int i = 0; i < MAIN_SLOTS; i++) {
+            if (hasRemainingSpace(container.getItem(i), stack,
+                    container)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Vanilla {@code Inventory.hasRemainingSpaceForItem} semantics:
+     * same item and tags, stackable, and below both the per-stack and
+     * the container maxima.
+     *
+     * @param slot      the candidate slot stack; never null
+     * @param stack     the stack seeking merge space; never null
+     * @param container the binding container supplying the container
+     *                  max stack size
+     * @return true when the candidate slot can absorb from the stack
+     */
+    private static boolean hasRemainingSpace(ItemStack slot,
+                                             ItemStack stack,
+                                             SimpleContainer container) {
+        return !slot.isEmpty()
+            && ItemStack.isSameItemSameTags(slot, stack)
+            && slot.isStackable()
+            && slot.getCount() < slot.getMaxStackSize()
+            && slot.getCount() < container.getMaxStackSize();
+    }
+
+    /**
+     * Add a stack, merging into a specific slot (or the first
+     * mergeable slot when {@code slot} is -1). The inherited undamaged
+     * path is safe once the search family is overridden — it merges
+     * through the overridden {@link #getItem} / {@link #setItem}. The
+     * damaged path is overridden because vanilla writes damaged tools
+     * straight into the phantom {@code items} list; popTime (the client
+     * pickup animation) is skipped, the device has no client.
+     *
+     * @param slot  target slot, or -1 for "find space"
+     * @param stack the stack to add; never null
+     * @return true when at least part of the stack was placed
+     */
+    @Override
+    public boolean add(int slot, ItemStack stack) {
+        if (!stack.isDamaged()) {
+            return super.add(slot, stack);
+        }
+        if (slot == -1) {
+            slot = getFreeSlot();
+        }
+        if (slot < 0) {
+            return false;
+        }
+        setItem(slot, stack.copyAndClear());
+        return true;
     }
 
     /**

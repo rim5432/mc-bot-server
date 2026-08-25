@@ -1618,6 +1618,137 @@ public final class BotSliceGameTests {
         helper.succeed();
     }
 
+    /**
+     * Scenario: closing a crafting menu must not corrupt an occupied
+     * hotbar 0. The vanilla placeItemBackInInventory inherits its slot
+     * search from Inventory; on the bridge that search used to read the
+     * phantom items list, fall back to "slot 0 is free" unconditionally,
+     * and merge the returned stacks into whatever slot 0 held — the
+     * cobble would grow by the return count and the diamonds would
+     * vanish. Regression for the phantom slot-search family (P0).
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void returnsGridWithoutCorruptingOccupiedSlot0(
+            GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+
+        BlockPos tableLocal = new BlockPos(7, GametestRig.WALK_Y, 8);
+        helper.setBlock(tableLocal, Blocks.CRAFTING_TABLE);
+        BlockPos tableAbs = helper.absolutePos(tableLocal);
+
+        // Slot 0 holds a different, non-full item: the corruption
+        // trigger (a merge target that fails the same-item check).
+        rig.body().getInventory().container().setItem(0,
+            new ItemStack(Items.COBBLESTONE, 32));
+
+        var facade = new BotPlayerFacade(rig.body());
+        var opener = new MenuOpener(facade);
+        var menu = opener.open(tableAbs).orElseThrow();
+
+        // Mixed grid: 5 diamonds + 4 sticks — two kinds both returning.
+        var rawMenu = menu.rawMenu();
+        CraftingContainer craftSlots =
+            (CraftingContainer) rawMenu.slots.get(1).container;
+        for (int i = 0; i < 5; i++) {
+            craftSlots.setItem(i, new ItemStack(Items.DIAMOND, 1));
+        }
+        for (int i = 5; i < 9; i++) {
+            craftSlots.setItem(i, new ItemStack(Items.STICK, 1));
+        }
+
+        menu.close();
+
+        checkEquals(32, rig.body().getInventory().container()
+            .getItem(0).getCount(),
+            "slot 0 cobble count must be unchanged after close");
+        check(Items.COBBLESTONE.equals(rig.body().getInventory()
+                .container().getItem(0).getItem()),
+            "slot 0 must still hold cobblestone, not a merged stack");
+        checkEquals(5, countItems(rig, Items.DIAMOND),
+            "all 5 grid diamonds must return to the inventory");
+        checkEquals(4, countItems(rig, Items.STICK),
+            "all 4 grid sticks must return to the inventory");
+
+        rig.body().discard();
+        helper.succeed();
+    }
+
+    /**
+     * Scenario: closing a crafting menu with a completely full main
+     * inventory must drop the grid materials at the body, not loop
+     * forever. The vanilla loop's exit for a full inventory is
+     * getFreeSlot() == -1; on the bridge that method used to read the
+     * phantom items list (never full), so the loop spun forever on the
+     * server tick thread. This test completing at all is the no-hang
+     * assertion; the entity check pins where the items went.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void dropsGridMaterialsWhenInventoryFull(
+            GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+        var level = helper.getLevel();
+
+        BlockPos tableLocal = new BlockPos(7, GametestRig.WALK_Y, 8);
+        helper.setBlock(tableLocal, Blocks.CRAFTING_TABLE);
+        BlockPos tableAbs = helper.absolutePos(tableLocal);
+
+        // Every main slot a full cobble stack: no merge space, no free
+        // slot — the only correct outcome is the drop path.
+        var container = rig.body().getInventory().container();
+        for (int i = 0; i < 36; i++) {
+            container.setItem(i, new ItemStack(Items.COBBLESTONE, 64));
+        }
+
+        var facade = new BotPlayerFacade(rig.body());
+        var opener = new MenuOpener(facade);
+        var menu = opener.open(tableAbs).orElseThrow();
+
+        var rawMenu = menu.rawMenu();
+        CraftingContainer craftSlots =
+            (CraftingContainer) rawMenu.slots.get(1).container;
+        for (int i = 0; i < 9; i++) {
+            craftSlots.setItem(i, new ItemStack(Items.DIAMOND, 1));
+        }
+
+        // Before the phantom fix this call never returned.
+        menu.close();
+
+        helper.startSequence()
+            .thenWaitUntil(driveUntil(rig, () -> {
+                var items = level.getEntitiesOfClass(ItemEntity.class,
+                    rig.body().getBoundingBox().inflate(3.0));
+                int diamonds = items.stream()
+                    .filter(e -> Items.DIAMOND.equals(
+                        e.getItem().getItem()))
+                    .mapToInt(e -> e.getItem().getCount())
+                    .sum();
+                check(diamonds == 9,
+                    "the 9 grid diamonds must drop at the body when "
+                        + "the inventory is full, saw " + diamonds);
+            }))
+            .thenExecuteAfter(0, () -> {
+                checkEquals(36 * 64, countItems(rig, Items.COBBLESTONE),
+                    "the full cobble inventory must be untouched");
+                rig.body().discard();
+            })
+            .thenSucceed();
+    }
+
+    /** Total count of one item kind across the whole binding
+     * container (all 41 slots). */
+    private static int countItems(GametestRig.Rig rig,
+                                  net.minecraft.world.item.Item item) {
+        var container = rig.body().getInventory().container();
+        int total = 0;
+        for (int i = 0; i < container.getContainerSize(); i++) {
+            ItemStack stack = container.getItem(i);
+            if (!stack.isEmpty() && stack.is(item)) {
+                total += stack.getCount();
+            }
+        }
+        return total;
+    }
+
     private static void assertEventSeen(
             com.mcbot.mcbotserver.core.event.InMemoryEventQueue events,
             String kind) {
