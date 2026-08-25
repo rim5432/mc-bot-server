@@ -140,7 +140,7 @@ TASK_PAUSED (which names the rule) is the siren either way.
 | # | Question | Status |
 |---|---|---|
 | F1 | Crashed-state dig: should MinimalReflex dig when the latch is set and the eye is buried? | Deferred with the 0008 F8 asymmetry argument: rare x rare, and dig needs executor wiring + an eye-cell feed - more than ADR-0005 D3's "a few ifs". Revisit if a crashed body ever dies buried. |
-| F2 | Tool-accelerated digging: `getDestroySpeed` from a held item. | Blocked on 0007 Phase 1 (inventory/tool loadout). The pacing function already takes its inputs as parameters; the executor grows a main-hand supplier then. |
+| F2 | Tool-accelerated digging: `getDestroySpeed` from a held item. | RESOLVED 2026-08-25 (63c2e00): DigExecutor feeds ItemStack.getDestroySpeed + hasCorrectToolForDrops every tick; DigPacing consumes them exactly as designed. |
 | F3 | BLOCK_BROKEN disclosure event (harness observability of digs). | Not queued. The suffocation preemption already discloses through TASK_PAUSED naming the rule; a dig-specific event earns its place when a mission digs (function-map section 5 harvest loops). |
 | F4 | Missions claiming INTERACT (a DigProcess, harvest-and-place). | The channel is general and behaviors may claim it; nothing is queued until a task vocabulary needs it (function-map section 5 GAP row owns that demand). |
 

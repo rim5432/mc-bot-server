@@ -6,7 +6,7 @@ covers:
   - src/main/java/com/mcbot/mcbotserver/api/world/CollisionShape.java
   - src/main/java/com/mcbot/mcbotserver/core/behavior/CombatBehavior.java
   - src/main/java/com/mcbot/mcbotserver/core/behavior/PathingBehavior.java
-status: open
+status: parked (sketch only; not adopted - re-derive at pickup)
 related:
   - doc/architecture/boundaries.md
   - doc/architecture/function-map.md

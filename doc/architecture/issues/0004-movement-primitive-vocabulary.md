@@ -296,7 +296,7 @@ current primitive set:
    ASCEND; in-engine green via `surfacesWhenAirRunsLow`). The
    discussion this finding opened — every extreme scenario, not
    just drowning — continues in issue
-   [0008](0008-extreme-scenario-survival-framework.md).
+   [0008](archive/0008-extreme-scenario-survival-framework.md).
 3. **Sprint-jump as the default long-haul gait**: players cover
    open ground sprinting, and sprint-jumps preserve momentum. A mob
    carrier pays no hunger for sprinting (`setSprinting(true)` is

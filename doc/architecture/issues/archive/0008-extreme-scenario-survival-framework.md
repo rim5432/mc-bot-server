@@ -6,7 +6,9 @@ covers:
   - src/main/java/com/mcbot/mcbotserver/api/reflex/ThreatBlackboard.java
   - src/main/java/com/mcbot/mcbotserver/core/reflex/MinimalReflex.java
   - src/main/java/com/mcbot/mcbotserver/api/reflex/ReflexAction.java
-status: open
+status: resolved (all rulings shipped 2026-08-25; deferred tails recorded in section 5; archived 2026-08-25)
+superseded_by: architecture/boundaries.md
+
 related:
   - doc/architecture/issues/0004-movement-primitive-vocabulary.md
   - doc/architecture/issues/0007-player-parity-interaction.md

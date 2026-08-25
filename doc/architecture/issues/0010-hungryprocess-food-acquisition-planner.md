@@ -6,7 +6,7 @@ covers:
   - doc/architecture/boundaries.md
   - src/main/java/com/mcbot/mcbotserver/api/reflex/ThreatBlackboard.java
   - src/main/java/com/mcbot/mcbotserver/core/process/
-status: open (design phase; blocked on 0007 Player carrier + inventory)
+status: open (design phase; 0007 Phase 1 inventory sense + BotPlayerFacade landed 2026-08-25 - remaining gate is foodData lifecycle semantics on a never-ticked facade)
 related:
   - doc/architecture/issues/0008-extreme-scenario-survival-framework.md
   - doc/architecture/issues/0007-player-parity-interaction.md

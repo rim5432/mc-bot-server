@@ -4,7 +4,9 @@ last_verified: 2026-08-25
 covers:
   - src/main/java/com/mcbot/mcbotserver/core/process/DefendProcess.java
   - doc/architecture/boundaries.md
-status: resolved
+status: resolved (archived 2026-08-25)
+superseded_by: architecture/boundaries.md
+
 ---
 
 ## Problem
