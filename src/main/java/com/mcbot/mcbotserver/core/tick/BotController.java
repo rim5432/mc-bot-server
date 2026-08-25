@@ -122,7 +122,7 @@ public final class BotController {
      * decisions to the freeze hold (rigs without rescue wiring park
      * the mission instead of routing to safety).
      */
-    private final java.util.function.Supplier<BotProcess>
+    private final Supplier<BotProcess>
         rescueMissionFactory;
     /** Reflex-owned ESCAPE rescue seat bookkeeping. */
     private final ReflexRescueSeat rescueSeat;
