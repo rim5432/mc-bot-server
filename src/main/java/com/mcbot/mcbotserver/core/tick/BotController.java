@@ -30,7 +30,6 @@ import java.io.StringWriter;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.LinkedHashMap;
 
 /**
  * The single tick entry: fixed four-stage pipeline plus the ADR-0005
@@ -112,13 +111,14 @@ public final class BotController {
      */
     private final java.util.function.Supplier<BotProcess>
         engageMissionFactory;
+    /** Mission TASK_* emission and hand-off edge detection. */
+    private final MissionReporter missions;
 
     private long tickCounter;
     private boolean crashed;
     private int crashCounter;
     private boolean inLethalFluid;
     private int airSupply = ThreatBlackboard.MAX_AIR_SUPPLY;
-    private BotProcess previousCurrent;
     private int ticksSinceKeepalive;
     /** Live reflex-owned defend mission, if any; null otherwise. */
     private BotProcess reflexEngageMission;
@@ -210,6 +210,7 @@ public final class BotController {
         this.crashReporter =
             Objects.requireNonNull(crashReporter, "crashReporter");
         this.engageMissionFactory = engageMissionFactory;
+        this.missions = new MissionReporter(arbiter, events);
     }
 
     /**
@@ -395,11 +396,7 @@ public final class BotController {
                     || (decision == null && !fightAwaitingSeat))) {
             String resumingTask = arbiter.paused().displayName();
             boolean resumed = arbiter.tryResume();
-            emitMissionEvent(resumed
-                    ? EventKind.TASK_RESUMED : EventKind.TASK_DROPPED,
-                day, tod, resumingTask,
-                resumed ? "world assumptions held"
-                    : "world assumptions invalidated; task dropped");
+            missions.resumeVerdict(resumed, resumingTask, day, tod);
         }
 
         // Stage 2: arbiter picks or keeps the winner.
@@ -418,7 +415,7 @@ public final class BotController {
 
         // Stage 4: resolve contests, expire claims, emit intents.
         actor.flush();
-        emitMissionTransition(day, tod);
+        missions.announceTransition(day, tod);
 
         // Stage 5 (observability): periodic keepalive for harnesses
         // that want to distinguish "alive and progressing" from
@@ -461,8 +458,7 @@ public final class BotController {
             String evictedName = arbiter.paused().displayName();
             if (arbiter.requeuePausedOrDrop()
                     == TaskArbiter.PausedEviction.DROPPED) {
-                emitMissionEvent(EventKind.TASK_DROPPED, day, tod,
-                    evictedName,
+                missions.dropped(evictedName, day, tod,
                     "context invalidated by reflex chain requeue");
             }
         }
@@ -473,12 +469,11 @@ public final class BotController {
         boolean announceVerdict = false;
         switch (arbiter.forcePauseAll(ctx)) {
             case PARKED -> {
-                emitMissionEvent(EventKind.TASK_PAUSED, day, tod,
-                    pausedTask, "paused by reflex "
-                        + decision.ruleName());
+                missions.paused(pausedTask, day, tod,
+                    "paused by reflex " + decision.ruleName());
                 // No current while parked: the transition detector
                 // must not fire on stale state.
-                previousCurrent = null;
+                missions.forgetCurrent();
             }
             case RETIRED_TERMINAL -> announceVerdict = true;
             case NO_CURRENT -> {
@@ -490,8 +485,8 @@ public final class BotController {
         if (announceVerdict) {
             // Retirement-lap corpse: its verdict is announced here,
             // on the reflex tick, explicitly per the ParkResult
-            // contract - not via any previousCurrent side effect.
-            emitMissionTransition(day, tod);
+            // contract - not via any transition-state side effect.
+            missions.announceTransition(day, tod);
         }
     }
 
@@ -575,67 +570,6 @@ public final class BotController {
             return n.center();
         }
         return null;
-    }
-
-    /**
-     * Detect a mission hand-off and emit its completion event. The
-     * pipeline stays generic: any process implementing TerminalMission
-     * gets TASK_COMPLETED / TASK_FAILED; anything else ends silently.
-     */
-    private void emitMissionTransition(long day, long tod) {
-        BotProcess previous = previousCurrent;
-        BotProcess now = arbiter.current();
-        previousCurrent = now;
-        if (previous == null || previous == now) {
-            return;
-        }
-        if (!(previous instanceof com.mcbot.mcbotserver.core.process
-                .TerminalMission mission)) {
-            return;
-        }
-        if (mission.missionSucceeded()) {
-            emitMissionEvent(EventKind.TASK_COMPLETED, day, tod,
-                mission.missionTaskId(), "goal reached",
-                mission.verdictAttrs());
-        } else if (previous.isActive()) {
-            // Swapped out while still active (preemption path already
-            // reported); nothing terminal to announce.
-            return;
-        } else {
-            String reason = mission.failureReasonOrNull();
-            String shown = reason != null ? reason : "unknown";
-            var extra = new LinkedHashMap<String, String>(
-                mission.verdictAttrs());
-            extra.put("reason", reason != null ? reason : "unknown");
-            emitMissionEvent(EventKind.TASK_FAILED, day, tod,
-                mission.missionTaskId(), "failed: " + shown, extra);
-        }
-    }
-
-    private void emitMissionEvent(String kind, long day, long tod,
-                                  String taskName, String detail) {
-        emitMissionEvent(kind, day, tod, taskName, detail, Map.of());
-    }
-
-    /**
-     * Push one mission lifecycle event. Structured fields land in
-     * attrs (task, reason); text stays human-readable summary only -
-     * harnesses must never parse it.
-     */
-    private void emitMissionEvent(String kind, long day, long tod,
-                                  String taskName, String detail,
-                                  Map<String, String> extraAttrs) {
-        boolean urgent = EventKind.TASK_PAUSED.equals(kind)
-            || EventKind.TASK_DROPPED.equals(kind);
-        try {
-            var attrs = new LinkedHashMap<String, String>();
-            attrs.put("task", taskName);
-            attrs.putAll(extraAttrs);
-            events.push(new BotEvent(kind, day, tod, urgent,
-                Map.copyOf(attrs), taskName + ": " + detail));
-        } catch (RuntimeException ignored) {
-            // Reporting must never take the pipeline down with it.
-        }
     }
 
     // invariant: see ADR-0005 D2 (latch -> snapshot -> clear -> report)
