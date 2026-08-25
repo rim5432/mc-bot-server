@@ -12,6 +12,8 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.ContainerSynchronizer;
+import net.minecraft.world.inventory.CraftingMenu;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
@@ -81,6 +83,7 @@ public final class BindingMenu {
      * @return fresh snapshot; never null
      */
     public MenuView snapshot() {
+        syncPositionIfFacade();
         int size = menu.slots.size();
         List<SlotView> slots = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
@@ -115,6 +118,7 @@ public final class BindingMenu {
      * @param clickType the click type; never null
      */
     public void click(int slot, int button, ClickType clickType) {
+        syncPositionIfFacade();
         menu.clicked(slot, button, clickType, player);
     }
 
@@ -126,6 +130,80 @@ public final class BindingMenu {
      *
      * @return the vanilla menu; never null
      */
+    /**
+     * Close this menu and revert the facade to its inventory menu.
+     *
+     * <p>Why this exists: vanilla closes menus through the ServerPlayer
+     * network path, which triggers {@code containerMenu.removed(player)}.
+     * BotPlayerFacade is not a ServerPlayer, so that path never runs.
+     * Furthermore, both {@link AbstractContainerMenu#removed} and
+     * {@code CraftingMenu.removed -> clearContainer} gate item return on
+     * {@code player instanceof ServerPlayer}; for a non-ServerPlayer the
+     * carried item and crafting-grid materials are silently lost. This
+     * method performs the return manually before calling removed().
+     *
+     * <p>Order: (1) save carried, (2) return crafting-grid materials
+     * manually, (3) call menu.removed() (clears carried, stops chest
+     * open, clearContainer is no-op since grid is empty), (4) return
+     * carried to inventory, (5) facade.closeContainer().
+     */
+    public void close() {
+        ItemStack carried = menu.getCarried().copy();
+
+        if (menu instanceof CraftingMenu) {
+            returnCraftingGridToInventory();
+        }
+
+        // contract: see ADR-0004 (menu is request-response; close is the
+        // terminal request). removed() clears carried and calls
+        // container.stopOpen (chest lid). For CraftingMenu it also calls
+        // clearContainer, which is a no-op here because the grid was
+        // already emptied above.
+        menu.removed(player);
+
+        if (!carried.isEmpty()) {
+            // placeItemBackInInventory works for non-ServerPlayer (it only
+            // skips the network packet, which we don't need with the
+            // no-op synchronizer). If the inventory is full it drops the
+            // remainder at the body location via player.drop().
+            player.getInventory().placeItemBackInInventory(carried);
+        }
+
+        if (player instanceof BotPlayerFacade facade) {
+            facade.closeContainer();
+        }
+    }
+
+    /**
+     * Extract all items from the 3x3 crafting grid and place them in the
+     * player inventory. CraftingMenu layout: slot 0 = result, slots 1-9
+     * = grid. Uses removeItemNoUpdate to avoid triggering slotsChanged
+     * (which would recompute the recipe mid-close).
+     */
+    private void returnCraftingGridToInventory() {
+        for (int i = 1; i <= 9; i++) {
+            Slot slot = menu.slots.get(i);
+            ItemStack removed = slot.container.removeItemNoUpdate(slot.getContainerSlot());
+            if (!removed.isEmpty()) {
+                player.getInventory().placeItemBackInInventory(removed);
+            }
+        }
+    }
+
+    /**
+     * Sync facade position to the body before every menu operation.
+     * Entity.getX/Y/Z are final and cannot be overridden, so the facade
+     * holds a stale position unless syncPosition() is called. Without
+     * this, ChestMenu.stillValid (which checks player distance to the
+     * container) would use the position frozen at open-time and never
+     * invalidate when the bot walks away.
+     */
+    private void syncPositionIfFacade() {
+        if (player instanceof BotPlayerFacade facade) {
+            facade.syncPosition();
+        }
+    }
+
     public AbstractContainerMenu rawMenu() {
         return menu;
     }

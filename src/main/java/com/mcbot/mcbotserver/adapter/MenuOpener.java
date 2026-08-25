@@ -13,6 +13,7 @@ import net.minecraft.world.level.block.CraftingTableBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -51,6 +52,11 @@ public final class MenuOpener {
      * every AbstractContainerMenu constructor. */
     private static final AtomicInteger NEXT_ID = new AtomicInteger(1);
 
+    /** Maximum interaction reach in blocks. Matches the reach used by
+     * {@code DigExecutor} and {@code InteractBlockExecutor} (4.5 blocks,
+     * the vanilla survival player reach). Squared for comparison. */
+    private static final double REACH_BLOCKS_SQ = 4.5 * 4.5;
+
     /** The facade whose inventory and player context back every menu. */
     private final BotPlayerFacade facade;
 
@@ -75,6 +81,17 @@ public final class MenuOpener {
      */
     public Optional<BindingMenu> open(BlockPos pos) {
         Level level = facade.body().level();
+
+        // Reach gate: measured from the body's eye position to the block
+        // center. Matches DigExecutor / InteractBlockExecutor (4.5 blocks).
+        // Without this the bot could open a menu on any loaded chunk
+        // regardless of distance.
+        facade.syncPosition();
+        double distSq = facade.getEyePosition().distanceToSqr(Vec3.atCenterOf(pos));
+        if (distSq > REACH_BLOCKS_SQ) {
+            return Optional.empty();
+        }
+
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();
 

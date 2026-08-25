@@ -1507,6 +1507,93 @@ public final class BotSliceGameTests {
         helper.succeed();
     }
 
+    /**
+     * Scenario: closing a crafting menu returns the grid materials to the
+     * player inventory. Vanilla closes menus through the ServerPlayer
+     * network path, which BotPlayerFacade does not have; furthermore both
+     * {@code AbstractContainerMenu.removed} and
+     * {@code CraftingMenu.removed -> clearContainer} gate item return on
+     * {@code player instanceof ServerPlayer}. Without {@link BindingMenu#close()}
+     * the grid items would be silently lost. This test fills the grid
+     * directly (no result taken), closes, and verifies all 9 diamonds are
+     * returned to the inventory.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void returnsCraftingGridOnClose(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+
+        BlockPos tableLocal = new BlockPos(7, GametestRig.WALK_Y, 8);
+        helper.setBlock(tableLocal, Blocks.CRAFTING_TABLE);
+        BlockPos tableAbs = helper.absolutePos(tableLocal);
+
+        // Give the bot 9 diamonds in hotbar 0 (separate from grid items).
+        rig.body().getInventory().container().setItem(0,
+            new ItemStack(Items.DIAMOND, 9));
+
+        var facade = new BotPlayerFacade(rig.body());
+        var opener = new MenuOpener(facade);
+        var menu = opener.open(tableAbs).orElseThrow();
+
+        // Fill grid with 9 diamonds directly (not via clicks from inventory).
+        var rawMenu = menu.rawMenu();
+        CraftingContainer craftSlots =
+            (CraftingContainer) rawMenu.slots.get(1).container;
+        for (int i = 0; i < 9; i++) {
+            craftSlots.setItem(i, new ItemStack(Items.DIAMOND, 1));
+        }
+
+        // Close: must return grid materials to inventory.
+        menu.close();
+
+        // Grid must be empty after close.
+        for (int i = 0; i < 9; i++) {
+            check(craftSlots.getItem(i).isEmpty(),
+                "crafting grid slot " + i + " must be empty after close");
+        }
+
+        // The 9 grid diamonds merged with the 9 setup diamonds in hotbar 0
+        // (placeItemBackInInventory prefers merging before finding a free
+        // slot). 9 + 9 = 18.
+        checkEquals(18, rig.body().getInventory().container()
+            .getItem(0).getCount(),
+            "hotbar 0 must hold 18 diamonds (9 setup + 9 returned from grid)");
+
+        // Facade must be back on the inventory menu after close.
+        check(facade.containerMenu == facade.facadeInventoryMenu(),
+            "facade containerMenu must revert to inventory menu after close");
+
+        rig.body().discard();
+        helper.succeed();
+    }
+
+    /**
+     * Scenario: {@link MenuOpener#open} rejects a target beyond the 4.5
+     * block interaction reach. Without the reach gate the bot could open a
+     * menu on any loaded chunk regardless of distance. The bot is at
+     * (7, WALK_Y, 7); a chest at z=15 is 8 blocks away — well beyond
+     * reach. The opener must return empty.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void rejectsMenuBeyondReach(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+
+        // Place a chest 8 blocks south of the bot (z=15, bot at z=7).
+        BlockPos chestLocal = new BlockPos(7, GametestRig.WALK_Y, 15);
+        helper.setBlock(chestLocal, Blocks.CHEST);
+        BlockPos chestAbs = helper.absolutePos(chestLocal);
+
+        var facade = new BotPlayerFacade(rig.body());
+        var opener = new MenuOpener(facade);
+        var menuOpt = opener.open(chestAbs);
+
+        check(menuOpt.isEmpty(),
+            "menu opener must return empty for a chest 8 blocks away "
+                + "(beyond 4.5 block reach)");
+
+        rig.body().discard();
+        helper.succeed();
+    }
+
     private static void assertEventSeen(
             com.mcbot.mcbotserver.core.event.InMemoryEventQueue events,
             String kind) {

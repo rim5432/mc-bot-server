@@ -71,6 +71,14 @@ public final class BotPlayerFacade extends Player {
         super(body.level(), body.blockPosition(), body.getYRot(),
             createProfile(body));
         this.body = body;
+        // NOTE: Entity.eyeHeight is private and getEyeHeight() is final,
+        // so this facade retains the Player default eyeHeight (1.62) even
+        // though the carrier PathfinderMob is shorter (~1.53). The 0.09
+        // discrepancy is a known design choice (issue 0007 §7 risk 1):
+        // menu reach checks via getEyePosition() use 1.62, which is
+        // slightly more permissive than the body's actual eye line. This
+        // is acceptable for device semantics and must not be "fixed" by
+        // future editors without re-calibrating all interaction geometry.
         this.bridgeInventory = new BridgeInventory(this, body);
         // active=true on the server side (mirrors InventoryMenu's
         // !level.isClientSide flag in the Player constructor).
