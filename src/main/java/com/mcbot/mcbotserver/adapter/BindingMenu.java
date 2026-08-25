@@ -2,8 +2,11 @@ package com.mcbot.mcbotserver.adapter;
 
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
 import com.mcbot.mcbotserver.api.inventory.ItemView;
+import com.mcbot.mcbotserver.api.menu.MenuClick;
 import com.mcbot.mcbotserver.api.menu.MenuView;
+import com.mcbot.mcbotserver.api.menu.SlotRole;
 import com.mcbot.mcbotserver.api.menu.SlotView;
+import com.mcbot.mcbotserver.api.types.CellPos;
 
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -63,6 +66,10 @@ public final class BindingMenu {
     /** Menu kind identifier for the snapshot. */
     private final String type;
 
+    /** The world block this menu is bound to; null for the bot's own
+     * inventory menu. */
+    private final CellPos sourcePos;
+
     /**
      * Terminal-state latch: set by {@link #close()}, never cleared.
      * Clicks and snapshots on a closed menu are programming errors —
@@ -81,16 +88,20 @@ public final class BindingMenu {
      * later {@code MenuOpener.open} closes this one first (vanilla
      * parity).
      *
-     * @param menu   the open vanilla menu; never null
-     * @param player the player context (the facade); never null
-     * @param type   menu kind identifier for snapshots (e.g. "inventory",
-     *               "crafting_table", "chest"); never null or blank
+     * @param menu      the open vanilla menu; never null
+     * @param player    the player context (the facade); never null
+     * @param type      menu kind identifier for snapshots (e.g.
+     *                  "inventory", "crafting_table", "chest"); never
+     *                  null or blank
+     * @param sourcePos the world block the menu is bound to; null for
+     *                  the bot's own inventory menu
      */
     public BindingMenu(AbstractContainerMenu menu, Player player,
-                       String type) {
+                       String type, CellPos sourcePos) {
         this.menu = Objects.requireNonNull(menu, "menu");
         this.player = Objects.requireNonNull(player, "player");
         this.type = Objects.requireNonNull(type, "type");
+        this.sourcePos = sourcePos;
         if (type.isBlank()) {
             throw new IllegalArgumentException("type must not be blank");
         }
@@ -101,10 +112,10 @@ public final class BindingMenu {
     }
 
     /**
-     * Snapshot the menu's current state: every slot plus the carried
-     * (cursor) item. The returned {@link MenuView} is immutable — the
-     * planner reads it to decide click sequences but cannot mutate the
-     * menu through it.
+     * Snapshot the menu's current state: every slot with its role, the
+     * carried (cursor) stack, and the source block. The returned
+     * {@link MenuView} is immutable — the planner reads it to decide
+     * click sequences but cannot mutate the menu through it.
      *
      * @return fresh snapshot; never null
      * @throws IllegalStateException if the menu is closed
@@ -114,23 +125,11 @@ public final class BindingMenu {
         int size = menu.slots.size();
         List<SlotView> slots = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
-            slots.add(new SlotView(i, toView(menu.slots.get(i).getItem())));
+            slots.add(new SlotView(i,
+                toView(menu.slots.get(i).getItem()), roleOf(i, size)));
         }
-        return new MenuView(type, size, slots);
-    }
-
-    /**
-     * The item currently carried on the cursor (the "ghost" stack
-     * between clicks). Relevant for click-sequence planning: a planner
-     * must know what it is holding before it decides where to click.
-     *
-     * @return the carried item view; {@link ItemView#EMPTY} if nothing
-     *         is carried
-     * @throws IllegalStateException if the menu is closed
-     */
-    public ItemView getCarried() {
-        ensureOpen();
-        return toView(menu.getCarried());
+        return new MenuView(type, sourcePos, toView(menu.getCarried()),
+            size, slots);
     }
 
     /**
@@ -138,21 +137,79 @@ public final class BindingMenu {
      * surface — all slot mutations (pickup, place, swap, quick-move,
      * craft-take) go through here so the menu's internal state machine
      * (including {@code ResultSlot.onTake} material consumption) stays
-     * consistent.
+     * consistent. Takes the api's {@link MenuClick} vocabulary; the
+     * engine click type never crosses into caller code.
      *
-     * @param slot     the clicked slot index (menu's flat index, -1 for
-     *                 "clicked outside the window" / drop carried)
-     * @param button   the mouse button (0 = left, 1 = right; for
-     *                 {@link ClickType#SWAP} this is the hotbar index 0..8)
-     * @param clickType the click type; never null
+     * @param slot      the clicked slot index (menu's flat index, -1 for
+     *                  "clicked outside the window" / drop carried)
+     * @param button    the mouse button (0 = left, 1 = right); per-kind
+     *                  semantics are documented on {@link MenuClick}
+     * @param clickType the click kind; never null
      * @throws IllegalStateException if the menu is closed, or if the
      *         menu's stillValid predicate fails (bot out of the vanilla
      *         keep-open range, or the source block changed or broke)
      */
-    public void click(int slot, int button, ClickType clickType) {
+    public void click(int slot, int button, MenuClick clickType) {
         ensureOpen();
         ensureStillValid();
-        menu.clicked(slot, button, clickType, player);
+        menu.clicked(slot, button, toEngine(clickType), player);
+    }
+
+    /**
+     * Engine-click translation for {@link #click}. The two excluded
+     * engine kinds (CLONE, QUICK_CRAFT) have no api vocabulary — see
+     * the {@link MenuClick} deviation note.
+     */
+    private static ClickType toEngine(MenuClick type) {
+        return switch (type) {
+            case PICKUP -> ClickType.PICKUP;
+            case QUICK_MOVE -> ClickType.QUICK_MOVE;
+            case THROW -> ClickType.THROW;
+        };
+    }
+
+    /**
+     * The role of one flat slot. This table is where the vanilla
+     * layout knowledge lives — callers address slots by role, never by
+     * per-type flat arithmetic. Layouts: CraftingMenu (45: result,
+     * grid 1-9, main 10-36, hotbar 37-44), InventoryMenu (46: result,
+     * grid 1-4, armor 5-8, main 9-35, hotbar 36-44, offhand 45), and
+     * container menus (chest rows: container block, then the standard
+     * 27 main + 9 hotbar player region — also the fallback for menu
+     * kinds the table does not know yet; each new kind extends this
+     * table in the same change that adds it).
+     */
+    private SlotRole roleOf(int index, int size) {
+        if (menu instanceof CraftingMenu) {
+            if (index == 0) {
+                return SlotRole.RESULT;
+            }
+            if (index <= 9) {
+                return SlotRole.GRID;
+            }
+            return index <= size - 9 ? SlotRole.MAIN : SlotRole.HOTBAR;
+        }
+        if (menu instanceof InventoryMenu) {
+            if (index == 0) {
+                return SlotRole.RESULT;
+            }
+            if (index <= 4) {
+                return SlotRole.GRID;
+            }
+            if (index <= 8) {
+                return SlotRole.ARMOR;
+            }
+            if (index == size - 1) {
+                return SlotRole.OFFHAND;
+            }
+            return index <= 35 ? SlotRole.MAIN : SlotRole.HOTBAR;
+        }
+        // Container menus (chest, and unknown kinds as fallback):
+        // leading container slots, then main 27, then hotbar 9.
+        if (index <= size - 37) {
+            return SlotRole.CONTAINER;
+        }
+        return index <= size - 10 ? SlotRole.MAIN : SlotRole.HOTBAR;
     }
 
     /**

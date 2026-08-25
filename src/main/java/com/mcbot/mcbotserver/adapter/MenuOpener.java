@@ -138,7 +138,7 @@ public final class MenuOpener {
         facade.syncPosition();
         var menu = facade.facadeInventoryMenu();
         facade.containerMenu = menu;
-        return new BindingMenu(menu, facade, "inventory");
+        return new BindingMenu(menu, facade, "inventory", null);
     }
 
     /**
@@ -165,7 +165,8 @@ public final class MenuOpener {
         BotCraftingMenu menu = new BotCraftingMenu(
             NEXT_ID.getAndIncrement(), inv, access);
         facade.containerMenu = menu;
-        return new BindingMenu(menu, facade, "crafting_table");
+        return new BindingMenu(menu, facade, "crafting_table",
+            toCellPos(pos));
     }
 
     private Optional<BindingMenu> openChest(BlockPos pos) {
@@ -181,7 +182,18 @@ public final class MenuOpener {
         ChestMenu menu = ChestMenu.threeRows(
             NEXT_ID.getAndIncrement(), inv, chest);
         facade.containerMenu = menu;
-        return Optional.of(new BindingMenu(menu, facade, "chest"));
+        return Optional.of(new BindingMenu(menu, facade, "chest",
+            toCellPos(pos)));
+    }
+
+    /**
+     * Convert an engine block position to the api position type for
+     * snapshots (the api never sees engine types).
+     */
+    private static com.mcbot.mcbotserver.api.types.CellPos toCellPos(
+            BlockPos pos) {
+        return new com.mcbot.mcbotserver.api.types.CellPos(
+            pos.getX(), pos.getY(), pos.getZ());
     }
 
     /**

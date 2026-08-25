@@ -14,18 +14,23 @@ import com.mcbot.mcbotserver.api.inventory.ItemView;
  * Phase 2. The slot index is the menu's flat index (0..containerSize-1),
  * not the inventory compartment index — the menu's slot layout differs
  * from the raw inventory (crafting grid, result, armor, main, hotbar are
- * all interleaved by the menu's {@code addSlot} order).
+ * all interleaved by the menu's {@code addSlot} order). The role says
+ * what the slot IS so planners never hardcode per-type flat layouts
+ * (the gametest-era "menu slot 37 = hotbar 0" knowledge now lives in
+ * the adapter's role table alone).
  *
  * @param index the menu's flat slot index
  * @param item  the item in this slot; {@link ItemView#EMPTY} for empty
+ * @param role  what this slot is; never null
  */
-public record SlotView(int index, ItemView item) {
+public record SlotView(int index, ItemView item, SlotRole role) {
 
     /**
      * Creates a validated slot view.
      *
      * @param index must not be negative
      * @param item  must not be null
+     * @param role  must not be null
      */
     public SlotView {
         if (index < 0) {
@@ -34,6 +39,9 @@ public record SlotView(int index, ItemView item) {
         }
         if (item == null) {
             throw new IllegalArgumentException("slot item must not be null");
+        }
+        if (role == null) {
+            throw new IllegalArgumentException("slot role must not be null");
         }
     }
 

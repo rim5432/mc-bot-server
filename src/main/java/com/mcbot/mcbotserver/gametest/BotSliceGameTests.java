@@ -6,6 +6,8 @@ import com.mcbot.mcbotserver.adapter.BotAssembly;
 import com.mcbot.mcbotserver.adapter.BotCraftingMenu;
 import com.mcbot.mcbotserver.adapter.BotPlayerFacade;
 import com.mcbot.mcbotserver.adapter.MenuOpener;
+import com.mcbot.mcbotserver.api.menu.MenuClick;
+import com.mcbot.mcbotserver.api.menu.SlotRole;
 import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
 import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Channel;
@@ -31,7 +33,6 @@ import net.minecraft.world.entity.monster.Skeleton;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.CraftingContainer;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
@@ -1437,13 +1438,28 @@ public final class BotSliceGameTests {
         checkEquals(1, result.getCount(),
             "result must be 1 diamond block");
 
+        // Disclosure shape: roles and sourcePos are in the snapshot.
+        var snap = menu.snapshot();
+        checkEquals(SlotRole.RESULT, snap.slot(0).role(),
+            "slot 0 must be the RESULT role");
+        checkEquals(SlotRole.GRID, snap.slot(1).role(),
+            "slot 1 must be the GRID role");
+        checkEquals(SlotRole.HOTBAR, snap.slot(38).role(),
+            "slot 38 must be the HOTBAR role");
+        checkEquals(SlotRole.MAIN, snap.slot(10).role(),
+            "slot 10 must be the MAIN role");
+        checkEquals(tableAbs, snap.sourcePos() == null ? null
+                : new BlockPos(snap.sourcePos().x(), snap.sourcePos().y(),
+                    snap.sourcePos().z()),
+            "the crafting-table menu must carry its source position");
+
         // Take the result: left-click (button 0) the result slot (0).
         // ResultSlot.onTake consumes the 9 grid diamonds.
-        menu.click(0, 0, ClickType.PICKUP);
+        menu.click(0, 0, MenuClick.PICKUP);
         checkEquals("minecraft:diamond_block",
-            menu.getCarried().itemId(),
+            menu.snapshot().carried().itemId(),
             "carried must be diamond_block after take");
-        checkEquals(1, menu.getCarried().count(),
+        checkEquals(1, menu.snapshot().carried().count(),
             "carried must be 1 diamond block");
 
         // Verify grid materials were consumed by ResultSlot.onTake.
@@ -1453,8 +1469,8 @@ public final class BotSliceGameTests {
         }
 
         // Place the diamond block into hotbar slot 1 (menu slot 38).
-        menu.click(38, 0, ClickType.PICKUP);
-        check(menu.getCarried().isEmpty(),
+        menu.click(38, 0, MenuClick.PICKUP);
+        check(menu.snapshot().carried().isEmpty(),
             "carried must be empty after placing in hotbar 1");
         ItemStack placed = rig.body().getInventory().container().getItem(1);
         check(placed.is(Items.DIAMOND_BLOCK),
@@ -1507,16 +1523,16 @@ public final class BotSliceGameTests {
         var facade = new BotPlayerFacade(rig.body());
         facade.syncPosition();
         var menu = new BindingMenu(facade.facadeInventoryMenu(),
-            facade, "inventory");
+            facade, "inventory", null);
 
         // Pick up: left-click the backpack slot. This goes through
         // Slot.tryRemove → Slot.remove → container.removeItem — the
         // phantom-compartment path that was broken before the override.
-        menu.click(BACKPACK_MENU_SLOT, 0, ClickType.PICKUP);
-        checkEquals("minecraft:diamond", menu.getCarried().itemId(),
+        menu.click(BACKPACK_MENU_SLOT, 0, MenuClick.PICKUP);
+        checkEquals("minecraft:diamond", menu.snapshot().carried().itemId(),
             "after pickup: carried must be diamonds (removeItem must "
                 + "read the binding container, not the phantom super list)");
-        checkEquals(8, menu.getCarried().count(),
+        checkEquals(8, menu.snapshot().carried().count(),
             "after pickup: carried must be all 8 diamonds");
         check(rig.body().getInventory().container().getItem(9).isEmpty(),
             "after pickup: backpack slot 9 must be empty (removeItem "
@@ -1524,8 +1540,8 @@ public final class BotSliceGameTests {
 
         // Place: left-click hotbar 0. This goes through setByPlayer →
         // setItem (the path that always worked).
-        menu.click(HOTBAR0_MENU_SLOT, 0, ClickType.PICKUP);
-        check(menu.getCarried().isEmpty(),
+        menu.click(HOTBAR0_MENU_SLOT, 0, MenuClick.PICKUP);
+        check(menu.snapshot().carried().isEmpty(),
             "after place: carried must be empty");
         checkEquals(8, rig.body().getInventory().container()
             .getItem(0).getCount(),
@@ -1820,7 +1836,7 @@ public final class BotSliceGameTests {
 
         boolean threw = false;
         try {
-            tableMenu.click(1, 0, ClickType.PICKUP);
+            tableMenu.click(1, 0, MenuClick.PICKUP);
         } catch (IllegalStateException expected) {
             threw = true;
         }
@@ -1898,7 +1914,7 @@ public final class BotSliceGameTests {
 
         boolean threw = false;
         try {
-            menu.click(0, 0, ClickType.PICKUP);
+            menu.click(0, 0, MenuClick.PICKUP);
         } catch (IllegalStateException expected) {
             threw = true;
         }
@@ -1934,16 +1950,16 @@ public final class BotSliceGameTests {
 
         // Inventory-menu layout: armor slots 5-8 (5=head, 8=feet),
         // hotbar slots 36-44 (hotbar 0 = menu 36, hotbar 1 = 37).
-        menu.click(36, 0, ClickType.PICKUP);
+        menu.click(36, 0, MenuClick.PICKUP);
         checkEquals("minecraft:diamond_helmet",
-            menu.getCarried().itemId(),
+            menu.snapshot().carried().itemId(),
             "pickup must lift the helmet from hotbar 0");
-        menu.click(5, 0, ClickType.PICKUP);
-        check(menu.getCarried().isEmpty(),
+        menu.click(5, 0, MenuClick.PICKUP);
+        check(menu.snapshot().carried().isEmpty(),
             "the helmet must land on the head armor slot");
-        menu.click(37, 0, ClickType.PICKUP);
-        menu.click(8, 0, ClickType.PICKUP);
-        check(menu.getCarried().isEmpty(),
+        menu.click(37, 0, MenuClick.PICKUP);
+        menu.click(8, 0, MenuClick.PICKUP);
+        check(menu.snapshot().carried().isEmpty(),
             "the boots must land on the feet armor slot");
 
         check(Items.DIAMOND_HELMET.equals(container.getItem(36).getItem()),
