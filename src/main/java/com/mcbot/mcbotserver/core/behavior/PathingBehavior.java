@@ -368,73 +368,10 @@ public final class PathingBehavior implements Behavior {
         }
 
         if (evaluateTriggers) {
-            // Plan-progress score (ledger 20, Path A).
-            // Three OR criteria; any one counts as progress and
-            // resets the accumulator. External replan (exhaustion,
-            // offPath, freshness drop) MUST NOT clear the
-            // accumulator - only real plan-progress or the fuse
-            // itself does. The previous motion detector is gone:
-            // it was strictly weaker than plan-progress for the
-            // "moving but not progressing" case (limbo body in
-            // free fall - large per-tick 3D displacement, zero
-            // waypoint-progress).
-            if (fuse.evaluate(cursor, position,
-                anchorCell(directive.goal()))) {
-                fuse.onProgress();
-            } else {
-                fuse.onStall();
-            }
-
-            boolean fuseCondition = fuse.shouldFire();
-            boolean offPath = !cursor.exhausted()
-                && distanceToSegment(position, cursor.previous(),
-                    cursor.current()) > REPLAN_DISTANCE;
-            boolean exhausted = cursor.exhausted();
-
-            // Replan cooldown bypassed on the landing edge: contact
-            // is the first tick the body's position is meaningful for
-            // pathing, and a stale plan from before take-off must
-            // be replaced immediately rather than after the
-            // cooldown elapses.
-            if ((fuseCondition || offPath || exhausted)
-                && gate.mayRequest(window)) {
-                gate.onRequest();
-                applyAdoption(lifecycle.request(world, cell,
-                    directive.goal(), noPath.nextNodeBudget()),
-                    world, directive.goal());
-                if (noPath.tripped()) {
-                    resetPlan();
-                    return ExecutionReport.failed("NO_PATH");
-                }
-            }
-
-            if (cursor.isEmpty()) {
-                // A search still running is not an answer: report
-                // RUNNING rather than inventing NO_PATH for a
-                // question in flight.
-                if (lifecycle.inFlight()) {
-                    return ExecutionReport.running();
-                }
-                // Definitive no-path right now: fail cleanly; the
-                // mission process owns the terminal transition
-                // from here. A fuse-triggered failure reports
-                // STUCK (physically immovable), a planning-side
-                // one reports NO_PATH.
-                if (fuseCondition) {
-                    fuse.latch();
-                    return ExecutionReport.failed("STUCK");
-                }
-                return ExecutionReport.failed("NO_PATH");
-            }
-            if (fuseCondition && !fuse.latched()) {
-                // Fresh-plan grace expired while the body stayed
-                // frozen and the replan cooldown is still blocking
-                // the next attempt. Report once, latch, keep
-                // claims flowing; movement or a later successful
-                // plan clears the latch.
-                fuse.latch();
-                return ExecutionReport.stuck(
-                    "frozen between replan cooldowns");
+            ExecutionReport verdict = triggerVerdict(world,
+                directive.goal(), position, cell, window);
+            if (verdict != null) {
+                return verdict;
             }
         }
 
@@ -452,6 +389,97 @@ public final class PathingBehavior implements Behavior {
         }
         steerTowardCurrentWaypoint(position, actor);
         return ExecutionReport.running();
+    }
+
+    /**
+     * Plan-health evaluation for one trigger-eligible (ground)
+     * tick: fuse scoring, the replan decision, and the emptiness
+     * verdicts. Every verdict below this layer - cursor advance,
+     * departure hold, steering - belongs to a tick that still has
+     * a usable plan.
+     *
+     * @param world   read-only perception for the replan search;
+     *                never null
+     * @param goal    the active goal; never null
+     * @param position current body position; never null
+     * @param cell    the floored position cell; never null
+     * @param window  the vertical gate's verdict for this tick;
+     *                never null
+     * @return a report to return from this tick (failed NO_PATH /
+     *         STUCK, running while a search is in flight, stuck
+     *         once between replan cooldowns); null when the tick
+     *         should proceed to cursor advance
+     */
+    private ExecutionReport triggerVerdict(WorldView world, Goal goal,
+                                           Vec3 position, CellPos cell,
+                                           ReplanGate.TickWindow window) {
+        // Plan-progress score (ledger 20, Path A).
+        // Three OR criteria; any one counts as progress and
+        // resets the accumulator. External replan (exhaustion,
+        // offPath, freshness drop) MUST NOT clear the
+        // accumulator - only real plan-progress or the fuse
+        // itself does. The previous motion detector is gone:
+        // it was strictly weaker than plan-progress for the
+        // "moving but not progressing" case (limbo body in
+        // free fall - large per-tick 3D displacement, zero
+        // waypoint-progress).
+        if (fuse.evaluate(cursor, position, anchorCell(goal))) {
+            fuse.onProgress();
+        } else {
+            fuse.onStall();
+        }
+
+        boolean fuseCondition = fuse.shouldFire();
+        boolean offPath = !cursor.exhausted()
+            && distanceToSegment(position, cursor.previous(),
+                cursor.current()) > REPLAN_DISTANCE;
+        boolean exhausted = cursor.exhausted();
+
+        // Replan cooldown bypassed on the landing edge: contact
+        // is the first tick the body's position is meaningful for
+        // pathing, and a stale plan from before take-off must
+        // be replaced immediately rather than after the
+        // cooldown elapses.
+        if ((fuseCondition || offPath || exhausted)
+            && gate.mayRequest(window)) {
+            gate.onRequest();
+            applyAdoption(lifecycle.request(world, cell, goal,
+                noPath.nextNodeBudget()), world, goal);
+            if (noPath.tripped()) {
+                resetPlan();
+                return ExecutionReport.failed("NO_PATH");
+            }
+        }
+
+        if (cursor.isEmpty()) {
+            // A search still running is not an answer: report
+            // RUNNING rather than inventing NO_PATH for a
+            // question in flight.
+            if (lifecycle.inFlight()) {
+                return ExecutionReport.running();
+            }
+            // Definitive no-path right now: fail cleanly; the
+            // mission process owns the terminal transition
+            // from here. A fuse-triggered failure reports
+            // STUCK (physically immovable), a planning-side
+            // one reports NO_PATH.
+            if (fuseCondition) {
+                fuse.latch();
+                return ExecutionReport.failed("STUCK");
+            }
+            return ExecutionReport.failed("NO_PATH");
+        }
+        if (fuseCondition && !fuse.latched()) {
+            // Fresh-plan grace expired while the body stayed
+            // frozen and the replan cooldown is still blocking
+            // the next attempt. Report once, latch, keep
+            // claims flowing; movement or a later successful
+            // plan clears the latch.
+            fuse.latch();
+            return ExecutionReport.stuck(
+                "frozen between replan cooldowns");
+        }
+        return null;
     }
 
     /**
