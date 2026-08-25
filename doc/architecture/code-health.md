@@ -2,10 +2,13 @@
 title: Code Health Ledger
 last_verified: 2026-08-25
 covers:
+  - src/main/java/com/mcbot/mcbotserver/core/tick/BotController.java
   - src/main/java/com/mcbot/mcbotserver/core/tick/MissionReporter.java
   - src/main/java/com/mcbot/mcbotserver/core/tick/ReflexEngageSeat.java
+  - src/main/java/com/mcbot/mcbotserver/adapter/BindingActor.java
   - src/main/java/com/mcbot/mcbotserver/adapter/MeleeResolver.java
   - src/main/java/com/mcbot/mcbotserver/adapter/PresenceLayer.java
+  - src/main/java/com/mcbot/mcbotserver/core/behavior/PathingBehavior.java
   - src/test/java/com/mcbot/mcbotserver/hygiene/EnglishOnlyScan.java
   - src/test/java/com/mcbot/mcbotserver/hygiene/GametestInventoryCheck.java
   - src/test/java/com/mcbot/mcbotserver/tickpipeline/PathingTestAccess.java
@@ -195,6 +198,18 @@ Adapter moves ride the combat and presence gametest scenarios; the
 LOS-blocked scenario comment was repointed to
 `MeleeResolver.sightBlocked` in the moving commit.
 
+### Inline-FQN second sweep (2026-08-25)
+
+H7 closed in 28c9a94 once the concurrent dig-feature session
+landed and the controller/actor files stopped moving: the residual
+inline FQNs (BotController's Supplier, BindingActor's
+ChannelArbiter delegate and sprint-clip MC types,
+PathingBehavior's AStarPathFinder budget reference, DigExecutor's
+Vec3.atCenterOf, DefendProcess's three api param FQNs) became
+imports, and DefendProcess's default-only report switch flattened
+into the comment block it always was. Zero behaviour change;
+compile + full suite green.
+
 ## Ruling anchors in code
 
 Where the live architectural rulings physically live, so "why is it
@@ -224,15 +239,6 @@ without an anchor is a workplan item, not a row here.
   the candidate: a layer-1 test scanning every boundary-interface
   implementer for its contract marker. Optional for Stage 3; pair
   with the next boundary-touching change.
-- **OPEN H7 - inline-FQN style round, second sweep.** Residual
-  inline FQNs after the 2026-08-25 decomposition: BotController's
-  `java.util.function.Supplier` (field and ten-arg constructor),
-  BindingActor's ChannelArbiter delegate and the sprint-clip MC
-  types, PathingBehavior's AStarPathFinder node-budget reference,
-  plus DefendProcess's empty `onExecutionReport` switch skeleton.
-  Deferred mid-round because controller and actor were under
-  concurrent edit (dig-channel wiring); reopens when that session
-  lands.
 - **OPEN H8 - test-package mirroring.** Test packages
   (`corepathing`, `coreprocess`, `tickpipeline`, `reflexlayer`,
   `boundaryd`) do not mirror main-source packages, so test-to-code
@@ -246,3 +252,11 @@ without an anchor is a workplan item, not a row here.
   different return types. Consolidation is an api-surface design
   decision (a shared `api.sensing` vocabulary versus staying
   local), so it needs a ruling before code moves.
+- **OPEN H10 - preemptAndHold dig-claim injection.** The dig
+  feature (issue 0009) added a DIG branch inside
+  `BotController.preemptAndHold`: when the reflex decision carries
+  a dig target, the preemption also submits a ROT aim and an
+  INTERACT dig claim (~25 lines). The method is no longer purely
+  "park and hold"; extracting `preemptDigClaims(decision,
+  position)` restores single responsibility. Mechanical, no
+  behaviour change; do it with the next controller touch.
