@@ -78,6 +78,7 @@ public final class LevelThreatSensor implements ThreatSensor {
     private final Supplier<Integer> fireTicks;
     private final Supplier<Integer> freezeTicks;
     private final Supplier<Boolean> inWall;
+    private final Supplier<CellPos> suffocationBlock;
 
     /**
      * Creates a sensor scanning around the live body position.
@@ -98,6 +99,11 @@ public final class LevelThreatSensor implements ThreatSensor {
      *                    never null
      * @param inWall     body suffocation supplier ({@code body::isInWall});
      *                   never null
+     * @param suffocationBlock solid eye-cell supplier for the DIG
+     *                   self-rescue (issue 0009); never null - must
+     *                   return null while the eye is clear, so an
+     *                   unstamped board degrades to the freeze hold
+     *                   rather than a dig-at-null
      */
     public LevelThreatSensor(com.mcbot.mcbotserver.adapter.BindingWorldView
                                  view,
@@ -106,10 +112,12 @@ public final class LevelThreatSensor implements ThreatSensor {
                              Supplier<Boolean> inLava,
                              Supplier<Integer> fireTicks,
                              Supplier<Integer> freezeTicks,
-                             Supplier<Boolean> inWall) {
+                             Supplier<Boolean> inWall,
+                             Supplier<CellPos> suffocationBlock) {
         if (view == null || bodyPos == null || airSupply == null
                 || inLava == null || fireTicks == null
-                || freezeTicks == null || inWall == null) {
+                || freezeTicks == null || inWall == null
+                || suffocationBlock == null) {
             throw new IllegalArgumentException(
                 "arguments must not be null");
         }
@@ -120,6 +128,7 @@ public final class LevelThreatSensor implements ThreatSensor {
         this.fireTicks = fireTicks;
         this.freezeTicks = freezeTicks;
         this.inWall = inWall;
+        this.suffocationBlock = suffocationBlock;
     }
 
     @Override
@@ -132,6 +141,13 @@ public final class LevelThreatSensor implements ThreatSensor {
         board.fireTicks = fireTicks.get();
         board.freezeTicks = freezeTicks.get();
         board.inWall = inWall.get();
+        CellPos eyeBlock = suffocationBlock.get();
+        if (eyeBlock != null && !board.inWall) {
+            // Position without the vital is stale data, not a rescue
+            // target - the pair must travel together or not at all.
+            eyeBlock = null;
+        }
+        board.suffocationBlock = eyeBlock;
         CellPos center = bodyPos.get();
         List<EntitySnapshot> hits = world.getEntities(
             center, THREAT_RANGE,

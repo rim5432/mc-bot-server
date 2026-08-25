@@ -570,6 +570,37 @@ BotState getState();
     the lockstep. Boolean-condition rules (lava, suffocation) carry
     only their priority in JSON - the inverted 0/1 signal's
     hysteresis thresholds are code constants, not tunable data.
+    25. Block capability axis opened - dig first (issue 0009; user
+    ruling 2026-08-25 "start enriching the bot's block capability",
+    motivated by the gravel-suffocation escape). Decision 14's
+    "four channels" grows to FIVE: INTERACT carries held block
+    interaction (USE stays entity-melee; the same channel 0007
+    section 6.2 hypothesized, pulled forward because bare-hand
+    mining is inventory-free). Vocabulary: `Intent.Dig(CellPos)` - a
+    claim this tick IS the button state; multi-tick destroy progress
+    accumulates adapter-side in DigExecutor (mirrors
+    ServerPlayerGameMode: per-tick = digSpeed / destroySpeed /
+    (correctTool ? 30 : 100), x0.2 airborne, break at 1.0 via
+    `level.destroyBlock(pos, true)`, crack stages through
+    `destroyBlockProgress`; deviations: no stop-destroy 0.7 shortcut
+    and no Forge LeftClickBlock/onBlockBreakEvent hooks - both
+    Player/client-shaped, deferred with the 0007 facade). The
+    arithmetic lives in core `DigPacing` (gravel 18 hand-ticks,
+    stone 150, hardness-0 pops, unbreakable never). Reflex half:
+    `ReflexAction.DIG` maps (controller) to MOVE hold + ROT aim
+    (presentation only - the executor never reads facing) +
+    INTERACT dig claims from the decision's `actionTarget`
+    (`ReflexRule.actionTarget(board)`); a targetless DIG degrades to
+    the freeze hold - missing data must not mint a dig-at-null.
+    FREEZE_ON_SUFFOCATION is renamed DIG_ON_SUFFOCATION (115 /
+    hold 10 unchanged, ladder unchanged): with dig capability the
+    rescue direction is KNOWN (the eye block, sensor-stamped onto
+    `ThreatBlackboard.suffocationBlock`), superseding the stopgap
+    whose whole argument was the unknown direction. The old type
+    string is a hard parse error (loud datapack update, not silent
+    drop); the reload-parity gate pins the lockstep. Crashed-state
+    suffocation stays freeze-class - MinimalReflex keeps "a few ifs"
+    (issue 0009 F1).
 
 ## Deferred, with reopen conditions
 

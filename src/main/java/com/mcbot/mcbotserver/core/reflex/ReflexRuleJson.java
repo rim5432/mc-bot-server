@@ -95,7 +95,7 @@ public final class ReflexRuleJson {
                 entry.addProperty("priority", engage.priority());
             } else if (rule instanceof AscendInLethalFluidRule lava) {
                 entry.addProperty("priority", lava.priority());
-            } else if (rule instanceof FreezeOnSuffocationRule wall) {
+            } else if (rule instanceof DigOnSuffocationRule wall) {
                 entry.addProperty("priority", wall.priority());
             } else {
                 throw new IllegalArgumentException(
@@ -125,7 +125,7 @@ public final class ReflexRuleJson {
         if ("ASCEND_IN_LETHAL_FLUID".equals(type)) {
             return lavaRule(rule);
         }
-        if ("FREEZE_ON_SUFFOCATION".equals(type)) {
+        if ("DIG_ON_SUFFOCATION".equals(type)) {
             return suffocationRule(rule);
         }
         throw new IllegalArgumentException(
@@ -188,7 +188,10 @@ public final class ReflexRuleJson {
      * Boolean-condition rules carry only their priority - trigger and
      * release are code-level constants (the inverted 0/1 signal's
      * thresholds are not tunable data), so the JSON form stays
-     * one field wide.
+     * one field wide. DIG_ON_SUFFOCATION is the renamed successor of
+     * the FREEZE_ON_SUFFOCATION stopgap (issue 0009): the old type
+     * string is intentionally a hard parse error now - a datapack
+     * still naming it must be updated, never silently ignored.
      */
     private static ReflexRule lavaRule(JsonObject rule) {
         int priority = rule.has("priority")
@@ -205,12 +208,12 @@ public final class ReflexRuleJson {
     private static ReflexRule suffocationRule(JsonObject rule) {
         int priority = rule.has("priority")
             ? rule.get("priority").getAsInt()
-            : FreezeOnSuffocationRule.SUFFOCATION_PRIORITY;
+            : DigOnSuffocationRule.SUFFOCATION_PRIORITY;
         try {
-            return new FreezeOnSuffocationRule(priority);
+            return new DigOnSuffocationRule(priority);
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(
-                "FREEZE_ON_SUFFOCATION: " + e.getMessage(), e);
+                "DIG_ON_SUFFOCATION: " + e.getMessage(), e);
         }
     }
 }

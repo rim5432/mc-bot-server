@@ -16,7 +16,7 @@
       "priority": 130
     },
     {
-      "type": "FREEZE_ON_SUFFOCATION",
+      "type": "DIG_ON_SUFFOCATION",
       "priority": 115
     },
     {

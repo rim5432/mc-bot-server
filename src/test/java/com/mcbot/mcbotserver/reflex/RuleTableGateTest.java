@@ -135,13 +135,13 @@ class RuleTableGateTest {
         List<ReflexRule> rules = ReflexRuleJson.parse("{\"rules\": ["
             + "{\"type\": \"ASCEND_IN_LETHAL_FLUID\","
             + " \"priority\": 130},"
-            + "{\"type\": \"FREEZE_ON_SUFFOCATION\","
+            + "{\"type\": \"DIG_ON_SUFFOCATION\","
             + " \"priority\": 115}"
             + "]}");
         var lava = (com.mcbot.mcbotserver.core.reflex
                 .AscendInLethalFluidRule) rules.get(0);
         var wall = (com.mcbot.mcbotserver.core.reflex
-                .FreezeOnSuffocationRule) rules.get(1);
+                .DigOnSuffocationRule) rules.get(1);
         assertEquals(130, lava.priority());
         assertEquals(115, wall.priority());
         List<ReflexRule> reparsed =
@@ -151,8 +151,24 @@ class RuleTableGateTest {
                 reparsed.get(0)).priority());
         assertEquals(wall.priority(),
             ((com.mcbot.mcbotserver.core.reflex
-                    .FreezeOnSuffocationRule) reparsed.get(1))
+                    .DigOnSuffocationRule) reparsed.get(1))
                 .priority());
+    }
+
+    /**
+     * The renamed suffocation type is a hard error under its old
+     * spelling: a datapack still naming FREEZE_ON_SUFFOCATION (the
+     * 0008 stopgap superseded by issue 0009's DIG upgrade) must be
+     * updated loudly, never silently ignored - the same contract as
+     * any unknown type.
+     */
+    @Test
+    void supersededSuffocationTypeIsAHardParseError() {
+        assertThrows(IllegalArgumentException.class,
+            () -> ReflexRuleJson.parse("{\"rules\": ["
+                + "{\"type\": \"FREEZE_ON_SUFFOCATION\","
+                + " \"priority\": 115}]}"),
+            "the stopgap type must not parse after the rename");
     }
 
     /**
@@ -184,7 +200,7 @@ class RuleTableGateTest {
         assertEquals(
             java.util.Set.of("FREEZE_ON_LOW_HEALTH",
                 "SURFACE_ON_LOW_AIR", "ASCEND_IN_LETHAL_FLUID",
-                "FREEZE_ON_SUFFOCATION", "ENGAGE_ON_HOSTILE_PROXIMITY"),
+                "DIG_ON_SUFFOCATION", "ENGAGE_ON_HOSTILE_PROXIMITY"),
             names,
             "the datapack table and the code default table must stay "
                 + "in lockstep or /reload silently drops rules");

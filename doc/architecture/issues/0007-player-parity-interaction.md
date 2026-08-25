@@ -129,6 +129,13 @@ state) turns out to be facade-hostile.
    api-layer pure-Java `Direction`, adapter maps to engine
    `Direction`), hold-to-mine with the adapter-side mining state
    machine, `DropSelected`.
+   Carve-out 2026-08-25 (issue 0009): the DIG half of this phase
+   shipped early on the survival track - the suffocation escape
+   motivated the INTERACT channel, `Intent.Dig` and the
+   adapter-side executor (ledger 25), all inventory-free. Phase 1
+   keeps the use/place shapes, the face semantics, the inventory
+   reads and `DropSelected`; its hold-to-mine item is now "grow the
+   executor's main-hand tool supplier", not "build the machine".
 2. **Phase 2 (L)** menu system + crafting-table disclosure - api
    `MenuView` / `CraftingView` (2x2 `InventoryMenu` baseline, 3x3
    table extension), core as a click-sequence PLANNER over the

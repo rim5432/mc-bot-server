@@ -65,10 +65,13 @@ reopened on demand — **[DEFERRED]** outside v1.
   of 300, decision 22; ASCEND holds jump, vanilla fluid physics does
   the swimming), ascends in lethal fluid (lava, 4 HP/tick with no
   interval - the one vital that outranks everything, decision 24),
-  halts on suffocation (1 HP/tick instant class where a guessed
-  rescue direction can worsen the glitch - freeze is the only
-  strictly-correct verb, and the reflex doubles as the pathing-bug
-  siren), and engages hostiles that close to melee range while
+  digs itself free on suffocation (1 HP/tick instant class; the eye
+  block is a KNOWN rescue target, so the self-rescue dig supersedes
+  the freeze stopgap - dirt-class escape costs ~15 of 20 health
+  points, authentic vanilla hand-dig math, decision 25; an
+  unbreakable eye block still kills, and the preemption's
+  TASK_PAUSED is the siren either way), and engages hostiles that
+  close to melee range while
   idle (decision 23: one preemption tick, then a reflex-owned defend
   mission runs the fight through the arbiter). Triage ladder frozen
   at five rungs: LAVA 130 > SUFFOCATION 115 > SURFACE 110 > FREEZE

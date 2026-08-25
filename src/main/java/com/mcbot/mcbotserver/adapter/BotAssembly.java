@@ -16,9 +16,9 @@ import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.process.DefendProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.core.reflex.AscendInLethalFluidRule;
+import com.mcbot.mcbotserver.core.reflex.DigOnSuffocationRule;
 import com.mcbot.mcbotserver.core.reflex.EngageOnHostileProximityRule;
 import com.mcbot.mcbotserver.core.reflex.FreezeOnLowHealthRule;
-import com.mcbot.mcbotserver.core.reflex.FreezeOnSuffocationRule;
 import com.mcbot.mcbotserver.core.reflex.SurfaceOnLowAirRule;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
 import com.mcbot.mcbotserver.core.state.ChangeDetectingStateChannel;
@@ -121,7 +121,8 @@ public final class BotAssembly {
             new LevelThreatSensor(view,
                 () -> poseOf(body), body::getAirSupply,
                 body::isInLava, body::getRemainingFireTicks,
-                body::getTicksFrozen, body::isInWall));
+                body::getTicksFrozen, body::isInWall,
+                () -> suffocationBlockOf(body)));
         reflex.addRule(new FreezeOnLowHealthRule());
         // Air reflex outranks the freeze rule by default (SURFACE
         // _PRIORITY 110 vs FREEZE 100): freezing underwater converts
@@ -133,14 +134,15 @@ public final class BotAssembly {
         // since ADR-0003 (issue 0008 F2); this rule + the vitals
         // sensor pass close the live-pipeline lava blind spot.
         reflex.addRule(new AscendInLethalFluidRule());
-        // Suffocation halt (issue 0008 D3): 1 HP/tick instant-class,
-        // and the rescue direction is unknown - a reflex guessing a
-        // direction can push the body deeper into the glitch, so
-        // freezing is strictly correct. 115 sits between SURFACE and
-        // LAVA per the 0008 F9 triage table. On this codebase inWall
-        // is almost always a pathing bug - the reflex is also the
-        // siren; the fix lives upstream.
-        reflex.addRule(new FreezeOnSuffocationRule());
+        // Suffocation self-rescue dig (issue 0008 D3, upgraded by
+        // issue 0009): 1 HP/tick instant-class, but with dig
+        // capability the rescue direction is KNOWN - the eye block -
+        // so the rule digs it out instead of freezing (the stopgap
+        // FREEZE was superseded). 115 keeps its slot between SURFACE
+        // and LAVA per the 0008 F9 triage table. The TASK_PAUSED
+        // preemption is still the siren for the unbreakable-wall case
+        // the dig cannot answer.
+        reflex.addRule(new DigOnSuffocationRule());
         // Idle-combat reflex (2026-08-24 night-cave death): engages a
         // hostile that closes to melee range even when no mission is
         // running. Sits BELOW the survival holds: at three health
@@ -224,6 +226,26 @@ public final class BotAssembly {
     private static CellPos poseOf(BotBodyEntity body) {
         return new CellPos(body.getBlockX(), body.getBlockY(),
             body.getBlockZ());
+    }
+
+    /**
+     * The solid cell containing the eye while it suffocates - the dig
+     * self-rescue's target. Mirrors what vanilla's isInWall checks
+     * (the eye's own cell); null while the eye is clear so the board
+     * never carries a rescue target without the vital that motivates
+     * it.
+     *
+     * @param body the live carrier; never null
+     * @return the eye's cell, or null when the eye is not in a wall
+     */
+    private static CellPos suffocationBlockOf(BotBodyEntity body) {
+        if (!body.isInWall()) {
+            return null;
+        }
+        var eyeCell = net.minecraft.core.BlockPos.containing(
+            body.getEyePosition());
+        return new CellPos(eyeCell.getX(), eyeCell.getY(),
+            eyeCell.getZ());
     }
 
     private static com.mcbot.mcbotserver.api.types.Vec3 finePoseOf(

@@ -38,5 +38,17 @@ public enum ReflexAction {
      * reflexes are one-tick decisions - the rule only notices the
      * threat; DefendProcess owns the fight.
      */
-    ENGAGE
+    ENGAGE,
+
+    /**
+     * Dig the action target the decision carries: the controller
+     * holds the body still (MOVE), aims at the target cell (ROT) and
+     * holds the dig claim (INTERACT) every tick the rule keeps
+     * firing; destroy progress accumulates adapter-side, so the
+     * reflex itself stays a one-tick pure decision - the same shape
+     * as ASCEND (the engine, not the reflex, carries the multi-tick
+     * state). A DIG decision without a target degrades to the freeze
+     * hold: missing position data must not mint a dig-at-null.
+     */
+    DIG
 }

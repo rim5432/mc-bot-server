@@ -20,6 +20,7 @@ import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.api.world.WorldView;
+import com.mcbot.mcbotserver.core.behavior.IdleLook;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.core.reflex.MinimalReflex;
@@ -469,6 +470,31 @@ public final class BotController {
         }
         actor.submit(new Claim(Channel.MOVE, decision.priority(),
             "reflex:" + decision.ruleName(), hold));
+        if (decision.action() == ReflexAction.DIG
+                && decision.target() != null) {
+            // DIG carries its own geometry: hold still, aim at the
+            // target cell, and hold the dig claim - the adapter's
+            // executor accumulates destroy progress across ticks, the
+            // same engine-carries-the-state shape as ASCEND's held
+            // jump. A targetless DIG (board stamped inWall without a
+            // position, or the post-rescue hysteresis hold where the
+            // eye is already clear) degrades to the plain freeze hold
+            // above - missing data must not mint a dig-at-null. The
+            // aim claim is presentation only (the executor is
+            // server-authoritative and never reads facing, exactly
+            // like vanilla's ServerPlayerGameMode); cell-center math
+            // keeps it free of eye-height constants.
+            CellPos digTarget = decision.target();
+            Vec3 from = cellCenter(positionSource.get());
+            Vec3 to = cellCenter(digTarget);
+            actor.submit(new Claim(Channel.ROT, decision.priority(),
+                "reflex:" + decision.ruleName(),
+                new Intent.Look(IdleLook.yawTo(from, to),
+                    IdleLook.pitchTo(from, to))));
+            actor.submit(new Claim(Channel.INTERACT, decision.priority(),
+                "reflex:" + decision.ruleName(),
+                new Intent.Dig(digTarget)));
+        }
         actor.flush();
         if (announceVerdict) {
             // Retirement-lap corpse: its verdict is announced here,
@@ -502,6 +528,18 @@ public final class BotController {
                 return;
             }
         }
+    }
+
+    /**
+     * Center of one block cell - the DIG reflex aims from body-cell
+     * center to target-cell center; presentation-grade geometry, not
+     * physics.
+     *
+     * @param cell the cell; never null
+     * @return the cell's center point; never null
+     */
+    private static Vec3 cellCenter(CellPos cell) {
+        return new Vec3(cell.x() + 0.5, cell.y() + 0.5, cell.z() + 0.5);
     }
 
     /**

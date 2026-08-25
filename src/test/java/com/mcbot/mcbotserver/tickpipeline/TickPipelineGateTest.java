@@ -238,6 +238,68 @@ class TickPipelineGateTest {
                 + move.intent());
     }
 
+    /**
+     * Suffocation reflex digs instead of halting: the DIG action maps
+     * to a held MOVE + an aim ROT + an INTERACT dig claim at the
+     * decision's target cell (issue 0009). A targetless DIG - the
+     * board stamped the vital without the position - degrades to the
+     * plain freeze hold: missing data must not mint a dig-at-null.
+     */
+    @Test
+    void suffocationReflexSubmitsDigClaimsAtTheEyeBlock() {
+        float[] health = {20f};
+        boolean[] inWall = {false};
+        CellPos[] eyeBlock = {null};
+        SurvivalReflexLayer layer = new SurvivalReflexLayer(
+            (world, board) -> {
+                board.inWall = inWall[0];
+                board.suffocationBlock =
+                    inWall[0] ? eyeBlock[0] : null;
+            });
+        layer.addRule(new com.mcbot.mcbotserver.core.reflex
+            .DigOnSuffocationRule());
+        TaskArbiter arbiter = new TaskArbiter();
+        RecordingActor actor = new RecordingActor();
+        PathingBehavior mover = new PathingBehavior("mover",
+            () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5),
+            BasicMoves::from);
+        BotController controller = controller(health, layer, arbiter,
+            mover, actor, new InMemoryEventQueue(() -> 1L, () -> 0L));
+
+        CellPos target = new CellPos(0, 65, 0);
+        inWall[0] = true;
+        eyeBlock[0] = target;
+        controller.onTick(new MockWorldView());
+
+        Claim move = lastClaimOf(actor, Channel.MOVE);
+        assertNotNull(move);
+        assertTrue(move.holder().startsWith("reflex:"),
+            "hold claim must come from the reflex");
+        assertTrue(move.intent() instanceof Intent.Move hold
+                && !hold.jump() && hold.forward() == 0,
+            "the dig runs standing still: " + move.intent());
+        Claim rot = lastClaimOf(actor, Channel.ROT);
+        assertNotNull(rot,
+            "the reflex must aim at the dig target");
+        assertTrue(rot.intent() instanceof Intent.Look);
+        Claim interact = lastClaimOf(actor, Channel.INTERACT);
+        assertNotNull(interact,
+            "the reflex must hold the dig claim");
+        assertTrue(interact.intent() instanceof Intent.Dig d
+                && d.target().equals(target),
+            "the dig claim names the eye block: "
+                + interact.intent());
+
+        // Targetless degrade: vital without position keeps the hold
+        // but must not mint a dig-at-null.
+        actor.submitted.clear();
+        eyeBlock[0] = null;
+        controller.onTick(new MockWorldView());
+        assertNotNull(lastClaimOf(actor, Channel.MOVE));
+        assertNull(lastClaimOf(actor, Channel.INTERACT),
+            "a targetless DIG degrades to the freeze hold");
+    }
+
     private Claim lastClaimOf(RecordingActor actor, Channel channel) {
         Claim found = null;
         for (Claim c : actor.submitted) {

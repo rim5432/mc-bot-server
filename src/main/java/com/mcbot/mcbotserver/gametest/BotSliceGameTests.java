@@ -8,8 +8,8 @@ import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.process.DefendProcess;
 import com.mcbot.mcbotserver.core.reflex.AscendInLethalFluidRule;
+import com.mcbot.mcbotserver.core.reflex.DigOnSuffocationRule;
 import com.mcbot.mcbotserver.core.reflex.FreezeOnLowHealthRule;
-import com.mcbot.mcbotserver.core.reflex.FreezeOnSuffocationRule;
 import com.mcbot.mcbotserver.core.reflex.SurfaceOnLowAirRule;
 
 import net.minecraft.core.BlockPos;
@@ -882,40 +882,44 @@ public final class BotSliceGameTests {
 
     /**
      * Scenario 8: a solid block placed at the body's eye triggers the
-     * suffocation reflex, which FREEZEs the body and pauses the active
-     * mission. Removing the block lets the hold window elapse, the
-     * reflex releases, and the mission resumes to completion.
+     * suffocation reflex, which now DIGS the eye block out itself
+     * (issue 0009 upgrade of the 0008 D3 stopgap), then lets the hold
+     * window elapse, releases, and resumes the mission to completion.
      *
-     * <p>Why: issue 0008 F4/D3 - suffocation is the one vital where
-     * the rescue direction is UNKNOWN (a reflex guessing movement can
-     * push the body deeper into glitch geometry), so FREEZE is
-     * strictly correct. 1 HP/tick with no interval (LivingEntity.baseTick
-     * decompiled 1.20.1), 20 ticks from full health. Priority 115 sits
-     * between SURFACE (110) and LAVA (130) per the F9 triage table.
+     * <p>Why: suffocation is 1 HP/tick with no interval
+     * (LivingEntity.baseTick decompiled 1.20.1), 20 ticks from full
+     * health. The FREEZE stopgap argued the rescue direction was
+     * unknown; with dig capability it is known exactly - the eye
+     * block - so the deterministic self-rescue replaces the halt.
+     * DIRT seals the eye because it is the softest gravity-stable
+     * block (hardness 0.5, drops without a tool): DigPacing charges
+     * 15 bare-hand ticks, so the body escapes on a sliver of health -
+     * authentic vanilla math (a real player hand-digs dirt exactly
+     * this fast), not a balance choice. Priority 115 keeps its slot
+     * between SURFACE (110) and LAVA (130) per the 0008 F9 triage
+     * table.
      *
      * <p>Discriminative chain: (1) the mission starts and the body
-     * begins walking; (2) a block at eye level causes inWall=true and
-     * the reflex fires FREEZE, preempting the mission (TASK_PAUSED);
-     * (3) the block is removed, the 10-tick hold window elapses, the
-     * reflex releases, and world revalidation resumes the mission
-     * (TASK_RESUMED); (4) the body reaches the goal (TASK_COMPLETED).
-     * Without the reflex, a body walking into a wall would keep
-     * pathing and potentially glitch deeper - the FREEZE is the siren.
-     *
-     * <p>Suffocation damage is 1/tick; the wall is placed for well
-     * under 20 ticks, so the body survives with health to spare. The
-     * pin is the event sequence (PAUSED → RESUMED → COMPLETED), not a
-     * damage number.
+     * begins walking; (2) a dirt block at eye level causes inWall=true
+     * and the reflex preempts the mission (TASK_PAUSED); (3) the body
+     * breaks the block ITSELF - the scenario never removes it, so the
+     * only path to step (4) is the held dig claim accumulating through
+     * the executor; (4) the 10-tick hold window elapses, the reflex
+     * releases, world revalidation resumes the mission
+     * (TASK_RESUMED); (5) the body reaches the goal (TASK_COMPLETED)
+     * still alive, with damage actually taken (health strictly below
+     * full - the scenario must prove the escape raced real damage,
+     * not that no damage flowed).
      */
     @GameTest(template = "empty16x8x16", timeoutTicks = TIMEOUT)
-    public static void freezesWhenSuffocating(GameTestHelper helper) {
+    public static void digsFreeWhenSuffocating(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(4, GametestRig.WALK_Y, 8));
         CellPos goalCell = localToCell(helper,
             new BlockPos(12, GametestRig.WALK_Y, 8));
         var mission = submitGoto(rig, goalCell);
 
         // Let the mission start and the body take a step or two before
-        // we seal its eye - proves the mission was genuinely running,
+        // we bury its eye - proves the mission was genuinely running,
         // not parked from the start.
         int startX = rig.body().getBlockX();
         helper.startSequence()
@@ -923,41 +927,49 @@ public final class BotSliceGameTests {
                 () -> check(rig.body().getBlockX() > startX,
                     "waiting for the mission to start walking")))
             .thenExecute(() -> {
-                // Seal the eye: a full solid block at the eye's block
-                // position makes LivingEntity.isInWall() return true.
-                // The body cannot walk through it, so it stays pinned
-                // with its eye inside the block - exactly the glitch
-                // geometry this reflex exists to catch.
-                int eyeBlockY = (int) Math.floor(rig.body().getEyeY());
-                helper.setBlock(new BlockPos(rig.body().getBlockX(),
-                    eyeBlockY, rig.body().getBlockZ()), Blocks.SMOOTH_STONE);
+                // Bury the eye: a full solid dirt block at the eye's
+                // cell makes LivingEntity.isInWall() return true. Dirt
+                // has no falling-gravity conversion (sand and gravel
+                // would drop away mid-scenario) and 0.5 hardness.
+                // toLocal is load-bearing: the body reports WORLD
+                // coordinates while setBlock takes structure-local
+                // ones - feeding absolutes through places the seal
+                // outside the box and the scenario tests nothing.
+                helper.setBlock(GametestRig.toLocal(helper,
+                    new BlockPos(rig.body().getBlockX(),
+                        (int) Math.floor(rig.body().getEyeY()),
+                        rig.body().getBlockZ())), Blocks.DIRT);
             })
             .thenWaitUntil(driveUntil(rig,
                 () -> assertEventSeen(rig.events(), EventKind.TASK_PAUSED)))
+            // The self-rescue: the dig runs to completion with no
+            // scenario-side removal. 15 dig ticks + latency headroom.
+            .thenWaitUntil(driveUntil(rig,
+                () -> check(
+                    helper.getBlockState(GametestRig.toLocal(helper,
+                        new BlockPos(rig.body().getBlockX(),
+                            (int) Math.floor(rig.body().getEyeY()),
+                            rig.body().getBlockZ()))).isAir(),
+                    "the body must dig the eye block out itself")))
             .thenExecute(() -> {
-                // The body must still be alive - suffocation is 1/tick
-                // and the wall has been up for well under 20 ticks.
                 check(rig.body().isAlive(),
                     "the body must survive the suffocation window");
-                check(rig.body().getHealth() > 0,
-                    "health must be positive after suffocation; got "
+                check(rig.body().getHealth() > 0f
+                        && rig.body().getHealth() < 20f,
+                    "escape must race real damage: health strictly "
+                        + "between 0 and 20, got "
                         + rig.body().getHealth());
-                // Remove the block so the eye clears and the reflex can
-                // release after its hold window.
-                int eyeBlockY = (int) Math.floor(rig.body().getEyeY());
-                helper.setBlock(new BlockPos(rig.body().getBlockX(),
-                    eyeBlockY, rig.body().getBlockZ()), Blocks.AIR);
             })
             // Hold window (10 ticks) + a few for revalidation and
             // mission re-seating.
             .thenExecuteFor(
-                FreezeOnSuffocationRule.SUFFOCATION_HOLD_TICKS + 15,
+                DigOnSuffocationRule.SUFFOCATION_HOLD_TICKS + 15,
                 driveOnly(rig))
             .thenWaitUntil(driveUntil(rig,
                 () -> assertEventSeen(rig.events(), EventKind.TASK_RESUMED)))
             .thenWaitUntil(driveUntil(rig,
                 () -> check(reached(rig.body(), goalCell),
-                    "waiting for arrival after suffocation clears")))
+                    "waiting for arrival after the self-rescue")))
             .thenExecuteFor(3, driveOnly(rig))
             .thenExecuteAfter(0, () -> {
                 check(!mission.isActive(),

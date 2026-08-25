@@ -82,6 +82,15 @@ public final class ThreatBlackboard {
      */
     public boolean inWall;
 
+    /**
+     * The solid cell containing the eye while {@link #inWall} is
+     * true - the block the suffocation self-rescue digs out (issue
+     * 0009). beginTick resets to null, and a rig that stamps inWall
+     * without a position reads as targetless: the DIG action then
+     * degrades to the freeze hold instead of digging at a guess.
+     */
+    public CellPos suffocationBlock;
+
     /** Reset all fields to a fresh-tick baseline before sensing. */
     public void beginTick(long tickCounter, long gameDay,
                           long timeOfDayTicks, CellPos position,
@@ -98,5 +107,6 @@ public final class ThreatBlackboard {
         this.fireTicks = 0;
         this.freezeTicks = 0;
         this.inWall = false;
+        this.suffocationBlock = null;
     }
 }

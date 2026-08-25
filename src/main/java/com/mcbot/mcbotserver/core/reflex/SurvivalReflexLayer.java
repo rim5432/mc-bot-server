@@ -35,9 +35,23 @@ import java.util.Objects;
 //           + hold window absorb signal jitter at the scheduler)
 public final class SurvivalReflexLayer {
 
-    /** One fired reflex, resolved for this tick. */
+    /**
+     * One fired reflex, resolved for this tick. {@code target} is the
+     * action's geometry (the eye block for DIG) and is null for kinds
+     * that need none - or when the board carried no position, in which
+     * case the controller degrades target-consuming kinds to the
+     * freeze hold.
+     */
     public record ReflexDecision(String ruleName, int priority,
-                                 ReflexAction action) {
+                                 ReflexAction action,
+                                 com.mcbot.mcbotserver.api.types.CellPos
+                                     target) {
+
+        /** Creates a targetless decision (every kind but DIG). */
+        public ReflexDecision(String ruleName, int priority,
+                              ReflexAction action) {
+            this(ruleName, priority, action, null);
+        }
     }
 
     private final ThreatSensor sensor;
@@ -157,7 +171,8 @@ public final class SurvivalReflexLayer {
                     && (winner == null
                         || effectivePriority > winner.priority())) {
                 winner = new ReflexDecision(rule.name(),
-                    effectivePriority, rule.action());
+                    effectivePriority, rule.action(),
+                    rule.actionTarget(blackboard));
             }
         }
         return winner;

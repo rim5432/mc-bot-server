@@ -224,6 +224,6 @@ ruling must add its row before implementation.
 |---|---|---|
 | D1 | Vitals sensing pass (F1)? | RULED YES - shipped 2026-08-25 (6ccdb3b, ledger 24): fireTicks / freezeTicks / inWall / inLethalFluid all sensor-stamped with safe beginTick defaults |
 | D2 | Live-pipeline lava: ASCEND-only vs + escape mission (F2)? | RULED ASCEND-only first (6ccdb3b): 130/ASCEND buys surface seconds; the ENGAGE-pattern escape mission stays deferred until an unattended run dies in lava for real. Review follow-up repaired the missing JSON form + datapack row (reload-parity, ledger 24) |
-| D3 | Suffocation FREEZE rule at 115 (F4)? | RULED YES - shipped 2026-08-25 (ledger 24): FREEZE_ON_SUFFOCATION 115/hold 10, FREEZE action; ladder-gated between SURFACE and LAVA |
+| D3 | Suffocation FREEZE rule at 115 (F4)? | RULED YES - shipped 2026-08-25 (ledger 24): FREEZE_ON_SUFFOCATION 115/hold 10, FREEZE action; ladder-gated between SURFACE and LAVA. SUPERSEDED same day by issue 0009: with dig capability the rescue direction is known (the eye block), so the rule is renamed DIG_ON_SUFFOCATION with the DIG self-rescue action - same priority, same hold, same ladder slot; the FREEZE survives only as the targetless-degrade path and the crashed-state behavior |
 | D4 | Widen MinimalReflex with an air check (F8)? | RULED YES - shipped 2026-08-25 (6ccdb3b): one more if, air < 80 holds jump; ADR-0005 D3 dependency class intact |
 | D5 | Fire: sense-only, no rule (F3)? | RULED ADOPTED - no rule; sensing fields arrived with D1 |

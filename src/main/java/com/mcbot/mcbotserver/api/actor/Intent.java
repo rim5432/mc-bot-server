@@ -1,5 +1,7 @@
 package com.mcbot.mcbotserver.api.actor;
 
+import com.mcbot.mcbotserver.api.types.CellPos;
+
 /**
  * The closed vocabulary of physical intents. Values are pure data — an
  * intent never computes physics; the vanilla engine is the only thing
@@ -58,6 +60,33 @@ public sealed interface Intent {
             if (slot < 0 || slot > 8) {
                 throw new IllegalArgumentException(
                     "slot must be in 0..8, got " + slot);
+            }
+        }
+    }
+
+    /**
+     * Held dig at one block cell, resolved on the INTERACT channel.
+     * The claim's presence this tick IS the button state - holding a
+     * dig means re-asserting the claim every tick; the adapter
+     * accumulates destroy progress across those ticks and breaks the
+     * block when it completes (the vanilla ServerPlayerGameMode
+     * shape, mirrored adapter-side). The engine applies all world
+     * mutation; boundary A holds - this record only names a cell.
+     *
+     * @param target the block cell being dug; never null
+     */
+    record Dig(CellPos target)
+            implements Intent {
+
+        /**
+         * Creates a validated dig intent.
+         *
+         * @param target must not be null
+         */
+        public Dig {
+            if (target == null) {
+                throw new IllegalArgumentException(
+                    "dig target must not be null");
             }
         }
     }

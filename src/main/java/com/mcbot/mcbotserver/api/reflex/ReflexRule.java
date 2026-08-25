@@ -47,4 +47,21 @@ public interface ReflexRule {
     default ReflexAction action() {
         return ReflexAction.FREEZE;
     }
+
+    /**
+     * The cell an action kind operates on, extracted from fresh
+     * sensor data. Only {@link ReflexAction#DIG} consumes a target
+     * today (the suffocation rule names the eye block); kinds that
+     * need no geometry return null and the controller must treat a
+     * null target on a target-consuming kind as a degrade-to-freeze,
+     * never a dig-at-null.
+     *
+     * @param board this tick's sensed state; never null
+     * @return the action target cell, or null when the action needs
+     *         none or the board carries no position
+     */
+    default com.mcbot.mcbotserver.api.types.CellPos actionTarget(
+            ThreatBlackboard board) {
+        return null;
+    }
 }

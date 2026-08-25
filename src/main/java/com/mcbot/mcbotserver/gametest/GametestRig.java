@@ -212,4 +212,26 @@ final class GametestRig {
         BlockPos abs = helper.absolutePos(local);
         return new CellPos(abs.getX(), abs.getY(), abs.getZ());
     }
+
+    /**
+     * World position to structure-local coordinates. Vanilla's
+     * {@code relativePos} is NOT the inverse of {@code absolutePos}
+     * for rotation-NONE tests (it applies a 180-degree transform and
+     * returns mirrored negatives) - subtracting the origin is. Every
+     * scenario that combines live body coordinates with
+     * {@code helper.setBlock}/{@code getBlockState} must convert
+     * through here; feeding world coordinates straight in places
+     * blocks outside the box and the scenario silently tests nothing
+     * (found live in the suffocation scenario's seal).
+     *
+     * @param helper  the running gametest; never null
+     * @param worldPos position in world coordinates; never null
+     * @return the same position in structure-local coordinates
+     */
+    static BlockPos toLocal(GameTestHelper helper, BlockPos worldPos) {
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        return new BlockPos(worldPos.getX() - origin.getX(),
+            worldPos.getY() - origin.getY(),
+            worldPos.getZ() - origin.getZ());
+    }
 }

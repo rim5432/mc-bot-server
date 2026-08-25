@@ -53,7 +53,7 @@ class GametestInventoryCheck {
             "holdsFireWhenSightBlocked",
             "surfacesWhenAirRunsLow",
             "ascendsFromLavaOnReflex",
-            "freezesWhenSuffocating"),
+            "digsFreeWhenSuffocating"),
         "GauntletGameTests", Set.of(
             "gauntletEndToEnd",
             "routesThroughFenceGap"),

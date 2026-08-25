@@ -459,6 +459,17 @@ monotonic and "alive indefinitely" is impossible without a policy).
          Stage 3 vocabulary seed vs promote); let the datapack
          water/lava trait JSON supersede the code baseline
          (closeout follow-up 5 residue).                        [dep: none]
+- [x] M  Dig capability, first block-interaction slice (issue 0009;
+         user ruling 2026-08-25, motivated by the gravel-suffocation
+         escape): INTERACT channel + Intent.Dig (claim-per-tick is
+         the held button), adapter DigExecutor mirroring vanilla
+         destroy progress, core DigPacing arithmetic, suffocation
+         rule upgraded FREEZE -> DIG (renamed DIG_ON_SUFFOCATION,
+         old type a hard parse error), sensor eye-cell feed,
+         datapack row rename. Offline gates (DigPacingTest,
+         DigOnSuffocationRuleTest, controller claim mapping,
+         reload-parity) + in-engine digsFreeWhenSuffocating
+         (self-rescue, no scenario-side removal).               [dep: none]
 
 ## Stage 3 - player parity (unlocked only by the survival gate)
 
