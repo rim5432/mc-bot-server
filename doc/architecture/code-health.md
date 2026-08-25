@@ -86,6 +86,7 @@ admitted here may encode a size cap.
 | H-R5 Gametest inventory | The registered `@GameTest` set cannot silently shrink | `hygiene.GametestInventoryCheck` | gated |
 | H-R6 Geometry spectrum rationale | Threshold constants document their partial-top-spectrum reasoning | not mechanically checkable | review-only |
 | H-R7 Package structure | Main modules single-level, module names never reused as subpackages; test packages mirror main or are sanctioned metas | `architecture.PackageStructureGateTest` | gated 2026-08-25 |
+| H-R8 Contract markers present | Every src/main implementer of a boundary interface carries its `contract: see` pointer (AGENTS.md 1.4.3.1) | `architecture.BoundaryContractMarkerTest` | gated 2026-08-25 |
 
 ### Rule detail
 
@@ -258,10 +259,6 @@ without an anchor is a workplan item, not a row here.
   Schedule: before Stage 3 vocabulary lands - pose parameterization
   touches the same collision predicates, and trimming afterwards
   would churn boundary-D consumers twice.
-- **OPEN H3 - BoundaryContractMarkerTest.** AGENTS.md 1.4.9 names
-  the candidate: a layer-1 test scanning every boundary-interface
-  implementer for its contract marker. Optional for Stage 3; pair
-  with the next boundary-touching change.
 - **OPEN H9 - sensor functional-interface consolidation.**
   PositionSource / HealthSource / GameClock (BotController) and
   PositionSource / OnGroundSource (PathingBehavior) are five

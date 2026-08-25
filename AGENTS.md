@@ -392,11 +392,13 @@ only. Apply the rules below to every public / protected element:
 
 #### 1.4.9 Enforcement
 
-- The contract-marker convention is **review-enforced today**. A
-  layer-1 JUnit test (`BoundaryContractMarkerTest`) is a candidate
-  to add once a marker-bearing class exists; it would scan every
-  class implementing a boundary interface and assert the matching
-  marker is present. Until then, code review is the gate.
+- The contract-marker convention is **gated** by
+  `architecture.BoundaryContractMarkerTest` (registry rule H-R8):
+  every src/main implementer of a boundary interface must carry a
+  `contract: see ...` marker, and the scan's interface inventory is
+  a pinned list - growing it is a review checkpoint. Code review
+  remains the judge of marker *quality*; the gate only proves
+  presence.
 - The English-only mandate is also review-enforced. An automated
   test (the `EnglishCommentPolicyTest` analogue in
   netcraft-rewrite) can be added per package if drift appears; the
