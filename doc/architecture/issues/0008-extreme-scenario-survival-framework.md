@@ -10,6 +10,8 @@ status: open
 related:
   - doc/architecture/issues/0004-movement-primitive-vocabulary.md
   - doc/architecture/issues/0007-player-parity-interaction.md
+  - doc/architecture/issues/0009-block-capability-dig.md
+  - doc/architecture/issues/0010-hungryprocess-food-acquisition-planner.md
   - doc/decisions/0003-reflex-layer-preemption.md
   - doc/guide/workplan.md
 ---
@@ -175,15 +177,19 @@ direction inversion would keep the rule off at the trigger. Pure
 is correct: freezeTicks changes at most 2/tick on thaw, so boundary
 flapping is sub-perceptible and a hysteresis dead-band is unnecessary.
 
-### F7 - Starvation: the shape is pre-ruled, the carrier is not
+### F7 - Starvation: moved to issue 0010
 
-Confirmed Player-only (FoodData on Player.java:168; zero
-references elsewhere). When the 0007 carrier ruling lands a
-player-side facade, hunger slots in as the exact parallel of
-ENGAGE: sense `foodData.needsFood()` on the board, rule
-EAT_WHEN_HUNGRY at routine urgency (eating is never
-preemption-class), one-tick handoff to an eat mission (inventory
-select + Stage 3 UseItem). Nothing to build before 0007 Phase 1/4.
+Originally pre-ruled as "sense needsFood, EAT_WHEN_HUNGRY at routine
+urgency, one-tick handoff to eat mission." The user ruling
+2026-08-25 upgraded the scope: the bot must also **acquire** food
+when inventory is empty, with self-contained initial strategies
+(forage/hunt/fish) and harness escalation only when all fail. This
+outgrew F7's one-line reservation. **Migrated to issue 0010**
+(`0010-hungryprocess-food-acquisition-planner.md`), which designs
+the full HungryProcess planner, the three initial strategies, the
+escalation boundary, and six open decisions (D1-D6). F7's original
+consumption-side ruling (auto-eat when food in inventory) is
+absorbed as HungryProcess's CONSUME state.
 
 ### F8 - The crashed-state asymmetry (MinimalReflex)
 
@@ -248,8 +254,11 @@ ruling must add its row before implementation.
 4. **Adopted without code (original D4)**: fire is sense-only for
    non-lethal fire; the sensing fields landed in D1. The lethal
    band is now covered by D5-revised.
-5. **With 0007 Phase 1**: F7's sensing groundwork (hunger is
-   Player-only, FoodData on Player.java:168).
+5. **Migrated to issue 0010 (2026-08-25)**: F7 starvation. The
+   consumption-side auto-eat and the acquisition-side HungryProcess
+   planner (forage/hunt/fish initial strategies + harness
+   escalation) are now designed in `0010-hungryprocess-food-acquisition-planner.md`.
+   Blocked on 0007 Player carrier + inventory.
 6. **Shipped 2026-08-25 (ledger 27, F6)**: POWDER_SNOW_CLIMB 95,
    pure ASCEND (held jump — powder snow is climbable), trigger=100.
    In-engine `climbsOutOfPowderSnow`. Design constraint:
