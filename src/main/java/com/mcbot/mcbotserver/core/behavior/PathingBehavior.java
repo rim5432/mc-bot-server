@@ -182,7 +182,7 @@ public final class PathingBehavior implements Behavior {
     public static final double ARRIVE_MIN_DRIVE = 0.35;
 
     private final String name;
-    private final PositionSource positionSource;
+    private final BodyPositionSource positionSource;
     private final OnGroundSource onGroundSource;
     private final PlanLifecycle lifecycle;
     private final WaypointCursor cursor = new WaypointCursor();
@@ -193,22 +193,6 @@ public final class PathingBehavior implements Behavior {
     private int ticksSinceAdoption;
     private Goal lastGoal;
     private int departHoldTicks;
-    /**
-     * Fine-grained body position. Doubles are load-bearing here: the
-     * stuck fuse measures sub-cell motion, and a block-cell source
-     * reads zero while a slowly accelerating body crosses its own cell.
-     */
-    @FunctionalInterface
-    public interface PositionSource {
-
-        /**
-         * Current body position in world doubles.
-         *
-         * @return the position; never null
-         */
-        Vec3 get();
-    }
-
     /**
      * Body contact state accessor. Drives the vertical gate in
      * {@link #tick} (issue 0001 fix 6): trigger evaluation is
@@ -242,7 +226,7 @@ public final class PathingBehavior implements Behavior {
      * @param positionSource body position accessor; never null
      * @param graph      edge supplier for planning; never null
      */
-    public PathingBehavior(String name, PositionSource positionSource,
+    public PathingBehavior(String name, BodyPositionSource positionSource,
                            MoveGraph graph) {
         this(name, positionSource, () -> true, graph, null);
     }
@@ -259,7 +243,7 @@ public final class PathingBehavior implements Behavior {
      * @param graph      edge supplier for planning; never null
      * @param worker     search executor; never null
      */
-    public PathingBehavior(String name, PositionSource positionSource,
+    public PathingBehavior(String name, BodyPositionSource positionSource,
                            MoveGraph graph, PlanWorker worker) {
         this(name, positionSource, () -> true, graph, worker);
     }
@@ -276,7 +260,7 @@ public final class PathingBehavior implements Behavior {
      * @param onGroundSource  body contact-state accessor; never null
      * @param graph           edge supplier for planning; never null
      */
-    public PathingBehavior(String name, PositionSource positionSource,
+    public PathingBehavior(String name, BodyPositionSource positionSource,
                            OnGroundSource onGroundSource,
                            MoveGraph graph) {
         this(name, positionSource, onGroundSource, graph, null);
@@ -296,7 +280,7 @@ public final class PathingBehavior implements Behavior {
      * @param graph           edge supplier for planning; never null
      * @param worker          search executor; never null
      */
-    public PathingBehavior(String name, PositionSource positionSource,
+    public PathingBehavior(String name, BodyPositionSource positionSource,
                            OnGroundSource onGroundSource,
                            MoveGraph graph, PlanWorker worker) {
         if (name == null || name.isBlank()) {

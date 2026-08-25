@@ -55,9 +55,9 @@ import java.util.function.Supplier;
 // contract: see ADR-0004 D1 + ADR-0005 D1 (pipeline order and catch frame)
 public final class BotController {
 
-    /** Body-position accessor. */
+    /** Body-position accessor, block-cell granularity. */
     @FunctionalInterface
-    public interface PositionSource {
+    public interface CellPositionSource {
 
         /**
          * Current block cell of the body.
@@ -101,7 +101,7 @@ public final class BotController {
     private final TaskArbiter arbiter;
     private final List<Behavior> behaviors;
     private final Actor actor;
-    private final PositionSource positionSource;
+    private final CellPositionSource positionSource;
     private final HealthSource healthSource;
     private final GameClock clock;
     private final EventQueue events;
@@ -161,7 +161,7 @@ public final class BotController {
      */
     public BotController(SurvivalReflexLayer reflex, TaskArbiter arbiter,
                          List<Behavior> behaviors, Actor actor,
-                         PositionSource positionSource, HealthSource healthSource,
+                         CellPositionSource positionSource, HealthSource healthSource,
                          GameClock clock, EventQueue events,
                          CrashReporter crashReporter) {
         this(reflex, arbiter, behaviors, actor, positionSource,
@@ -190,7 +190,7 @@ public final class BotController {
      */
     public BotController(SurvivalReflexLayer reflex, TaskArbiter arbiter,
                          List<Behavior> behaviors, Actor actor,
-                         PositionSource positionSource, HealthSource healthSource,
+                         CellPositionSource positionSource, HealthSource healthSource,
                          GameClock clock, EventQueue events,
                          CrashReporter crashReporter,
                          Supplier<BotProcess>
@@ -227,7 +227,7 @@ public final class BotController {
      */
     public BotController(SurvivalReflexLayer reflex, TaskArbiter arbiter,
                          List<Behavior> behaviors, Actor actor,
-                         PositionSource positionSource, HealthSource healthSource,
+                         CellPositionSource positionSource, HealthSource healthSource,
                          GameClock clock, EventQueue events,
                          CrashReporter crashReporter,
                          Supplier<BotProcess> engageMissionFactory,

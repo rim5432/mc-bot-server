@@ -234,6 +234,22 @@ architecture, boundarya, boundaryd, core, hygiene - every one
 either a main mirror or a sanctioned meta. Zero behaviour change:
 same classes, same tests, new homes.
 
+### Sensor-interface ruling (2026-08-25, closes H9)
+
+The five parallel sensor seams resolve without an api.sensing
+package: sensors are adapter-to-core wiring, invisible to any
+harness, and promoting them to api would thicken the surface open
+item H1 exists to trim. The real defect was contract duplication -
+PathingBehavior.PositionSource and CombatBehavior.PositionSource
+were byte-identical Vec3 suppliers under one name, and
+BotController's CellPos namesake made it a three-way collision.
+Now one shared `core.behavior.BodyPositionSource` serves both
+behaviors (the load-bearing doubles rationale travels with it),
+and the controller's block-cell source renamed to
+`CellPositionSource`. HealthSource, GameClock and OnGroundSource
+stay nested and local: single consumers, no collisions, nothing
+to consolidate.
+
 ## Ruling anchors in code
 
 Where the live architectural rulings physically live, so "why is it
@@ -259,13 +275,6 @@ without an anchor is a workplan item, not a row here.
   Schedule: before Stage 3 vocabulary lands - pose parameterization
   touches the same collision predicates, and trimming afterwards
   would churn boundary-D consumers twice.
-- **OPEN H9 - sensor functional-interface consolidation.**
-  PositionSource / HealthSource / GameClock (BotController) and
-  PositionSource / OnGroundSource (PathingBehavior) are five
-  parallel nested interfaces with a same-name collision across
-  different return types. Consolidation is an api-surface design
-  decision (a shared `api.sensing` vocabulary versus staying
-  local), so it needs a ruling before code moves.
 - **OPEN H10 - preemptAndHold dig-claim injection.** The dig
   feature (issue 0009) added a DIG branch inside
   `BotController.preemptAndHold`: when the reflex decision carries

@@ -61,7 +61,7 @@ public final class CombatBehavior implements Behavior {
     public static final int AIM_HOLD_TICKS = 3;
 
     private final String name;
-    private final PositionSource positionSource;
+    private final BodyPositionSource positionSource;
     private int ticksSinceSwing = ATTACK_COOLDOWN_TICKS;
     // Starts EXPIRED: a target that has never been in reach earns no
     // hold memory - only an actual in-reach sighting opens the window.
@@ -70,26 +70,12 @@ public final class CombatBehavior implements Behavior {
     private float lastYaw;
 
     /**
-     * Fine-grained body position, same shape as the pathing mover's.
-     */
-    @FunctionalInterface
-    public interface PositionSource {
-
-        /**
-         * Current body position in world doubles.
-         *
-         * @return the position; never null
-         */
-        Vec3 get();
-    }
-
-    /**
      * Creates a combat behavior over one body position source.
      *
      * @param name       stable identity for claims; never null or blank
      * @param positionSource body position accessor; never null
      */
-    public CombatBehavior(String name, PositionSource positionSource) {
+    public CombatBehavior(String name, BodyPositionSource positionSource) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("name must not be blank");
         }
