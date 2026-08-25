@@ -34,10 +34,10 @@ import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
 
 /**
- * Mod entry: the only MC-aware wiring point until the adapter grows
- * its own registration conventions. Owns entity registration, the
- * server-tick subscription (ADR-0004 D1 END phase) and the /botspawn
- * debug command that assembles a full pipeline around one body.
+ * Mod entry: the only MC-aware wiring point. Owns entity
+ * registration, the server-tick subscription (ADR-0004 D1 END
+ * phase) and the /botspawn command that assembles a full pipeline
+ * around one body.
  *
  * <p>Stage 1 scope: one active bot session at a time; a second
  * /botspawn replaces the first. Multi-body orchestration is out of

@@ -42,9 +42,10 @@ reopened on demand — **[DEFERRED]** outside v1.
 
 ### 2. Move around
 
-- **[SHIPPED]** Walk, diagonal, jump up one block, drop up to 3 blocks,
-  swim horizontally and upward. Lava execution is vocabulary-complete
-  but has no in-engine scenario yet. Pathfinding reroutes on
+- **[SHIPPED]** Walk, diagonal, jump up one block, drop up to 3
+  blocks, swim horizontally and upward. Lava locomotion is pinned
+  in-engine (crossesLavaTrench); shore-escape is a reflex row
+  below. Pathfinding reroutes on
   obstruction, recovers when shoved, reports clean failure on
   unreachable goals, and escalates stalled budget-cut partial
   searches to NO_PATH instead of burning the mission timeout
@@ -123,7 +124,7 @@ reopened on demand — **[DEFERRED]** outside v1.
   time (winner-take-all arbiter); a higher-priority task defers the
   current one.
 - **[GAP]** Follow / escort, harvest-and-place loops.
-- **[DEFERRED]** Inventory management, crafting, tool loadout.
+- **[DEFERRED]** Tool loadout (armor / equipment semantics).
 
 ### 6. Report back (harness seam)
 
@@ -136,6 +137,27 @@ reopened on demand — **[DEFERRED]** outside v1.
 - **[GAP]** Transport beyond the RCON console bridge (MCP / HTTP /
   stdio) — the bot stays blind to the choice.
 - **[DEFERRED]** Cross-restart event replay (JsonlJournal).
+
+### 7. Manipulate the world
+
+- **[SHIPPED]** Reads its own inventory every perception tick - a
+  41-slot immutable snapshot (main + armor + offhand) keyed by
+  registry id (issue 0007 Phase 1).
+- **[SHIPPED]** Digs with vanilla pacing math: per-tick tool speed
+  and correct-tool-for-drops drive both the 30/100 divisor and
+  whether drops spawn (issue 0009 + 0007 tool supplier).
+- **[SHIPPED]** Drops the selected stack (Q / Ctrl-Q semantics)
+  and places BlockItems against a clicked face - default state,
+  air cells only, BlockItem.canPlace parity guards.
+- **[SHIPPED]** Opens crafting tables and chests and drives them
+  through vanilla click machinery via a Player facade; crafting
+  resolves against the real RecipeManager (issue 0007 Phase 2).
+- **[GAP]** Core-side click-sequence planner (materials placed by
+  clicks, not container writes), chest in-engine scenario,
+  CraftingView structured grid snapshot, use-block interactions
+  (buttons, doors).
+- **[DEFERRED]** Armor semantics on the carrier, enchantment-aware
+  dig speed, match_tool loot fidelity.
 
 ## Known limits (v1 honest)
 
