@@ -31,6 +31,7 @@ import java.io.StringWriter;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * The single tick entry: fixed four-stage pipeline plus the ADR-0005
@@ -110,7 +111,7 @@ public final class BotController {
      * decisions to the freeze hold (rigs without combat wiring park
      * the mission instead of fighting blind).
      */
-    private final java.util.function.Supplier<BotProcess>
+    private final Supplier<BotProcess>
         engageMissionFactory;
     /** Mission TASK_* emission and hand-off edge detection. */
     private final MissionReporter missions;
@@ -183,7 +184,7 @@ public final class BotController {
                          PositionSource positionSource, HealthSource healthSource,
                          GameClock clock, EventQueue events,
                          CrashReporter crashReporter,
-                         java.util.function.Supplier<BotProcess>
+                         Supplier<BotProcess>
                              engageMissionFactory) {
         this.reflex = Objects.requireNonNull(reflex, "reflex");
         this.arbiter = Objects.requireNonNull(arbiter, "arbiter");

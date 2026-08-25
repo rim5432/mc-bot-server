@@ -13,6 +13,7 @@ import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.api.world.WorldView;
+import com.mcbot.mcbotserver.core.pathing.AStarPathFinder;
 import com.mcbot.mcbotserver.core.pathing.MoveGraph;
 import com.mcbot.mcbotserver.core.pathing.PlanSmoother;
 import com.mcbot.mcbotserver.core.pathing.PlanWorker;
@@ -188,8 +189,7 @@ public final class PathingBehavior implements Behavior {
     private final PlanProgressFuse fuse = new PlanProgressFuse();
     private final ReplanGate gate = new ReplanGate();
     private final NoPathEscalator noPath =
-        new NoPathEscalator(com.mcbot.mcbotserver.core.pathing
-            .AStarPathFinder.DEFAULT_NODE_BUDGET);
+        new NoPathEscalator(AStarPathFinder.DEFAULT_NODE_BUDGET);
     private int ticksSinceAdoption;
     private Goal lastGoal;
     private int departHoldTicks;

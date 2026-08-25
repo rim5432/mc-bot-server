@@ -7,6 +7,7 @@ import com.mcbot.mcbotserver.core.actor.DigPacing;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * The dig half of the entity binding: converts a held INTERACT claim
@@ -148,7 +149,7 @@ public final class DigExecutor {
      */
     private boolean withinReach(BlockPos pos) {
         var eye = body.getEyePosition();
-        var center = net.minecraft.world.phys.Vec3.atCenterOf(pos);
+        var center = Vec3.atCenterOf(pos);
         return eye.distanceToSqr(center)
             <= DIG_REACH_BLOCKS * DIG_REACH_BLOCKS;
     }

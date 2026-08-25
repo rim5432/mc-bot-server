@@ -5,6 +5,11 @@ import com.mcbot.mcbotserver.api.actor.Actor;
 import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
+import com.mcbot.mcbotserver.core.actor.ChannelArbiter;
+
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.Map;
 import java.util.Objects;
@@ -25,8 +30,7 @@ import java.util.Objects;
 // contract: see ADR-0004 D2 (four channels, per-tick expiring claims)
 public final class BindingActor implements Actor {
 
-    private final com.mcbot.mcbotserver.core.actor.ChannelArbiter delegate =
-        new com.mcbot.mcbotserver.core.actor.ChannelArbiter();
+    private final ChannelArbiter delegate = new ChannelArbiter();
     private final BotBodyEntity body;
     /** USE-press melee resolution (cone, reach, LOS, lava). */
     private final MeleeResolver melee;
@@ -157,17 +161,12 @@ public final class BindingActor implements Actor {
             return false;
         }
         var view = body.getViewVector(1.0F);
-        var dir = new net.minecraft.world.phys.Vec3(view.x, 0, view.z)
-            .normalize();
+        var dir = new Vec3(view.x, 0, view.z).normalize();
         var eye = body.getEyePosition();
-        var clip = body.level().clip(new net.minecraft.world.level
-            .ClipContext(eye,
-                eye.add(dir.scale(SPRINT_CLEARANCE_BLOCKS)),
-                net.minecraft.world.level.ClipContext.Block.COLLIDER,
-                net.minecraft.world.level.ClipContext.Fluid.NONE,
-                body));
-        return clip.getType()
-            == net.minecraft.world.phys.HitResult.Type.MISS;
+        var clip = body.level().clip(new ClipContext(eye,
+            eye.add(dir.scale(SPRINT_CLEARANCE_BLOCKS)),
+            ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, body));
+        return clip.getType() == HitResult.Type.MISS;
     }
 
     private static double clamp(double v) {

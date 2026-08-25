@@ -1,6 +1,8 @@
 package com.mcbot.mcbotserver.core.process;
 
+import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
 import com.mcbot.mcbotserver.api.goal.GoalNear;
+import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
 import com.mcbot.mcbotserver.api.process.Attack;
 import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.api.process.Directive;
@@ -270,41 +272,35 @@ public final class DefendProcess implements BotProcess, TerminalMission {
     }
 
     @Override
-    public void onExecutionReport(
-            com.mcbot.mcbotserver.api.behavior.ExecutionReport report) {
+    public void onExecutionReport(ExecutionReport report) {
         if (!active) {
             // Terminal state is sticky, mirroring GotoProcess: late
             // reports must never flip a decided outcome.
             return;
         }
-        switch (report.status()) {
-            // Deliberately NO success case here: a SUCCEEDED report
-            // means the chase locomotion reached its GoalNear - standing
-            // next to the enemy is where the FIGHT starts, never the
-            // verdict. Only this process's own scans declare victory.
-            //
-            // Deliberately NO failure case either: a locomotion FAILED
-            // describes the CHASE, not the FIGHT - a blocked path or a
-            // fuse trip while closing distance must not abort the
-            // engagement (the body may already be within swing range).
-            // Terminal authority belongs to scans, leash, and timeout.
-            default -> {
-                // RUNNING, STUCK, SUCCESS, FAILED - all execution
-                // weather; the scans decide.
-            }
-        }
+        // Every report status is execution weather here - RUNNING,
+        // STUCK, SUCCESS, FAILED alike; the scans decide.
+        //
+        // Deliberately NO success case: a SUCCEEDED report means the
+        // chase locomotion reached its GoalNear - standing next to
+        // the enemy is where the FIGHT starts, never the verdict.
+        // Only this process's own scans declare victory.
+        //
+        // Deliberately NO failure case either: a locomotion FAILED
+        // describes the CHASE, not the FIGHT - a blocked path or a
+        // fuse trip while closing distance must not abort the
+        // engagement (the body may already be within swing range).
+        // Terminal authority belongs to scans, leash, and timeout.
     }
 
     @Override
-    public void onLostControl(
-            com.mcbot.mcbotserver.api.interrupt.InterruptionContext c) {
+    public void onLostControl(InterruptionContext c) {
         // Reflex supremacy (decision 9): being parked does not end the
         // fight by itself; resume() decides whether it may continue.
     }
 
     @Override
-    public boolean resume(
-            com.mcbot.mcbotserver.api.interrupt.InterruptionContext c) {
+    public boolean resume(InterruptionContext c) {
         if (!active) {
             return false;
         }
