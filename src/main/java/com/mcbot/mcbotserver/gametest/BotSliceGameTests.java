@@ -2117,6 +2117,71 @@ public final class BotSliceGameTests {
         helper.succeed();
     }
 
+    /**
+     * Scenario: the Phase 2 acceptance loop verbatim — walk to a
+     * crafting table, open it, place materials via planned clicks,
+     * take the product, close. Every earlier menu scenario spawned
+     * the bot standing next to the table; this one walks there
+     * through the goto pipeline first, so the full harness-visible
+     * arc (mission → arrival → transaction → product) is pinned.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = TIMEOUT)
+    public static void walksToTableAndCrafts(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
+
+        BlockPos tableLocal = new BlockPos(12, GametestRig.WALK_Y, 8);
+        helper.setBlock(tableLocal, Blocks.CRAFTING_TABLE);
+        BlockPos tableAbs = helper.absolutePos(tableLocal);
+        CellPos standCell = localToCell(helper,
+            new BlockPos(11, GametestRig.WALK_Y, 8));
+
+        // Materials ride along before the walk.
+        rig.body().getInventory().container().setItem(0,
+            new ItemStack(Items.DIAMOND, 9));
+
+        var mission = submitGoto(rig, standCell);
+
+        helper.startSequence()
+            .thenWaitUntil(driveUntil(rig,
+                () -> check(reached(rig.body(), standCell),
+                    "waiting for arrival beside the table")))
+            .thenExecuteFor(3, driveOnly(rig))
+            .thenExecuteAfter(0, () -> {
+                check(!mission.isActive(),
+                    "the goto mission must retire on arrival");
+                check(mission.missionSucceeded(),
+                    "the walk must be a success");
+
+                var actor = rig.actor();
+                var view = actor.openMenu(new CellPos(tableAbs.getX(),
+                    tableAbs.getY(), tableAbs.getZ()));
+                check(view != null,
+                    "openMenu must succeed after walking there");
+                CraftingView craft = CraftingView.of(view);
+                for (var step : MenuPlanner.planGridFill(craft,
+                        "minecraft:diamond",
+                        0, 1, 2, 3, 4, 5, 6, 7, 8)) {
+                    view = actor.menuClick(step.slot(), step.button(),
+                        step.kind());
+                }
+                checkEquals("minecraft:diamond_block",
+                    view.slot(craft.result().index()).item().itemId(),
+                    "result must recompute after the planned fill");
+                for (var step : MenuPlanner.planTakeResult(
+                        CraftingView.of(view))) {
+                    view = actor.menuClick(step.slot(), step.button(),
+                        step.kind());
+                }
+                actor.closeMenu();
+
+                check(countItems(rig, Items.DIAMOND_BLOCK) == 1,
+                    "exactly one diamond_block must exist after "
+                        + "the loop");
+                rig.body().discard();
+            })
+            .thenSucceed();
+    }
+
     /** Total count of one item kind across the whole binding
      * container (all 41 slots). */
     private static int countItems(GametestRig.Rig rig,
