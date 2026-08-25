@@ -5,16 +5,9 @@ import com.mcbot.mcbotserver.api.actor.Actor;
 import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
-import com.mcbot.mcbotserver.api.types.Vec3;
-import com.mcbot.mcbotserver.core.behavior.IdleLook;
 
-import net.minecraft.world.InteractionHand;
-
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Random;
 
 /**
  * Write half of the entity binding: resolves per-tick claims and
@@ -37,16 +30,11 @@ public final class BindingActor implements Actor {
     private final BotBodyEntity body;
     /** USE-press melee resolution (cone, reach, LOS, lava). */
     private final MeleeResolver melee;
+    /** Cosmetic expression: idle look/sweep + walk fidget (0005). */
+    private final PresenceLayer presence;
+    /** Held-dig execution: destroy progress + the break (0009). */
+    private final DigExecutor dig;
     private boolean lastUsePressing;
-    // Walk-fidget state (issue 0005 P3): one seeded generator owns the
-    // whole sequence so every run is identical per design rule 3.
-    private final Random fidgetRandom = new Random(FIDGET_SEED);
-    private int fidgetCountdown = nextFidgetInterval();
-    private int fidgetEchoSwingDelay = -1;
-    // Idle-sweep state (issue 0005 P2.3).
-    private int idleTicks;
-    private float idleBaseYaw;
-    private boolean sweepRight;
 
     /**
      * Creates an actor bound to one body.
@@ -56,6 +44,8 @@ public final class BindingActor implements Actor {
     public BindingActor(BotBodyEntity body) {
         this.body = Objects.requireNonNull(body, "body");
         this.melee = new MeleeResolver(body);
+        this.presence = new PresenceLayer(body);
+        this.dig = new DigExecutor(body);
     }
 
     @Override
@@ -86,7 +76,7 @@ public final class BindingActor implements Actor {
         Claim rot = winners.get(Channel.ROT);
         if (rot != null && rot.intent() instanceof Intent.Look l) {
             body.setTargetRotation(l.yawDeg(), l.pitchDeg());
-            idleTicks = 0;
+            presence.onRotClaim();
         } else if (rot == null) {
             // Idle presence (issue 0005 P0.2/P0.3): no behavior owns
             // ROT this tick - between plans, after arrival, reflex
@@ -96,7 +86,7 @@ public final class BindingActor implements Actor {
             // claim-resolved looks and never touches a mission
             // channel. When pathing or combat claims ROT the same
             // tick, that claim wins and this stays silent.
-            applyIdleLook();
+            presence.tickIdleRot();
         }
 
         Claim use = winners.get(Channel.USE);
@@ -111,11 +101,22 @@ public final class BindingActor implements Actor {
 
         Claim slot = winners.get(Channel.SLOT);
         if (slot != null
-            && slot.intent() instanceof Intent.SelectSlot s) {
+                && slot.intent() instanceof Intent.SelectSlot s) {
             body.selectedSlot = s.slot();
         }
 
-        tickWalkFidget(winners, move, rot);
+        Claim interact = winners.get(Channel.INTERACT);
+        if (interact != null
+                && interact.intent() instanceof Intent.Dig d) {
+            dig.dig(d.target());
+        } else {
+            // A dig no longer held must clear its crack broadcast the
+            // same tick; vanilla's stop path does, and a stale crack
+            // would lie to every observer.
+            dig.release();
+        }
+
+        presence.tickWalkFidget(winners, move, rot);
         return winners;
     }
 
@@ -124,64 +125,7 @@ public final class BindingActor implements Actor {
         delegate.clearAllIntents();
         body.setDrive(0f, 0f, false);
         body.setSprinting(false);
-    }
-
-    /**
-     * Idle head-track pass: delegates target choice and turn pacing
-     * to {@link IdleLook} and echoes the result through the body's
-     * normal rotation write. Spectators and removed players are
-     * skipped; distance and selection semantics live in the policy
-     * so layer-1 tests pin them.
-     */
-    // contract: see issues/0005-player-feel-motion-layer.md P0 (idle
-    // look is adapter-local presentation, never an Intent)
-    private void applyIdleLook() {
-        var eye = body.getEyePosition();
-        List<Vec3> candidates = new ArrayList<>();
-        for (var player : body.level().players()) {
-            if (player.isRemoved() || player.isSpectator()) {
-                continue;
-            }
-            var playerEye = player.getEyePosition();
-            candidates.add(new Vec3(playerEye.x, playerEye.y,
-                playerEye.z));
-        }
-        IdleLook.Target target =
-            IdleLook.nearestTarget(new Vec3(eye.x, eye.y, eye.z),
-                candidates);
-        if (target == null) {
-            // Nobody near: periodic sweep instead (issue 0005 P2.3).
-            applyIdleSweep();
-            return;
-        }
-        idleTicks = 0;
-        body.setTargetRotation(
-            IdleLook.turnTowardYaw(body.getYRot(), target.yawDeg()),
-            IdleLook.turnTowardPitch(body.getXRot(), target.pitchDeg()));
-    }
-
-    /**
-     * Idle sweep pass (issue 0005 P2.3): flip a glance direction every
-     * {@link IdleLook#SWEEP_INTERVAL_TICKS} idle ticks, anchored to the
-     * yaw at the moment idleness began. Deterministic by construction
-     * - a counter flip, no randomness.
-     */
-    // contract: see issues/0005-player-feel-motion-layer.md P2 (idle
-    // sweep is adapter-local presentation, never an Intent)
-    private void applyIdleSweep() {
-        if (idleTicks == 0) {
-            idleBaseYaw = body.getYRot();
-        }
-        idleTicks++;
-        if (idleTicks % IdleLook.SWEEP_INTERVAL_TICKS == 0) {
-            sweepRight = !sweepRight;
-        }
-        float sweepYaw = idleBaseYaw + (sweepRight
-            ? IdleLook.SWEEP_AMPLITUDE_DEG
-            : -IdleLook.SWEEP_AMPLITUDE_DEG);
-        body.setTargetRotation(
-            IdleLook.turnTowardYaw(body.getYRot(), sweepYaw),
-            IdleLook.turnTowardPitch(body.getXRot(), 0f));
+        dig.release();
     }
 
     /**
@@ -224,70 +168,6 @@ public final class BindingActor implements Actor {
                 body));
         return clip.getType()
             == net.minecraft.world.phys.HitResult.Type.MISS;
-    }
-
-    /** Fixed seed for the fidget interval sequence (design rule 3). */
-    public static final long FIDGET_SEED = 0x5EED0005L;
-
-    /** Fewest walking ticks between fidget bursts (issue 0005 P3). */
-    public static final int FIDGET_MIN_INTERVAL_TICKS = 40;
-
-    /** Most walking ticks between fidget bursts (issue 0005 P3). */
-    public static final int FIDGET_MAX_INTERVAL_TICKS = 120;
-
-    /** One-in-N chance a burst plays a second swing after the first. */
-    public static final int FIDGET_ECHO_CHANCE = 3;
-
-    /** Ticks between the first and second swing of a burst - past the
-     *  vanilla swing animation length so the arc plays twice. */
-    public static final int FIDGET_ECHO_DELAY_TICKS = 8;
-
-    /** Claim priority at which a holder counts as combat for fidget
-     *  suppression (combat owns ROT/USE at 20; pathing sits at 10). */
-    public static final int COMBAT_PRIORITY_BAND = 20;
-
-    private int nextFidgetInterval() {
-        return FIDGET_MIN_INTERVAL_TICKS + fidgetRandom.nextInt(
-            FIDGET_MAX_INTERVAL_TICKS - FIDGET_MIN_INTERVAL_TICKS + 1);
-    }
-
-    /**
-     * Walk-fidget pass (issue 0005 P3): occasional main-hand swing
-     * bursts while walking, one every {@link FIDGET_MIN_INTERVAL_TICKS}
-     * to {@link FIDGET_MAX_INTERVAL_TICKS} walking ticks. The countdown
-     * only advances while a drive claim is actually flowing, so pauses
-     * do not mint fidgets.
-     *
-     * <p>Semantic boundary (binding, from the issue): the swing MUST
-     * bypass the USE channel - {@code Intent.Use} means "act with the
-     * main hand" and deals melee damage; routing cosmetic swings
-     * through it would convert idle flavor into combat input. Direct
-     * {@code body.swing} only, and suppressed while combat owns the
-     * arbiter (a USE claim or a combat-priority ROT claim this tick)
-     * - never swing idly mid-fight.
-     */
-    // contract: see issues/0005-player-feel-motion-layer.md P3 (the
-    // marker that prevents promotion into Intent.Use)
-    private void tickWalkFidget(Map<Channel, Claim> winners, Claim move,
-                                Claim rot) {
-        boolean walking = move != null
-            && move.intent() instanceof Intent.Move m
-            && m.forward() >= 0.5;
-        boolean combatOwnsArbiter = winners.get(Channel.USE) != null
-            || (rot != null && rot.priority() >= COMBAT_PRIORITY_BAND);
-        if (!walking || combatOwnsArbiter) {
-            return;
-        }
-        if (fidgetEchoSwingDelay > 0 && --fidgetEchoSwingDelay == 0) {
-            body.swing(InteractionHand.MAIN_HAND);
-        }
-        if (--fidgetCountdown <= 0) {
-            body.swing(InteractionHand.MAIN_HAND);
-            if (fidgetRandom.nextInt(FIDGET_ECHO_CHANCE) == 0) {
-                fidgetEchoSwingDelay = FIDGET_ECHO_DELAY_TICKS;
-            }
-            fidgetCountdown = nextFidgetInterval();
-        }
     }
 
     private static double clamp(double v) {
