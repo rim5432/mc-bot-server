@@ -113,6 +113,8 @@ public final class BotController {
         engageMissionFactory;
     /** Mission TASK_* emission and hand-off edge detection. */
     private final MissionReporter missions;
+    /** Reflex-owned ENGAGE fight seat bookkeeping. */
+    private final ReflexEngageSeat engageSeat;
 
     private long tickCounter;
     private boolean crashed;
@@ -120,9 +122,6 @@ public final class BotController {
     private boolean inLethalFluid;
     private int airSupply = ThreatBlackboard.MAX_AIR_SUPPLY;
     private int ticksSinceKeepalive;
-    /** Live reflex-owned defend mission, if any; null otherwise. */
-    private BotProcess reflexEngageMission;
-    private int ticksSinceEngageSubmit = ENGAGE_RESUBMIT_COOLDOWN;
 
     /**
      * How often the keepalive event fires. Matches
@@ -132,19 +131,6 @@ public final class BotController {
      * kinds, so this can be tuned later without breaking replay.
      */
     private static final int KEEPALIVE_INTERVAL = 20;
-
-    /**
-     * Ticks between reflex engage submissions. Deliberately ABOVE
-     * the engage rule's hold window plus a release-band transit:
-     * (a) a reflex-owned defend whose verdict landed while the rule
-     * still fires - a threat fleeing through the release band - must
-     * not mint a mission per tick; (b) after the threat disappears
-     * the rule keeps firing through its hysteresis hold with no
-     * threat left, and resubmitting there would mint a spurious
-     * instant-SUCCESS defend per engagement tail. The fight's own
-     * leash, grace and escape verdicts resolve the engagement.
-     */
-    private static final int ENGAGE_RESUBMIT_COOLDOWN = 40;
 
     /**
      * Assembles the pipeline without combat wiring: ENGAGE reflex
@@ -211,6 +197,7 @@ public final class BotController {
             Objects.requireNonNull(crashReporter, "crashReporter");
         this.engageMissionFactory = engageMissionFactory;
         this.missions = new MissionReporter(arbiter, events);
+        this.engageSeat = new ReflexEngageSeat(arbiter);
     }
 
     /**
@@ -335,9 +322,7 @@ public final class BotController {
         float health = healthSource.get();
         long day = clock.day();
         long tod = clock.timeOfDayTicks();
-        if (ticksSinceEngageSubmit < ENGAGE_RESUBMIT_COOLDOWN) {
-            ticksSinceEngageSubmit++;
-        }
+        engageSeat.tickCooldown();
 
         // Stage 1: reflex bypass — non-null decision skips the mission,
         // except the ENGAGE kind, which spends exactly one tick on the
@@ -350,7 +335,14 @@ public final class BotController {
             boolean engageDecision =
                 decision.action() == ReflexAction.ENGAGE;
             if (engageDecision && engageMissionFactory != null) {
-                if (maybeSubmitEngageMission(decision, day, tod)) {
+                engageSeat.retireFinished();
+                if (engageSeat.maySubmit()) {
+                    preemptAndHold(decision,
+                        new Intent.Move(0, 0, false, false), day, tod);
+                    BotProcess mission = engageMissionFactory.get();
+                    arbiter.register(mission);
+                    arbiter.requestControl(mission);
+                    engageSeat.submitted(mission);
                     return;
                 }
                 // Live reflex-owned mission (or the resubmit cooldown):
@@ -385,12 +377,8 @@ public final class BotController {
         // is seated AND the reflex fight is not still awaiting its
         // seat in pending - in that window the arbiter must SELECT
         // the fight, not resume the parked mission over it.
-        boolean fightIsParked = reflexEngageMission != null
-            && reflexEngageMission.isActive()
-            && arbiter.paused() == reflexEngageMission;
-        boolean fightAwaitingSeat = reflexEngageMission != null
-            && reflexEngageMission.isActive()
-            && arbiter.paused() != reflexEngageMission;
+        boolean fightIsParked = engageSeat.fightIsParked();
+        boolean fightAwaitingSeat = engageSeat.fightAwaitingSeat();
         if (arbiter.paused() != null && arbiter.current() == null
                 && (fightIsParked
                     || (decision == null && !fightAwaitingSeat))) {
@@ -488,44 +476,6 @@ public final class BotController {
             // contract - not via any transition-state side effect.
             missions.announceTransition(day, tod);
         }
-    }
-
-    /**
-     * One reflex engage submission: park the current mission through
-     * the shared preemption skeleton, then hand the body to a fresh
-     * reflex-owned defend mission from the factory. The fight itself
-     * starts next tick, through the normal mission stage.
-     *
-     * <p>No-op (returns false) while a reflex-owned mission is still
-     * live, or inside the resubmit cooldown - a threat fleeing
-     * through the release band must not mint a mission per tick.
-     *
-     * @param decision the winning ENGAGE decision; never null
-     * @param day      game day for event stamping
-     * @param tod      time-of-day ticks for event stamping
-     * @return true when a mission was submitted and this tick is the
-     *         preemption; false when the caller should fall through
-     */
-    private boolean maybeSubmitEngageMission(
-            SurvivalReflexLayer.ReflexDecision decision, long day,
-            long tod) {
-        if (reflexEngageMission != null
-                && !reflexEngageMission.isActive()) {
-            // Retired; the transition detector announced its verdict.
-            reflexEngageMission = null;
-        }
-        if (reflexEngageMission != null
-                || ticksSinceEngageSubmit < ENGAGE_RESUBMIT_COOLDOWN) {
-            return false;
-        }
-        preemptAndHold(decision, new Intent.Move(0, 0, false, false),
-            day, tod);
-        BotProcess mission = engageMissionFactory.get();
-        arbiter.register(mission);
-        arbiter.requestControl(mission);
-        reflexEngageMission = mission;
-        ticksSinceEngageSubmit = 0;
-        return true;
     }
 
     /**
