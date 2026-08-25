@@ -44,13 +44,13 @@ import java.util.function.Supplier;
  * degraded mode; reset vs respawn recovery asymmetry). Reordering the
  * stages is a boundary violation.
  *
- * <p>Body facts (position, health, clock, lava flag) arrive through
- * constructor-injected accessors — the controller never imports engine
- * types, and the Stage 1 adapter is their only production supplier.
+ * <p>Body facts (position, health, clock, lethal-fluid flag) arrive
+ * through constructor-injected accessors — the controller never imports
+ * engine types; the adapter's BotAssembly is the production supplier.
  *
  * <p>Implementation note: runs on the server tick thread only; the
- * Forge subscription that calls {@link #onTick} lives in the mod entry
- * class until that adapter lands.
+ * Forge server-tick subscription that calls {@link #onTick} lives in
+ * the mod entry class — the one place allowed to hold MC-aware wiring.
  */
 // contract: see ADR-0004 D1 + ADR-0005 D1 (pipeline order and catch frame)
 public final class BotController {

@@ -51,10 +51,11 @@ Four tiers, strictly ordered per tick (details in ADR-0002 / ADR-0003):
 | arbiter; same-tick response (ADR-0003)                        |
 +--------------------------------------------------------------+
 | TaskArbiter           BotProcesses compete, winner-take-all   |
-| MineProcess / FollowProcess / DefendProcess ... (ADR-0002)    |
+| GotoProcess / DefendProcess (+ reflex rescue missions)        |
+| (ADR-0002)                                                    |
 +--------------------------------------------------------------+
 | Behaviors             always-on services                      |
-| PathingBehavior-equivalent, LookBehavior, CombatBehavior      |
+| PathingBehavior, CombatBehavior, IdleLook                     |
 +--------------------------------------------------------------+
 | Actor                 movement input, single-writer handover  |
 +--------------------------------------------------------------+
@@ -66,20 +67,29 @@ fire, server rules) follow the same reflex pattern as separate guardians
 
 ## Current status
 
-Stage 2 complete (2026-08-22, hardened 2026-08-23): all four tiers
-run offline behind the layer-1 gates AND in-engine via a five-scenario
-gametest suite - walks-to-block, shove-recovery, clean failure on
-unreachable goals, a full combat engagement (defend planner ->
-standoff chase -> cone-resolved melee with line-of-sight and
-vanilla-aligned reach -> kill -> TASK_COMPLETED), and ranged-refusal
-(ENGAGEMENT_REFUSED with attrs.threatType instead of chasing
-unwinnable fights). A* pathfinding runs off-thread on immutable
-snapshots; the reflex rule table is datapack-driven; the event stream
-carries structured failure reasons plus periodic keepalive snapshots.
+Stage 2 closed out and hardened through 2026-08-25. Three layers have
+shipped since on the same four-tier pipeline:
+
+- **Survival reflex ladder** (issue 0008, ledger entries 24-27):
+  drowning, lava shore-escape, fire extinguish, suffocation dig-out,
+  powder-snow climb, and idle-combat engage — every rule datapack-driven
+  with a lockstep gate pinning code rules to the shipped JSON table.
+- **Interaction surface** (issues 0007/0009, Phases 1-2): inventory
+  sense, DropSelected, block placement, and tool-supplied digging on a
+  fifth INTERACT channel; menu system (crafting table + chest) driven
+  server-side through a Player facade over the mob carrier.
+- **Harness convergence** (issue 0011, in flight): console verb
+  contract, session runtime, disclosure responsibilities.
+
+The in-engine gametest suite runs ~30 scenarios covering the pipeline,
+the survival ladder, interaction surfaces, crash recovery, and
+production wiring. Remaining major rows: the Stage 3 review (frozen-
+surface lift for menu planners), HungryProcess food acquisition
+(issue 0010), and the boundary-D transport choice (MCP vs HTTP).
+
 The capability envelope and its convergence criteria live in the
-[Functional Convergence Map](function-map.md); the remaining harness-
-side work is the transport choice for boundary D (MCP vs HTTP) plus
-the deferred rows in that map.
+[Functional Convergence Map](function-map.md); per-issue lifecycle
+rules live in root `AGENTS.md` section 0.3.
 
 Related: [Boundary Contracts & Ledger](boundaries.md),
 [Work Plan](../guide/workplan.md),
