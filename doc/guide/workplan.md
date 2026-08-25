@@ -1,6 +1,6 @@
 ---
 title: Work Plan (effort-sized checklist)
-last_verified: 2026-08-25
+last_verified: 2026-08-26
 covers:
   - doc/architecture/boundaries.md
   - doc/decisions/0004-tick-pipeline-actor-channels.md
@@ -601,6 +601,19 @@ freeze lifts.
          diamonds → diamond_block → ResultSlot.onTake consumes
          grid). 24/24 gametests pass. Remaining: core click-sequence
          PLANNER, chest gametest, CraftingView api type.
+         Progress 2026-08-26 (disclosure + transaction surface,
+         36/36 gametests): MenuView carries carried + sourcePos,
+         SlotView carries SlotRole (vanilla layout knowledge in one
+         adapter table), api MenuClick replaces the engine ClickType
+         in every public signature, armor bridge translation landed
+         (amended 0007 ruling), double chests open the full
+         CompoundContainer, and the menu write surface landed per
+         the A1 ruling as api.menu.MenuTransactions on BindingActor
+         (ledger 29) - craftsViaMenuTransactions proves the
+         click-only chain end to end. Remaining: core click-sequence
+         PLANNER (planning half is L1-testable against MenuView
+         fakes; execution rides MenuTransactions), CraftingView api
+         type, and the walk-to-table acceptance loop.
                                  [dep: P1]
 - [ ] M  Phase 3 - crafting automation: recipe query service over
          RecipeManager (adapter-side only - core stays

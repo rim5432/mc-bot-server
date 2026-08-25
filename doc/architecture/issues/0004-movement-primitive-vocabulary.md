@@ -1,6 +1,6 @@
 ---
 title: Movement primitive vocabulary - misnomers, fluid propulsion, missing key semantics
-last_verified: 2026-08-25
+last_verified: 2026-08-26
 covers:
   - src/main/java/com/mcbot/mcbotserver/core/pathing/BasicMoves.java
   - src/main/java/com/mcbot/mcbotserver/api/actor/Intent.java

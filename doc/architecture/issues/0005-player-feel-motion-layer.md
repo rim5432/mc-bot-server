@@ -1,6 +1,6 @@
 ---
 title: Player-feel motion layer - eyes, start/stop, rhythm, cosmetic fidgets
-last_verified: 2026-08-25
+last_verified: 2026-08-26
 covers:
   - src/main/java/com/mcbot/mcbotserver/core/behavior/PathingBehavior.java
   - src/main/java/com/mcbot/mcbotserver/core/behavior/IdleLook.java

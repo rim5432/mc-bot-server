@@ -282,6 +282,39 @@ state) turns out to be facade-hostile.
    materials like the 3x3. Double chests are explicitly rejected
    (vanilla merges halves into CompoundContainer; binding one half
    silently exposed 27 of 54 slots).
+   Vocabulary + surface round 2026-08-26 (b24b9d2, c936ba1,
+   ca69864, f413ad8; 36/36 gametests; user rulings):
+   - Armor order ruling AMENDED - pulled forward from Phase 4 and
+     landed with the SlotRole slice: bridge-side translation
+     (binding = 75 - vanillaFlat, armor only) in the four flat-index
+     accessors. Reason: SlotRole makes armor a first-class
+     addressable surface, so the reversal became reachable, not
+     remote. Pinned by equipsArmorThroughMenuClicks.
+   - Disclosure shape executed: MenuView carries carried (the §6.5
+     ruling) + sourcePos (null for own inventory); SlotView carries
+     SlotRole; the vanilla flat-layout knowledge lives in exactly
+     one adapter table (BindingMenu.roleOf).
+   - api.menu.MenuClick (PICKUP/QUICK_MOVE/THROW; CLONE and
+     QUICK_CRAFT deliberately excluded) - the engine ClickType no
+     longer appears in any public signature, so a core planner can
+     exist without MC imports.
+   - §6.2 menu transaction surface RESOLVED by user ruling ("A1
+     now", 2026-08-26; ledger 29): imperative request-response
+     methods on the boundary-A actor binding. Landing shape adjusts
+     the A1 sketch by one step: the methods live on the new
+     api.menu.MenuTransactions interface implemented by BindingActor
+     NEXT TO Actor - ChannelArbiter and test recordings are
+     legitimate claim-only actors. The §6.1 backlog entries
+     OpenMenu/CloseMenu/MenuClick as Intent KINDS are thereby moot:
+     menu operations are transactions, never intents. gametest
+     craftsViaMenuTransactions pins the chain end to end (clicks
+     only, no raw container writes).
+   - Double chests land the full vanilla merge (ChestBlock
+     .getContainer, sixRows for the pair; blocked chests rejected
+     like vanilla) - supersedes the reject-only interim above.
+   Remaining in Phase 2: core click-sequence PLANNER (pure planning
+   half is now L1-testable against MenuView fakes; the execution
+   half rides MenuTransactions), CraftingView api type.
 3. **Phase 3 (M)** crafting automation - `RecipeManager` query
    service, quick-move sequences.
 4. **Phase 4 (XL)** full parity - remaining menu kinds, `UseItem`
@@ -350,17 +383,17 @@ state) turns out to be facade-hostile.
   `sendSystemMessage` NPE). The audit enumerates which Player
   methods the menu call graph actually touches before writing the
   facade.
-- **Armor index order (ruled 2026-08-25, deferred to Phase 4)**:
-  vanilla `Inventory` flat slots 36-39 run feet→head (the armor
-  list index is `EquipmentSlot.getIndex()` with FEET=0, and
+- **Armor index order (ruled 2026-08-25, amended 2026-08-26, now
+  LANDED)**: vanilla `Inventory` flat slots 36-39 run feet→head (the
+  armor list index is `EquipmentSlot.getIndex()` with FEET=0, and
   `InventoryMenu`'s armor slots address container slots 39..36 for
   head..feet), while `BindingInventory` and `InventoryView` run
-  head→feet. `BridgeInventory`'s "flat index maps 1:1" claim holds
-  for 0-35 and 40 only. No current menu path addresses armor, but
-  menus must not touch armor through the bridge until translation
-  lands: the ruled fix is bridge-side (reverse flat 36-39 at the
-  seam) and ships with the Phase 4 armor interaction item together
-  with its own test, not as a silent index flip.
+  head→feet. `BridgeInventory`'s "flat index maps 1:1" claim held
+  for 0-35 and 40 only. Original ruling deferred the fix to Phase 4;
+  the SlotRole disclosure round made armor first-class addressable,
+  so the translation was pulled forward and landed bridge-side
+  (binding = 75 - vanillaFlat, armor only, in the four flat-index
+  accessors; b24b9d2, pinned by equipsArmorThroughMenuClicks).
 - **Core never writes menu state.** `ResultSlot.onTake` consumes
   grid materials on take; a core-side slot writer bypasses that
   and duplicates items. All menu mutations go through the

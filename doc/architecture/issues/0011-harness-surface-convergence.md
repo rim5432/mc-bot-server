@@ -1,6 +1,6 @@
 ---
 title: Harness surface convergence - the console verb contract, session runtime, and disclosure responsibilities
-last_verified: 2026-08-25
+last_verified: 2026-08-26
 covers:
   - doc/architecture/boundaries.md
   - src/main/java/com/mcbot/mcbotserver/adapter/BotCommands.java
