@@ -312,9 +312,29 @@ state) turns out to be facade-hostile.
    - Double chests land the full vanilla merge (ChestBlock
      .getContainer, sixRows for the pair; blocked chests rejected
      like vanilla) - supersedes the reject-only interim above.
-   Remaining in Phase 2: core click-sequence PLANNER (pure planning
-   half is now L1-testable against MenuView fakes; the execution
-   half rides MenuTransactions), CraftingView api type.
+   Closeout 2026-08-26 (9e113c5, 72e7498, f5e7bd9, 6580b99;
+   37/37 gametests): the planner half landed and Phase 2 is
+   complete. api CraftingView projects grid + result out of a
+   MenuView through SlotRole - callers never do flat arithmetic,
+   and the projection validates the vanilla pair (4 or 9 GRID
+   slots), rejecting non-crafting menus at of() time. core.menu
+   .MenuPlanner is pure static planning from one snapshot:
+   planGridFill (whole-stack lift from MAIN/HOTBAR in snapshot
+   order, one-item-per-cell right-click deposits, remainder returns
+   to its source) and planTakeResult (quick-move on the result
+   slot). Mixed recipes compose by chaining single-material plans -
+   each plan leaves the cursor spent or returned. Unsatisfiable
+   demand fails before any step exists. craftsViaMenuTransactions
+   migrated to planner-driven execution (its hardcoded flat layout
+   deleted, not relocated), which also live-proved QUICK_MOVE on
+   the result slot rides vanilla quickMoveStack so ResultSlot.onTake
+   consumes the grid. walksToTableAndCrafts pins the acceptance
+   criterion verbatim: goto mission to the adjacent cell retires as
+   a success, then open → planned fill → take → close → exactly one
+   product in the binding container. Offline gates: CraftingViewTest
+   (7 tests), MenuPlannerTest (9 tests). Remaining known gaps moved
+   to function-map §7: chest-side planning sequences, use-item/use-
+   block verbs.
 3. **Phase 3 (M)** crafting automation - `RecipeManager` query
    service, quick-move sequences.
 4. **Phase 4 (XL)** full parity - remaining menu kinds, `UseItem`

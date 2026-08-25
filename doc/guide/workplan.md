@@ -581,7 +581,7 @@ freeze lifts.
          0009, now with tool support. Acceptance criterion fully met
          (dig + inventory read + drop). Phase 1 COMPLETE.
          [Phase 1 fully landed 2026-08-25]
-- [ ] L  Phase 2 - menu system + crafting-table disclosure: api
+- [x] L  Phase 2 - menu system + crafting-table disclosure: api
          MenuView/CraftingView (2x2 InventoryMenu baseline, 3x3
          table extension), core click-sequence planner over the
          read-only view (core holds no menu state - all mutations
@@ -614,6 +614,20 @@ freeze lifts.
          PLANNER (planning half is L1-testable against MenuView
          fakes; execution rides MenuTransactions), CraftingView api
          type, and the walk-to-table acceptance loop.
+         Progress 2026-08-26 (planner + acceptance loop, 37/37
+         gametests): api CraftingView projects the crafting grid +
+         result through SlotRole (2x2 baseline, 3x3 extension, no
+         flat arithmetic for callers), core MenuPlanner plans pure
+         click sequences from one snapshot - whole-stack lifts,
+         one-item-per-cell right-click deposits, remainder returns,
+         quick-move take; mixed recipes compose by chaining
+         single-material plans. craftsViaMenuTransactions migrated
+         to planner-driven (its hardcoded flat layout is gone) and
+         walksToTableAndCrafts pins the acceptance criterion
+         verbatim: goto mission to the adjacent cell, open, planned
+         fill, take, close, exactly one product in the binding.
+         Offline gates: CraftingViewTest + MenuPlannerTest.
+         [Phase 2 fully landed 2026-08-26]
                                  [dep: P1]
 - [ ] M  Phase 3 - crafting automation: recipe query service over
          RecipeManager (adapter-side only - core stays

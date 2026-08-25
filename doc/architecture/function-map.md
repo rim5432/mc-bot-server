@@ -171,9 +171,13 @@ reopened on demand — **[DEFERRED]** outside v1.
 - **[SHIPPED]** Opens crafting tables and chests and drives them
   through vanilla click machinery via a Player facade; crafting
   resolves against the real RecipeManager (issue 0007 Phase 2).
-- **[GAP]** Core-side click-sequence planner (materials placed by
-  clicks, not container writes), chest in-engine scenario,
-  CraftingView structured grid snapshot.
+- **[SHIPPED]** Core-side click-sequence planner over the
+  CraftingView lens: whole-stack lifts, one-item-per-cell
+  deposits, remainder returns, quick-move take — executed through
+  the actor's MenuTransactions (issue 0007 Phase 2). The
+  walk-to-table acceptance loop pins the full arc.
+- **[GAP]** Chest-side planning (deposit/withdraw sequences) and a
+  structured chest scenario over the planner.
 - **[GAP]** Use-item verbs — eating food (issue 0010's consumption
   half), buckets, bows — and use-block interactions (buttons,
   doors, levers); both ride the facade's Player-typed surface.
