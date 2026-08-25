@@ -1,6 +1,6 @@
 ---
 title: Functional Convergence Map (device-layer capability envelope)
-last_verified: 2026-08-25
+last_verified: 2026-08-26
 covers:
   - doc/guide/workplan.md
   - doc/architecture/boundaries.md
@@ -13,6 +13,12 @@ test-gated end to end, and drivable by an external harness — not
 when features run out. This map answers "what can this bot do" from
 the bot's own perspective: see, move, survive, fight, take orders,
 report back. Implementation detail lives in ADRs and boundaries.md.
+
+Parity bar: wherever a row intersects a vanilla player verb, the
+mechanics aim at player parity - exact engine math where it matters
+(dig pacing, fluid physics, menu click machinery), documented
+deviation everywhere else. The parity axes are ruled per issue
+(0004 movement vocabulary, 0005 motion feel, 0007 interaction).
 
 ## Mission envelope
 
@@ -43,9 +49,11 @@ reopened on demand — **[DEFERRED]** outside v1.
 ### 2. Move around
 
 - **[SHIPPED]** Walk, diagonal, jump up one block, drop up to 3
-  blocks, swim horizontally and upward. Lava locomotion is pinned
-  in-engine (crossesLavaTrench); shore-escape is a reflex row
-  below. Pathfinding reroutes on
+  blocks, swim horizontally and upward, sprint when the road ahead
+  is clear (carrier-local rule: strong forward claim, dry ground,
+  5-block eye clip; ~1.3x speed observed). Lava locomotion is
+  pinned in-engine (crossesLavaTrench); shore-escape is a reflex
+  row below. Pathfinding reroutes on
   obstruction, recovers when shoved, reports clean failure on
   unreachable goals, and escalates stalled budget-cut partial
   searches to NO_PATH instead of burning the mission timeout
@@ -53,6 +61,8 @@ reopened on demand — **[DEFERRED]** outside v1.
 - **[GAP]** Parkour jumps, pillar-up, door handling, sneak-walk along
   1-wide edges.
 - **[DEFERRED]** Climb (ladders / vines) — trait exists, no move yet.
+- **[DEFERRED]** Deliberate underwater depth control (Shift = dive
+  on the reserved `yya` axis; v1 ships ascent only — issue 0004 D3).
 
 ### 3. Survive (reflex layer)
 
@@ -98,7 +108,8 @@ reopened on demand — **[DEFERRED]** outside v1.
   nothing (decision 24 widened the air check; still one if-flag per
   vital, ADR-0005 D3 class). The latch clears
   on harness reset or death+respawn (crash counter preserved).
-- **[GAP]** Fall protection, projectile dodge, automatic eating, ranged
+- **[GAP]** Fall protection, projectile dodge, automatic eating
+  (designed in issue 0010), ranged
   idle threats (a skeleton kiting at standoff never trips the melee
   engage trigger - responding needs ranged tactics or retreat policy),
   fighting while at low health (the freeze hold currently wins that
@@ -143,6 +154,9 @@ reopened on demand — **[DEFERRED]** outside v1.
 - **[SHIPPED]** Reads its own inventory every perception tick - a
   41-slot immutable snapshot (main + armor + offhand) keyed by
   registry id (issue 0007 Phase 1).
+- **[SHIPPED]** Selects the held hotbar slot through the SLOT
+  channel - live tool supply for digging, and the selected slot
+  in every state snapshot.
 - **[SHIPPED]** Digs with vanilla pacing math: per-tick tool speed
   and correct-tool-for-drops drive both the 30/100 divisor and
   whether drops spawn (issue 0009 + 0007 tool supplier).
@@ -154,8 +168,10 @@ reopened on demand — **[DEFERRED]** outside v1.
   resolves against the real RecipeManager (issue 0007 Phase 2).
 - **[GAP]** Core-side click-sequence planner (materials placed by
   clicks, not container writes), chest in-engine scenario,
-  CraftingView structured grid snapshot, use-block interactions
-  (buttons, doors).
+  CraftingView structured grid snapshot.
+- **[GAP]** Use-item verbs - eating food (issue 0010's consumption
+  half), buckets, bows - and use-block interactions (buttons,
+  doors, levers); both ride the facade's Player-typed surface.
 - **[DEFERRED]** Armor semantics on the carrier, enchantment-aware
   dig speed, match_tool loot fidelity.
 
