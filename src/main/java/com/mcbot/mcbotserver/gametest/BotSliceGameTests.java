@@ -1,7 +1,11 @@
 package com.mcbot.mcbotserver.gametest;
 
 import com.mcbot.mcbotserver.McBotServer;
+import com.mcbot.mcbotserver.adapter.BindingMenu;
 import com.mcbot.mcbotserver.adapter.BotAssembly;
+import com.mcbot.mcbotserver.adapter.BotCraftingMenu;
+import com.mcbot.mcbotserver.adapter.BotPlayerFacade;
+import com.mcbot.mcbotserver.adapter.MenuOpener;
 import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
 import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Channel;
@@ -26,6 +30,8 @@ import net.minecraft.world.entity.monster.Skeleton;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.CraftingContainer;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.gametest.GameTestHolder;
@@ -1338,6 +1344,104 @@ public final class BotSliceGameTests {
                 rig.body().discard();
             })
             .thenSucceed();
+    }
+
+    /**
+     * Scenario: the bot opens a crafting table via {@link MenuOpener},
+     * fills the 3x3 grid with diamonds, and takes the resulting diamond
+     * block. This validates the Phase 2 crafting-table disclosure end to
+     * end: {@link BotCraftingMenu} bypasses the vanilla
+     * {@code slotChangedCraftingGrid} ServerPlayer cast (issue 0007
+     * risk), {@link BindingMenu} drives {@code clicked()} with a no-op
+     * synchronizer, and {@code ResultSlot.onTake} consumes the grid
+     * materials on take.
+     *
+     * <p>CraftingMenu slot layout: 0=result, 1-9=crafting grid (3x3),
+     * 10-36=player main, 37-45=hotbar. The bot starts with 9 diamonds in
+     * hotbar slot 0 (menu slot 37); the result lands in hotbar slot 1
+     * (menu slot 38).
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void craftsDiamondBlockAtTable(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+
+        // Place a crafting table one block south of the bot.
+        BlockPos tableLocal = new BlockPos(7, GametestRig.WALK_Y, 8);
+        helper.setBlock(tableLocal, Blocks.CRAFTING_TABLE);
+        // MenuOpener reads world-absolute positions (same as the level
+        // the body lives in); convert from template-local.
+        BlockPos tableAbs = helper.absolutePos(tableLocal);
+
+        // Give the bot 9 diamonds in hotbar slot 0.
+        rig.body().getInventory().container().setItem(0,
+            new ItemStack(Items.DIAMOND, 9));
+        checkEquals(9, rig.body().getInventory().container()
+            .getItem(0).getCount(), "setup: 9 diamonds in hotbar 0");
+
+        // Create facade + opener, open the crafting table.
+        var facade = new BotPlayerFacade(rig.body());
+        var opener = new MenuOpener(facade);
+        var menuOpt = opener.open(tableAbs);
+        check(menuOpt.isPresent(),
+            "crafting table must open a menu");
+        var menu = menuOpt.get();
+        checkEquals("crafting_table", menu.snapshot().type(),
+            "menu type must be crafting_table");
+
+        // Fill the 3x3 crafting grid (menu slots 1-9) with one diamond
+        // each. Access the CraftingContainer through slot 1's container
+        // (all grid slots share the same container).
+        var rawMenu = menu.rawMenu();
+        CraftingContainer craftSlots =
+            (CraftingContainer) rawMenu.slots.get(1).container;
+        for (int i = 0; i < 9; i++) {
+            craftSlots.setItem(i, new ItemStack(Items.DIAMOND, 1));
+        }
+        // Trigger result recomputation. BotCraftingMenu.slotsChanged
+        // bypasses the vanilla ServerPlayer cast and resolves the recipe
+        // directly against the server recipe manager.
+        rawMenu.slotsChanged(craftSlots);
+
+        // Verify the result slot holds a diamond block.
+        ItemStack result = rawMenu.slots.get(0).getItem();
+        check(result.is(Items.DIAMOND_BLOCK),
+            "result must be diamond_block, got " + result.getItem());
+        checkEquals(1, result.getCount(),
+            "result must be 1 diamond block");
+
+        // Take the result: left-click (button 0) the result slot (0).
+        // ResultSlot.onTake consumes the 9 grid diamonds.
+        menu.click(0, 0, ClickType.PICKUP);
+        checkEquals("minecraft:diamond_block",
+            menu.getCarried().itemId(),
+            "carried must be diamond_block after take");
+        checkEquals(1, menu.getCarried().count(),
+            "carried must be 1 diamond block");
+
+        // Verify grid materials were consumed by ResultSlot.onTake.
+        for (int i = 0; i < 9; i++) {
+            check(craftSlots.getItem(i).isEmpty(),
+                "crafting grid slot " + i + " must be empty after take");
+        }
+
+        // Place the diamond block into hotbar slot 1 (menu slot 38).
+        menu.click(38, 0, ClickType.PICKUP);
+        check(menu.getCarried().isEmpty(),
+            "carried must be empty after placing in hotbar 1");
+        ItemStack placed = rig.body().getInventory().container().getItem(1);
+        check(placed.is(Items.DIAMOND_BLOCK),
+            "diamond_block must be in hotbar 1, got " + placed.getItem());
+        checkEquals(1, placed.getCount(),
+            "hotbar 1 must hold 1 diamond block");
+
+        // The original 9 diamonds in hotbar 0 were never touched (the
+        // grid was filled directly in test setup, not via clicks).
+        checkEquals(9, rig.body().getInventory().container()
+            .getItem(0).getCount(),
+            "hotbar 0 must still hold 9 diamonds (setup-filled grid)");
+
+        rig.body().discard();
+        helper.succeed();
     }
 
     private static void assertEventSeen(

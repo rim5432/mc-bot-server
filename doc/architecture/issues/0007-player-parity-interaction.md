@@ -228,6 +228,34 @@ state) turns out to be facade-hostile.
    table extension), core as a click-sequence PLANNER over the
    read-only view (core holds no menu state - see risk 2),
    `MenuOpener` per block kind, `BotPlayerFacade`.
+   Progress 2026-08-25 (Phase 2 baseline + crafting table landed):
+   `BotPlayerFacade` extends `Player` (2 abstract methods:
+   isSpectator/isCreative false), delegates position/level/UUID to
+   the body, overrides `getInventory()` to return `BridgeInventory`,
+   creates its own `InventoryMenu` (super's inventoryMenu is final
+   and backed by the empty default inventory — ignored, closeContainer
+   overridden). `BridgeInventory` extends `Inventory`, delegates all
+   41 slot reads/writes to the body's `BindingInventory` (layout
+   matches exactly: 36 main + 4 armor + 1 offhand). `BindingMenu`
+   wraps `AbstractContainerMenu` with a no-op `ContainerSynchronizer`
+   (4 methods: sendInitialData/sendSlotChange/sendCarriedChange/
+   sendDataChange), provides snapshot() → MenuView and click() →
+   menu.clicked(). api types: `MenuView` (type + containerSize +
+   immutable SlotView list) and `SlotView` (index + ItemView).
+   `BotCraftingMenu` extends `CraftingMenu` and overrides
+   `slotsChanged` to bypass the vanilla `slotChangedCraftingGrid`
+   ServerPlayer cast (which would ClassCastException on the facade):
+   it reads the CraftingContainer/ResultContainer through the public
+   slots list, queries the server RecipeManager directly, and writes
+   the result — no network packet, no ServerPlayer. `MenuOpener`
+   opens crafting_table (→ BotCraftingMenu) and chest (→ ChestMenu
+   backed by ChestBlockEntity) and returns BindingMenu. In-engine
+   gate: `craftsDiamondBlockAtTable` gametest (9 diamonds in 3x3
+   grid → slotsChanged → diamond_block result → click take →
+   ResultSlot.onTake consumes all 9 grid materials → place result in
+   hotbar 1). 24/24 gametests pass. Remaining in Phase 2: core
+   click-sequence PLANNER (places materials via clicks instead of
+   direct container writes), chest gametest, CraftingView api type.
 3. **Phase 3 (M)** crafting automation - `RecipeManager` query
    service, quick-move sequences.
 4. **Phase 4 (XL)** full parity - remaining menu kinds, `UseItem`

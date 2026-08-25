@@ -58,7 +58,8 @@ class GametestInventoryCheck {
             "digsFreeWhenSuffocating",
             "regeneratesHealthWhenBelowMax",
             "dropsSelectedItem",
-            "placesBlockOnInteract"),
+            "placesBlockOnInteract",
+            "craftsDiamondBlockAtTable"),
         "GauntletGameTests", Set.of(
             "gauntletEndToEnd",
             "routesThroughFenceGap"),

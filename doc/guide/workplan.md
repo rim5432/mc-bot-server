@@ -584,14 +584,14 @@ freeze lifts.
          ruling in 0007). Acceptance: walk to a crafting table,
          open it, place materials via MenuClick, read the result
          slot, take the product.
-         Progress 2026-08-25 (baseline landed): BotPlayerFacade
-         (extends Player, delegates to body, BridgeInventory backed
-         by BindingInventory, own InventoryMenu), BridgeInventory
-         (41-slot delegation), BindingMenu (no-op ContainerSynchronizer,
-         snapshot + click), api MenuView/SlotView. In-engine gate:
-         movesItemViaInventoryMenu gametest (pickup + place via
-         menu.clicked). Remaining: core click-sequence PLANNER,
-         MenuOpener (chest/crafting_table), CraftingView (3x3).
+         Progress 2026-08-25 (baseline + crafting table landed):
+         BotPlayerFacade + BridgeInventory + BindingMenu +
+         MenuView/SlotView + BotCraftingMenu (ServerPlayer cast
+         bypass in slotsChanged) + MenuOpener (crafting_table +
+         chest). In-engine gate: craftsDiamondBlockAtTable (9
+         diamonds → diamond_block → ResultSlot.onTake consumes
+         grid). 24/24 gametests pass. Remaining: core click-sequence
+         PLANNER, chest gametest, CraftingView api type.
                                  [dep: P1]
 - [ ] M  Phase 3 - crafting automation: recipe query service over
          RecipeManager (adapter-side only - core stays
