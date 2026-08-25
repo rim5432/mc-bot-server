@@ -768,6 +768,30 @@ public final class BotSliceGameTests {
                     Blocks.SMOOTH_STONE);
             }
         }
+        // Isolation wall (2 high, perimeter): the empty template has
+        // no walls, so with 27 concurrent tests a NEIGHBOURING
+        // structure's body can have clear line of sight to this
+        // zombie from inside its 40-block presence box and win the
+        // acquisition race (both bots scan every 20 ticks; whoever
+        // hits the target==null zombie first claims it). The wall
+        // makes the foreign sight-line fail while the in-structure
+        // fight (7 blocks, clear interior) is untouched.
+        for (int x = 0; x < 16; x++) {
+            for (int y = 1; y <= 2; y++) {
+                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y + y,
+                    0), Blocks.SMOOTH_STONE);
+                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y + y,
+                    15), Blocks.SMOOTH_STONE);
+            }
+        }
+        for (int z = 1; z < 15; z++) {
+            for (int y = 1; y <= 2; y++) {
+                helper.setBlock(new BlockPos(0, GametestRig.FLOOR_Y + y,
+                    z), Blocks.SMOOTH_STONE);
+                helper.setBlock(new BlockPos(15, GametestRig.FLOOR_Y + y,
+                    z), Blocks.SMOOTH_STONE);
+            }
+        }
         Zombie zombie = EntityType.ZOMBIE.create(level);
         check(zombie != null, "zombie creation failed");
         var zAbs = helper.absolutePos(
