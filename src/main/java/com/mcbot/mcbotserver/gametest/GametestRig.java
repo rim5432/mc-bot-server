@@ -114,11 +114,13 @@ final class GametestRig {
     static void driveTick(Rig rig) {
         rig.gotoHandler().tick();
         rig.state().current();
-        // Feed the lava flag before the pipeline runs: MinimalReflex
-        // (crashed state) reads this to decide whether to jump
-        // (ADR-0005 D3); the normal reflex layer derives fluid state
-        // from ThreatBlackboard sensors instead.
+        // Feed the crashed-state flags before the pipeline runs:
+        // MinimalReflex (ADR-0005 D3) reads these to decide whether
+        // to jump (lava) or ascend (low air). The normal reflex layer
+        // derives fluid/vital state from ThreatBlackboard sensors
+        // instead; these setters are the crashed-state parallel only.
         rig.controller().setInLethalFluid(rig.body().isInLava());
+        rig.controller().setAirSupply(rig.body().getAirSupply());
         rig.controller().onTick(rig.view());
     }
 
