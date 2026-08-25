@@ -48,16 +48,17 @@ reopened on demand — **[DEFERRED]** outside v1.
 
 ### 2. Move around
 
-- **[SHIPPED]** Walk, diagonal, jump up one block, drop up to 3
-  blocks, swim horizontally and upward, sprint when the road ahead
-  is clear (carrier-local rule: strong forward claim, dry ground,
-  5-block eye clip; ~1.3x speed observed). Lava locomotion is
-  pinned in-engine (crossesLavaTrench); shore-escape is a reflex
-  row below. Pathfinding reroutes on
-  obstruction, recovers when shoved, reports clean failure on
-  unreachable goals, and escalates stalled budget-cut partial
-  searches to NO_PATH instead of burning the mission timeout
-  (decision 21; live verification queued in workplan follow-up 6).
+- **[SHIPPED]** Locomotion vocabulary: walk, diagonal, jump up one
+  block, drop up to 3 blocks, swim horizontally and upward, sprint
+  when the road ahead is clear (carrier-local rule: strong forward
+  claim, dry ground, 5-block eye clip; ~1.3x speed observed). Lava
+  locomotion is pinned in-engine (crossesLavaTrench); shore escape
+  is a reflex row below.
+- **[SHIPPED]** Pathfinding resilience: reroutes on obstruction,
+  recovers when shoved, reports clean failure on unreachable goals,
+  and escalates stalled budget-cut partial searches to NO_PATH
+  instead of burning the mission timeout (decision 21; live
+  verification queued in workplan follow-up 6).
 - **[GAP]** Parkour jumps, pillar-up, door handling, sneak-walk along
   1-wide edges.
 - **[DEFERRED]** Climb (ladders / vines) — trait exists, no move yet.
@@ -66,43 +67,44 @@ reopened on demand — **[DEFERRED]** outside v1.
 
 ### 3. Survive (reflex layer)
 
-- **[SHIPPED]** The world treats the bot as a player (ruling
+- **[SHIPPED]** Treated as a player by the world (ruling
   2026-08-25): hostiles acquire the body on sight through a
-  carrier-side presence pass (line of sight, their own follow range,
-  only free target slots) - unprovoked combat is now possible and
-  the night-survival acceptance means what it says. Pinned in-engine
-  by hostilesAggroOnSight.
-- **[SHIPPED]** Freezes on low health, surfaces on low air (trigger 80
-  of 300, decision 22; ASCEND holds jump, vanilla fluid physics does
-  the swimming), ascends in lethal fluid (lava, 4 HP/tick with no
-  interval - the one vital that outranks everything, decision 24),
-  digs itself free on suffocation (1 HP/tick instant class; the eye
-  block is a KNOWN rescue target, so the self-rescue dig supersedes
-  the freeze stopgap - dirt-class escape costs ~15 of 20 health
-  points, authentic vanilla hand-dig math, decision 25; an
-  unbreakable eye block still kills, and the preemption's
-  TASK_PAUSED is the siren either way), and engages hostiles that
-  close to melee range while
-  idle (decision 23: one preemption tick, then a reflex-owned defend
-  mission runs the fight through the arbiter). ESCAPE is the
-  survival twin of ENGAGE (decision 26): one preemption tick + a
-  rescue GotoProcess to the nearest safe cell (lava shore or water
-  source), then the mission stage owns the route. Triage ladder
-  frozen at seven rungs: LAVA 130 > SUFFOCATION 115 > SURFACE 110 >
-  FIRE_ESCAPE 105 > FREEZE 100 > POWDER_SNOW_CLIMB 95 > ENGAGE 90
-  (decision 24 + 26 + 27).
-  Non-lethal fire is sensed but ruleless by ruling (issue 0008
-  D5-original - fire is self-answering below the kill threshold);
-  lethal fire (fireTicks/20 >= health) triggers EXTINGUISH_FIRE.
-  Powder snow freezing triggers CLIMB_OUT_OF_POWDER_SNOW at
-  freezeTicks=100 (ASCEND = held jump; powder snow is climbable,
-  decision 27). Reflex rules
-  are datapack JSON; new survival scenarios are data, not code; a
-  code-registered rule type must land with its JSON branch and
-  datapack row in the same change or the first /reload silently
-  drops it (ledger 24 reload-parity rule). A reflex preemption
-  skips all mission work for that tick - except ENGAGE and ESCAPE,
-  which each spend exactly one tick preempting.
+  carrier-side presence pass — their own follow range, line of
+  sight, only free target slots. Unprovoked combat is possible;
+  pinned by hostilesAggroOnSight.
+- **[SHIPPED]** Vitals holds: freezes below the health trigger and
+  surfaces at 80 of 300 air (decision 22) — ASCEND holds jump and
+  vanilla fluid physics does the swimming.
+- **[SHIPPED]** Lava shore escape (decision 26): one preemption
+  tick, then a rescue GotoProcess paths to the nearest safe cell —
+  lava deals 4 HP per tick with no interval, the one vital that
+  outranks everything (decision 24).
+- **[SHIPPED]** Suffocation dig-out (decision 25): the eye block is
+  a known rescue target, so the rule digs it out with authentic
+  vanilla hand-dig math (~15 of 20 health points for dirt class);
+  an unbreakable eye block still kills, and the preemption's
+  TASK_PAUSED is the siren either way.
+- **[SHIPPED]** Fire: lethal band only (fireTicks/20 >= health)
+  triggers EXTINGUISH_FIRE toward water; non-lethal fire is sensed
+  but ruleless — self-answering below the kill threshold
+  (issue 0008 D5).
+- **[SHIPPED]** Powder-snow climb (decision 27): freezing at
+  freezeTicks=100 climbs out — powder snow is climbable, so the
+  action is pure held jump.
+- **[SHIPPED]** Idle engage (decision 23): hostiles closing to
+  melee range while idle get one preemption tick, then a
+  reflex-owned defend mission runs the fight through the arbiter.
+  ESCAPE (decision 26) is its survival twin.
+- **[SHIPPED]** Triage ladder, frozen at seven rungs: LAVA 130 >
+  SUFFOCATION 115 > SURFACE 110 > FIRE_ESCAPE 105 > FREEZE 100 >
+  POWDER_SNOW_CLIMB 95 > ENGAGE 90 (decisions 24 + 26 + 27).
+- **[SHIPPED]** Rules are datapack JSON; new survival scenarios are
+  data, not code. A code-registered rule type must land with its
+  JSON branch and datapack row in the same change, or the first
+  /reload silently drops it (ledger 24 reload-parity gate).
+- **[SHIPPED]** Preemption semantics: a reflex tick skips all
+  mission work — except ENGAGE and ESCAPE, which each spend
+  exactly one tick preempting.
 - **[SHIPPED]** After any pipeline crash the bot latches into a minimal
   state: ascend from lethal fluid or critically low air, otherwise
   nothing (decision 24 widened the air check; still one if-flag per
@@ -111,7 +113,7 @@ reopened on demand — **[DEFERRED]** outside v1.
 - **[GAP]** Fall protection, projectile dodge, automatic eating
   (designed in issue 0010), ranged
   idle threats (a skeleton kiting at standoff never trips the melee
-  engage trigger - responding needs ranged tactics or retreat policy),
+  engage trigger — responding needs ranged tactics or retreat policy),
   fighting while at low health (the freeze hold currently wins that
   arbitration).
 - **[DEFERRED]** Process-suppressed reflexes (a mission pauses a reflex).
@@ -131,9 +133,12 @@ reopened on demand — **[DEFERRED]** outside v1.
 
 ### 5. Take orders
 
-- **[SHIPPED]** goto a block, defend an area, cancel. One task at a
+- **[SHIPPED]** Tasks: goto a block, defend an area. One task at a
   time (winner-take-all arbiter); a higher-priority task defers the
   current one.
+- **[SHIPPED]** Console verbs goto / cancel / stop / status /
+  events / reset, frozen as the de-facto harness wire contract
+  (issue 0011).
 - **[GAP]** Follow / escort, harvest-and-place loops.
 - **[DEFERRED]** Tool loadout (armor / equipment semantics).
 
@@ -151,17 +156,17 @@ reopened on demand — **[DEFERRED]** outside v1.
 
 ### 7. Manipulate the world
 
-- **[SHIPPED]** Reads its own inventory every perception tick - a
+- **[SHIPPED]** Reads its own inventory every perception tick — a
   41-slot immutable snapshot (main + armor + offhand) keyed by
   registry id (issue 0007 Phase 1).
 - **[SHIPPED]** Selects the held hotbar slot through the SLOT
-  channel - live tool supply for digging, and the selected slot
+  channel — live tool supply for digging, and the selected slot
   in every state snapshot.
 - **[SHIPPED]** Digs with vanilla pacing math: per-tick tool speed
   and correct-tool-for-drops drive both the 30/100 divisor and
   whether drops spawn (issue 0009 + 0007 tool supplier).
 - **[SHIPPED]** Drops the selected stack (Q / Ctrl-Q semantics)
-  and places BlockItems against a clicked face - default state,
+  and places BlockItems against a clicked face — default state,
   air cells only, BlockItem.canPlace parity guards.
 - **[SHIPPED]** Opens crafting tables and chests and drives them
   through vanilla click machinery via a Player facade; crafting
@@ -169,8 +174,8 @@ reopened on demand — **[DEFERRED]** outside v1.
 - **[GAP]** Core-side click-sequence planner (materials placed by
   clicks, not container writes), chest in-engine scenario,
   CraftingView structured grid snapshot.
-- **[GAP]** Use-item verbs - eating food (issue 0010's consumption
-  half), buckets, bows - and use-block interactions (buttons,
+- **[GAP]** Use-item verbs — eating food (issue 0010's consumption
+  half), buckets, bows — and use-block interactions (buttons,
   doors, levers); both ride the facade's Player-typed surface.
 - **[DEFERRED]** Armor semantics on the carrier, enchantment-aware
   dig speed, match_tool loot fidelity.

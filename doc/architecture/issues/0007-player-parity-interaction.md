@@ -1,6 +1,6 @@
 ---
 title: Player parity - inventory, menus, crafting, and the interaction surface
-last_verified: 2026-08-25
+last_verified: 2026-08-26
 covers:
   - doc/architecture/function-map.md
   - src/main/java/com/mcbot/mcbotserver/adapter/BindingActor.java
@@ -23,10 +23,11 @@ at the information-interaction level - inventory, container menus,
 the crafting-table disclosure, block/entity interaction - but only
 after the pre-Stage-3 survival gate closes (a body that cannot
 survive a night does not need a crafting table yet). This issue
-reviews the function-map rows it would flip: the [DEFERRED]
-inventory-management / crafting / tool-loadout row, the "Take
-orders" harvest-and-place GAP, and the survival "automatic eating"
-GAP.
+reviews the function-map rows it would flip. Already flipped by
+Phases 1-2: inventory management and crafting are now SHIPPED
+rows in the map's "Manipulate the world" section. Still pending
+on the map: the tool-loadout DEFERRED row, the "Take orders"
+harvest-and-place GAP, and the survival "automatic eating" GAP.
 
 Initial analysis 2026-08-24; reviewed and corrected the same day
 (menu transaction semantics, interaction-surface precision, core
