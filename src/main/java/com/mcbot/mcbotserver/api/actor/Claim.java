@@ -66,7 +66,9 @@ public record Claim(Channel channel, int priority, String holder,
             case ROT -> intent instanceof Intent.Look;
             case USE -> intent instanceof Intent.Use;
             case SLOT -> intent instanceof Intent.SelectSlot;
-            case INTERACT -> intent instanceof Intent.Dig;
+            case INTERACT -> intent instanceof Intent.Dig
+                || intent instanceof Intent.DropSelected
+                || intent instanceof Intent.InteractBlock;
         };
     }
 }

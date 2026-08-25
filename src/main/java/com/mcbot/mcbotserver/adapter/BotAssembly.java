@@ -117,7 +117,8 @@ public final class BotAssembly {
                 .register("minecraft:lava",
                     BlockTraits.dangerousLiquid())
                 .seal();
-        BindingWorldView view = new BindingWorldView(level, traits);
+        BindingWorldView view = new BindingWorldView(level, traits,
+            () -> body.getInventory().snapshot());
         BindingActor actor = new BindingActor(body);
 
         SurvivalReflexLayer reflex = new SurvivalReflexLayer(
@@ -239,10 +240,17 @@ public final class BotAssembly {
     private static BotState snapshotOf(BotBodyEntity body,
                                        GotoCommandHandler gotoHandler,
                                        ServerLevel level) {
-        // Item fields stay empty until an inventory mechanic exists -
-        // inventory skills are a function-map DEFERRED row, and an
-        // honest empty map beats a fake loadout.
+        // Item summary from the live inventory binding (issue 0007 Phase
+        // 1): aggregate main-slot counts by item id. Armor and offhand
+        // are excluded from the summary map — they are equipment, not
+        // transferable stack count.
+        var inv = body.getInventory().snapshot();
         Map<String, Integer> items = new LinkedHashMap<>();
+        for (var slot : inv.main()) {
+            if (!slot.isEmpty()) {
+                items.merge(slot.itemId(), slot.count(), Integer::sum);
+            }
+        }
         Map<String, Integer> effects = new LinkedHashMap<>();
         for (MobEffectInstance instance : body.getActiveEffects()) {
             effects.put(BuiltInRegistries.MOB_EFFECT
@@ -251,7 +259,8 @@ public final class BotAssembly {
         }
         return new BotState(poseOf(body), body.getYRot(),
             body.getXRot(), level.dimension().location().getPath(),
-            items, 0, effects, gotoHandler.activeTaskSummary());
+            items, inv.selectedSlot(), effects,
+            gotoHandler.activeTaskSummary());
     }
 
     private static CellPos poseOf(BotBodyEntity body) {

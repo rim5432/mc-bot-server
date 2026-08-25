@@ -1,6 +1,8 @@
 package com.mcbot.mcbotserver.api.actor;
 
 import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.api.types.Direction;
+import com.mcbot.mcbotserver.api.types.Vec3;
 
 /**
  * The closed vocabulary of physical intents. Values are pure data — an
@@ -87,6 +89,76 @@ public sealed interface Intent {
             if (target == null) {
                 throw new IllegalArgumentException(
                     "dig target must not be null");
+            }
+        }
+    }
+
+    /**
+     * Drop the selected hotbar item, resolved on the INTERACT channel.
+     * One-shot action: the adapter fires on the rising edge (claim
+     * present this tick, absent last tick) and spawns an item entity
+     * via {@code Entity.spawnAtLocation}, then clears or shrinks the
+     * source slot. Re-asserting the claim across ticks does not drop
+     * twice — the rising-edge gate is the same shape USE uses for
+     * melee swings (issue 0007 Phase 1).
+     *
+     * @param fullStack true to drop the entire stack; false to drop a
+     *                   single item (vanilla Q vs Ctrl-Q distinction)
+     */
+    record DropSelected(boolean fullStack) implements Intent {
+    }
+
+    /**
+     * Right-click a block: place a block from the selected hotbar slot
+     * onto the clicked face, resolved on the INTERACT channel. One-shot
+     * action — the adapter fires on the rising edge (same shape USE uses
+     * for melee swings and DropSelected uses for item drops); a held
+     * claim across ticks does not place repeatedly.
+     *
+     * <p>Phase 1 scope (issue 0007): only block placement is implemented
+     * — the adapter checks that the selected item is a BlockItem,
+     * computes the placement cell as {@code target.relative(face)}, and
+     * calls {@code level.setBlock} directly (bypassing
+     * ServerPlayerGameMode.useItemOn, which requires a ServerPlayer the
+     * carrier does not have until Phase 2's BotPlayerFacade). Use-block
+     * interactions (open a chest, press a button) and direction-aware
+     * block states (stairs, pistons) are deferred to Phase 2 — they need
+     * either a Player parameter or BlockState.getStateForPlacement context.
+     *
+     * <p>The placement position depends on the face: placing on the UP
+     * face puts the block above the target, on the NORTH face puts it
+     * north of the target, etc. {@code hitPos} is the absolute
+     * intersection point of the ray with the cube face — carried for
+     * Phase 2 direction-aware placement and sub-face targeting (e.g.
+     * which half of a stair), but not used by the Phase 1 executor.
+     *
+     * @param target the clicked block cell; never null
+     * @param face   which face of the target was clicked; never null
+     * @param hitPos absolute intersection point of the ray with the face;
+     *               never null
+     */
+    record InteractBlock(CellPos target, Direction face, Vec3 hitPos)
+            implements Intent {
+
+        /**
+         * Creates a validated interact-block intent.
+         *
+         * @param target must not be null
+         * @param face   must not be null
+         * @param hitPos must not be null
+         */
+        public InteractBlock {
+            if (target == null) {
+                throw new IllegalArgumentException(
+                    "interact target must not be null");
+            }
+            if (face == null) {
+                throw new IllegalArgumentException(
+                    "interact face must not be null");
+            }
+            if (hitPos == null) {
+                throw new IllegalArgumentException(
+                    "interact hitPos must not be null");
             }
         }
     }

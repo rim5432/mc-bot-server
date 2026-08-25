@@ -3,6 +3,9 @@ package com.mcbot.mcbotserver.gametest;
 import com.mcbot.mcbotserver.McBotServer;
 import com.mcbot.mcbotserver.adapter.BotAssembly;
 import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
+import com.mcbot.mcbotserver.api.actor.Claim;
+import com.mcbot.mcbotserver.api.actor.Channel;
+import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.types.CellPos;
@@ -18,8 +21,11 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Skeleton;
 import net.minecraft.world.entity.monster.Zombie;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.gametest.GameTestHolder;
@@ -1146,6 +1152,189 @@ public final class BotSliceGameTests {
                 assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
                 check(rig.body().isAlive(),
                     "the body must survive the whole scenario");
+                rig.body().discard();
+            })
+            .thenSucceed();
+    }
+
+    /**
+     * Scenario: the body's passive regeneration (carrier deviation,
+     * workplan survival gate body-recovery policy) restores health from
+     * a low value back to max. A mob carrier has zero vanilla regen, so
+     * without the deviation health is monotonic and the body can never
+     * recover between fights. This pins the full in-engine chain:
+     * {@code BotBodyEntity.customServerAiStep → tickCount % 20 == 0 →
+     * heal(1.0f) → LivingEntity health rises}.
+     *
+     * <p>Rate: 1 HP per 20 ticks (1 second), so from 5 to 20 takes
+     * ~15 seconds (300 ticks). The timeout is generous; the test
+     * asserts intermediate recovery first (health > start) and then
+     * full recovery (health == max), so a partial regen failure is
+     * distinguishable from a total one.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 400)
+    public static void regeneratesHealthWhenBelowMax(
+            GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+        float startHealth = 5.0f;
+        float maxHealth = rig.body().getMaxHealth();
+        rig.body().setHealth(startHealth);
+
+        helper.startSequence()
+            // First gate: health must rise above the start value.
+            .thenWaitUntil(driveUntil(rig,
+                () -> check(rig.body().getHealth() > startHealth,
+                    "waiting for regen to start (current="
+                        + String.format("%.1f", rig.body().getHealth())
+                        + ")")))
+            // Second gate: health must reach max.
+            .thenWaitUntil(driveUntil(rig,
+                () -> check(rig.body().getHealth() >= maxHealth,
+                    "waiting for full regen (current="
+                        + String.format("%.1f", rig.body().getHealth())
+                        + ", max=" + maxHealth + ")")))
+            .thenExecuteFor(5, driveOnly(rig))
+            .thenExecuteAfter(0, () -> {
+                check(rig.body().isAlive(),
+                    "the body must be alive after regen");
+                check(rig.body().getHealth() >= maxHealth,
+                    "health must be at or above max after regen; got "
+                        + rig.body().getHealth());
+                rig.body().discard();
+            })
+            .thenSucceed();
+    }
+
+    /**
+     * Scenario: the DropSelected intent on the INTERACT channel spawns
+     * the selected hotbar item as a world item entity and clears the
+     * source slot. Full-stack drop (vanilla Q).
+     *
+     * <p>Why a gametest and not an offline assertion: the drop mutates
+     * world state (spawns an ItemEntity) and the inventory container —
+     * both need a real engine. The offline gate (DropSelectedIntentTest)
+     * covers intent shape and channel validation; this pins the full
+     * adapter chain: claim → BindingActor INTERACT dispatch → rising-edge
+     * gate → BotBodyEntity.dropSelectedItem → spawnAtLocation + slot clear.
+     *
+     * <p>Rising-edge: the claim is submitted once before the sequence;
+     * the first driveTick flushes the actor and fires the drop. The
+     * claim expires at flush, so subsequent ticks do not re-drop even
+     * though driveUntil keeps driving.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void dropsSelectedItem(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+        var level = helper.getLevel();
+
+        // Put 16 diamonds in hotbar slot 0 (the default selected slot).
+        rig.body().getInventory().container().setItem(0,
+            new ItemStack(Items.DIAMOND, 16));
+        checkEquals(16, rig.body().getInventory().container()
+            .getItem(0).getCount(), "setup: 16 diamonds in slot 0");
+
+        // Submit the drop claim. Priority 200 beats any reflex or
+        // behavior that might contest INTERACT (none should in an idle
+        // body, but the high priority is defensive).
+        rig.actor().submit(new Claim(Channel.INTERACT, 200, "gt-drop",
+            new Intent.DropSelected(true)));
+
+        helper.startSequence()
+            // First driveTick fires the drop; subsequent ticks let the
+            // ItemEntity appear in getEntitiesOfClass (spawnAtLocation
+            // registers it immediately, but the entity tick may take one
+            // cycle to be visible).
+            .thenWaitUntil(driveUntil(rig, () -> {
+                var items = level.getEntitiesOfClass(ItemEntity.class,
+                    rig.body().getBoundingBox().inflate(3.0));
+                check(!items.isEmpty(),
+                    "an ItemEntity must spawn after DropSelected");
+            }))
+            .thenExecuteAfter(0, () -> {
+                var items = level.getEntitiesOfClass(ItemEntity.class,
+                    rig.body().getBoundingBox().inflate(3.0));
+                ItemEntity dropped = items.get(0);
+                check(Items.DIAMOND.equals(dropped.getItem().getItem()),
+                    "the dropped item must be a diamond, got "
+                        + dropped.getItem().getItem());
+                checkEquals(16, dropped.getItem().getCount(),
+                    "full-stack drop must spawn all 16 diamonds");
+                check(rig.body().getInventory().container()
+                    .getItem(0).isEmpty(),
+                    "the source slot must be empty after a full-stack drop");
+                rig.body().discard();
+            })
+            .thenSucceed();
+    }
+
+    /**
+     * Scenario: the InteractBlock intent on the INTERACT channel places
+     * the selected hotbar block against the clicked face and shrinks the
+     * source stack by one. Phase 1 scope: default-state block placement
+     * only (no direction-aware states, no use-block / menu opening) —
+     * see InteractBlockExecutor Javadoc for the deferred items.
+     *
+     * <p>Setup: a dirt block sits one cell south of the bot at foot
+     * level; the bot holds 16 stone in hotbar slot 0. The claim targets
+     * the dirt block's UP face, so the stone lands on top of the dirt
+     * (target.relative(UP)). The bot is within bare-hand reach (≈1.4
+     * blocks from eye to dirt center).
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void placesBlockOnInteract(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+        // Target: dirt one cell south at foot level. Click its UP face
+        // to place on top of it.
+        BlockPos target = new BlockPos(7, GametestRig.WALK_Y, 8);
+        helper.setBlock(target, Blocks.DIRT);
+        BlockPos placePos = target.above();
+        // Template-local coords must read through the helper - a raw
+        // level read would interpret them as absolute world position
+        // and answer with whatever sits outside the test box.
+        check(helper.getBlockState(placePos).isAir(),
+            "setup: placement cell must be air before the test");
+
+        // Give the bot 16 stone in the selected hotbar slot (slot 0).
+        rig.body().getInventory().container().setItem(0,
+            new ItemStack(Items.STONE, 16));
+        checkEquals(16, rig.body().getInventory().container()
+            .getItem(0).getCount(), "setup: 16 stone in slot 0");
+
+        // Intents carry WORLD-absolute cells - the adapter reads them
+        // straight out of the level, and its reach gate measures real
+        // distances. The rig works in template-local coords, so convert
+        // before submitting. hitPos: center of the UP face, absolute;
+        // carried for Phase 2 direction-aware placement, unused by the
+        // Phase 1 executor.
+        BlockPos absTarget = helper.absolutePos(target);
+        var hit = new com.mcbot.mcbotserver.api.types.Vec3(
+            absTarget.getX() + 0.5, absTarget.getY() + 1.0,
+            absTarget.getZ() + 0.5);
+
+        // Submit the place claim and drive one tick so the actor flushes
+        // and the rising-edge gate fires.
+        rig.actor().submit(new Claim(Channel.INTERACT, 200, "gt-place",
+            new Intent.InteractBlock(
+                new com.mcbot.mcbotserver.api.types.CellPos(
+                    absTarget.getX(), absTarget.getY(), absTarget.getZ()),
+                com.mcbot.mcbotserver.api.types.Direction.UP,
+                hit)));
+        driveOnly(rig).run();
+
+        helper.startSequence()
+            // The block placement is synchronous inside the tick (setBlock
+            // is immediate), but the item shrink and the level state may
+            // take one cycle to settle in getBlockState.
+            .thenWaitUntil(driveUntil(rig, () -> {
+                check(
+                    helper.getBlockState(placePos).is(Blocks.STONE),
+                    "a stone block must be placed above the dirt target, "
+                        + "got " + helper.getBlockState(placePos));
+            }))
+            .thenExecuteAfter(0, () -> {
+                checkEquals(15, rig.body().getInventory().container()
+                    .getItem(0).getCount(),
+                    "the source stack must shrink by one after placement");
                 rig.body().discard();
             })
             .thenSucceed();

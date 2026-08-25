@@ -136,6 +136,93 @@ state) turns out to be facade-hostile.
    keeps the use/place shapes, the face semantics, the inventory
    reads and `DropSelected`; its hold-to-mine item is now "grow the
    executor's main-hand tool supplier", not "build the machine".
+   Progress 2026-08-25 (inventory sense half landed in parallel
+   with the survival gate): api `ItemView` (record: id + count +
+   nbtDigest, `EMPTY` constant) and `InventoryView` (record: 36
+   main + selectedSlot + 4 armor + offhand, `empty()` factory,
+   `getSelected` / `hasItem` / `countOf` / `hotbar` / `backpack`,
+   defensive-copy immutability); `WorldView.getInventory()` default
+   method (returns empty); adapter `BindingInventory`
+   (`SimpleContainer`-backed, 41 slots, `snapshot()` produces
+   `InventoryView`); wired into `BotBodyEntity` (owns the
+   container), `BindingActor` (SLOT claim mirrors selectedSlot to
+   the binding), `BindingWorldView` (supplier-based override),
+   `BotAssembly` (state snapshot reads real item counts),
+   `MockWorldView` (test scriptable inventory). Offline gate:
+   `InventorySenseTest` (26 assertions across validation, queries,
+   immutability). Remaining in Phase 1: main-hand tool supplier on
+   DigExecutor (dig currently bare-hand; tool speed/tier not yet
+   wired).
+   Progress 2026-08-25 (DropSelected landed): `Intent.DropSelected`
+   (record: `fullStack` boolean — Q vs Ctrl-Q distinction) rides the
+   INTERACT channel alongside Dig (per-channel arbitration means they
+   cannot both win a tick); `BindingActor` fires on the rising edge
+   (same shape USE uses for melee swings — a held claim across ticks
+   does not drop twice); `BotBodyEntity.dropSelectedItem(boolean)`
+   spawns via `Entity.spawnAtLocation` (0.5f y-offset) and clears or
+   shrinks the source slot. Offline gate: `DropSelectedIntentTest`
+   (10 assertions: record shape, INTERACT-accepts, other-channels-reject,
+   Dig coexistence, null/blank rejection). In-engine gate:
+   `dropsSelectedItem` gametest (16 diamonds in slot 0 → claim →
+   ItemEntity spawns with count 16 → slot empty).
+   Progress 2026-08-25 (InteractBlock place landed): `Intent.InteractBlock`
+   (record: `CellPos target` + `Direction face` + `Vec3 hitPos`) rides
+   the INTERACT channel alongside Dig and DropSelected (three variants,
+   one winner per tick); api-layer `Direction` enum (6 values in MC
+   ordinal order, `dx/dy/dz` + `relative(CellPos)`); `BindingActor`
+   fires on the rising edge (same one-shot pattern as DropSelected);
+   `InteractBlockExecutor` bypasses `ServerPlayerGameMode.useItemOn`
+   (which requires a ServerPlayer — Phase 2 facade territory) and
+   places directly via `level.setBlock` + item shrink, exactly the way
+   DigExecutor bypasses destroyBlock. Phase 1 scope: default-state block
+   placement only (BlockItem, air target cell, 4.5 block reach);
+   direction-aware states (stairs, pistons), use-block (chest/button),
+   and replaceable-cell placement (water, tall grass) are deferred to
+   Phase 2 — they need `Block.getStateForPlacement(BlockPlaceContext)`
+   or `BlockState.use(Level, Player, ...)`, both Player-typed. Offline
+   gate: `InteractBlockIntentTest` (21 assertions: Direction enum shape
+   + unit vectors + relative, InteractBlock record + null validation,
+   channel validation, INTERACT three-variant coexistence). In-engine
+   gate: `placesBlockOnInteract` gametest (dirt target south of bot,
+   16 stone in slot 0 → claim UP face → stone block appears above dirt
+   → stack shrinks to 15).
+   Progress 2026-08-25 (DigExecutor tool supplier landed): the dig
+   executor now reads the selected hotbar ItemStack every tick and
+   computes `toolSpeed = stack.getDestroySpeed(state)` and
+   `hasCorrectTool = !requiresCorrectToolForDrops || stack.isCorrectToolForDrops(state)`,
+   passing both to `DigPacing.perTickProgress`. `DigPacing` signature
+   grew from `(destroySpeed, requiresCorrectTool, onGround)` to
+   `(destroySpeed, toolSpeed, hasCorrectTool, onGround)` — the
+   semantic flip from "does the block require a tool" to "does the
+   current tool satisfy the requirement" is what makes correct-tool
+   drops work. The break call changed from `destroyBlock(pos, true)`
+   to `destroyBlock(pos, hasCorrectTool)`, matching vanilla
+   `ServerPlayerGameMode.destroyBlock` — a hand-mined stone block
+   breaks but yields no cobblestone. Offline gate: `DigPacingTest`
+   extended with iron-pickaxe (~8 ticks on stone vs 150 bare-hand),
+   wooden-pickaxe (~23 ticks), correct-tool divisor (30 vs 100), and
+   low-tier-tool-fast-but-no-drops cases. Phase 1 is now fully
+   complete: inventory sense + DropSelected + InteractBlock(place) +
+   DIG(with tool supplier) + acceptance criterion (dig + read inventory
+   + drop) all met.
+   Review round 2026-08-25 (formula audit + fixes): the DigPacing
+   arithmetic was verified point-by-point against the decompiled tree
+   — `Inventory.getDestroySpeed` returns the held item's speed with no
+   +1 base, the 30/100 divisor matches `getDestroyProgress`, and the
+   airborne /5 matches `Player.getDigSpeed`; test numbers match wiki
+   breaking times (stone: 150 hand ticks, 23 wooden, 8 iron). The
+   drop-path deviations are now inventoried in DigExecutor's Javadoc:
+   loot context receives `ItemStack.EMPTY` as the tool (match_tool-
+   gated drops behave bare-hand), no XP pop, no tool durability, no
+   mining exhaustion (an issue 0010 modeling concern), no underwater
+   /5. InteractBlockExecutor gained vanilla `BlockItem.canPlace` parity
+   guards (`canSurvive` + `isUnobstructed` with
+   `CollisionContext.empty()`) — no self-entombment, no non-surviving
+   placements. Bot drops carry the player's 40-tick pickup delay
+   instead of `spawnAtLocation`'s default 10. The Phase 2 facade getter
+   stayed out of the body so this batch lands self-contained; the
+   in-flight menu-stack WIP is preserved untracked alongside a scratch
+   copy of its excised gametest.
 2. **Phase 2 (L)** menu system + crafting-table disclosure - api
    `MenuView` / `CraftingView` (2x2 `InventoryMenu` baseline, 3x3
    table extension), core as a click-sequence PLANNER over the

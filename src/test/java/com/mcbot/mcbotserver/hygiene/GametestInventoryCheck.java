@@ -55,7 +55,10 @@ class GametestInventoryCheck {
             "escapesLavaToShore",
             "findsWaterWhenBurning",
             "climbsOutOfPowderSnow",
-            "digsFreeWhenSuffocating"),
+            "digsFreeWhenSuffocating",
+            "regeneratesHealthWhenBelowMax",
+            "dropsSelectedItem",
+            "placesBlockOnInteract"),
         "GauntletGameTests", Set.of(
             "gauntletEndToEnd",
             "routesThroughFenceGap"),

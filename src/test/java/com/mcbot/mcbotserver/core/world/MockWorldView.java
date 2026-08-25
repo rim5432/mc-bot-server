@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.core.world;
 
+import com.mcbot.mcbotserver.api.inventory.InventoryView;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.BlockSnapshot;
 import com.mcbot.mcbotserver.api.world.BlockTraits;
@@ -46,6 +47,8 @@ public final class MockWorldView implements WorldView {
     // answer, which is the empty registry's default by default.
     private final Map<CellPos, BlockTraits> traitOverrides = new HashMap<>();
     private BlockTraitsRegistry traitsRegistry = BlockTraitsRegistry.empty();
+    /** Scriptable inventory for tests that exercise item sense. */
+    private InventoryView inventory = InventoryView.empty();
 
     /**
      * Place or replace a block cell.
@@ -164,6 +167,22 @@ public final class MockWorldView implements WorldView {
         return this;
     }
 
+    /**
+     * Install an inventory snapshot returned by {@link #getInventory()}.
+     * Tests that exercise item sense call this; the default is
+     * {@link InventoryView#empty()}.
+     *
+     * @param inventory the snapshot to return; must not be null
+     * @return this mock, for fluent test setup
+     */
+    public MockWorldView setInventory(InventoryView inventory) {
+        if (inventory == null) {
+            throw new IllegalArgumentException("inventory must not be null");
+        }
+        this.inventory = inventory;
+        return this;
+    }
+
     @Override
     public BlockSnapshot getBlock(CellPos pos, ViewMode mode) {
         if (pos == null) {
@@ -231,5 +250,10 @@ public final class MockWorldView implements WorldView {
     @Override
     public boolean isLoaded(CellPos pos) {
         return pos != null && !unloaded.contains(pos);
+    }
+
+    @Override
+    public InventoryView getInventory() {
+        return inventory;
     }
 }

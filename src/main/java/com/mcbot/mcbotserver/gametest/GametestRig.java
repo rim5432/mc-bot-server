@@ -1,6 +1,7 @@
 package com.mcbot.mcbotserver.gametest;
 
 import com.mcbot.mcbotserver.McBotServer;
+import com.mcbot.mcbotserver.adapter.BindingActor;
 import com.mcbot.mcbotserver.adapter.BindingWorldView;
 import com.mcbot.mcbotserver.adapter.BotAssembly;
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
@@ -57,6 +58,7 @@ final class GametestRig {
 
     /** Everything one scenario needs, wired by the shared factory. */
     record Rig(BotBodyEntity body, BindingWorldView view,
+               BindingActor actor,
                InMemoryEventQueue events,
                TaskArbiter arbiter,
                BotController controller,
@@ -98,8 +100,8 @@ final class GametestRig {
         level.addFreshEntity(body);
 
         BotAssembly.Assembled a = BotAssembly.assemble(level, body);
-        return new Rig(a.body(), a.view(), a.events(), a.arbiter(),
-            a.controller(), a.gotoHandler(), a.state());
+        return new Rig(a.body(), a.view(), a.actor(), a.events(),
+            a.arbiter(), a.controller(), a.gotoHandler(), a.state());
     }
 
     /**

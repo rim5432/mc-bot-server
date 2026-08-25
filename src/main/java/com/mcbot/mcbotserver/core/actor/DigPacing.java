@@ -1,32 +1,44 @@
 package com.mcbot.mcbotserver.core.actor;
 
 /**
- * Bare-hand dig pacing: the pure half of the dig executor, mirroring
- * vanilla's destroy-progress arithmetic so block-break timing matches
- * a player holding left-click with an empty hand.
+ * Dig pacing: the pure half of the dig executor, mirroring vanilla's
+ * destroy-progress arithmetic so block-break timing matches a player
+ * holding left-click with the selected hotbar item.
  *
  * <p>Contract: see boundaries.md decision 25 (issue 0009). Vanilla
  * math, all constants from the decompiled 1.20.1 tree:
  * {@code Block.getDestroyProgress} computes
  * {@code digSpeed / destroySpeed / (correctTool ? 30 : 100)} per tick,
  * and {@code ServerPlayerGameMode#incrementDestroyProgress} scales it
- * by ticks held. The carrier has no Player and no tool, so digSpeed is
- * the bare-hand 1.0 modulo the situational modifiers that exist on
- * any entity (airborne penalty, {@code Player.getDigSpeed}); correct
- * tool reduces to "the block drops without one"
- * ({@code !requiresCorrectToolForDrops}), because a hand is never the
- * correct tool for anything that asks for one.
+ * by ticks held. The adapter supplies three block facts plus the
+ * selected item's effective dig speed and correct-tool-for-drops
+ * verdict; this class does the arithmetic.
  *
- * <p>Why core/: the numbers are the contract (gravel costs 18 ticks,
- * stone 150, torch pops instantly) and layer-1 tests pin them without
- * an engine; the adapter only supplies the three block facts.
+ * <p>Tool speed (issue 0007 Phase 1 tool supplier): {@code toolSpeed}
+ * is the selected item's {@code ItemStack.getDestroySpeed(BlockState)}
+ * — a pickaxe returns its tier speed (wood 2.0, stone 4.0, iron 6.0,
+ * diamond 8.0, netherite 9.0) against blocks it can dig, and 1.0
+ * otherwise; an empty hand or non-tool item also returns 1.0. The
+ * {@code hasCorrectTool} flag is
+ * {@code !state.requiresCorrectToolForDrops() || stack.isCorrectToolForDrops(state)}
+ * — it controls both the divisor (30 vs 100) and whether the broken
+ * block spawns drops (the adapter passes it to
+ * {@code level.destroyBlock(pos, hasCorrectTool)}).
+ *
+ * <p>Why core/: the numbers are the contract (gravel costs 18 ticks
+ * bare-hand, stone 150 bare-hand, stone with iron pickaxe 8 ticks)
+ * and layer-1 tests pin them without an engine; the adapter only
+ * supplies the block and item facts.
  */
 public final class DigPacing {
 
     /**
-     * Bare-hand dig speed. Empty main hand: no tool bonus, no
-     * efficiency, no haste (effects are a Stage 3 facade question,
-     * issue 0007 Phase 4).
+     * Bare-hand dig speed. Empty main hand or a non-tool item: no tool
+     * bonus, no efficiency, no haste (effects are a Stage 3 facade
+     * question, issue 0007 Phase 4). The adapter passes this value when
+     * the selected slot is empty or holds a non-digger item —
+     * {@code ItemStack.getDestroySpeed} already returns 1.0 in those
+     * cases, so this constant is the documented fallback.
      */
     public static final float BARE_HAND_DIG_SPEED = 1.0f;
 
@@ -37,12 +49,12 @@ public final class DigPacing {
      */
     public static final float AIRBORNE_DIG_MULTIPLIER = 0.2f;
 
-    /** Destroy-speed divisor when the block drops without a tool. */
+    /** Destroy-speed divisor when the block drops with the current tool. */
     public static final int HARVESTABLE_DIVISOR = 30;
 
     /**
-     * Destroy-speed divisor when the block demands a tool the bare
-     * hand is not: five times slower, still finite - vanilla lets a
+     * Destroy-speed divisor when the block demands a tool the current
+     * item is not: five times slower, still finite - vanilla lets a
      * hand break stone, it just charges 150 ticks for it.
      */
     public static final int TOOL_REQUIRED_DIVISOR = 100;
@@ -53,35 +65,43 @@ public final class DigPacing {
     /**
      * Destroy progress contributed by one held tick.
      *
-     * @param destroySpeed         the block's destroy speed (vanilla
-     *                             {@code getDestroySpeed} - hardness);
-     *                             negative means unbreakable
-     * @param requiresCorrectTool  true when the block only drops with
-     *                             the right tool
-     * @param onGround             whether the digging body stands on
-     *                             ground
+     * @param destroySpeed    the block's destroy speed (vanilla
+     *                        {@code getDestroySpeed} - hardness);
+     *                        negative means unbreakable
+     * @param toolSpeed       the selected item's effective dig speed
+     *                        against this block ({@code ItemStack.getDestroySpeed});
+     *                        1.0 for bare hand or non-tool items
+     * @param hasCorrectTool  true when the current tool satisfies the
+     *                        block's tool requirement (or the block does
+     *                        not require one); controls the divisor and
+     *                        whether drops spawn
+     * @param onGround        whether the digging body stands on ground
      * @return per-tick progress; 0 for unbreakable blocks, +Infinity
      *         for zero-hardness blocks (they pop on the first tick,
      *         exactly as vanilla's division produces)
      */
     public static float perTickProgress(float destroySpeed,
-                                        boolean requiresCorrectTool,
+                                        float toolSpeed,
+                                        boolean hasCorrectTool,
                                         boolean onGround) {
         if (destroySpeed < 0f) {
             return 0f;
         }
         float digSpeed = onGround
-            ? BARE_HAND_DIG_SPEED
-            : BARE_HAND_DIG_SPEED * AIRBORNE_DIG_MULTIPLIER;
-        return digSpeed / destroySpeed / (requiresCorrectTool
-            ? TOOL_REQUIRED_DIVISOR
-            : HARVESTABLE_DIVISOR);
+            ? toolSpeed
+            : toolSpeed * AIRBORNE_DIG_MULTIPLIER;
+        return digSpeed / destroySpeed / (hasCorrectTool
+            ? HARVESTABLE_DIVISOR
+            : TOOL_REQUIRED_DIVISOR);
     }
 
     /**
      * Cumulative progress after {@code heldTicks} ticks of holding.
-     * Vanilla multiplies the per-tick figure by {@code heldTicks + 1}
-     * because the start tick already contributes one full step.
+     * Each tick adds one full {@code perTickProgress} step, so the
+     * break completes when cumulative reaches {@code >= 1.0}. Vanilla
+     * uses the same model: {@code perTick * (i + 1)} where {@code i}
+     * is zero-based; our {@code heldTicks} is one-based so the
+     * expression is equivalently {@code perTick * heldTicks}.
      *
      * @param perTickProgress value from {@link #perTickProgress}
      * @param heldTicks       ticks held including the current one,

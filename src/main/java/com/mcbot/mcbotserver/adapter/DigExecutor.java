@@ -6,6 +6,7 @@ import com.mcbot.mcbotserver.core.actor.DigPacing;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
@@ -22,15 +23,28 @@ import net.minecraft.world.phys.Vec3;
  * unchanged target ({@code perTick * heldTicks}), crack stages go to
  * observers via {@code destroyBlockProgress}, and the break itself is
  * {@code level.destroyBlock(pos, true)} (drops + the 2001 level
- * event, both handled inside that call). Two deliberate deviations,
- * both because a server-side bot has no client to compensate for:
- * vanilla's stop-destroy 0.7 completion shortcut (lag compensation for
- * a client that released the button a few packets early) is not
- * mirrored - the bot's claims are the ground truth, so the break lands
- * at exactly 1.0; and the Forge LeftClickBlock / onBlockBreakEvent
- * hooks are Player-typed and skipped - no carrier Player exists until
- * the 0007 facade ruling, so protection-mod interop is deferred with
- * it.
+ * event, both handled inside that call).
+ *
+ * <p>Deliberate deviations, inventoried (a server-side bot has no
+ * Player until Phase 2's BotPlayerFacade):
+ * <ul>
+ *   <li>Vanilla's stop-destroy 0.7 completion shortcut (lag
+ *       compensation for a client releasing the button a few packets
+ *       early) is not mirrored — the bot's claims are ground truth,
+ *       so the break lands at exactly 1.0.</li>
+ *   <li>Forge LeftClickBlock / onBlockBreakEvent hooks are Player-typed
+ *       — protection-mod interop defers with the facade.</li>
+ *   <li>The loot context receives {@code ItemStack.EMPTY} as the tool,
+ *       not the held stack — {@code match_tool} loot conditions
+ *       (shears-on-leaves, silk-touch variants) behave as bare-hand
+ *       until Phase 4 routes the break through a tool-aware path.</li>
+ *   <li>No XP pop, no tool durability, no mining exhaustion — those
+ *       arrive with their own phase gates (exhaustion concerns issue
+ *       0010).</li>
+ *   <li>No underwater dig penalty ({@code isEyeInFluid /= 5}) — only
+ *       the airborne penalty is modelled; both environment effects are
+ *       Phase 4 territory alongside efficiency/haste.</li>
+ * </ul>
  *
  * <p>Reach gate: a claim outside bare-hand reach is ignored (progress
  * never starts), matching vanilla's mayInteract honesty without
@@ -44,10 +58,10 @@ import net.minecraft.world.phys.Vec3;
 public final class DigExecutor {
 
     /**
-     * Bare-hand block reach, eye to block center, in blocks. Vanilla
-     * players reach 4.5 (block-reach attribute); the bot holds the
-     * same number as a constant until inventory/tooling lands
-     * (0007 Phase 1).
+     * Block reach, eye to block center, in blocks. Vanilla players
+     * reach 4.5 (block-reach attribute); the bot holds the same number.
+     * Tool-independent — reach is a player attribute, not a tool
+     * property. Issue 0007 Phase 1 tool supplier landed 2026-08-25.
      */
     public static final double DIG_REACH_BLOCKS = 4.5;
 
@@ -101,11 +115,21 @@ public final class DigExecutor {
             // claim keeps arriving, the executor stays honest.
             return;
         }
+        // Tool facts from the selected hotbar slot (issue 0007 Phase 1
+        // tool supplier). Recomputed every tick because the SLOT channel
+        // may switch the held item mid-dig; vanilla's per-tick
+        // incremental destroy progress does the same.
+        ItemStack held = body.getInventory().container()
+            .getItem(body.selectedSlot);
+        float toolSpeed = held.getDestroySpeed(state);
+        boolean hasCorrectTool = !state.requiresCorrectToolForDrops()
+            || held.isCorrectToolForDrops(state);
         heldTicks++;
         float progress = DigPacing.cumulativeProgress(
             DigPacing.perTickProgress(
                 state.getDestroySpeed(body.level(), pos),
-                state.requiresCorrectToolForDrops(),
+                toolSpeed,
+                hasCorrectTool,
                 body.onGround()),
             heldTicks);
         if (progress >= 1.0f) {
@@ -113,7 +137,11 @@ public final class DigExecutor {
             // 2001 break effect itself, and a stale stage would linger
             // on the next dig of the same cell.
             body.level().destroyBlockProgress(body.getId(), pos, -1);
-            body.level().destroyBlock(pos, true);
+            // Drop items only when the tool is correct for the block —
+            // vanilla ServerPlayerGameMode.destroyBlock passes
+            // player.hasCorrectToolForDrops(state) as the drop flag, so
+            // a hand-mined stone block breaks but yields no cobblestone.
+            body.level().destroyBlock(pos, hasCorrectTool);
             target = null;
             heldTicks = 0;
             lastStage = -1;

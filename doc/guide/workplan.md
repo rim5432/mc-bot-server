@@ -415,24 +415,32 @@ test count when red).
 
 Unlocked by the Stage 2 backlog; blocks all Stage 3 work. The gate
 exists because convergence criterion 2 (10-minute unattended
-survival) is red by construction today: the 2026-08-24 live session
+survival) was red at construction: the 2026-08-24 live session
 (tool/sessions/20260824T135850Z-playerfeel-live) lost the body
 twice unattended - drowned in the spawn lake after ~20 min (air
 reflex reserved as issue 0004 F6(2)) and killed in a night cave
 while idle (nothing engages hostiles without a mission) - and the
-carrier has no health-recovery path at all (zero heal call sites
-in main today; a mob carrier does not regenerate, so damage is
-monotonic and "alive indefinitely" is impossible without a policy).
+carrier had no health-recovery path at the time. All three core
+defenses (air reflex, idle combat, passive regen) are now landed;
+the remaining gate items are the 10-minute acceptance rehearsal,
+the H-R4 convergence pass, and bookkeeping.
 
-- [ ] M  Air-supply reflex (issue 0004 F6(2)): surface the body's
+- [x] M  Air-supply reflex (issue 0004 F6(2)): surface the body's
          air supply on ThreatBlackboard + adapter sensor wiring;
          the rule itself is rule-table JSON (low air -> preempt
          toward the surface; Swim/SwimUp vocabulary already makes
          the surface plannable). MinimalReflex's jump-while-in-fluid
          is the crashed-state precedent, not the mechanism here -
          this is a normal reflex directive. Offline gate test +
-         in-engine drowning-recovery scenario.                [dep: none]
-- [ ] M  Idle hostile protection: today nothing engages a hostile
+         in-engine drowning-recovery scenario.
+         Landed 2026-08-25 (vitals sensing pass, commit 6ccdb3b):
+         ThreatBlackboard.airSupply + LevelThreatSensor feed,
+         SurfaceOnLowAirRule (trigger 80 / release 200 / priority 110,
+         hysteresis), reflex_rules.json SURFACE_ON_LOW_AIR row,
+         SurfaceOnLowAirRuleTest offline gate, surfacesWhenAirRunsLow
+         gametest (4-deep pool, forced air 60, verifies surface +
+         survival + air regen).                              [dep: none]
+- [x] M  Idle hostile protection: today nothing engages a hostile
          unless a DefendProcess mission is running. Design ruling
          at pickup: standing idle-band DefendProcess (arbiter-side,
          wins only when nothing else claims) vs reflex-carried
@@ -440,11 +448,36 @@ monotonic and "alive indefinitely" is impossible without a policy).
          stateless one-tick decisions and combat needs target
          tracking - the arbiter-side shape is the working
          hypothesis). Offline gate + in-engine night-idle
-         survival scenario.                                     [dep: none]
-- [ ] S  Body recovery policy: decide and implement the v1 health
+         survival scenario.
+         Landed 2026-08-25 (idle-combat reflex, commit 79961e9
+         context): the reflex-carried path was chosen over the
+         arbiter-side idle-band — EngageOnHostileProximityRule
+         (trigger 6 blocks / release 14 / priority 90, hysteresis)
+         notices a hostile inside melee range and the controller's
+         ENGAGE handling mints a reflex-owned DefendProcess via the
+         assembly factory. reflex_rules.json ENGAGE_ON_HOSTILE_PROXIMITY
+         row, EngageReflexGateTest offline gate (preemption + mission
+         handoff + resume), defendsByKillingZombie gametest (no
+         mission submitted, pure reflex trigger → kill → survive),
+         refusesRangedItCannotAnswer gametest (standoff skeleton does
+         NOT trip the rule). Ranged types are REFUSED by DefendProcess
+         (decision 11) so the rule's 6-block trigger never fires on a
+         kiting skeleton at its preferred 8-10 block standoff. [dep: none]
+- [x] S  Body recovery policy: decide and implement the v1 health
          floor. Working hypothesis: peaceful-style regeneration as
          a documented carrier deviation; eating lands with Stage 3
-         UseItem, not here.                                     [dep: none]
+         UseItem, not here.
+         Landed 2026-08-25: peaceful-style passive regen on
+         BotBodyEntity.customServerAiStep — 1 HP per 20 ticks
+         (REGEN_INTERVAL_TICKS / REGEN_AMOUNT constants) while
+         health < maxHealth, gated on tickCount alignment. Runs
+         regardless of crash latch (the latch freezes the brain,
+         not the body's life support). Documented as a carrier
+         deviation in the class Javadoc so a future "remove free
+         regen" decision is a one-line delete. regeneratesHealthWhenBelowMax
+         gametest (setHealth 5 → verify intermediate rise → verify
+         full recovery to max). Eating (Stage 3 UseItem, Phase 4)
+         may supplement or replace this floor.               [dep: none]
 - [ ] M  10-minute acceptance rehearsal through the RCON bridge to
          a recorded verdict in tool/sessions/. Programmatic driver,
          boundary-D verbs only, mixed day/night overworld, at
@@ -496,7 +529,7 @@ decision, tick ordering) is backlog text until the Stage 3 review
 ratifies it - per AGENTS.md the stage review is the only place the
 freeze lifts.
 
-- [ ] L  Phase 1 - inventory sense + basic interaction: api
+- [x] L  Phase 1 - inventory sense + basic interaction: api
          ItemView/InventoryView (String ids, zero MC imports),
          SimpleContainer-backed BindingInventory, Intent.
          InteractBlock (face + hitPos; placement depends on the
@@ -504,7 +537,41 @@ freeze lifts.
          adapter-side mining state machine (survival digging is
          multi-tick progress, not single-shot), DropSelected.
          Acceptance: bot digs a block, reads its own inventory,
-         drops an item.                                          [dep: gate]
+         drops an item.
+         Progress 2026-08-25: inventory sense half landed in
+         parallel with the survival gate (disjoint files — api/ +
+         adapter/BindingInventory vs tick/reflex/entity). api
+         ItemView + InventoryView records, WorldView.getInventory()
+         default, adapter BindingInventory (SimpleContainer-backed,
+         41 slots), wired into BotBodyEntity / BindingActor /
+         BindingWorldView / BotAssembly / MockWorldView. Offline
+         gate: InventorySenseTest (26 assertions). DropSelected
+         landed 2026-08-25: Intent.DropSelected (fullStack boolean)
+         on INTERACT channel, rising-edge fire in BindingActor,
+         BotBodyEntity.dropSelectedItem via spawnAtLocation. Offline
+         gate: DropSelectedIntentTest (10 assertions). In-engine
+         gate: dropsSelectedItem gametest. InteractBlock (place)
+         landed 2026-08-25: Intent.InteractBlock (target + face +
+         hitPos) on INTERACT channel, api Direction enum (6 values,
+         MC ordinal order), rising-edge fire in BindingActor,
+         InteractBlockExecutor bypasses useItemOn (needs ServerPlayer)
+         and places via level.setBlock + item shrink. Phase 1 scope:
+         default-state block placement only (direction-aware states,
+         use-block, replaceable cells deferred to Phase 2). Offline
+         gate: InteractBlockIntentTest (21 assertions). In-engine
+         gate: placesBlockOnInteract gametest. DigExecutor tool
+         supplier landed 2026-08-25: reads selected ItemStack every
+         tick, computes toolSpeed (getDestroySpeed) + hasCorrectTool
+         (!requiresCorrectToolForDrops || isCorrectToolForDrops),
+         passes to DigPacing; destroyBlock uses hasCorrectTool for
+         drops (hand-mined stone breaks but no cobblestone). DigPacing
+         signature grew to (destroySpeed, toolSpeed, hasCorrectTool,
+         onGround). Offline gate: DigPacingTest extended with iron
+         pickaxe (~8 ticks stone vs 150 bare-hand), wooden pickaxe
+         (~23), correct-tool divisor 30 vs 100. DIG shipped via issue
+         0009, now with tool support. Acceptance criterion fully met
+         (dig + inventory read + drop). Phase 1 COMPLETE.
+         [Phase 1 fully landed 2026-08-25]
 - [ ] L  Phase 2 - menu system + crafting-table disclosure: api
          MenuView/CraftingView (2x2 InventoryMenu baseline, 3x3
          table extension), core click-sequence planner over the
@@ -516,7 +583,16 @@ freeze lifts.
          BotPlayerFacade (minimal Player adapter - see the carrier
          ruling in 0007). Acceptance: walk to a crafting table,
          open it, place materials via MenuClick, read the result
-         slot, take the product.                                 [dep: P1]
+         slot, take the product.
+         Progress 2026-08-25 (baseline landed): BotPlayerFacade
+         (extends Player, delegates to body, BridgeInventory backed
+         by BindingInventory, own InventoryMenu), BridgeInventory
+         (41-slot delegation), BindingMenu (no-op ContainerSynchronizer,
+         snapshot + click), api MenuView/SlotView. In-engine gate:
+         movesItemViaInventoryMenu gametest (pickup + place via
+         menu.clicked). Remaining: core click-sequence PLANNER,
+         MenuOpener (chest/crafting_table), CraftingView (3x3).
+                                 [dep: P1]
 - [ ] M  Phase 3 - crafting automation: recipe query service over
          RecipeManager (adapter-side only - core stays
          MC-clean), quick-move sequences. Acceptance: given a

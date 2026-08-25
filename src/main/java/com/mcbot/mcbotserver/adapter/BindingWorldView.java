@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.adapter;
 
+import com.mcbot.mcbotserver.api.inventory.InventoryView;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.BlockSnapshot;
 import com.mcbot.mcbotserver.api.world.BlockTraits;
@@ -19,6 +20,7 @@ import net.minecraft.world.phys.AABB;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * Read half of the entity binding: pure reads over one ServerLevel.
@@ -36,30 +38,53 @@ public final class BindingWorldView implements WorldView {
 
     private final ServerLevel level;
     private final BlockTraitsRegistry traits;
+    private final Supplier<InventoryView> inventorySupplier;
 
     /**
-     * Creates a view over one level with no trait annotations - every
-     * cell answers {@link BlockTraits#defaults()}.
+     * Creates a view over one level with no trait annotations and an
+     * empty inventory — every cell answers {@link BlockTraits#defaults()}
+     * and {@link #getInventory()} returns {@link InventoryView#empty()}.
      *
      * @param level the world to read; never null
      */
     public BindingWorldView(ServerLevel level) {
-        this(level, BlockTraitsRegistry.empty());
+        this(level, BlockTraitsRegistry.empty(), InventoryView::empty);
     }
 
     /**
      * Creates a view over one level with a trait registry backing
-     * {@link #getBlockTraits}. The swim vocabulary needs at least the
-     * liquid trait for water; without an entry every fluid reads as
-     * plain passable air and no water move is ever viable.
+     * {@link #getBlockTraits} and an empty inventory. The swim
+     * vocabulary needs at least the liquid trait for water; without an
+     * entry every fluid reads as plain passable air and no water move
+     * is ever viable.
      *
      * @param level  the world to read; never null
      * @param traits sealed trait registry; never null
      */
     public BindingWorldView(ServerLevel level,
                             BlockTraitsRegistry traits) {
+        this(level, traits, InventoryView::empty);
+    }
+
+    /**
+     * Creates a view over one level with a trait registry and an
+     * inventory supplier. The supplier is called once per perception
+     * tick from {@link #getInventory()}; it must return a fresh
+     * immutable snapshot (the adapter binding's
+     * {@code BindingInventory.snapshot()} is the canonical source).
+     *
+     * @param level            the world to read; never null
+     * @param traits           sealed trait registry; never null
+     * @param inventorySupplier produces the current inventory snapshot;
+     *                          never null
+     */
+    public BindingWorldView(ServerLevel level,
+                            BlockTraitsRegistry traits,
+                            Supplier<InventoryView> inventorySupplier) {
         this.level = Objects.requireNonNull(level, "level");
         this.traits = Objects.requireNonNull(traits, "traits");
+        this.inventorySupplier = Objects.requireNonNull(inventorySupplier,
+            "inventorySupplier");
     }
 
     @Override
@@ -176,6 +201,19 @@ public final class BindingWorldView implements WorldView {
     @Override
     public boolean isLoaded(CellPos pos) {
         return level.hasChunkAt(toMc(pos));
+    }
+
+    /**
+     * Inventory snapshot from the body's binding. The supplier is
+     * called fresh each invocation — the adapter's
+     * {@code BindingInventory.snapshot()} produces an immutable copy,
+     * so off-thread consumers read without locks.
+     *
+     * @return the current inventory snapshot; never null
+     */
+    @Override
+    public InventoryView getInventory() {
+        return inventorySupplier.get();
     }
 
     private static BlockPos toMc(CellPos pos) {

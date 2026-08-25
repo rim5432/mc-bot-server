@@ -1,19 +1,29 @@
 package com.mcbot.mcbotserver.adapter.entity;
 
+import com.mcbot.mcbotserver.adapter.BindingInventory;
+
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.control.MoveControl;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
 /**
  * The physical body: a vanilla-pathfinding-capable mob whose locomotion
  * is driven exclusively by per-tick input writes from the binding.
  *
- * <p>Spike outcome (workplan follow-up, Stage 1 review pending): a
+ * <p>Carrier ratification (Stage 1 review; issue 0007 Path A): a
  * custom PathfinderMob carrier instead of a ServerPlayer subclass.
- * Rationale: the vertical slice needs engine-owned physics and nothing
- * else; player-parity machinery (FakeConnection, chunk-ticket mixin,
- * inventory semantics) is deferred until a real requirement appears.
+ * Rationale: engine-owned physics plus the accumulated calibration
+ * surface (direct jumpFromGround / jumpInFluid calls, no-op control
+ * swaps, drive constants) make a carrier rewrite prohibitively
+ * expensive; player parity arrives on the interaction axis via
+ * BotPlayerFacade (typed Player parameters, issue 0007 Phase 2)
+ * rather than by making the body a real ServerPlayer. The threat axis
+ * of the same ruling is already shipped (presence pass below); the
+ * interaction axis is in active development (inventory sense first,
+ * issue 0007 Phase 1).
  * Vanilla {@code travel()} remains the only thing that moves this body
  * — boundary A holds because every write below is an intent echo of an
  * Actor claim, never self-computed physics.
@@ -74,11 +84,89 @@ public final class BotBodyEntity extends PathfinderMob {
     private static final double PRESENCE_SCAN_HALF_WIDTH = 40.0;
 
     /**
+     * Ticks between passive regeneration ticks. Peaceful-style floor:
+     * 1 HP per second — slow enough that active combat stays dangerous,
+     * fast enough that the body can recover between fights. A mob
+     * carrier has zero vanilla regen, so without this health is
+     * monotonic and "alive indefinitely" is impossible (workplan
+     * survival gate, body recovery policy). Eating (Stage 3 UseItem)
+     * may supplement or replace this floor; the carrier deviation stays
+     * documented so a future "remove free regen" decision is a one-line
+     * delete, not an archeological dig.
+     */
+    public static final int REGEN_INTERVAL_TICKS = 20;
+
+    /** Health restored per {@link #REGEN_INTERVAL_TICKS}. */
+    public static final float REGEN_AMOUNT = 1.0f;
+
+    /**
      * Hotbar selection echoed from the SLOT channel. A mob carrier has
-     * no vanilla hotbar; the value is recorded state until equipment
-     * semantics arrive (workplan Stage 2 inventory item).
+     * no vanilla hotbar; the value is recorded state and mirrored to
+     * {@link #inventory} on every SLOT claim write (issue 0007 Phase 1).
      */
     public int selectedSlot;
+
+    /**
+     * The bot's inventory container (41 slots: 36 main + 4 armor + 1
+     * offhand). Owned by the body because it is physical carrier state,
+     * same category as health or air supply. The perception layer reads
+     * it via {@link BindingInventory#snapshot()}; item pickup and menu
+     * mutations write through {@link BindingInventory#container()}.
+     *
+     * <p>Issue 0007 Phase 1: SimpleContainer-backed (no Player required);
+     * armor semantics and vanilla Inventory parity arrive in later phases.
+     */
+    private final BindingInventory inventory = new BindingInventory();
+
+    /**
+     * The body's inventory binding.
+     *
+     * @return the inventory; never null
+     */
+    public BindingInventory getInventory() {
+        return inventory;
+    }
+
+    /**
+     * Drop the selected hotbar item as a world item entity. Called by
+     * the INTERACT channel's DropSelected handler on the rising edge
+     * (issue 0007 Phase 1). Uses {@code Entity.spawnAtLocation} — the
+     * same vanilla path mobs use for death drops — which handles the
+     * random velocity and the item entity registration. The source slot
+     * is cleared (full stack) or shrunk (single item) after the spawn.
+     *
+     * <p>Why on the body and not in BindingActor: the drop mutates the
+     * inventory container (owned by the body) and spawns a world entity
+     * (a body-level operation). BindingActor is the claim resolver; it
+     * delegates the actual world mutation here, same as DigExecutor
+     * delegates destroy progress to the body's level.
+     *
+     * @param fullStack true to drop the entire stack; false to drop a
+     *                  single item (vanilla Q vs Ctrl-Q distinction)
+     */
+    public void dropSelectedItem(boolean fullStack) {
+        var container = inventory.container();
+        ItemStack held = container.getItem(selectedSlot);
+        if (held.isEmpty()) {
+            return;
+        }
+        // 0.5f y-offset: spawns at about hand height, matching the
+        // vanilla player drop visual.
+        ItemStack toDrop = fullStack ? held.copy()
+            : held.copyWithCount(1);
+        ItemEntity dropped = spawnAtLocation(toDrop, 0.5f);
+        if (dropped != null) {
+            // Vanilla player-thrown drops wait 40 ticks before pickup;
+            // spawnAtLocation's default of 10 would let the bot
+            // re-vacuum its own drop almost immediately.
+            dropped.setPickUpDelay(40);
+        }
+        if (fullStack) {
+            container.setItem(selectedSlot, ItemStack.EMPTY);
+        } else {
+            held.shrink(1);
+        }
+    }
 
     /**
      * Creates a body for the registered entity type.
@@ -158,6 +246,21 @@ public final class BotBodyEntity extends PathfinderMob {
 
     @Override
     protected void customServerAiStep() {
+        // Passive health regeneration (workplan survival gate, body
+        // recovery policy): a mob carrier has zero vanilla regen, so
+        // this is a documented carrier deviation — peaceful-style 1 HP
+        // per 20 ticks while below max. Runs regardless of crash latch:
+        // the latch freezes the BRAIN (MinimalReflex only), not the
+        // body's life support — a crashed body that stops taking damage
+        // should slowly heal, same as a player in peaceful mode. Gated
+        // on tickCount alignment so it fires exactly once per interval,
+        // not once per method entry (customServerAiStep is called once
+        // per tick by Mob.aiStep, but the gate is defensive).
+        if (tickCount % REGEN_INTERVAL_TICKS == 0
+                && getHealth() < getMaxHealth()) {
+            heal(REGEN_AMOUNT);
+        }
+
         // Deliberately no super call: goal selectors and MoveControl
         // would fight the binding for zza. Inputs are applied directly
         // through LivingEntity's own public drive setters.

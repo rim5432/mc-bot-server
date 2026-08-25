@@ -38,7 +38,11 @@ public final class BindingActor implements Actor {
     private final PresenceLayer presence;
     /** Held-dig execution: destroy progress + the break (0009). */
     private final DigExecutor dig;
+    /** One-shot block placement from the selected hotbar slot (0007). */
+    private final InteractBlockExecutor interact;
     private boolean lastUsePressing;
+    private boolean lastDropClaimed;
+    private boolean lastInteractClaimed;
 
     /**
      * Creates an actor bound to one body.
@@ -50,6 +54,7 @@ public final class BindingActor implements Actor {
         this.melee = new MeleeResolver(body);
         this.presence = new PresenceLayer(body);
         this.dig = new DigExecutor(body);
+        this.interact = new InteractBlockExecutor(body);
     }
 
     @Override
@@ -107,17 +112,53 @@ public final class BindingActor implements Actor {
         if (slot != null
                 && slot.intent() instanceof Intent.SelectSlot s) {
             body.selectedSlot = s.slot();
+            // Mirror to the inventory binding so perception snapshots
+            // read the correct held slot (issue 0007 Phase 1). The body
+            // field stays the write target for the SLOT channel; the
+            // inventory is the read side for WorldView.getInventory().
+            body.getInventory().setSelectedSlot(s.slot());
         }
 
         Claim interact = winners.get(Channel.INTERACT);
         if (interact != null
                 && interact.intent() instanceof Intent.Dig d) {
             dig.dig(d.target());
+            lastDropClaimed = false;
+            lastInteractClaimed = false;
+        } else if (interact != null
+                && interact.intent() instanceof Intent.DropSelected ds) {
+            // Drop is one-shot: fire on the rising edge only. A held
+            // DropSelected claim across ticks must not drop twice — the
+            // same rising-edge gate USE uses for melee swings. Any stale
+            // dig crack is cleared because DropSelected owns the channel
+            // this tick (per-channel arbitration means Dig cannot also
+            // win).
+            dig.release();
+            if (!lastDropClaimed) {
+                body.dropSelectedItem(ds.fullStack());
+            }
+            lastDropClaimed = true;
+            lastInteractClaimed = false;
+        } else if (interact != null
+                && interact.intent() instanceof Intent.InteractBlock ib) {
+            // Place is one-shot: fire on the rising edge only. A held
+            // InteractBlock claim across ticks must not place repeatedly
+            // — same rising-edge gate as DropSelected and USE melee.
+            // Any stale dig crack is cleared because InteractBlock owns
+            // the channel this tick.
+            dig.release();
+            if (!lastInteractClaimed) {
+                this.interact.place(ib);
+            }
+            lastInteractClaimed = true;
+            lastDropClaimed = false;
         } else {
             // A dig no longer held must clear its crack broadcast the
             // same tick; vanilla's stop path does, and a stale crack
             // would lie to every observer.
             dig.release();
+            lastDropClaimed = false;
+            lastInteractClaimed = false;
         }
 
         presence.tickWalkFidget(winners, move, rot);
@@ -130,6 +171,8 @@ public final class BindingActor implements Actor {
         body.setDrive(0f, 0f, false);
         body.setSprinting(false);
         dig.release();
+        lastDropClaimed = false;
+        lastInteractClaimed = false;
     }
 
     /**

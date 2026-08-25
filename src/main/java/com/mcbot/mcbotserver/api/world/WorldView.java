@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.api.world;
 
+import com.mcbot.mcbotserver.api.inventory.InventoryView;
 import com.mcbot.mcbotserver.api.types.CellPos;
 
 import java.util.List;
@@ -92,4 +93,23 @@ public interface WorldView {
      *         unknown
      */
     boolean isLoaded(CellPos pos);
+
+    /**
+     * Snapshot of the bot's own inventory at perception time. The
+     * default is an empty inventory — implementations that carry a
+     * real container (the adapter binding, issue 0007 Phase 1) MUST
+     * override. The snapshot is immutable; callers read it without
+     * locks.
+     *
+     * <p>Why on WorldView and not a separate sense channel: inventory
+     * is self-perception, the same category as the body's pose or
+     * health. It is read at the same tick as block/entity perception
+     * and consumed by the same planner; a separate channel would
+     * double the snapshot boundary.
+     *
+     * @return an immutable inventory snapshot; never null
+     */
+    default InventoryView getInventory() {
+        return InventoryView.empty();
+    }
 }
