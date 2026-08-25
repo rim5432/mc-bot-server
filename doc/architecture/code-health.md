@@ -2,6 +2,10 @@
 title: Code Health Ledger
 last_verified: 2026-08-25
 covers:
+  - src/main/java/com/mcbot/mcbotserver/core/tick/MissionReporter.java
+  - src/main/java/com/mcbot/mcbotserver/core/tick/ReflexEngageSeat.java
+  - src/main/java/com/mcbot/mcbotserver/adapter/MeleeResolver.java
+  - src/main/java/com/mcbot/mcbotserver/adapter/PresenceLayer.java
   - src/test/java/com/mcbot/mcbotserver/hygiene/EnglishOnlyScan.java
   - src/test/java/com/mcbot/mcbotserver/hygiene/GametestInventoryCheck.java
   - src/test/java/com/mcbot/mcbotserver/tickpipeline/PathingTestAccess.java
@@ -171,6 +175,26 @@ semantics from 17ba7a2 were never in the modified set -
 `ArbiterGateTest` and `ReflexChainGateTest` pin those semantics and
 stayed green throughout.
 
+### Controller and actor decomposition (2026-08-25)
+
+Second god-class pass, prompted by the repo-wide structure review.
+BotController (694) split its mission TASK_* emission and hand-off
+edge detection into `core.tick.MissionReporter` (495bdb7) and its
+ENGAGE-fight lifecycle into `core.tick.ReflexEngageSeat` (6c49ee4);
+the controller keeps 578 lines of pipeline orchestration plus the
+ADR-0005 frame. BindingActor (443) split USE-press melee resolution
+into `adapter.MeleeResolver` (8305564) and the issue-0005
+presentation block into `adapter.PresenceLayer` (b7c7482); the actor
+keeps 176 lines of channel-claim resolution. PathingBehavior.tick's
+trigger-evaluation block became `triggerVerdict` (4a82b64), taking
+tick() from ~135 to ~75 lines. Evidence: zero test edits across all
+five commits (258 cases, 0 skips, at extraction time); the suite
+grew to 267 mid-round from a concurrent session's dig-reflex work
+whose two transient gate failures were foreign to these changes.
+Adapter moves ride the combat and presence gametest scenarios; the
+LOS-blocked scenario comment was repointed to
+`MeleeResolver.sightBlocked` in the moving commit.
+
 ## Ruling anchors in code
 
 Where the live architectural rulings physically live, so "why is it
@@ -185,7 +209,7 @@ without an anchor is a workplan item, not a row here.
 | Park semantics: explicit ParkResult, atomic retire sweep, resume revalidation | `TaskArbiter.forcePauseAll` + `ParkResult` Javadoc | 17ba7a2 |
 | One-tick retirement lap: verdict announced on the reflex tick; no tail sweep inside arbiter tick | `TaskArbiter.tick` tail comment; function-map reflex-tick event semantics section | 17ba7a2 |
 | Shape contract: STEP_UP_REACH / STANDABLE_THRESHOLD split, footprint rule, fence-as-wall | `CollisionShape` constant Javadoc + boundaries.md decision ledger 19b (issue 0002 archived) | e08c6bd |
-| Melee LOS clip: eye-to-surface ray with lava-opaque cells | `BindingActor.sightBlocked` | function-map combat row |
+| Melee LOS clip: eye-to-surface ray with lava-opaque cells | `MeleeResolver.sightBlocked` | function-map combat row |
 | Executor jump actuation: direct `jumpFromGround()` under swapped MoveControl | `BotBodyEntity` deviation comment | f942b9b |
 
 ## Open items
@@ -200,3 +224,25 @@ without an anchor is a workplan item, not a row here.
   the candidate: a layer-1 test scanning every boundary-interface
   implementer for its contract marker. Optional for Stage 3; pair
   with the next boundary-touching change.
+- **OPEN H7 - inline-FQN style round, second sweep.** Residual
+  inline FQNs after the 2026-08-25 decomposition: BotController's
+  `java.util.function.Supplier` (field and ten-arg constructor),
+  BindingActor's ChannelArbiter delegate and the sprint-clip MC
+  types, PathingBehavior's AStarPathFinder node-budget reference,
+  plus DefendProcess's empty `onExecutionReport` switch skeleton.
+  Deferred mid-round because controller and actor were under
+  concurrent edit (dig-channel wiring); reopens when that session
+  lands.
+- **OPEN H8 - test-package mirroring.** Test packages
+  (`corepathing`, `coreprocess`, `tickpipeline`, `reflexlayer`,
+  `boundaryd`) do not mirror main-source packages, so test-to-code
+  mapping needs mental translation. The rename should land together
+  with the package-structure registry admission (queued behind
+  H-R4) so the gate pins the final shape, not an intermediate one.
+- **OPEN H9 - sensor functional-interface consolidation.**
+  PositionSource / HealthSource / GameClock (BotController) and
+  PositionSource / OnGroundSource (PathingBehavior) are five
+  parallel nested interfaces with a same-name collision across
+  different return types. Consolidation is an api-surface design
+  decision (a shared `api.sensing` vocabulary versus staying
+  local), so it needs a ruling before code moves.
