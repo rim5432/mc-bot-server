@@ -3,16 +3,29 @@ package com.mcbot.mcbotserver.adapter;
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
 
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * Inventory bridge that delegates all slot reads/writes to the body's
+ * Inventory bridge that delegates slot storage to the body's
  * {@link BindingInventory} (a 41-slot {@code SimpleContainer}: 36 main
  * + 4 armor + 1 offhand). Extends {@link Inventory} so vanilla menu
  * constructors and the {@code Slot} call graph accept it, but the
  * Inventory's own internal lists ({@code items}, {@code armor},
- * {@code offhand}) are never used — every accessor overrides to the
- * binding container.
+ * {@code offhand}) are never used — they are phantom compartments
+ * created by the super constructor and stay empty forever. Every slot
+ * accessor below delegates to the binding container; the phantom lists
+ * are only reachable if someone bypasses these overrides (no 1.20.1
+ * menu code does).
+ *
+ * <p>Why removeItem must be overridden: the vanilla extraction path is
+ * {@code AbstractContainerMenu.doClick} → {@code Slot.tryRemove} →
+ * {@code Slot.remove} → {@code container.removeItem(slot, amount)}.
+ * The inherited {@code Inventory.removeItem} operates on the phantom
+ * {@code items} list and returns EMPTY even when the binding slot is
+ * full — a click on a backpack slot would silently pick up nothing.
+ * Overriding it (and {@code removeItemNoUpdate}) routes the extraction
+ * to the real binding container.
  *
  * <p>Contract: see issue 0007 §4 Path A and §7 risk. The slot layout
  * matches exactly: Inventory's compartment iteration is
@@ -107,5 +120,63 @@ public final class BridgeInventory extends Inventory {
     @Override
     public void clearContent() {
         body.getInventory().container().clearContent();
+    }
+
+    /**
+     * Remove and return up to {@code amount} items from the binding
+     * slot. Overridden because the inherited {@code Inventory.removeItem}
+     * operates on the phantom {@code items} list and would return EMPTY
+     * for every slot — the vanilla click extraction path
+     * ({@code Slot.tryRemove} → {@code Slot.remove} →
+     * {@code container.removeItem}) would silently pick up nothing.
+     *
+     * @param slot   flat slot index 0..40
+     * @param amount maximum items to remove
+     * @return the removed stack; never null (EMPTY if the slot was empty
+     *         or amount was zero)
+     */
+    @Override
+    public ItemStack removeItem(int slot, int amount) {
+        return body.getInventory().container().removeItem(slot, amount);
+    }
+
+    /**
+     * Remove and return the entire stack from the binding slot, without
+     * triggering a {@code setChanged} notification. Overridden for the
+     * same phantom-list reason as {@link #removeItem}.
+     *
+     * @param slot flat slot index 0..40
+     * @return the removed stack; never null (EMPTY if the slot was empty)
+     */
+    @Override
+    public ItemStack removeItemNoUpdate(int slot) {
+        return body.getInventory().container().removeItemNoUpdate(slot);
+    }
+
+    /**
+     * Whether every binding slot is empty. Overridden because the
+     * inherited {@code Inventory.isEmpty} checks the phantom compartments
+     * (always empty) and would return true even when the bot carries
+     * items.
+     *
+     * @return true when no slot holds an item
+     */
+    @Override
+    public boolean isEmpty() {
+        return body.getInventory().container().isEmpty();
+    }
+
+    /**
+     * Whether the player may still interact with this inventory. A
+     * player's own inventory is always valid (no distance check), so this
+     * returns true unconditionally — same as the vanilla
+     * {@code Inventory.stillValid} default.
+     *
+     * @param player the interacting player; unused
+     * @return true always
+     */
+    @Override
+    public boolean stillValid(Player player) {
+        return true;
     }
 }

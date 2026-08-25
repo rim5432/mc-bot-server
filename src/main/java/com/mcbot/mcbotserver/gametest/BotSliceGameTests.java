@@ -1444,6 +1444,69 @@ public final class BotSliceGameTests {
         helper.succeed();
     }
 
+    /**
+     * Scenario: clicking a backpack slot in the inventory menu picks up
+     * the item via {@code container.removeItem} — the path that was
+     * broken by BridgeInventory's phantom super-constructed compartments
+     * (review P1-1 on commit 3d53037). The inherited
+     * {@code Inventory.removeItem} operated on the empty phantom lists
+     * and returned EMPTY; every backpack click would silently pick up
+     * nothing. This test forces that exact code path:
+     * {@code doClick PICKUP} → {@code Slot.tryRemove} →
+     * {@code Slot.remove} → {@code BridgeInventory.removeItem}.
+     *
+     * <p>InventoryMenu slot layout: 0=craft result, 1-4=craft grid,
+     * 5-8=armor, 9-35=main backpack, 36-44=hotbar, 45=offhand.
+     * BindingInventory index 9 (first backpack slot) = InventoryMenu
+     * slot 9; BindingInventory index 0 (hotbar 0) = menu slot 36.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void picksUpFromBackpackSlot(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+
+        // Put 8 diamonds in the first backpack slot (BindingInventory
+        // index 9 = InventoryMenu slot 9). Hotbar stays empty.
+        final int BACKPACK_MENU_SLOT = 9;
+        final int HOTBAR0_MENU_SLOT = 36;
+        rig.body().getInventory().container().setItem(9,
+            new ItemStack(Items.DIAMOND, 8));
+        checkEquals(8, rig.body().getInventory().container()
+            .getItem(9).getCount(), "setup: 8 diamonds in backpack slot 9");
+        check(rig.body().getInventory().container().getItem(0).isEmpty(),
+            "setup: hotbar 0 must be empty");
+
+        // Open the inventory menu through the facade.
+        var facade = new BotPlayerFacade(rig.body());
+        facade.syncPosition();
+        var menu = new BindingMenu(facade.facadeInventoryMenu(),
+            facade, "inventory");
+
+        // Pick up: left-click the backpack slot. This goes through
+        // Slot.tryRemove → Slot.remove → container.removeItem — the
+        // phantom-compartment path that was broken before the override.
+        menu.click(BACKPACK_MENU_SLOT, 0, ClickType.PICKUP);
+        checkEquals("minecraft:diamond", menu.getCarried().itemId(),
+            "after pickup: carried must be diamonds (removeItem must "
+                + "read the binding container, not the phantom super list)");
+        checkEquals(8, menu.getCarried().count(),
+            "after pickup: carried must be all 8 diamonds");
+        check(rig.body().getInventory().container().getItem(9).isEmpty(),
+            "after pickup: backpack slot 9 must be empty (removeItem "
+                + "must have removed from the binding container)");
+
+        // Place: left-click hotbar 0. This goes through setByPlayer →
+        // setItem (the path that always worked).
+        menu.click(HOTBAR0_MENU_SLOT, 0, ClickType.PICKUP);
+        check(menu.getCarried().isEmpty(),
+            "after place: carried must be empty");
+        checkEquals(8, rig.body().getInventory().container()
+            .getItem(0).getCount(),
+            "after place: hotbar 0 must hold 8 diamonds");
+
+        rig.body().discard();
+        helper.succeed();
+    }
+
     private static void assertEventSeen(
             com.mcbot.mcbotserver.core.event.InMemoryEventQueue events,
             String kind) {

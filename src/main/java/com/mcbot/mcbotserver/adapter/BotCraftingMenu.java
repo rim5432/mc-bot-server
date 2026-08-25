@@ -115,9 +115,11 @@ public final class BotCraftingMenu extends CraftingMenu {
             }
         }
         resultSlots.setItem(0, result);
-        // Mirror to the remote-slot array so AbstractContainerMenu.clicked
-        // (which reads remoteSlots for its quick-move heuristics) sees
-        // the correct result.
-        setRemoteSlot(0, result);
+        // Note: remoteSlots is intentionally NOT updated here. In vanilla
+        // it mirrors slot state for client-server diff sync; the bot drives
+        // the menu server-side with a no-op ContainerSynchronizer, and
+        // AbstractContainerMenu.clicked() never reads remoteSlots (verified
+        // against the 1.20.1 decompiled tree). The Slot itself reads from
+        // resultSlots, so click/take paths see the correct result.
     }
 }
