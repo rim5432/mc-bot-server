@@ -507,6 +507,8 @@ public final class BotController {
      * preemption: InterruptionContext snapshot, forcePauseAll with
      * its PARKED / RETIRED_TERMINAL / NO_CURRENT outcomes, the hold
      * claim, flush, and the retirement-lap verdict announcement.
+     * DIG decisions additionally inject their aim-and-hold claims
+     * through {@link #preemptDigClaims} before the flush.
      *
      * @param decision the winning reflex decision; never null
      * @param hold     the intent that holds the body this tick;
@@ -554,31 +556,7 @@ public final class BotController {
         }
         actor.submit(new Claim(Channel.MOVE, decision.priority(),
             "reflex:" + decision.ruleName(), hold));
-        if (decision.action() == ReflexAction.DIG
-                && decision.target() != null) {
-            // DIG carries its own geometry: hold still, aim at the
-            // target cell, and hold the dig claim - the adapter's
-            // executor accumulates destroy progress across ticks, the
-            // same engine-carries-the-state shape as ASCEND's held
-            // jump. A targetless DIG (board stamped inWall without a
-            // position, or the post-rescue hysteresis hold where the
-            // eye is already clear) degrades to the plain freeze hold
-            // above - missing data must not mint a dig-at-null. The
-            // aim claim is presentation only (the executor is
-            // server-authoritative and never reads facing, exactly
-            // like vanilla's ServerPlayerGameMode); cell-center math
-            // keeps it free of eye-height constants.
-            CellPos digTarget = decision.target();
-            Vec3 from = cellCenter(positionSource.get());
-            Vec3 to = cellCenter(digTarget);
-            actor.submit(new Claim(Channel.ROT, decision.priority(),
-                "reflex:" + decision.ruleName(),
-                new Intent.Look(IdleLook.yawTo(from, to),
-                    IdleLook.pitchTo(from, to))));
-            actor.submit(new Claim(Channel.INTERACT, decision.priority(),
-                "reflex:" + decision.ruleName(),
-                new Intent.Dig(digTarget)));
-        }
+        preemptDigClaims(decision);
         actor.flush();
         if (announceVerdict) {
             // Retirement-lap corpse: its verdict is announced here,
@@ -586,6 +564,41 @@ public final class BotController {
             // contract - not via any transition-state side effect.
             missions.announceTransition(day, tod);
         }
+    }
+
+    /**
+     * DIG reflex claim injection: a targeted DIG decision adds a ROT
+     * aim at the target cell and an INTERACT dig claim on top of the
+     * preemption hold. DIG carries its own geometry - hold still,
+     * aim, and hold the claim; the adapter's executor accumulates
+     * destroy progress across ticks, the same engine-carries-the-
+     * state shape as ASCEND's held jump. A targetless DIG (board
+     * stamped inWall without a position, or the post-rescue
+     * hysteresis hold where the eye is already clear) degrades to
+     * the plain freeze hold - missing data must not mint a
+     * dig-at-null. The aim claim is presentation only (the executor
+     * is server-authoritative and never reads facing, exactly like
+     * vanilla's ServerPlayerGameMode); cell-center math keeps it
+     * free of eye-height constants.
+     *
+     * @param decision the winning reflex decision; never null
+     */
+    private void preemptDigClaims(
+            SurvivalReflexLayer.ReflexDecision decision) {
+        if (decision.action() != ReflexAction.DIG
+                || decision.target() == null) {
+            return;
+        }
+        CellPos digTarget = decision.target();
+        Vec3 from = cellCenter(positionSource.get());
+        Vec3 to = cellCenter(digTarget);
+        actor.submit(new Claim(Channel.ROT, decision.priority(),
+            "reflex:" + decision.ruleName(),
+            new Intent.Look(IdleLook.yawTo(from, to),
+                IdleLook.pitchTo(from, to))));
+        actor.submit(new Claim(Channel.INTERACT, decision.priority(),
+            "reflex:" + decision.ruleName(),
+            new Intent.Dig(digTarget)));
     }
 
     /**

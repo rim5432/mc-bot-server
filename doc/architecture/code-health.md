@@ -250,6 +250,15 @@ and the controller's block-cell source renamed to
 stay nested and local: single consumers, no collisions, nothing
 to consolidate.
 
+### preemptDigClaims extraction (2026-08-25, closes H10)
+
+The dig feature's claim injection (~25 lines inside
+preemptAndHold) moves to its own private method with the geometry
+rationale as its Javadoc; preemptAndHold is purely park-and-hold
+again and its Javadoc names the delegation. Guard inverted from
+the call site (if-targeted) into the method (if-not-targeted
+return), so future DIG-carrying preemption paths cannot forget it.
+
 ## Ruling anchors in code
 
 Where the live architectural rulings physically live, so "why is it
@@ -275,11 +284,3 @@ without an anchor is a workplan item, not a row here.
   Schedule: before Stage 3 vocabulary lands - pose parameterization
   touches the same collision predicates, and trimming afterwards
   would churn boundary-D consumers twice.
-- **OPEN H10 - preemptAndHold dig-claim injection.** The dig
-  feature (issue 0009) added a DIG branch inside
-  `BotController.preemptAndHold`: when the reflex decision carries
-  a dig target, the preemption also submits a ROT aim and an
-  INTERACT dig claim (~25 lines). The method is no longer purely
-  "park and hold"; extracting `preemptDigClaims(decision,
-  position)` restores single responsibility. Mechanical, no
-  behaviour change; do it with the next controller touch.
