@@ -626,7 +626,7 @@ public final class BotSliceGameTests {
      * scan is distance-based and wall-blind - by design, see
      * LevelThreatSensor) but cannot be damaged: the bot closes to its
      * standoff, swings on cooldown, and every swing is eaten by
-     * {@code BindingActor.sightBlocked}. The mission then fails
+     * {@code MeleeResolver.sightBlocked}. The mission then fails
      * honestly by its own tick budget instead of pretending to win.
      *
      * <p>The zombie stays at exactly 20 health for the whole scenario

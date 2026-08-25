@@ -1,7 +1,6 @@
 package com.mcbot.mcbotserver.adapter;
 
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
-import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
 import com.mcbot.mcbotserver.api.actor.Actor;
 import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
@@ -36,6 +35,8 @@ public final class BindingActor implements Actor {
     private final com.mcbot.mcbotserver.core.actor.ChannelArbiter delegate =
         new com.mcbot.mcbotserver.core.actor.ChannelArbiter();
     private final BotBodyEntity body;
+    /** USE-press melee resolution (cone, reach, LOS, lava). */
+    private final MeleeResolver melee;
     private boolean lastUsePressing;
     // Walk-fidget state (issue 0005 P3): one seeded generator owns the
     // whole sequence so every run is identical per design rule 3.
@@ -54,6 +55,7 @@ public final class BindingActor implements Actor {
      */
     public BindingActor(BotBodyEntity body) {
         this.body = Objects.requireNonNull(body, "body");
+        this.melee = new MeleeResolver(body);
     }
 
     @Override
@@ -100,7 +102,7 @@ public final class BindingActor implements Actor {
         Claim use = winners.get(Channel.USE);
         if (use != null && use.intent() instanceof Intent.Use u) {
             if (u.pressing() && !lastUsePressing) {
-                resolveMelee();
+                melee.onUsePress();
             }
             lastUsePressing = u.pressing();
         } else {
@@ -285,155 +287,6 @@ public final class BindingActor implements Actor {
                 fidgetEchoSwingDelay = FIDGET_ECHO_DELAY_TICKS;
             }
             fidgetCountdown = nextFidgetInterval();
-        }
-    }
-
-    /**
-     * Half-angle of the melee aim cone, in degrees. A swing hits the
-     * nearest living hostile whose direction from the eyes stays
-     * inside this cone - deliberately a cone test rather than vanilla
-     * ray-clip, because target data crosses the boundary at block
-     * granularity and a ray would whiff on sub-cell offsets.
-     */
-    public static final double AIM_CONE_DEG = 45.0;
-
-    /** Damage per landed skeleton swing; zombie-scale for now. */
-    public static final float MELEE_DAMAGE = 3f;
-
-    /**
-     * Swing reach measured EYE TO TARGET BOUNDING-BOX SURFACE,
-     * aligned with vanilla's player metric (~3.0) so the bot holds no
-     * hidden long-arm advantage. The old center-to-center 3.5 read
-     * ~0.4 blocks farther than vanilla on horizontal targets.
-     */
-    public static final double MELEE_REACH_SURFACE = 3.0;
-
-    /**
-     * Loose prefilter for the candidate net: bounding-box inflation
-     * before the exact surface-distance gate. Generous on purpose -
-     * the gate below is the authority.
-     */
-    private static final double CANDIDATE_NET = MELEE_REACH_SURFACE
-        + 1.5;
-
-    /**
-     * Slack for the line-of-sight clip: a hit point this close to the
-     * target counts as grazing the hitbox face, not as occlusion.
-     */
-    public static final double MELEE_CLIP_SLACK = 0.35;
-
-    /**
-     * Whether terrain blocks the swing line. A melee reach number
-     * alone lies around corners: distance and cone can be satisfied
-     * while a wall eats the line; the clip asks the real voxel grid.
-     *
-     * @param eye          the swing origin; never null
-     * @param targetCenter candidate mid-height position; never null
-     * @return true when solid terrain blocks the line before the
-     *         target (grazes at the hitbox face stay clear)
-     */
-    private boolean sightBlocked(net.minecraft.world.phys.Vec3 eye,
-                                 net.minecraft.world.phys.Vec3
-                                     targetCenter) {
-        var clip = body.level().clip(new net.minecraft.world.level
-            .ClipContext(eye, targetCenter,
-                net.minecraft.world.level.ClipContext.Block.COLLIDER,
-                net.minecraft.world.level.ClipContext.Fluid.NONE,
-                body));
-        if (clip.getType() == net.minecraft.world.phys.HitResult.Type.MISS) {
-            return false;
-        }
-        return eye.distanceTo(clip.getLocation())
-            < eye.distanceTo(targetCenter) - MELEE_CLIP_SLACK;
-    }
-
-    /**
-     * Whether the swing line passes through lava. Water stays
-     * transparent by v1 semantics; lava is opaque because melee
-     * across it is impossible and pretending otherwise turns the bot
-     * into a sandbag swinging at the far shore.
-     *
-     * @param eye          the swing origin; never null
-     * @param targetCenter candidate mid-height position; never null
-     * @return true when any sampled point along the line sits in lava
-     */
-    private boolean lavaBetween(net.minecraft.world.phys.Vec3 eye,
-                                net.minecraft.world.phys.Vec3
-                                    targetCenter) {
-        var delta = targetCenter.subtract(eye);
-        int steps = (int) Math.ceil(delta.length() / 0.5);
-        for (int i = 1; i < steps; i++) {
-            var at = eye.add(delta.scale((double) i / steps));
-            if (body.level().getBlockState(
-                    net.minecraft.core.BlockPos.containing(at))
-                    .is(net.minecraft.world.level.block.Blocks.LAVA)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Resolve one USE press as "act with main hand": always swing;
-     * additionally hurt the nearest living hostile inside the reach
-     * box and the aim cone (numen-notes fidelity note: native
-     * click-targeting is approximated by cone resolution because
-     * EntitySnapshot granularity is block-level).
-     *
-     * <p>Runs during flush on the server tick thread.
-     */
-    // contract: see boundaries.md decision 14 (USE = act with main hand)
-    private void resolveMelee() {
-        body.swing(InteractionHand.MAIN_HAND);
-        var view = body.getViewVector(1.0F).normalize();
-        var eye = body.getEyePosition();
-        var box = body.getBoundingBox().inflate(CANDIDATE_NET);
-        net.minecraft.world.entity.LivingEntity best = null;
-        double bestDist = Double.MAX_VALUE;
-        for (net.minecraft.world.entity.LivingEntity e : body.level()
-                .getEntitiesOfClass(
-                    net.minecraft.world.entity.LivingEntity.class,
-                    box, other -> other != body && other.isAlive())) {
-            var key = net.minecraftforge.registries.ForgeRegistries
-                .ENTITY_TYPES.getKey(e.getType());
-            if (key == null || !LevelThreatSensor.hostileTypes()
-                    .contains(key.toString())) {
-                continue;
-            }
-            // Vanilla-aligned reach: squared distance from the eye to
-            // the CLOSEST SURFACE of the target's bounding box - never
-            // center-to-center, which read ~0.4 blocks longer than a
-            // player could legitimately swing.
-            double surfDistSq = e.getBoundingBox().distanceToSqr(eye);
-            if (surfDistSq > MELEE_REACH_SURFACE * MELEE_REACH_SURFACE) {
-                continue;
-            }            var targetCenter = e.position()
-                .add(0, e.getBbHeight() / 2, 0);
-            var toTarget = targetCenter.subtract(eye);
-            if (view.dot(toTarget.normalize())
-                < Math.cos(Math.toRadians(AIM_CONE_DEG))) {
-                continue;
-            }
-            if (sightBlocked(eye, targetCenter)
-                || lavaBetween(eye, targetCenter)) {
-                continue;
-            }
-            if (surfDistSq < bestDist) {
-                bestDist = surfDistSq;
-                best = e;
-            }
-        }
-        if (best != null) {
-            // Kept at DEBUG: useful for in-engine melee tracing when
-            // tuning ATTACK_REACH / AIM_CONE_DEG, not noise the
-            // production log needs at INFO. The 8c09134 standoff
-            // bug was found by walking these lines; a future tuning
-            // pass will reach for the same lever.
-            com.mojang.logging.LogUtils.getLogger().debug(
-                "[melee] HIT dist={} hp={}", bestDist,
-                best.getHealth());
-            best.hurt(body.damageSources()
-                .mobAttack(body), MELEE_DAMAGE);
         }
     }
 
