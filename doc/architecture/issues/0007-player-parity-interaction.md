@@ -1,6 +1,6 @@
 ---
 title: Player parity - inventory, menus, crafting, and the interaction surface
-last_verified: 2026-08-26
+last_verified: 2026-08-27
 covers:
   - doc/architecture/function-map.md
   - src/main/java/com/mcbot/mcbotserver/adapter/BindingActor.java
