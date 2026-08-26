@@ -14,7 +14,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.CraftingTableBlock;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.Vec3;
 
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -44,11 +43,11 @@ import java.util.concurrent.atomic.AtomicInteger;
  *       exactly like vanilla.</li>
  * </ul>
  *
- * <p>Distance policy: the open gate is 4.5 blocks (the project
- * interaction reach, matching DigExecutor /
- * InteractBlockExecutor); once open, the menu's vanilla stillValid
- * predicate (8 blocks for container menus) is re-checked per click
- * by {@link BindingMenu}. The asymmetry is intentional — it mirrors
+ * <p>Distance policy: the open gate is
+ * {@link ReachPolicy#BLOCK_REACH_BLOCKS} (the project interaction
+ * reach); once open, the menu's vanilla stillValid predicate (8
+ * blocks for container menus) is re-checked per click by
+ * {@link BindingMenu}. The asymmetry is intentional — it mirrors
  * vanilla's open-reach vs keep-open tolerance.
  *
  * <p>Thread safety: server tick thread only. The opener mutates the
@@ -62,11 +61,6 @@ public final class MenuOpener {
      * (no network packets with the no-op synchronizer) but required by
      * every AbstractContainerMenu constructor. */
     private static final AtomicInteger NEXT_ID = new AtomicInteger(1);
-
-    /** Maximum interaction reach in blocks. Matches the reach used by
-     * {@code DigExecutor} and {@code InteractBlockExecutor} (4.5 blocks,
-     * the vanilla survival player reach). Squared for comparison. */
-    private static final double REACH_BLOCKS_SQ = 4.5 * 4.5;
 
     /** The facade whose inventory and player context back every menu. */
     private final BotPlayerFacade facade;
@@ -100,12 +94,10 @@ public final class MenuOpener {
         Level level = facade.body().level();
 
         // Reach gate: measured from the body's eye position to the block
-        // center. Matches DigExecutor / InteractBlockExecutor (4.5 blocks).
-        // Without this the bot could open a menu on any loaded chunk
-        // regardless of distance.
+        // center. Without this the bot could open a menu on any loaded
+        // chunk regardless of distance.
         facade.syncPosition();
-        double distSq = facade.getEyePosition().distanceToSqr(Vec3.atCenterOf(pos));
-        if (distSq > REACH_BLOCKS_SQ) {
+        if (!ReachPolicy.withinReach(facade.getEyePosition(), pos)) {
             return Optional.empty();
         }
 

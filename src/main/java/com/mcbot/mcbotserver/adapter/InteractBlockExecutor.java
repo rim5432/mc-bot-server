@@ -11,7 +11,6 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
 
 /**
@@ -48,7 +47,7 @@ import net.minecraft.world.phys.shapes.CollisionContext;
  *
  * <p>Reach gate: a claim outside bare-hand reach is ignored (placement
  * never happens), matching vanilla's mayInteract honesty without needing
- * its Player parameter. Same constant as DigExecutor.DIG_REACH_BLOCKS.
+ * its Player parameter. Reach policy: see {@link ReachPolicy}.
  *
  * <p>Implementation note: runs on the server tick thread only, called
  * from BindingActor.flush on the rising edge of an InteractBlock claim.
@@ -56,13 +55,6 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 // contract: see boundaries.md decision 25 (INTERACT-channel vocabulary;
 //            all mutation behind the claim surface)
 public final class InteractBlockExecutor {
-
-    /**
-     * Bare-hand block reach, eye to block center, in blocks. Same
-     * constant as DigExecutor — a bot that can dig a block can place
-     * against it.
-     */
-    public static final double PLACE_REACH_BLOCKS = 4.5;
 
     private final BotBodyEntity body;
 
@@ -87,7 +79,7 @@ public final class InteractBlockExecutor {
     public void place(Intent.InteractBlock claim) {
         BlockPos target = new BlockPos(claim.target().x(),
             claim.target().y(), claim.target().z());
-        if (!withinReach(target)) {
+        if (!ReachPolicy.withinReach(body.getEyePosition(), target)) {
             return;
         }
         ItemStack held = body.getInventory().container()
@@ -127,19 +119,6 @@ public final class InteractBlockExecutor {
         // Client players swing on right-click place; the server-side body
         // mirrors that visible cadence directly (same as DigExecutor.swing).
         body.swing(InteractionHand.MAIN_HAND);
-    }
-
-    /**
-     * Whether the eye is within bare-hand reach of the block center.
-     *
-     * @param pos the clicked block; never null
-     * @return true when the placement may proceed
-     */
-    private boolean withinReach(BlockPos pos) {
-        Vec3 eye = body.getEyePosition();
-        Vec3 center = Vec3.atCenterOf(pos);
-        return eye.distanceToSqr(center)
-            <= PLACE_REACH_BLOCKS * PLACE_REACH_BLOCKS;
     }
 
     /**

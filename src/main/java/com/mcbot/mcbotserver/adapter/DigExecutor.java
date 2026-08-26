@@ -8,8 +8,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.Vec3;
-
 /**
  * The dig half of the entity binding: converts a held INTERACT claim
  * (Intent.Dig) into vanilla destroy progress and, on completion, the
@@ -57,14 +55,6 @@ import net.minecraft.world.phys.Vec3;
 //            vocabulary; all mutation behind the claim surface)
 public final class DigExecutor {
 
-    /**
-     * Block reach, eye to block center, in blocks. Vanilla players
-     * reach 4.5 (block-reach attribute); the bot holds the same number.
-     * Tool-independent — reach is a player attribute, not a tool
-     * property. Issue 0007 Phase 1 tool supplier landed 2026-08-25.
-     */
-    public static final double DIG_REACH_BLOCKS = 4.5;
-
     private final BotBodyEntity body;
 
     /** Current dig site; null while no dig is in progress. */
@@ -110,7 +100,7 @@ public final class DigExecutor {
             lastStage = -1;
             return;
         }
-        if (!withinReach(pos)) {
+        if (!ReachPolicy.withinReach(body.getEyePosition(), pos)) {
             // Out-of-reach claim: no progress, no broadcast - the
             // claim keeps arriving, the executor stays honest.
             return;
@@ -167,19 +157,6 @@ public final class DigExecutor {
         target = null;
         heldTicks = 0;
         lastStage = -1;
-    }
-
-    /**
-     * Whether the eye is within bare-hand reach of the block center.
-     *
-     * @param pos the claimed block; never null
-     * @return true when the dig may progress
-     */
-    private boolean withinReach(BlockPos pos) {
-        var eye = body.getEyePosition();
-        var center = Vec3.atCenterOf(pos);
-        return eye.distanceToSqr(center)
-            <= DIG_REACH_BLOCKS * DIG_REACH_BLOCKS;
     }
 
     /** Clear the crack broadcast for the current site, if any. */

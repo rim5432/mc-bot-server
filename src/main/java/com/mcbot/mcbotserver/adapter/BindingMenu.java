@@ -323,9 +323,9 @@ public final class BindingMenu {
      * so the gate runs here instead — per click, the only write
      * surface. The facade carries the default player BLOCK_REACH
      * attribute, so the gate distance is the vanilla 8.0 blocks for
-     * container menus (open is separately gated at 4.5 in MenuOpener;
-     * the asymmetry mirrors vanilla open-reach vs keep-open
-     * tolerance).
+     * container menus (open is separately gated by ReachPolicy in
+     * MenuOpener; the asymmetry mirrors vanilla open-reach vs
+     * keep-open tolerance).
      */
     private void ensureStillValid() {
         if (player instanceof BotPlayerFacade facade) {
