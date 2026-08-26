@@ -528,7 +528,10 @@ def cmd_write(path: str, value: str, tol: int | None = None,
                   file=sys.stderr)
             return 1
         timeout_val = timeout if timeout is not None else 2400
-        resp = wire(f"/bot mine {block_type} {count} {timeout_val}")
+        # Quote the registry id: Brigadier's string() type rejects a
+        # bare colon, so "minecraft:stone" must arrive quoted (same
+        # rule as the menu verbs' item ids).
+        resp = wire(f'/bot mine "{block_type}" {count} {timeout_val}')
         print(json.dumps(resp, indent=2))
         if resp.get("ok") and "task" in resp:
             print(f"taskId: {resp['task']}", file=sys.stderr)

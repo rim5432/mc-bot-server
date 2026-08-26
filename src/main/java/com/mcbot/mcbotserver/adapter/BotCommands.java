@@ -218,8 +218,11 @@ public final class BotCommands {
      */
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> mineBranch(
             Supplier<Channels> live) {
+        // string(), not word(): registry ids carry a colon and word()
+        // cannot parse one - the caller must quote the id (same rule
+        // as the menu verbs' item ids).
         var args = Commands.argument("blockType",
-                    StringArgumentType.word())
+                    StringArgumentType.string())
             .then(Commands.argument("count",
                         IntegerArgumentType.integer(1))
                 .executes(ctx -> runMine(ctx, live, 2400L))

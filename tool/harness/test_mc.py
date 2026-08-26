@@ -460,7 +460,7 @@ class MineTaskTest(McCliTest):
                                       "minecraft:stone:3")
         self.assertEqual(code, 0)
         self.assertEqual(self.wire_calls,
-                         ["/bot mine minecraft:stone 3 2400"])
+                         ['/bot mine "minecraft:stone" 3 2400'])
         self.assertIn("taskId: t9", err)
 
     def test_mine_passes_explicit_timeout(self):
@@ -469,7 +469,7 @@ class MineTaskTest(McCliTest):
                                     "minecraft:dirt:5", timeout=600)
         self.assertEqual(code, 0)
         self.assertEqual(self.wire_calls,
-                         ["/bot mine minecraft:dirt 5 600"])
+                         ['/bot mine "minecraft:dirt" 5 600'])
 
     def test_mine_handles_registry_id_with_colon(self):
         # blockType is a registry id (minecraft:stone) which contains a
@@ -479,7 +479,7 @@ class MineTaskTest(McCliTest):
                                     "minecraft:deepslate:2")
         self.assertEqual(code, 0)
         self.assertEqual(self.wire_calls,
-                         ["/bot mine minecraft:deepslate 2 2400"])
+                         ['/bot mine "minecraft:deepslate" 2 2400'])
 
     def test_mine_rejects_malformed_value(self):
         code, _, err = self.run_verb(mc.cmd_write, "/tasks/mine", "stone")
