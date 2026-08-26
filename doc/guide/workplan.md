@@ -629,11 +629,33 @@ freeze lifts.
          Offline gates: CraftingViewTest + MenuPlannerTest.
          [Phase 2 fully landed 2026-08-26]
                                  [dep: P1]
-- [ ] M  Phase 3 - crafting automation: recipe query service over
+- [x] M  Phase 3 - crafting automation: recipe query service over
          RecipeManager (adapter-side only - core stays
          MC-clean), quick-move sequences. Acceptance: given a
          recipe id, bot pulls materials, crafts, banks the
-         product.                                               [dep: P2]
+         product.
+         Progress 2026-08-26 (landed same day as Phase 2; 39/39
+         gametests): api RecipeView describes shaped recipes in
+         PATTERN-relative coordinates with tag-expanded accepted-id
+         lists (shapeless not representable - catalog emits empty);
+         adapter RecipeCatalog translates byId/byResult off the live
+         server datapack (catalogsShapedRecipes pins stick vs
+         diamond_block vs shapeless-vs-unknown); core MenuPlanner
+         grew planRecipe (pattern cells resolve first-fit against
+         snapshot supply, group per chosen kind, one planGridFill per
+         group, top-left anchoring on whatever surface is open) and
+         the chest half planWithdraw/planDeposit (QUICK_MOVE whole
+         stacks; withdrawal may overshoot demand, deposit refuses
+         when nothing matches). pullsCraftsAndBanksByRecipeId runs
+         the acceptance verbatim across three goto legs: chest ->
+         table -> chest, final state pinned from both sides. The
+         first engine run exposed a REAL pathing defect - an
+         exhausted cursor returned before steering, so a brake
+         undershoot idled one cell short until the mission budget
+         died; fixed at root in PathingBehavior (wind-down steering,
+         pinned offline by DepartureBrakeGateTest) instead of
+         reworked test geometry.
+         [Phase 3 fully landed 2026-08-26]
 - [ ] XL Phase 4 - full player behaviour parity: remaining menu
          kinds (enchanting, anvil, loom, villager, ...), Intent.
          UseItem (eat / drink / bow / place), armor slots,

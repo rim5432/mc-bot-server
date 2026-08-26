@@ -176,8 +176,16 @@ reopened on demand — **[DEFERRED]** outside v1.
   deposits, remainder returns, quick-move take — executed through
   the actor's MenuTransactions (issue 0007 Phase 2). The
   walk-to-table acceptance loop pins the full arc.
-- **[GAP]** Chest-side planning (deposit/withdraw sequences) and a
-  structured chest scenario over the planner.
+- **[SHIPPED]** Recipe-driven crafting: adapter RecipeCatalog
+  translates shaped recipes off the live datapack into pure
+  RecipeViews (tag-expanded, pattern-relative); planRecipe resolves
+  accepted kinds against actual inventory and anchors the pattern on
+  whatever surface is open. Chest flows ride planWithdraw /
+  planDeposit QUICK_MOVE sequences; pullsCraftsAndBanksByRecipeId
+  chains chest → table → chest end to end.
+- **[GAP]** Shapeless recipes (no fixed grid cells to describe) and
+  multi-step crafting chains (e.g. log → planks → sticks as one
+  request).
 - **[GAP]** Use-item verbs — eating food (issue 0010's consumption
   half), buckets, bows — and use-block interactions (buttons,
   doors, levers); both ride the facade's Player-typed surface.
