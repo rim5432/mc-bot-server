@@ -98,6 +98,49 @@ public final class RecipeCatalog {
     }
 
     /**
+     * Paginated list of every shaped recipe the catalog can translate.
+     *
+     * <p>Used by the {@code recipes list} wire command and the harness
+     * {@code dump-recipes} admin verb: the full set is too large for one
+     * RCON payload (Source RCON caps around 4 KB; vanilla has hundreds
+     * of shaped recipes), so the consumer pages through with
+     * offset/limit. Shapeless recipes are silently skipped — same rule
+     * as {@link #byId}.
+     *
+     * @param offset zero-based start index; clamped to [0, total]
+     * @param limit  maximum recipes per page; clamped to [1, 200]
+     * @return a page with the recipe views, total count, and effective
+     *         offset/limit; never null
+     */
+    public RecipePage list(int offset, int limit) {
+        List<RecipeView> all = new ArrayList<>();
+        for (ResourceLocation key : recipes.getRecipeIds().toList()) {
+            recipes.byKey(key)
+                .flatMap(recipe -> translate(key, recipe))
+                .ifPresent(all::add);
+        }
+        all.sort((a, b) -> a.recipeId().compareTo(b.recipeId()));
+        int total = all.size();
+        int from = Math.max(0, Math.min(offset, total));
+        int safeLimit = Math.max(1, Math.min(limit, 200));
+        int to = Math.min(from + safeLimit, total);
+        return new RecipePage(
+            List.copyOf(all.subList(from, to)), total, from, to - from);
+    }
+
+    /**
+     * One page of the full recipe listing.
+     *
+     * @param recipes the recipes in this page; never null, immutable
+     * @param total   total shaped recipes across all pages
+     * @param offset  effective zero-based start of this page
+     * @param limit   effective number of recipes in this page
+     */
+    public record RecipePage(List<RecipeView> recipes, int total,
+                             int offset, int limit) {
+    }
+
+    /**
      * Translate one engine recipe into the pure description.
      *
      * @param key    the recipe's registry key; never null
