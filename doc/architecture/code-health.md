@@ -88,6 +88,7 @@ admitted here may encode a size cap.
 | H-R6 Geometry spectrum rationale | Threshold constants document their partial-top-spectrum reasoning | not mechanically checkable | review-only |
 | H-R7 Package structure | Main modules single-level, module names never reused as subpackages; test packages mirror main or are sanctioned metas | `architecture.PackageStructureGateTest` | gated 2026-08-25 |
 | H-R8 Contract markers present | Every src/main implementer of a boundary interface carries its `contract: see` pointer (AGENTS.md 1.4.3.1) | `architecture.BoundaryContractMarkerTest` | gated 2026-08-25 |
+| H-R9 Review claims cite or are unverified | Every factual claim in a review/assessment carries a file:line or doc-anchor citation; quoted promises are checked against the anchor; "does this abstraction exist" checks the abstraction-status table first | not mechanically checkable | review-only since 2026-08-27 |
 
 ### Rule detail
 
@@ -141,6 +142,37 @@ admitted here may encode a size cap.
   where it does across the MC partial-top spectrum (issue 0002
   Resolution mandate) so future readers do not mistake it for a
   slab-specific magic number.
+- **H-R9 Review claims cite or are unverified.** The 2026-08-27
+  external architecture review misquoted boundary B's promise
+  ("touching zero Behaviors" became "zero controller changes") and
+  proposed abstracting ReflexSeat - which already existed with two
+  implementations. Both would have self-caught under
+  cite-or-unverified: the quote would have exposed its own drift
+  against the anchor, and the proposal would have found the
+  interface in the single lookup below. Factual claims carry
+  file:line; promise quotes carry the doc anchor and are read back
+  against it; abstraction proposals check the abstraction-status
+  table before claiming a gap. Misjudgment is an environment
+  property, not a reader property - the gated zones (H-R1, H-R4,
+  H-R7, H-R8) have zero misunderstanding history; the prose zones
+  accumulated all of it.
+
+## Abstraction status (single lookup)
+
+What exists, how many real implementations or callers it serves,
+and what promotes it next. Check this BEFORE proposing a new
+abstraction or a generalization - the second-consumer rule
+(glossary: promotion trigger) is law, and most "missing"
+abstractions already exist.
+
+| Abstraction | Implementations / callers | Next promotion trigger |
+|---|---|---|
+| `ReflexSeat` (core/tick) | ReflexEngageSeat + ReflexRescueSeat | a third seat (0010's EAT reflex if it needs handoff) generalizes the controller-side three-way resume dispatch |
+| `DigMission` (api/process) | DigProcess + MineProcess; a new dig-family mission costs zero controller change | a second CLAIM KIND (attack for hunt, use for eat) lifts process-driven claim injection to a declared BotProcess capability |
+| `submitAimAndDig` (BotController) | mission-dig path + preemptDigClaims | a second non-dig per-tick interaction widens the pair |
+| `MenuTransactions` (api.menu) | BindingActor; ruled form (ledger 29, not-claims-not-second-controller) | eat / use-item decides claim-vs-transaction; design agenda belongs to 0010 |
+| mc-skill pattern (skills/) | patrol.py | a second skill extracts the conventions (wait-chain, per-leg events drain) |
+| recipes materialization (harness) | dump-recipes + `~/.mc/recipes` + grep | a second heavy-read class earns the next dump verb |
 
 ## Closed rounds
 
