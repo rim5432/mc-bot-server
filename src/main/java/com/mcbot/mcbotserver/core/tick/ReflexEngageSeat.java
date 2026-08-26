@@ -14,7 +14,7 @@ import com.mcbot.mcbotserver.core.process.TaskArbiter;
  * <p>Implementation note: server tick thread only, like every
  * pipeline collaborator.
  */
-final class ReflexEngageSeat {
+final class ReflexEngageSeat implements ReflexSeat {
 
     /**
      * Ticks between reflex engage submissions. Deliberately ABOVE
@@ -56,7 +56,7 @@ final class ReflexEngageSeat {
      * announced by the transition detector; keeping the corpse would
      * only blur the parked/awaiting queries below.
      */
-    void retireFinished() {
+    public void retireFinished() {
         if (fight != null && !fight.isActive()) {
             fight = null;
         }
@@ -66,7 +66,7 @@ final class ReflexEngageSeat {
      * @return true when no fight is live and the resubmit cooldown
      *         has elapsed
      */
-    boolean maySubmit() {
+    public boolean maySubmit() {
         return fight == null
             && ticksSinceSubmit >= ENGAGE_RESUBMIT_COOLDOWN;
     }
@@ -76,7 +76,7 @@ final class ReflexEngageSeat {
      *
      * @param mission the freshly registered fight; never null
      */
-    void submitted(BotProcess mission) {
+    public void submitted(BotProcess mission) {
         fight = mission;
         ticksSinceSubmit = 0;
     }

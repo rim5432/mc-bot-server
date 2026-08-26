@@ -27,6 +27,7 @@ import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.core.process.TerminalMission;
 import com.mcbot.mcbotserver.core.reflex.MinimalReflex;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
+import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer.ReflexDecision;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -369,8 +370,52 @@ public final class BotController {
         }
     }
 
-    private void runPipeline(WorldView world) {
-        CellPos position = positionSource.get();
+    /**
+     * One-tick reflex-to-mission handoff shared by ENGAGE and ESCAPE
+     * (ledger 23 / 26): retire the seat's terminal mission, and when
+     * the seat accepts a submit, preempt-and-hold this tick and mint
+     * the reflex-owned mission.
+     *
+     * <p>Degrade path: a factory that returns {@code null} leaves the
+     * body parked by preemptAndHold; from the next tick the reflex
+     * fires again and the factory retries without starting a cooldown
+     * (maySubmit stays true) - this is the ESCAPE no-route shape. An
+     * ENGAGE factory never returns null in production, so the uniform
+     * null tolerance is strictly defensive.
+     *
+     * @param seat     one-reflex-mission seat for this action kind;
+     *                 never null
+     * @param factory  mission minter reading live body state; never
+     *                 null
+     * @param decision the firing reflex decision; never null
+     * @param day      game day for event stamps
+     * @param tod      time-of-day ticks for event stamps
+     * @return true when this tick was consumed by the handoff (the
+     *         caller must return); false when the seat is busy and
+     *         the caller falls through to the mission stage so the
+     *         live reflex mission keeps running - preempting it every
+     *         tick would starve the very mission the reflex submitted
+     */
+    private boolean handoffToSeat(ReflexSeat seat,
+                                  Supplier<BotProcess> factory,
+                                  ReflexDecision decision,
+                                  long day, long tod) {
+        seat.retireFinished();
+        if (!seat.maySubmit()) {
+            return false;
+        }
+        preemptAndHold(decision, new Intent.Move(0, 0, false, false),
+            day, tod);
+        BotProcess mission = factory.get();
+        if (mission != null) {
+            arbiter.register(mission);
+            arbiter.requestControl(mission);
+            seat.submitted(mission);
+        }
+        return true;
+    }
+
+    private void runPipeline(WorldView world) {        CellPos position = positionSource.get();
         float health = healthSource.get();
         long day = clock.day();
         long tod = clock.timeOfDayTicks();
@@ -388,14 +433,8 @@ public final class BotController {
             boolean engageDecision =
                 decision.action() == ReflexAction.ENGAGE;
             if (engageDecision && engageMissionFactory != null) {
-                engageSeat.retireFinished();
-                if (engageSeat.maySubmit()) {
-                    preemptAndHold(decision,
-                        new Intent.Move(0, 0, false, false), day, tod);
-                    BotProcess mission = engageMissionFactory.get();
-                    arbiter.register(mission);
-                    arbiter.requestControl(mission);
-                    engageSeat.submitted(mission);
+                if (handoffToSeat(engageSeat, engageMissionFactory,
+                        decision, day, tod)) {
                     return;
                 }
                 // Live reflex-owned mission (or the resubmit cooldown):
@@ -411,21 +450,8 @@ public final class BotController {
                 // reachable target returns null and the preemption
                 // degrades to the freeze hold (park and escalate) -
                 // no escape route means the harness must decide.
-                rescueSeat.retireFinished();
-                if (rescueSeat.maySubmit()) {
-                    preemptAndHold(decision,
-                        new Intent.Move(0, 0, false, false), day, tod);
-                    BotProcess mission = rescueMissionFactory.get();
-                    if (mission != null) {
-                        arbiter.register(mission);
-                        arbiter.requestControl(mission);
-                        rescueSeat.submitted(mission);
-                    }
-                    // If mission is null: the body is already parked
-                    // for this tick by preemptAndHold; from the next
-                    // tick the reflex fires again and the factory
-                    // retries (no cooldown started, maySubmit stays
-                    // true). This is the degrade-to-freeze path.
+                if (handoffToSeat(rescueSeat, rescueMissionFactory,
+                        decision, day, tod)) {
                     return;
                 }
                 // Live reflex-owned rescue mission (or cooldown): fall
