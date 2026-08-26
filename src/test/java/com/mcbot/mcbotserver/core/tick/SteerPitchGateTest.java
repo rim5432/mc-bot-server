@@ -28,19 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class SteerPitchGateTest {
 
-    private static MockWorldView floorTo(int xLen) {
-        MockWorldView world = new MockWorldView();
-        for (int x = 0; x <= xLen; x++) {
-            for (int z = -2; z <= 2; z++) {
-                world.putBlock(new BlockSnapshot(
-                    new CellPos(x, 63, z), "minecraft:smooth_stone"));
-            }
-        }
-        return world;
-    }
-
     private static MockWorldView worldWithPlatform() {
-        MockWorldView world = floorTo(8);
+        MockWorldView world = MockWorldView.pavedFloor(8);
         for (int x = 2; x <= 3; x++) {
             for (int z = -2; z <= 2; z++) {
                 world.putBlock(new BlockSnapshot(
@@ -73,7 +62,7 @@ class SteerPitchGateTest {
         // Tick past the P2.1 departure hold first.
         for (int i = 0; i <= PathingBehavior.DEPARTURE_DELAY_TICKS;
              i++) {
-            mover.tick(floorTo(8), Directive.of(
+            mover.tick(MockWorldView.pavedFloor(8), Directive.of(
                 new GoalBlock(new CellPos(7, 64, 0))), actor);
         }
 

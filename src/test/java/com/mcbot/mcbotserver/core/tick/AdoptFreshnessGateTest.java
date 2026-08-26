@@ -8,9 +8,7 @@ import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
-import com.mcbot.mcbotserver.api.world.BlockSnapshot;
 import com.mcbot.mcbotserver.api.world.WorldView;
-import com.mcbot.mcbotserver.core.actor.ChannelArbiter;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 import com.mcbot.mcbotserver.core.pathing.BasicMoves;
 import com.mcbot.mcbotserver.core.pathing.PlanWorker;
@@ -53,17 +51,6 @@ class AdoptFreshnessGateTest {
         worker.shutdown();
     }
 
-    private static MockWorldView floorTo(int xLen) {
-        MockWorldView world = new MockWorldView();
-        for (int x = 0; x <= xLen; x++) {
-            for (int z = -2; z <= 2; z++) {
-                world.putBlock(new BlockSnapshot(
-                    new CellPos(x, 63, z), "minecraft:smooth_stone"));
-            }
-        }
-        return world;
-    }
-
     private static final class NullActor implements Actor {
         @Override public void submit(Claim claim) {}
         @Override public Map<Channel, Claim> flush() { return Map.of(); }
@@ -81,7 +68,7 @@ class AdoptFreshnessGateTest {
         Vec3[] position = { new Vec3(0.5, 64, 0.5) };
         PathingBehavior mover = new PathingBehavior("mover",
             () -> position[0], BasicMoves::from, worker);
-        WorldView world = floorTo(60);
+        WorldView world = MockWorldView.pavedFloor(60);
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(40, 64, 0)));
 
@@ -130,7 +117,7 @@ class AdoptFreshnessGateTest {
         Vec3[] position = { new Vec3(0.5, 64, 0.5) };
         PathingBehavior mover = new PathingBehavior("mover",
             () -> position[0], BasicMoves::from, worker);
-        WorldView world = floorTo(60);
+        WorldView world = MockWorldView.pavedFloor(60);
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(40, 64, 0)));
 

@@ -10,6 +10,8 @@ import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
 
+import com.mcbot.mcbotserver.testsupport.RepoRoot;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -47,7 +49,7 @@ class EnglishOnlyScan {
      * a CJK codepoint. */
     @Test
     void coveredTreesCarryZeroCjkCodepoints() throws IOException {
-        Path root = repoRoot();
+        Path root = RepoRoot.find();
         List<String> violations = new ArrayList<>();
         scanMarkdown(root, violations);
         for (String tree : new String[] {"src/main/java", "src/test/java"}) {
@@ -137,26 +139,5 @@ class EnglishOnlyScan {
         }
         return (cp >= 0x3000 && cp <= 0x303F)
                 || (cp >= 0xFF01 && cp <= 0xFF60);
-    }
-
-    /** Walks up from the JVM working directory until it finds the
-     * project marker chain, mirroring {@code GametestInventoryCheck}.
-     *
-     * @return the repository root, never null
-     * @throws IllegalStateException when no directory above the
-     *         working directory carries the project marker chain
-     */
-    private static Path repoRoot() {
-        for (Path p = Path.of("").toAbsolutePath();
-             p != null;
-             p = p.getParent()) {
-            boolean hasSources = Files.exists(p.resolve(Path.of("src",
-                "main", "java", "com", "mcbot", "mcbotserver")));
-            if (hasSources && Files.exists(p.resolve("gradle.properties"))) {
-                return p;
-            }
-        }
-        throw new IllegalStateException(
-            "project root not found above " + Path.of("").toAbsolutePath());
     }
 }

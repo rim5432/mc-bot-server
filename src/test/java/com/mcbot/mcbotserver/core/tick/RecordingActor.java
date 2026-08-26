@@ -10,15 +10,18 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Test-double actor: records every submitted claim in arrival order
- * while delegating resolution to a real {@link ChannelArbiter}, so
- * tests can assert both "what was claimed" and "what won".
+ * Shared test-double actor: records every submitted claim in arrival
+ * order while delegating resolution to a real {@link ChannelArbiter},
+ * so tests can assert both "what was claimed" and "what won".
  *
- * <p>Package-private test infrastructure; not part of any boundary.
+ * <p>Test infrastructure only, not part of any boundary; variants
+ * (throw-on-flush, captured flush) extend this class locally instead
+ * of growing hooks here.
  */
-final class RecordingActor implements Actor {
+public class RecordingActor implements Actor {
 
-    final List<Claim> submitted = new ArrayList<>();
+    /** Claims accepted this tick-since-clear, in arrival order. */
+    public final List<Claim> submitted = new ArrayList<>();
     private final ChannelArbiter delegate = new ChannelArbiter();
 
     @Override

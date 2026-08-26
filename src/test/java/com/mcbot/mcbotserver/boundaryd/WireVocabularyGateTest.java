@@ -17,6 +17,7 @@ import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventBatch;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.state.BotState;
+import com.mcbot.mcbotserver.testsupport.RepoRoot;
 
 import org.junit.jupiter.api.Test;
 
@@ -103,7 +104,7 @@ class WireVocabularyGateTest {
      *  or a registered shape lacks its kind. */
     @Test
     void kindInventoryMatchesEventKindConstants() {
-        Path source = repoRoot().resolve(Path.of("src", "main",
+        Path source = RepoRoot.find().resolve(Path.of("src", "main",
             "java", "com", "mcbot", "mcbotserver", "api", "event",
             "EventKind.java"));
         assertTrue(Files.isRegularFile(source),
@@ -140,7 +141,7 @@ class WireVocabularyGateTest {
     void producerAttrLiteralsStayInsideTheVocabulary() {
         Set<String> stamped = new TreeSet<>();
         for (String file : PRODUCER_FILES) {
-            Path path = repoRoot().resolve(
+            Path path = RepoRoot.find().resolve(
                 "src/main/java/com/mcbot/mcbotserver/" + file);
             assertTrue(Files.isRegularFile(path),
                 () -> "producer file listed in PRODUCER_FILES is "
@@ -208,25 +209,5 @@ class WireVocabularyGateTest {
                 + "and harness path prints these names; a rename is "
                 + "a boundary-D breaking change - update the pin, "
                 + "boundaries.md and every consumer in one change.");
-    }
-
-    /** Walks up from the JVM working directory until it finds the
-     *  project marker chain, so the check is independent of which
-     *  directory the Gradle test task runs in.
-     *
-     * @return the repository root, never null
-     */
-    private static Path repoRoot() {
-        for (Path p = Path.of("").toAbsolutePath();
-             p != null;
-             p = p.getParent()) {
-            boolean hasSources = Files.exists(p.resolve(Path.of("src",
-                "main", "java", "com", "mcbot", "mcbotserver")));
-            if (hasSources && Files.exists(p.resolve("gradle.properties"))) {
-                return p;
-            }
-        }
-        throw new IllegalStateException(
-            "project root not found above " + Path.of("").toAbsolutePath());
     }
 }

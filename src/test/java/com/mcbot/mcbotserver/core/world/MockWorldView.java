@@ -51,6 +51,24 @@ public final class MockWorldView implements WorldView {
     private InventoryView inventory = InventoryView.empty();
 
     /**
+     * Stand-in ground plane for movement tests: smooth stone at y=63
+     * spanning x in [0, xLen] and z in [-2, 2], everything else air.
+     *
+     * @param xLen the last paved x column; must not be negative
+     * @return a fresh mock with the floor installed, never null
+     */
+    public static MockWorldView pavedFloor(int xLen) {
+        MockWorldView world = new MockWorldView();
+        for (int x = 0; x <= xLen; x++) {
+            for (int z = -2; z <= 2; z++) {
+                world.putBlock(new BlockSnapshot(
+                    new CellPos(x, 63, z), "minecraft:smooth_stone"));
+            }
+        }
+        return world;
+    }
+
+    /**
      * Place or replace a block cell.
      *
      * @param snapshot the cell content; must not be null

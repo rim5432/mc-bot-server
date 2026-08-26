@@ -1,6 +1,5 @@
 package com.mcbot.mcbotserver.core.pathing;
 
-import com.mcbot.mcbotserver.api.actor.Actor;
 import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
@@ -10,18 +9,16 @@ import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.api.world.WorldView;
-import com.mcbot.mcbotserver.core.actor.ChannelArbiter;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 import com.mcbot.mcbotserver.core.pathing.BasicMoves;
 import com.mcbot.mcbotserver.core.pathing.PlanWorker;
+import com.mcbot.mcbotserver.core.tick.RecordingActor;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
 import com.mcbot.mcbotserver.core.world.SnapshotWorldView;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -46,41 +43,6 @@ class PlanWorkerGateTest {
         worker.shutdown();
     }
 
-    /** Delegating actor that records every submission this tick. */
-    private static final class RecordingActor implements Actor {
-        private final ChannelArbiter delegate = new ChannelArbiter();
-        final List<Claim> submitted = new ArrayList<>();
-
-        @Override
-        public void submit(Claim claim) {
-            submitted.add(claim);
-            delegate.submit(claim);
-        }
-
-        @Override
-        public java.util.Map<Channel, Claim> flush() {
-            return delegate.flush();
-        }
-
-        @Override
-        public void clearAllIntents() {
-            submitted.clear();
-            delegate.clearAllIntents();
-        }
-    }
-
-    private static MockWorldView floorTo(int xLen) {
-        MockWorldView world = new MockWorldView();
-        for (int x = 0; x <= xLen; x++) {
-            for (int z = -2; z <= 2; z++) {
-                world.putBlock(new com.mcbot.mcbotserver.api.world
-                    .BlockSnapshot(new CellPos(x, 63, z),
-                        "minecraft:smooth_stone"));
-            }
-        }
-        return world;
-    }
-
     /**
      * Frozen body, reachable goal: the first tick requests a plan and
      * must NOT report NO_PATH while it is in flight; once the worker
@@ -94,7 +56,7 @@ class PlanWorkerGateTest {
         PathingBehavior mover = new PathingBehavior("mover",
             () -> position[0], BasicMoves::from, worker);
         RecordingActor actor = new RecordingActor();
-        WorldView world = floorTo(60);
+        WorldView world = MockWorldView.pavedFloor(60);
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(40, 64, 0)));
 
@@ -125,7 +87,7 @@ class PlanWorkerGateTest {
         PathingBehavior mover = new PathingBehavior("mover",
             () -> position[0], BasicMoves::from, worker);
         RecordingActor actor = new RecordingActor();
-        WorldView world = floorTo(60);
+        WorldView world = MockWorldView.pavedFloor(60);
         Directive oldGoal = Directive.of(
             new GoalBlock(new CellPos(40, 64, 0)));
 
@@ -152,7 +114,7 @@ class PlanWorkerGateTest {
      */
     @Test
     void snapshotAnswersNullOutsideCapturedBox() {
-        MockWorldView world = floorTo(60);
+        MockWorldView world = MockWorldView.pavedFloor(60);
         world.putBlock(new com.mcbot.mcbotserver.api.world
             .BlockSnapshot(new CellPos(500, 63, 500),
                 "minecraft:stone"));
@@ -173,7 +135,7 @@ class PlanWorkerGateTest {
      */
     @Test
     void workerRejectsUnboundedWallClock() {
-        var snapshot = SnapshotWorldView.capture(floorTo(4),
+        var snapshot = SnapshotWorldView.capture(MockWorldView.pavedFloor(4),
             new CellPos(0, 64, 0), new CellPos(2, 64, 0));
         org.junit.jupiter.api.Assertions.assertThrows(
             IllegalArgumentException.class,

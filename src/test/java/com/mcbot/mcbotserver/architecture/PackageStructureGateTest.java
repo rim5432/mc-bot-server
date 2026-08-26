@@ -10,6 +10,8 @@ import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
 
+import com.mcbot.mcbotserver.testsupport.RepoRoot;
+
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -38,10 +40,12 @@ class PackageStructureGateTest {
     /**
      * Test packages that test the repository rather than one main
      * package: the boundary-contract gates (boundarya = boundary A,
-     * boundaryd = boundary D) and the hygiene/architecture gates.
+     * boundaryd = boundary D), the hygiene/architecture gates, and
+     * testsupport (shared test infrastructure - RepoRoot et al).
      */
     private static final Set<String> TEST_METAS = Set.of(
-        "architecture", "boundarya", "boundaryd", "hygiene");
+        "architecture", "boundarya", "boundaryd", "hygiene",
+        "testsupport");
 
     /** Anchors proving the main scan actually saw the tree. */
     private static final List<String> MAIN_ANCHORS = List.of(
@@ -54,7 +58,7 @@ class PackageStructureGateTest {
     /** Fails when a main package breaks the module grammar. */
     @Test
     void mainPackagesStaySingleLevelAndCrossHalfFree() {
-        Set<String> packages = scanPackages(repoRoot().resolve(
+        Set<String> packages = scanPackages(RepoRoot.find().resolve(
             Path.of("src", "main", "java", "com", "mcbot", "mcbotserver")));
         List<String> violations = packages.stream()
             .filter(p -> !isLegalMainPackage(p))
@@ -76,9 +80,9 @@ class PackageStructureGateTest {
      *  belongs to the sanctioned meta set. */
     @Test
     void testPackagesMirrorMainOrAreSanctionedMetas() {
-        Set<String> main = scanPackages(repoRoot().resolve(
+        Set<String> main = scanPackages(RepoRoot.find().resolve(
             Path.of("src", "main", "java", "com", "mcbot", "mcbotserver")));
-        Set<String> test = scanPackages(repoRoot().resolve(
+        Set<String> test = scanPackages(RepoRoot.find().resolve(
             Path.of("src", "test", "java", "com", "mcbot", "mcbotserver")));
         Set<String> violations = new TreeSet<>(test);
         violations.removeAll(main);
@@ -137,25 +141,5 @@ class PackageStructureGateTest {
         } catch (IOException e) {
             return false;
         }
-    }
-
-    /** Walks up from the JVM working directory until it finds the
-     *  project marker chain, so the check is independent of which
-     *  directory the Gradle test task runs in.
-     *
-     * @return the repository root, never null
-     */
-    private static Path repoRoot() {
-        for (Path p = Path.of("").toAbsolutePath();
-             p != null;
-             p = p.getParent()) {
-            boolean hasSources = Files.exists(p.resolve(Path.of("src",
-                "main", "java", "com", "mcbot", "mcbotserver")));
-            if (hasSources && Files.exists(p.resolve("gradle.properties"))) {
-                return p;
-            }
-        }
-        throw new IllegalStateException(
-            "project root not found above " + Path.of("").toAbsolutePath());
     }
 }

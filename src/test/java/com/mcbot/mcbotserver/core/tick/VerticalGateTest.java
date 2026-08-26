@@ -1,15 +1,11 @@
 package com.mcbot.mcbotserver.core.tick;
 
-import com.mcbot.mcbotserver.api.actor.Actor;
-import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
-import com.mcbot.mcbotserver.api.world.BlockSnapshot;
-import com.mcbot.mcbotserver.core.actor.ChannelArbiter;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 import com.mcbot.mcbotserver.core.pathing.BasicMoves;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
@@ -17,7 +13,6 @@ import com.mcbot.mcbotserver.core.world.MockWorldView;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -40,24 +35,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class VerticalGateTest {
 
-    private static MockWorldView floorTo(int xLen) {
-        MockWorldView world = new MockWorldView();
-        for (int x = 0; x <= xLen; x++) {
-            for (int z = -2; z <= 2; z++) {
-                world.putBlock(new BlockSnapshot(
-                    new CellPos(x, 63, z), "minecraft:smooth_stone"));
-            }
-        }
-        return world;
-    }
-
-    private static final class RecordingActor implements Actor {
-        final ChannelArbiter delegate = new ChannelArbiter();
-        @Override public void submit(Claim claim) { delegate.submit(claim); }
-        @Override public Map<Channel, Claim> flush() { return delegate.flush(); }
-        @Override public void clearAllIntents() { delegate.clearAllIntents(); }
-    }
-
     /**
      * A body that falls continuously (onGround=false) for 30 ticks
      * must NOT trip the plan-progress fuse: the gate suppresses
@@ -71,7 +48,7 @@ class VerticalGateTest {
      */
     @Test
     void airborneTicksDoNotTripFuse() throws ReflectiveOperationException {
-        MockWorldView world = floorTo(60);
+        MockWorldView world = MockWorldView.pavedFloor(60);
         Vec3[] position = { new Vec3(0.5, 64, 0.5) };
         // Always airborne.
         PathingBehavior mover = new PathingBehavior("mover",
@@ -139,7 +116,7 @@ class VerticalGateTest {
     @Test
     void landingEdgeBypassesReplanCooldown()
         throws ReflectiveOperationException {
-        MockWorldView world = floorTo(60);
+        MockWorldView world = MockWorldView.pavedFloor(60);
         Vec3[] position = { new Vec3(0.5, 64, 0.5) };
         boolean[] onGround = { true };
         PathingBehavior mover = new PathingBehavior("mover",
@@ -215,7 +192,7 @@ class VerticalGateTest {
     @Test
     void steadyGroundedStillFiresFuseAt20()
         throws ReflectiveOperationException {
-        MockWorldView world = floorTo(60);
+        MockWorldView world = MockWorldView.pavedFloor(60);
         Vec3[] position = { new Vec3(0.5, 64, 0.5) };
         // Always grounded (same default as the 3-arg constructor).
         PathingBehavior mover = new PathingBehavior("mover",
@@ -264,7 +241,7 @@ class VerticalGateTest {
     @Test
     void alwaysAirborneIsolatesTriggerEvaluation()
         throws ReflectiveOperationException {
-        MockWorldView world = floorTo(60);
+        MockWorldView world = MockWorldView.pavedFloor(60);
         Vec3[] position = { new Vec3(0.5, 64, 0.5) };
         PathingBehavior mover = new PathingBehavior("mover",
             () -> position[0], () -> false, BasicMoves::from);

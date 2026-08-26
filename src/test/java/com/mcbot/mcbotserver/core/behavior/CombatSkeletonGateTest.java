@@ -1,6 +1,5 @@
 package com.mcbot.mcbotserver.core.behavior;
 
-import com.mcbot.mcbotserver.api.actor.Actor;
 import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
@@ -11,15 +10,13 @@ import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.api.world.EntitySnapshot;
 import com.mcbot.mcbotserver.api.world.WorldView;
-import com.mcbot.mcbotserver.core.actor.ChannelArbiter;
 import com.mcbot.mcbotserver.core.behavior.CombatBehavior;
 import com.mcbot.mcbotserver.core.process.DefendProcess;
+import com.mcbot.mcbotserver.core.tick.RecordingActor;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -327,29 +324,6 @@ class CombatSkeletonGateTest {
         assertEquals("z1",
             ((Attack) directive.overrides().combat()).targetId(),
             "the fight continues on the same target");
-    }
-
-    /** Delegating actor that records every submission this tick. */
-    private static final class RecordingActor implements Actor {
-        private final ChannelArbiter delegate = new ChannelArbiter();
-        final List<Claim> submitted = new ArrayList<>();
-
-        @Override
-        public void submit(Claim claim) {
-            submitted.add(claim);
-            delegate.submit(claim);
-        }
-
-        @Override
-        public java.util.Map<Channel, Claim> flush() {
-            return delegate.flush();
-        }
-
-        @Override
-        public void clearAllIntents() {
-            submitted.clear();
-            delegate.clearAllIntents();
-        }
     }
 
     private static Directive fightOrder(CellPos target) {

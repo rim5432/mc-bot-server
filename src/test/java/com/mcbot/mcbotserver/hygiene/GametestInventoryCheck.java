@@ -13,6 +13,8 @@ import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
 
+import com.mcbot.mcbotserver.testsupport.RepoRoot;
+
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -93,7 +95,7 @@ class GametestInventoryCheck {
      * pinned inventory in either direction. */
     @Test
     void registeredScenariosMatchThePinnedInventory() {
-        Path dir = repoRoot().resolve(
+        Path dir = RepoRoot.find().resolve(
             "src/main/java/com/mcbot/mcbotserver/gametest");
         Set<String> actual = new TreeSet<>();
         try (Stream<Path> files = Files.list(dir)) {
@@ -126,27 +128,5 @@ class GametestInventoryCheck {
                 + "- restore it and run build runGameTest before "
                 + "committing (the routesThroughFenceGap incident).");
         }
-    }
-
-    /** Walks up from the JVM working directory until it finds the
-     * project marker, so the check is independent of which directory
-     * the Gradle test task runs in.
-     *
-     * @return the repository root, never null
-     * @throws IllegalStateException when no directory above the
-     *         working directory carries the project marker chain
-     */
-    private static Path repoRoot() {
-        for (Path p = Path.of("").toAbsolutePath();
-             p != null;
-             p = p.getParent()) {
-            boolean hasSources = Files.exists(p.resolve(Path.of("src",
-                "main", "java", "com", "mcbot", "mcbotserver")));
-            if (hasSources && Files.exists(p.resolve("gradle.properties"))) {
-                return p;
-            }
-        }
-        throw new IllegalStateException(
-            "project root not found above " + Path.of("").toAbsolutePath());
     }
 }

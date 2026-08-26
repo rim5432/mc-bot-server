@@ -11,6 +11,8 @@ import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
 
+import com.mcbot.mcbotserver.testsupport.RepoRoot;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -55,7 +57,7 @@ class ReflectionDoorCheck {
      * the door uses reflection. */
     @Test
     void reflectionExistsOnlyBehindTheDoor() throws IOException {
-        Path testRoot = repoRoot().resolve(
+        Path testRoot = RepoRoot.find().resolve(
             Path.of("src", "test", "java"));
         List<String> violations = new ArrayList<>();
         Set<String> seen = new TreeSet<>();
@@ -104,27 +106,5 @@ class ReflectionDoorCheck {
                 }
             }
         }
-    }
-
-    /** Walks up from the JVM working directory until it finds the
-     * project marker chain, mirroring
-     * {@code GametestInventoryCheck}.
-     *
-     * @return the repository root, never null
-     * @throws IllegalStateException when no directory above the
-     *         working directory carries the project marker chain
-     */
-    private static Path repoRoot() {
-        for (Path p = Path.of("").toAbsolutePath();
-             p != null;
-             p = p.getParent()) {
-            boolean hasSources = Files.exists(p.resolve(Path.of("src",
-                "main", "java", "com", "mcbot", "mcbotserver")));
-            if (hasSources && Files.exists(p.resolve("gradle.properties"))) {
-                return p;
-            }
-        }
-        throw new IllegalStateException(
-            "project root not found above " + Path.of("").toAbsolutePath());
     }
 }

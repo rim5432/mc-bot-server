@@ -1,6 +1,5 @@
 package com.mcbot.mcbotserver.core.tick;
 
-import com.mcbot.mcbotserver.api.actor.Actor;
 import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
@@ -8,7 +7,6 @@ import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
-import com.mcbot.mcbotserver.core.actor.ChannelArbiter;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 import com.mcbot.mcbotserver.core.pathing.BasicMoves;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
@@ -28,18 +26,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class StuckFuseTest {
 
-    private static MockWorldView floorTo(int xLen) {
-        MockWorldView world = new MockWorldView();
-        for (int x = 0; x <= xLen; x++) {
-            for (int z = -2; z <= 2; z++) {
-                world.putBlock(new com.mcbot.mcbotserver.api.world
-                    .BlockSnapshot(new CellPos(x, 63, z),
-                        "minecraft:smooth_stone"));
-            }
-        }
-        return world;
-    }
-
     private static Vec3 at(double x) {
         return new Vec3(x, 64, 0.5);
     }
@@ -56,7 +42,7 @@ class StuckFuseTest {
         PathingBehavior mover = new PathingBehavior("mover",
             () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
-        MockWorldView world = floorTo(60);
+        MockWorldView world = MockWorldView.pavedFloor(60);
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(40, 64, 0)));
 
@@ -91,7 +77,7 @@ class StuckFuseTest {
         PathingBehavior mover = new PathingBehavior("mover",
             () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
-        MockWorldView world = floorTo(60);
+        MockWorldView world = MockWorldView.pavedFloor(60);
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(50, 64, 0)));
 
@@ -133,7 +119,7 @@ class StuckFuseTest {
         PathingBehavior mover = new PathingBehavior("mover",
             () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
-        MockWorldView world = floorTo(60);
+        MockWorldView world = MockWorldView.pavedFloor(60);
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(30, 64, 0)));
 
@@ -158,7 +144,7 @@ class StuckFuseTest {
         PathingBehavior mover = new PathingBehavior("mover",
             () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
-        MockWorldView world = floorTo(60);
+        MockWorldView world = MockWorldView.pavedFloor(60);
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(50, 64, 0)));
 

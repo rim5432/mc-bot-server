@@ -6,7 +6,6 @@ import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
-import com.mcbot.mcbotserver.api.world.BlockSnapshot;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 import com.mcbot.mcbotserver.core.pathing.BasicMoves;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
@@ -26,17 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@link PathingBehavior#ARRIVE_MIN_DRIVE}.
  */
 class DepartureBrakeGateTest {
-
-    private static MockWorldView floorTo(int xLen) {
-        MockWorldView world = new MockWorldView();
-        for (int x = 0; x <= xLen; x++) {
-            for (int z = -2; z <= 2; z++) {
-                world.putBlock(new BlockSnapshot(
-                    new CellPos(x, 63, z), "minecraft:smooth_stone"));
-            }
-        }
-        return world;
-    }
 
     private static Intent.Move lastMoveClaim(RecordingActor actor) {
         return actor.submitted.stream()
@@ -63,7 +51,7 @@ class DepartureBrakeGateTest {
         PathingBehavior mover = new PathingBehavior("mover",
             () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
-        MockWorldView world = floorTo(60);
+        MockWorldView world = MockWorldView.pavedFloor(60);
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(40, 64, 0)));
 
@@ -90,7 +78,7 @@ class DepartureBrakeGateTest {
         PathingBehavior mover = new PathingBehavior("mover",
             () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
-        MockWorldView world = floorTo(60);
+        MockWorldView world = MockWorldView.pavedFloor(60);
         Directive first = Directive.of(
             new GoalBlock(new CellPos(40, 64, 0)));
 
@@ -125,7 +113,7 @@ class DepartureBrakeGateTest {
         PathingBehavior mover = new PathingBehavior("mover",
             () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
-        MockWorldView world = floorTo(60);
+        MockWorldView world = MockWorldView.pavedFloor(60);
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(40, 64, 0)));
 
@@ -162,7 +150,7 @@ class DepartureBrakeGateTest {
         PathingBehavior mover = new PathingBehavior("mover",
             () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
-        MockWorldView world = floorTo(60);
+        MockWorldView world = MockWorldView.pavedFloor(60);
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(40, 64, 0)));
 
@@ -192,7 +180,7 @@ class DepartureBrakeGateTest {
         PathingBehavior mover = new PathingBehavior("mover",
             () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
-        MockWorldView world = floorTo(60);
+        MockWorldView world = MockWorldView.pavedFloor(60);
         Directive directive = Directive.of(
             new GoalBlock(new CellPos(40, 64, 0)));
 

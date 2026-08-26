@@ -42,31 +42,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ExceptionPolicyGateTest {
 
-    /** Delegating actor that records every submission this tick. */
-    private static final class RecordingActor implements Actor {
-        private final com.mcbot.mcbotserver.core.actor.ChannelArbiter
-            delegate = new com.mcbot.mcbotserver.core.actor.ChannelArbiter();
-        final List<Claim> submitted = new ArrayList<>();
+    /** Recording actor armed to explode from flush(). */
+    private static final class ThrowingActor extends RecordingActor {
         boolean throwOnFlush;
-
-        @Override
-        public void submit(Claim claim) {
-            submitted.add(claim);
-            delegate.submit(claim);
-        }
 
         @Override
         public Map<Channel, Claim> flush() {
             if (throwOnFlush) {
                 throw new IllegalStateException("flush boom");
             }
-            return delegate.flush();
-        }
-
-        @Override
-        public void clearAllIntents() {
-            submitted.clear();
-            delegate.clearAllIntents();
+            return super.flush();
         }
     }
 
@@ -138,7 +123,7 @@ class ExceptionPolicyGateTest {
         final InMemoryEventQueue events =
             new InMemoryEventQueue(() -> 4L, () -> 7000L);
         final List<InterruptionContext> fallbackCalls = new ArrayList<>();
-        final RecordingActor actor = new RecordingActor();
+        final ThrowingActor actor = new ThrowingActor();
         final TaskArbiter arbiter = new TaskArbiter();
         final QuietMission mission = new QuietMission();
         final ThrowingBehavior behavior = new ThrowingBehavior();

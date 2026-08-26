@@ -14,7 +14,6 @@ import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.WorldView;
-import com.mcbot.mcbotserver.core.actor.ChannelArbiter;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 import com.mcbot.mcbotserver.core.pathing.BasicMoves;
 import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
@@ -45,29 +44,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class TickPipelineGateTest {
 
-    /** Delegating actor that records submissions and flush results. */
-    private static final class RecordingActor implements Actor {
-        private final ChannelArbiter delegate = new ChannelArbiter();
-        private final List<Claim> submitted =
-            new java.util.ArrayList<>();
+    /** Recording actor that remembers its latest flush resolution. */
+    private static final class PipelineActor extends RecordingActor {
         private Map<Channel, Claim> lastFlush = Map.of();
 
         @Override
-        public void submit(Claim claim) {
-            submitted.add(claim);
-            delegate.submit(claim);
-        }
-
-        @Override
         public Map<Channel, Claim> flush() {
-            lastFlush = delegate.flush();
+            lastFlush = super.flush();
             return lastFlush;
-        }
-
-        @Override
-        public void clearAllIntents() {
-            submitted.clear();
-            delegate.clearAllIntents();
         }
     }
 
@@ -148,7 +132,7 @@ class TickPipelineGateTest {
         CountingMission mission = new CountingMission();
         arbiter.register(mission);
         arbiter.requestControl(mission);
-        RecordingActor actor = new RecordingActor();
+        PipelineActor actor = new PipelineActor();
         PathingBehavior mover = new PathingBehavior("mover", () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5), BasicMoves::from);
         BotController controller = controller(health, layer, arbiter,
             mover, actor, new InMemoryEventQueue(() -> 1L, () -> 0L));
@@ -215,7 +199,7 @@ class TickPipelineGateTest {
         CountingMission mission = new CountingMission();
         arbiter.register(mission);
         arbiter.requestControl(mission);
-        RecordingActor actor = new RecordingActor();
+        PipelineActor actor = new PipelineActor();
         PathingBehavior mover = new PathingBehavior("mover",
             () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5),
             BasicMoves::from);
@@ -259,7 +243,7 @@ class TickPipelineGateTest {
         layer.addRule(new com.mcbot.mcbotserver.core.reflex
             .DigOnSuffocationRule());
         TaskArbiter arbiter = new TaskArbiter();
-        RecordingActor actor = new RecordingActor();
+        PipelineActor actor = new PipelineActor();
         PathingBehavior mover = new PathingBehavior("mover",
             () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5),
             BasicMoves::from);
@@ -339,7 +323,7 @@ class TickPipelineGateTest {
         CountingMission mission = new CountingMission();
         arbiter.register(mission);
         arbiter.requestControl(mission);
-        RecordingActor actor = new RecordingActor();
+        PipelineActor actor = new PipelineActor();
         PathingBehavior mover = new PathingBehavior("mover", () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5), BasicMoves::from);
         BotController controller = controller(health, layer, arbiter,
             mover, actor, new InMemoryEventQueue(() -> 1L, () -> 0L));
@@ -382,7 +366,7 @@ class TickPipelineGateTest {
         CountingMission mission = new CountingMission();
         arbiter.register(mission);
         arbiter.requestControl(mission);
-        RecordingActor actor = new RecordingActor();
+        PipelineActor actor = new PipelineActor();
         PathingBehavior mover = new PathingBehavior("mover", () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5), BasicMoves::from);
         BotController controller = controller(health, layer, arbiter,
             mover, actor, events);
@@ -436,7 +420,7 @@ class TickPipelineGateTest {
         arbiter.requestControl(mission);
         BotController controller = controller(health, layer, arbiter,
             new PathingBehavior("mover", () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5), BasicMoves::from),
-            new RecordingActor(), events);
+            new PipelineActor(), events);
 
         controller.onTick(flooredWorld());
         health[0] = 3f;
@@ -477,7 +461,7 @@ class TickPipelineGateTest {
                 new GoalBlock(new CellPos(5, 80, 5)), 50, 400);
         arbiter.register(mission);
         arbiter.requestControl(mission);
-        RecordingActor actor = new RecordingActor();
+        PipelineActor actor = new PipelineActor();
         PathingBehavior mover = new PathingBehavior("mover", () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5), BasicMoves::from);
         BotController controller = controller(health, layer, arbiter,
             mover, actor, events);
@@ -520,7 +504,7 @@ class TickPipelineGateTest {
                 50, 400);
         arbiter.register(mission);
         arbiter.requestControl(mission);
-        RecordingActor actor = new RecordingActor();
+        PipelineActor actor = new PipelineActor();
         PathingBehavior mover = new PathingBehavior("mover", () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5), BasicMoves::from);
         BotController controller = controller(health, layer, arbiter,
             mover, actor, events);
@@ -574,7 +558,7 @@ class TickPipelineGateTest {
                 50, 400);
         arbiter.register(mission);
         arbiter.requestControl(mission);
-        RecordingActor actor = new RecordingActor();
+        PipelineActor actor = new PipelineActor();
         PathingBehavior mover = new PathingBehavior("mover", () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5), BasicMoves::from);
         BotController controller = controller(health, layer, arbiter,
             mover, actor, events);
@@ -628,7 +612,7 @@ class TickPipelineGateTest {
         CountingMission mission = new CountingMission();
         arbiter.register(mission);
         arbiter.requestControl(mission);
-        RecordingActor actor = new RecordingActor();
+        PipelineActor actor = new PipelineActor();
         PathingBehavior mover = new PathingBehavior("mover",
             () -> new com.mcbot.mcbotserver.api.types.Vec3(0.5, 64, 0.5),
             BasicMoves::from);
