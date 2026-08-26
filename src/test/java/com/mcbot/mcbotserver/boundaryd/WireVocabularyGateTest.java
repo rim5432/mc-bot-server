@@ -87,6 +87,7 @@ class WireVocabularyGateTest {
         "core/command/CommandBus.java",
         "core/command/GotoCommandHandler.java",
         "core/command/DigCommandHandler.java",
+        "core/command/MineCommandHandler.java",
         "core/state/ChangeDetectingStateChannel.java",
         "core/tick/BotController.java",
         "core/tick/MissionReporter.java",
