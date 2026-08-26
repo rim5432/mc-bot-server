@@ -1,6 +1,6 @@
 ---
 title: Work Plan (effort-sized checklist)
-last_verified: 2026-08-26
+last_verified: 2026-08-27
 covers:
   - doc/architecture/boundaries.md
   - doc/decisions/0004-tick-pipeline-actor-channels.md

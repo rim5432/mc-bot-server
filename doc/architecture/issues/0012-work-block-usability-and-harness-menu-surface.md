@@ -1,6 +1,6 @@
 ---
 title: Work-block usability - vanilla construction delegation and the harness manual menu surface
-last_verified: 2026-08-26
+last_verified: 2026-08-27
 covers:
   - doc/architecture/boundaries.md
   - src/main/java/com/mcbot/mcbotserver/adapter/MenuOpener.java
