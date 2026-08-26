@@ -12,7 +12,7 @@ covers:
   - src/main/java/com/mcbot/mcbotserver/adapter/RecipeCatalog.java
   - src/main/java/com/mcbot/mcbotserver/core/tick/MissionReporter.java
   - tool/harness/mc.py
-status: open (design complete - primary interaction model promoted, wire translation table as integration contract, translation-layer invariants recorded; goto migration CLI skeleton shipped 2026-08-26, hardened same day: typed verb discipline, /tasks/<id> derivation, admin stop/reset landing, cursor bookmark rule, 30 wire-mocked CLI tests; goto shadow comparison ALL GREEN 2026-08-26 on identical-failure pairs + cancel chain, COMPLETED sample pending healthy body movement; menu command implementation queued behind the in-flight menu refactor)
+status: open (design complete - primary interaction model promoted, wire translation table as integration contract, translation-layer invariants recorded; goto migration CLI skeleton shipped 2026-08-26, hardened same day: typed verb discipline, /tasks/<id> derivation, admin stop/reset landing, cursor bookmark rule, 30+ wire-mocked CLI tests; goto shadow comparison ALL GREEN 2026-08-26 with the TASK_COMPLETED sample on both paths + cancel chain; two live findings recorded: resetAt cursor re-anchoring, missing entity-ticking ticket on bare servers; menu command implementation queued behind the in-flight menu refactor)
 related:
   - doc/architecture/issues/0007-player-parity-interaction.md
   - doc/architecture/issues/0011-harness-surface-convergence.md
@@ -380,7 +380,11 @@ its own file offset; the shared cursor file does not. Only a cursorless
 stream stays complete - internal consumption must not eat events).
 Concurrent programmatic consumers pass `--since` and keep their own
 offsets: two consumers sharing the bookmark each see a partition, not
-the stream.
+the stream. The bookmark stores `<eventId> <resetAt>`; a changed
+resetAt epoch (bot restart - the stream does not survive restarts)
+voids it: `wait` re-anchors its scan to 0, `events` drains the new
+stream from 0. Found live by the shadow rerun: a stale pre-restart
+cursor made `wait` stare past the new stream head forever.
 
 ### Data-driven maintenance ladder
 
@@ -492,18 +496,25 @@ Implementation order:
 7. **D4 goto migration validation** (can run in parallel with 1-5, since
    goto wire is already live) - shadow comparison EXECUTED 2026-08-26
    via `tool/harness/shadow_compare.py` (old raw-RCON path vs
-   `mc write /tasks/goto`, 5 checks): ALL GREEN on identical-failure
-   pairs (TIMEOUT x2, then STUCK x2) plus the cancel chain - wire
+   `mc write /tasks/goto`, 5 checks): ALL GREEN including the
+   TASK_COMPLETED sample on both paths and the cancel chain - wire
    command byte-identical, receipts same shape, bare `taskId` on every
    terminal kind both paths, `cat /tasks/<id>` derivation agrees with
-   `wait`. No TASK_COMPLETED sample yet: on the live dev server the
-   body does not move (plan produced, waypoint cursor advances, body
-   frozen -> STUCK); movement execution is the pathing workstream's
-   active area - rerun the script for a COMPLETED sample once healthy.
-   The run also fixed a real CLI bug: negative-coordinate write values
-   hit argparse option parsing twice (token classification + argv=None
-   bypassing the shim). Remaining: write the first skill natively in
-   `mc` syntax (the step-0 grep found the call surface empty - there
+   `wait`, cancel-then-wait exits 0 on TASK_CANCELLED. Two live
+   findings along the way, both fixed or recorded:
+   (a) cross-restart cursor trap - the bookmark outlived the stream;
+   `resetAt` re-anchoring added to the cursor invariants (D5);
+   (b) on a bare dedicated server the bot's chunks have no
+   entity-ticking ticket: the body freezes (plan advances, Motion
+   never decays) until `forceload add` - gametest never hits this
+   because the framework supplies its own tickets. The mod has NO
+   companion chunk loader (AGENTS.md section 1.1 names the class as a
+   convention example, not code) - a bot-side gap this validation
+   exposed; the runbook in shadow_compare.py covers the manual prep.
+   Also fixed en route: negative-coordinate write values hit argparse
+   option parsing twice (token classification + argv=None bypassing
+   the shim). Remaining: write the first skill natively in `mc`
+   syntax (the step-0 grep found the call surface empty - there
    are no legacy skills to rewrite). Completion criterion:
    `grep -r "bot goto" skills/` returns empty + agent runs N sessions
    without touching raw RCON.

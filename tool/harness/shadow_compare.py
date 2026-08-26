@@ -19,6 +19,20 @@ Run against a live dev server with RCON up:
     python tool/harness/shadow_compare.py [--target x,y,z]
                                           [--tol N] [--timeout N]
 Exit 0 = all checks green; prints one PASS/FAIL line per check.
+
+Environment runbook (observed on 1.20.1 Forge dedicated server):
+- The bot's chunks need an entity-ticking ticket. Gametest supplies
+  its own tickets; a bare dedicated server does NOT keep spawn chunks
+  entity-ticking - the body freezes (plan advances, physics never
+  runs, Motion never decays). Prep: `forceload add` a 33x33 area
+  around the bot. The mod has no companion chunk loader yet - that is
+  a bot-side gap this harness exposed.
+- Every target needs a walkable surface and a live mission long
+  enough for the check: over-water targets fail fast with NO_PATH.
+- A persisted bot body from a previous server run is NOT wired after
+  restart; the script reuses a live /bot status when present, else
+  /botspawn (which places the body at the RCON source position - tp
+  it onto solid ground if that spot is inside terrain).
 """
 
 from __future__ import annotations
@@ -157,8 +171,12 @@ def main() -> int:
           f"cat={cat_state.get('status')} wait={new_kind}")
 
     # ---- Phase C: cancel chain through the CLI -----------------------
-    c_write = mc("write", "/tasks/goto", f"{int(pos[0]) - 60},{int(pos[1])},{int(pos[2])}",
-                 "--timeout", "1200")
+    # Target must outlive the cancel round-trip: a walkable ~120-block
+    # runway keeps the mission alive mid-walk. A target the pathing
+    # rejects fast (over water, unloaded) fails with NO_PATH before
+    # the cancel lands - TASK_FAILED would be truthful but pointless.
+    c_target = f"{int(pos[0])},{int(pos[1])},{int(pos[2]) + 120}"
+    c_write = mc("write", "/tasks/goto", c_target, "--timeout", "1200")
     try:
         c_receipt = json.loads(c_write.stdout)
     except json.JSONDecodeError:
