@@ -65,6 +65,22 @@ Generalization note: future non-survival hard constraints (friendly
 fire, server rules) follow the same reflex pattern as separate guardians
 (Phase 3, see ADR-0003 scope guard).
 
+## Interaction model (device <-> harness)
+
+The seam is the frozen wire verbs (`/bot status|goto|dig|mine|cancel|
+stop|events|reset` plus the synchronous read family — decision 28);
+every harness drives the same seam. The reference harness
+(`tool/harness/mc.py`) is a Unix shell over it, and the model is
+now core architecture: world state is a **path namespace**
+(`/blocks` `/entities` `/player` `/recipes` `/stations`), multi-tick
+actions are **jobs** (write submits -> taskId -> wait joins -> the
+terminal event is the verdict and the exit code), loops needing
+engine-speed feedback run **device-side as processes** (MineProcess)
+while the harness orchestrates between tasks with skills over six
+verbs. Binding law: boundaries.md decision 33; canonical detail:
+[harness-interaction.md](harness-interaction.md); executable queue:
+issue 0015.
+
 ## Current status
 
 Stage 2 closed out and hardened through 2026-08-25. Three layers have
@@ -78,8 +94,10 @@ shipped since on the same four-tier pipeline:
   sense, DropSelected, block placement, and tool-supplied digging on a
   fifth INTERACT channel; menu system (crafting table + chest) driven
   server-side through a Player facade over the mob carrier.
-- **Harness convergence** (issue 0011, in flight): console verb
-  contract, session runtime, disclosure responsibilities.
+- **Harness convergence** (issues 0011/0012, landed): console verb
+  contract, disclosure responsibilities, and the Unix interaction
+  model (decision 33 + [harness-interaction.md](harness-interaction.md))
+  — world-as-namespace, tasks-as-jobs, device-side loops.
 
 The in-engine gametest suite runs ~30 scenarios covering the pipeline,
 the survival ladder, interaction surfaces, crash recovery, and

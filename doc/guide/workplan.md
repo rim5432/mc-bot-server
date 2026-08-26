@@ -741,3 +741,17 @@ Lean-round-3 kept-rulings appendix (2026-08-27):
   opportunistically during future test edits (water/shore families);
   entity-driven and deliberately-empty setups stay bespoke because
   they ARE the scenario's assertion payload.
+
+### Interaction-model executable queue (2026-08-27, issue 0015)
+
+The model is law (boundaries.md decision 33) and canon
+(doc/architecture/harness-interaction.md); this is its executable
+arm. Harness-side only, zero wire change:
+
+- [ ] S  0015 near-term queue: wait exit codes 0=COMPLETED /
+         1=FAILED / 124=timeout (today BOTH terminal kinds exit 0,
+         so `wait &&` chains past failures - the verdict joint is
+         broken); stdout/stderr stream discipline with isatty;
+         events --only surfaced from the wire's narrowing; ls /
+         root discovery + mc help. Mock tests pin each.
+                                                          [dep: issue 0015]
