@@ -220,195 +220,79 @@ Don't reach for `enum` when the values carry different fields.
 
 ### 1.4 Comments (English-only, intent-first)
 
-Comments are part of the professional surface of this codebase. They
-are read by every future agent *before* they touch a line of code, and
-they decide whether a refactor preserves or silently destroys the
-contracts in `boundaries.md` and the ADRs. The comment rules below
-are the same shape as netcraft-rewrite's, with the **contract marker**
-re-purposed for our project (no save-compat here; the contracts are
-the ADRs and the live boundary protocol).
+Comments carry intent, constraints and invariants - what the next
+editor must not break. Division of labor: code says what/how,
+comments say why, Git records evolution. A comment that no longer
+matches its code is a defect; fix it in the same commit as the
+behavior change. If *what* needs a comment, refactor the code
+instead. One concept, one word, everywhere - synonyms break global
+search.
 
-#### 1.4.1 Language mandate — English only
+**1.4.1 Language - English only.** Every comment and Javadoc is
+English. Exceptions are data, never comments: game-content strings
+verbatim (`Component.literal("Stuck")`) and byte-fidelity registry
+keys. Zero CJK characters in any repository `.md` file (see §0.3
+for the markdown-side rule).
 
-- Every comment and Javadoc is written in **English**. The only
-  exceptions are data, not comments:
-  - Game-content strings preserved verbatim (item names, task names,
-    chat messages, tooltips) — e.g. `Component.literal("Stuck")`.
-  - Byte-for-byte fidelity keys referenced as literals (e.g. RL
-    paths registered with the original Forge registry).
-- Mixed-language comments are forbidden: `// premature gravity
-  compensation` (all English) is required; an English sentence with a
-  word from another language spliced in is not. A half-translated
-  comment is a half-written document — worse than none.
-- Citations from non-English sources (e.g. Numen class Javadoc)
-  are written as English translations, marked *(translated)* where
-  wording fidelity matters. Repository markdown never reproduces
-  original-language text — zero CJK characters in any `.md` file.
+**1.4.2 Must-comment sites.**
 
-#### 1.4.2 Principles — comments explain WHY, never WHAT
+- Class-level Javadoc: purpose plus the boundaries / ADRs the class
+  implements, with the `contract: see ...` pointer.
+- Every public / protected class, interface, enum, method, constant:
+  Javadoc mandatory (package-private / private only when non-obvious).
+  Tag order `@param` -> `@return` -> `@throws`; exactly one `@param`
+  each; non-void needs `@return` (booleans state both meanings),
+  void must not; nullability prose on every object param and return
+  (`never null` / `may return null`); first sentence is a third-person
+  summary ending in a period. Mechanics: `<p>` paragraphs,
+  `{@code}` / `{@link}` references, `@apiNote` vs `@implSpec` for
+  caller-vs-implementer when useful.
+- Frozen-boundary write site: `// contract: see ADR-NNNN` or
+  `// contract: see boundaries.md §X`.
+- Method called from `BotController.onTick()`:
+  `// invariant: see ADR-0005`.
+- Off-thread entry or state crossing threads:
+  `// runs on <thread>; do not access <off-thread state>`.
+- Lifecycle / state-machine transition: one line naming the trigger.
+- Stub: `// TODO <subsystem>: <what remains> (Ref: <issue>)` - a
+  silent stub is a bug, an ownerless TODO is noise.
+- Deliberate deviation from a reference design (Baritone / Numen):
+  one line on what differs and why, so nobody "fixes" it back.
 
-- The code shows *what*; the comment carries *intent, constraints
-  and invariants* — the things the next editor must not break
-  while changing the code.
-- **Comments must never lie.** A comment that no longer matches its
-  code is a bug. Any commit that changes behavior must update the
-  comments it invalidates in the same commit.
-- A comment that restates the code is worse than none: it doubles
-  the maintenance surface (two things to keep in sync instead of
-  one). The only exception is the contract markers in §1.4.3 —
-  they are contracts, not explanations, and are mandatory at every
-  write site.
-- **Three-way division of labor**: code says *what/how*, comments
-  say *why*, Git records the *evolution*. Never write change
-  history into comments; a comment describing a past state instead
-  of the current one is a lie, and it rots (see §1.4.5).
-- **If a comment is needed to explain *what* the code does, refactor
-  the code** (better names, extracted method) instead of writing
-  the comment — a comment is the last resort, not the first.
+**1.4.3 Forbidden.** Restating the code; commented-out code (git is
+the record); author / date graffiti; emoji, slang, unstandard
+abbreviations; obvious getters and one-line overrides.
 
-#### 1.4.3 MUST comment (mandatory sites)
-
-| Site | Required marker / form |
-|------|------------------------|
-| Class-level Javadoc | purpose + the boundaries / ADRs the class implements (see §1.7 template) |
-| Public / protected API | Javadoc **mandatory** for every `public` / `protected` class, interface, enum, method and constant; content rules in §1.4.6. Package-private / private: Javadoc only when logic is non-obvious |
-| Return-value nullability + pre / post conditions | `@return` states whether `null` is possible; `@param` states invalid inputs; `@throws` names the scenario that triggers the exception |
-| **Boundary contract site** (every place that touches a frozen boundary) | `// contract: see ADR-NNNN` or `// contract: see boundaries.md §X` (see §1.4.3.1) |
-| **Tick-exception site** (every method called from `BotController.onTick()`) | `// invariant: see ADR-0005` — surfaces the exception policy without restating it |
-| **Thread-safety / off-thread site** (every method that may run off the server thread, or that captures state that crosses threads) | `// runs on <thread>; do not access <off-thread state>` |
-| Lifecycle / state-machine transition | one line describing the transition and what triggers it |
-| Stub / deferred work | `// TODO <subsystem>: <what remains> (Ref: <issue>)` — a silent stub with no TODO is a bug; an ownerless TODO is noise |
-| Deliberate deviation from a reference design (Baritone / Numen) | one line: what differs and why — prevents a future "fix" re-introducing the original behaviour |
-
-##### 1.4.3.1 Contract marker format (this project's adaptation)
-
-Where netcraft-rewrite uses `// fidelity required` pointing to
-`save-compat.md`, mc-bot-server uses a **pointer to the frozen
-contract**:
+**1.4.3.1 Marker format** - the gate-scanned convention
+(`BoundaryContractMarkerTest`, code-health H-R8: proves presence on
+every src/main implementer of a boundary interface; its interface
+inventory is pinned, growing it is a review checkpoint; review
+judges quality):
 
 ```java
-// contract: see ADR-0004 §D2 (four-channel Actor with per-tick claims)
-public sealed interface Claim permits Claim.Move { ... }
-
 // contract: see boundaries.md §D (sync error path for structural failures)
 public sealed interface SubmitResult {
     record Ok(String taskId) implements SubmitResult {}
     record Rejected(String reason) implements SubmitResult {}
 }
-
-// contract: see ADR-0005 §D3 (MinimalReflex is the only path in crashed state)
-class MinimalReflex { /* a few `if` statements, nothing else */ }
-
-// invariant: see ADR-0003 §3 (resume revalidates world assumptions first)
-void resume(InterruptionContext ctx) { ... }
 ```
 
-The marker is **mandatory** at every write site that touches a
-frozen boundary, not just at the boundary's interface declaration.
-This is what makes a future agent's review of "did I just break a
-contract?" a single Ctrl-F away.
+Markers are contracts, not explanations: mandatory at every write
+site that touches a frozen boundary, not just at the interface
+declaration. A change that intentionally alters a frozen contract
+updates the ADR or boundary doc FIRST, then the marker - never edit
+the marker to dodge the doc.
 
-#### 1.4.4 MUST NOT comment (forbidden sites)
-
-- Restating the code: `i++ // increment i`. If a comment is needed
-  to say *what* the code does, the code needs a refactor, not a
-  comment.
-- Obvious getters / setters / one-line overrides that add no
-  information.
-- Commented-out code — delete it; git history is the record, never
-  resurrect via comment.
-- Author / date graffiti (`// fixed by x 2026-01-01`) — commits own
-  the history.
-- Emoji, slang, and non-standard abbreviations.
-
-#### 1.4.5 Comment evolution (anti-drift rules)
-
-- **Comment drift is a defect.** When you edit a method, verify its
-  comments still describe the new behavior — stale comments mislead
-  worse than no comments.
-- Renames / refactors update the comments referencing the old names
-  in the same diff.
-- Contract markers are not editable as a shortcut. If a change
-  intentionally changes a frozen contract, that is a real decision:
-  write the new ADR or update the boundary doc, then edit the
-  marker. **Do not edit the marker first.**
-- Deprecation uses `@Deprecated` plus a Javadoc `@deprecated` tag
-  stating the reason and the replacement via `{@link #<replacement>()}`.
-- TODO / FIXME must be owned: `// TODO <subsystem>: <what remains>
-  (Ref: <issue>)`. An ownerless TODO is noise; an overdue one is
-  technical debt to age out of the tree, not accumulate.
-
-#### 1.4.6 Javadoc contract (content and tags)
-
-Javadoc is a machine-checkable API contract, not prose for humans
-only. Apply the rules below to every public / protected element:
-
-- **First-sentence summary**: ends with a period; says what the
-  element *does* in third person — never imperative, never second
-  person, never a restatement of the signature.
-- **What, not how**: describe behavior and guarantees, not
-  implementation. Implementation details live in the code.
-- **Tag order and completeness**: `@param` → `@return` → `@throws`.
-  - Every method parameter gets exactly one `@param` whose name
-    matches the code parameter character for character.
-  - Non-`void` methods must have `@return`; `void` methods must
-    not. Booleans state what `true` and `false` each mean.
-  - `@throws` names the business scenario that raises the exception.
-- **Nullability and contracts**: prose states `never null` /
-  `may return null` / `must not be null` on every object parameter
-  and return value. State preconditions and postconditions when
-  the signature cannot show them.
-- **Cross-references**: the §1.4.3.1 contract markers live in
-  Javadoc too. Use `{@link com.mcbot.mcbotserver.api.SubmitResult}`
-  for the public contract and `see ADR-0004 §D2` for the rationale
-  pointer.
-- **Formatting**: paragraphs separated by `<p>`; lists use
-  `<ul>`/`<li>`; inline code uses `{@code ...}`; references use
-  `{@link ...}` / `{@see ...}` instead of hardcoded class names.
-- **Reader-vs-implementer distinction**: when useful, `@apiNote`
-  addresses callers, `@implSpec` / `@implNote` addresses
-  implementers.
-- **Terminology consistency**: the same business concept always
-  uses the same term across the codebase — one word per concept,
-  globally searchable, never synonyms in different files.
-
-#### 1.4.7 Writing style
-
-- Sentence case, terse but complete sentences. Constraints use the
-  imperative: "Must stay byte-for-byte...", "Do not reorder...",
-  "Do not call on the client thread".
-- Signal the comment's role with a lead word so a reader can tell
-  a contract from a restatement at a glance: `Because` / `Must` /
-  `Otherwise` for rationale; `TODO` for deferred work; `contract:`
-  for boundary pointers; `invariant:` for ADR-anchored properties;
-  `fidelity required` for byte-for-byte keys (rare in this project).
-- Technical terms stay in canonical English (`DeferredRegister`,
-  `RegistryObject`, `SavedData`).
-- One comment per statement; no trailing-comment walls.
-
-#### 1.4.8 Density target ("precise code quantity")
-
-- Roughly **one meaningful comment per 5–15 lines of logic**;
-  density rises only at contract points and complex ported
-  algorithms.
-- Javadoc exists only at class and public / protected API level;
-  package-private and internal code uses inline comments.
-- A file whose non-Javadoc comments exceed ~25% of its lines is
-  over-commented — tighten the prose, never delete the contracts.
-
-#### 1.4.9 Enforcement
-
-- The contract-marker convention is **gated** by
-  `architecture.BoundaryContractMarkerTest` (registry rule H-R8):
-  every src/main implementer of a boundary interface must carry a
-  `contract: see ...` marker, and the scan's interface inventory is
-  a pinned list - growing it is a review checkpoint. Code review
-  remains the judge of marker *quality*; the gate only proves
-  presence.
-- The English-only mandate is also review-enforced. An automated
-  test (the `EnglishCommentPolicyTest` analogue in
-  netcraft-rewrite) can be added per package if drift appears; the
-  build currently does not scan for CJK in comments.
+**Style + density.** Constraints are imperative ("Must stay
+byte-for-byte", "Do not call on the client thread"); lead words
+separate roles at a glance (`Because` / `Must` / `Otherwise` for
+rationale, `TODO`, `contract:`, `invariant:`); one comment per
+statement; roughly one meaningful comment per 5-15 lines of logic,
+denser only at contract points; a file whose comments exceed ~25%
+of its lines is over-commented - tighten prose, never delete
+contracts. Javadoc exists at class and public / protected API level
+only. The English-only mandate is additionally review-enforced, and
+scan-gated by the hygiene tests if drift appears.
 
 ### 1.5 Class Organization (for capability / event handler / boundary implementations)
 
@@ -456,53 +340,6 @@ plus its three impls (mock, server-side, client-side).
   record-component lists (one element per line, last line ends
   with `,`).
 
-### 1.7 Class Javadoc Template
-
-```java
-/**
- * Boundary-D event channel: polled, cursor-based, multi-consumer
- * (planner + social). Bot is the producer; harness is the active
- * consumer.
- *
- * <p>Contract: see {@link doc/architecture/boundaries.md#boundary-d-protocol}
- * for the six invariants (game-time stamp, no-survive-restart,
- * no-silent-drop, urgent-as-freshness, sync-error-vs-async-execution,
- * bot-is-harness-blind). Rationale and reference design:
- * {@link doc/reference/disclosure-patterns.md}.
- *
- * <p>Implementation note: this class is single-threaded (server tick).
- * Polling is the harness's job; {@link #statusSnapshot} reads state
- * without locks. Snapshot creation in the planner is the caller's
- * concern, not this class's — see ADR-0004 §D5.
- */
-public final class EventQueue { ... }
-```
-
-Public-method Javadoc — note tag order, nullability prose, the
-contract-marker pointer, and the *why* sentence when behavior is
-non-obvious:
-
-```java
-/**
- * Drain the queue up to the first entry that fails the predicate.
- * The failing entry and everything after it stay in the queue.
- *
- * <p>Why this shape: lets a "compact" or "clear" instruction sit
- * at the head of the queue without jumping ahead of real events
- * that arrived before it. The harness decides the predicate; the
- * queue does not know what the predicate means.
- *
- * @param keep drop entries while this returns true; the first
- *            false stops the drain
- * @param now  wall-clock time, in milliseconds, used to stamp
- *            the dropped-count synthetic event; not game tick
- * @return the drained entries in arrival order, never null
- * @see <a href="doc/reference/disclosure-patterns.md#6-takewhile-drains-in-order-stops-at-first-non-text-entry">disclosure-patterns §6</a>
- */
-```
-
----
-
 ## 2. Engineering Constraints (MC-specific, this project)
 
 The four boundaries in §0.4 are the architecture-level constraints;
@@ -546,7 +383,7 @@ the anchor is the source of truth, not this file.
   `CompletableFuture` or equivalent.
 - Every class that may run off-thread carries a Javadoc line and
   a `// runs on <thread>` comment at every public method entry
-  (see §1.4.3).
+  (see §1.4.2).
 - Off-thread state capture that crosses the main-thread / worker
   boundary is a single atomic reference or a `Long2ObjectMap` copy
   — never a shared mutable object.
@@ -641,8 +478,8 @@ annotation (`[dep: <other item>]`). The rules:
    interface, read the matching `boundaries.md` section. If it
    implements a decision, read the matching ADR.
 2. **Write the Javadoc skeleton before the body.** Class-level
-   Javadoc with the contract pointer (§1.4.3.1) and the
-   cross-references (§1.7); method-level Javadoc with `@param` /
+   Javadoc with the contract pointer (§1.4.3.1); method-level
+   Javadoc with `@param` /
    `@return` / `@throws`. This is the design surface; the body
    implements it.
 3. **Write the failing layer-1 test.** For Stage 0 this is
