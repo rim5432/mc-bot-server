@@ -95,9 +95,12 @@ reopened on demand — **[DEFERRED]** outside v1.
   melee range while idle get one preemption tick, then a
   reflex-owned defend mission runs the fight through the arbiter.
   ESCAPE (decision 26) is its survival twin.
-- **[SHIPPED]** Triage ladder, frozen at seven rungs: LAVA 130 >
-  SUFFOCATION 115 > SURFACE 110 > FIRE_ESCAPE 105 > FREEZE 100 >
-  POWDER_SNOW_CLIMB 95 > ENGAGE 90 (decisions 24 + 26 + 27).
+- **[SHIPPED]** Triage ladder (decisions 24 + 26 + 27), seven
+  rungs strictly ordered - ESCAPE_ON_LAVA > DIG_ON_SUFFOCATION >
+  SURFACE_ON_LOW_AIR > EXTINGUISH_FIRE > FREEZE_ON_LOW_HEALTH >
+  CLIMB_OUT_OF_POWDER_SNOW > ENGAGE_ON_HOSTILE_PROXIMITY. Values
+  are tuning data in reflex_rules.json; ReflexPriorityOrderGateTest
+  pins the inventory and the order, so this list stays prose-only.
 - **[SHIPPED]** Rules are datapack JSON; new survival scenarios are
   data, not code. A code-registered rule type must land with its
   JSON branch and datapack row in the same change, or the first

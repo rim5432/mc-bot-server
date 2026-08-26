@@ -572,9 +572,14 @@ BotState getState();
     a crashed bot with air < 80 holds jump; one more if in the same
     dependency class as the lava flag, ADR-0005 D3 intact. D4 ruled
     NO RULE: fire is self-answering (extinguished by water the
-    ongoing route touches) and sense-only since D1. The triage
-    ladder is now five rungs and frozen: LAVA 130 > SUFFOCATION 115
-    > SURFACE 110 > FREEZE 100 > ENGAGE 90. RELOAD-PARITY RULE (found
+    ongoing route touches) and sense-only since D1 - that half aged
+    well; fire itself gained rules later (decision 26). The v1
+    triage order was five rungs, LAVA > SUFFOCATION > SURFACE >
+    FREEZE > ENGAGE, recorded deliberately without numbers: values
+    are tuning data owned by reflex_rules.json, and
+    ReflexPriorityOrderGateTest pins the rung inventory plus the
+    strict full ordering; decisions 26 and 27 appended their rungs
+    without disturbing any v1 pair. RELOAD-PARITY RULE (found
     live in review): a reflex type registered by assembly code MUST
     land with its ReflexRuleJson parse/write branch AND its default
     datapack row in the same change - /reload replaces the whole
