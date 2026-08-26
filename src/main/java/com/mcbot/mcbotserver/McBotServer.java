@@ -195,6 +195,8 @@ public class McBotServer {
         BotCommands.register(event.getDispatcher(), this::channels);
         com.mcbot.mcbotserver.adapter.MenuCommands.register(
             event.getDispatcher(), this::menuLive);
+        com.mcbot.mcbotserver.adapter.WorldCommands.register(
+            event.getDispatcher(), this::worldLive);
         event.getDispatcher().register(Commands.literal("botspawn")
             .requires(src -> src.hasPermission(2))
             .executes(ctx -> {
@@ -304,6 +306,24 @@ public class McBotServer {
      *
      * @return the menu surface, or null before the first /botspawn
      */
+    /**
+     * Live perception surface for the 0013 slice-1 read family.
+     *
+     * @return the perception surface, or null before /botspawn
+     */
+    private com.mcbot.mcbotserver.adapter.WorldCommands.Live worldLive() {
+        if (activeView == null || activeBody == null
+                || !activeBody.isAlive()) {
+            return null;
+        }
+        return new com.mcbot.mcbotserver.adapter.WorldCommands.Live(
+            activeView,
+            () -> new com.mcbot.mcbotserver.api.types.CellPos(
+                activeBody.getBlockX(), activeBody.getBlockY(),
+                activeBody.getBlockZ()),
+            () -> String.valueOf(activeBody.getUUID()));
+    }
+
     private com.mcbot.mcbotserver.adapter.MenuCommands.Live menuLive() {
         if (activeActor == null || activeCatalog == null
                 || activeBody == null || !activeBody.isAlive()) {
