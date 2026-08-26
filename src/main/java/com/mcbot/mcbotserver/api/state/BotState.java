@@ -28,10 +28,12 @@ import java.util.Map;
  *                           never null
  * @param currentTaskSummary one-line description of the active task or
  *                           "idle"; never null
- * @param healthHearts       health bucketed to whole hearts (0..20);
- *                           bucketing keeps the change-detect cadence
- *                           honest - a raw float would push on every
- *                           regen tick (issue 0013 R5)
+ * @param healthHearts       health bucketed to whole hearts
+ *                           (0..10; 20 HP = 10 hearts, vanilla's
+ *                           2 HP per heart); bucketing keeps the
+ *                           change-detect cadence honest - a raw
+ *                           float would push on every regen tick
+ *                           (issue 0013 R5)
  * @param freeSlots          count of empty main-inventory slots; rides
  *                           the same snapshot loop as itemCounts
  */
@@ -59,7 +61,7 @@ public record BotState(
      * @param selectedHotbarSlot 0..8
      * @param effectAmplifiers   must not be null
      * @param currentTaskSummary must not be null
-     * @param healthHearts       0..20
+     * @param healthHearts       0..10 (whole hearts; 20 HP = 10)
      * @param freeSlots          non-negative
      */
     public BotState {
