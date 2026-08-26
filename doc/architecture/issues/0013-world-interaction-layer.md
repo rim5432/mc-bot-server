@@ -105,7 +105,7 @@ absorbed here to avoid a second owner.
    WorldView.** `block`, `blocks` (volume, capped 4x4x4 = 64 cells
    ~2.5KB), `entities [radius] [limit]` mirroring scan's shape
    (distance sort, truncated flag, self included and flagged).
-5. **health joins BotState as bucketed hearts (int 0-20); hunger
+5. **health joins BotState as bucketed hearts (vanilla scale, max 10 = 20 HP); hunger
    does not.** Bucketing preserves the no-push-every-tick contract
    (evidence: change-detect compares full records); hunger has no
    carrier and 0010 owns foodData. freeSlots rides the same change
@@ -126,16 +126,27 @@ Re-evaluation outcome, recorded here: the dual-protocol shape STAYS
 
 ### Wire translation (D1-style rows)
 
+Namespace finding (live-verified): the sync family lives at the
+command ROOT (block / blocks / entities / place, same as menu /
+scan / recipes from 0012), while the task family rides /bot (status /
+goto / dig / cancel / stop / events / reset). The CLI sends the real
+spelling.
+
 | CLI | Wire | Family | Status |
 |---|---|---|---|
-| `cat /blocks/<x,y,z>` | `/bot block x y z` | sync read | slice 1 |
-| `view /nearby` | `/bot entities 8 32` (client aggregation) | sync read | slice 1 |
-| `ls /entities/` | `/bot entities [radius] [limit]` | sync read | slice 1 |
-| `mc events --follow` | poll `/bot events` (peek) | CLI-only | slice 1 |
-| `cat /player/health` | `/bot status` (healthHearts field) | state | slice 2 |
-| `cat /player/inventory/free` | `/bot status` (freeSlots field) | state | slice 2 |
-| `write /tasks/dig "x,y,z"` | `/bot dig x y z [timeoutTicks]` | task | slice 3 |
-| `write /actions/place "x,y,z,face"` | `/bot place x y z face` | sync action | slice 4 |
+| `cat /blocks/<x,y,z>` | `block x y z` | sync read | live 2026-08-27 |
+| `cat /nearby` | `entities 8 32` (client aggregation; the proposal's view verb collapsed into cat) | sync read | live 2026-08-27 |
+| `ls /entities/` | `entities [radius] [limit]` | sync read | live 2026-08-27 |
+| `mc events --follow` | poll `/bot events` (peek) | CLI-only | live 2026-08-27 |
+| `cat /player/health` | `/bot status` (healthHearts field) | state | live 2026-08-27 (10 hearts = 20 HP full) |
+| `cat /player/inventory/free` | `/bot status` (freeSlots field) | state | live 2026-08-27 |
+| `write /tasks/dig "x,y,z"` | `/bot dig x y z [timeoutTicks]` | task | live 2026-08-27 (TASK_COMPLETED + BLOCK_BROKEN, block gone) |
+| `write /actions/place "x,y,z,face"` | `place x y z face` | sync action | rejection paths live (cell-not-air with the real pre-state); success path blocked on equip (no hotbar-selection verb yet) |
+
+Live findings recorded: (1) GoalNear(target, 3) admits chebyshev-3
+stops that are ~5.2 euclidean eye-to-block - beyond DigExecutor's 4.5
+reach; fixed to range 2 (1425928). (2) The proposal's `view` verb
+collapsed into `cat /nearby` per the no-new-verbs principle.
 
 BLOCK_BROKEN event (absorbs 0009 F3): emitted by the dig completion
 path with attrs taskId / posX / posY / posZ / blockId - KIND_ATTRS
