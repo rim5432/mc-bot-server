@@ -2,6 +2,7 @@ package com.mcbot.mcbotserver.core.process;
 
 import com.mcbot.mcbotserver.api.goal.GoalNear;
 import com.mcbot.mcbotserver.api.process.BotProcess;
+import com.mcbot.mcbotserver.api.process.DigMission;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.BlockSnapshot;
@@ -28,7 +29,8 @@ import com.mcbot.mcbotserver.api.world.ViewMode;
  */
 // contract: see boundaries.md section B (process tier is
 //            side-effect-free) + issue 0013 R1 (dig is a task)
-public final class DigProcess implements BotProcess, TerminalMission {
+public final class DigProcess implements BotProcess, TerminalMission,
+        DigMission {
 
     private final String taskId;
     private final CellPos target;
@@ -80,6 +82,18 @@ public final class DigProcess implements BotProcess, TerminalMission {
     /** Arbiter seat priority for the mission-dig claim path. */
     public int priority() {
         return priority;
+    }
+
+    @Override
+    public CellPos digTarget() {
+        return target;
+    }
+
+    @Override
+    public boolean isDigging() {
+        // DigProcess is always digging while active: the GoalNear directive
+        // holds the bot in range and the controller injects dig claims.
+        return active;
     }
 
     /** Block id captured on the first tick; null before that. */

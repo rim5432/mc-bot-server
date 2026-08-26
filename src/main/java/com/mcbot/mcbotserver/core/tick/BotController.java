@@ -14,6 +14,7 @@ import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.goal.GoalNear;
 import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
 import com.mcbot.mcbotserver.api.process.BotProcess;
+import com.mcbot.mcbotserver.api.process.DigMission;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.reflex.ReflexAction;
 import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
@@ -509,15 +510,16 @@ public final class BotController {
         arbiter.tick(world);
         Directive directive = arbiter.lastDirective();
 
-        // Mission-dig claim path (issue 0013 R1): while a DigProcess
-        // is seated, re-issue the aim + dig claims every tick (see
+        // Mission-dig claim path (issue 0013 R1, generalized by 0014
+        // DigMission): while any DigMission process is seated and reports
+        // isDigging(), re-issue the aim + dig claims every tick (see
         // submitAimAndDig for why silence resets progress). Reflex
         // preemption still wins because the reflex layer runs first
         // and parks missions.
-        if (arbiter.current() instanceof DigProcess dig
-                && dig.isActive()) {
-            submitAimAndDig(dig.priority(),
-                "mission:dig:" + dig.missionTaskId(), dig.target());
+        if (arbiter.current() instanceof DigMission dm
+                && dm.isDigging()) {
+            submitAimAndDig(dm.priority(),
+                "mission:dig:" + dm.missionTaskId(), dm.digTarget());
         }
 
         // Stage 3: behaviors claim channels per directive; reports flow
