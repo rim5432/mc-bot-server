@@ -322,6 +322,37 @@ class StreamResetTest(McCliTest):
         # re-anchor on first comparison, by design.
         self.assertEqual(mc.read_cursor_state(), (5, 0))
 
+    def test_wait_reanchors_when_cursor_beyond_head(self):
+        # resetAt does NOT signal a JVM restart (fresh queue starts at
+        # 1 again - found live: epochs collide across boots). The
+        # reliable signal is the id space restarting: a bookmark
+        # beyond the stream head is impossible in a monotonic stream.
+        self.write_stale_bookmark(837, 1)
+        self.queue(
+            batch([], latest=375, reset_at=1),
+            batch([event("TASK_COMPLETED", task_id="t14")],
+                  latest=380, reset_at=1),
+        )
+        code, _, err = self.run_verb(mc.cmd_wait, "t14",
+                                     timeout_sec=0.5, poll_interval=0)
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["/bot events 837",
+                                           "/bot events 0"])
+        self.assertIn("beyond stream head", err)
+
+    def test_events_reanchors_when_cursor_beyond_head(self):
+        self.write_stale_bookmark(837, 1)
+        self.queue(
+            batch([], latest=375, reset_at=1),
+            batch([], latest=379, reset_at=1),
+        )
+        code, _, err = self.run_verb(mc.cmd_events)
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["/bot events 837",
+                                           "/bot events 0"])
+        self.assertEqual(mc.read_cursor_state(), (379, 1))
+        self.assertIn("beyond stream head", err)
+
 
 class AdminVerbTest(McCliTest):
 

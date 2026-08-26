@@ -270,11 +270,19 @@ def cmd_wait(task_id: str, timeout_sec: int = 120, poll_interval: float = 1.0) -
         batch = resp.get("batch", {})
         events = batch.get("events", [])
         latest = batch.get("latest", since)
-        if epoch != batch.get("resetAt", epoch):
-            epoch = batch.get("resetAt", epoch)
+        stream_epoch = batch.get("resetAt", epoch)
+        # Two restart signals: resetAt only bumps on an explicit
+        # reset() - a JVM restart spins up a fresh queue with resetAt
+        # back at 1 (found live: epochs collide across boots). The
+        # reliable cross-restart signal is the id space restarting:
+        # since > latest is impossible in a monotonic stream.
+        if epoch != stream_epoch or since > latest:
+            why = (f"resetAt {epoch}->{stream_epoch}" if epoch != stream_epoch
+                   else f"cursor {since} beyond stream head {latest}")
+            epoch = stream_epoch
             since = 0
-            print(f"wait: stream reset detected (resetAt={epoch}); "
-                  "re-anchored cursor to 0", file=sys.stderr)
+            print(f"wait: stream restarted ({why}); re-anchored to 0",
+                  file=sys.stderr)
             continue
         for evt in events:
             evt_task = evt.get("attrs", {}).get("taskId",
@@ -310,8 +318,13 @@ def cmd_events(since: int | None = None) -> int:
     batch = resp.get("batch", {})
     latest = batch.get("latest", cursor)
     stream_epoch = batch.get("resetAt", epoch)
-    if since is None and epoch != stream_epoch:
-        print(f"events: stream reset detected (resetAt={stream_epoch}); "
+    # Same two restart signals as wait: resetAt catches an explicit
+    # reset() mid-boot; cursor > latest catches a JVM restart (fresh
+    # queue, ids from 1, resetAt back at 1 - epochs collide).
+    if since is None and (epoch != stream_epoch or cursor > latest):
+        why = (f"resetAt {epoch}->{stream_epoch}" if epoch != stream_epoch
+               else f"cursor {cursor} beyond stream head {latest}")
+        print(f"events: stream restarted ({why}); "
               "draining the new stream from 0", file=sys.stderr)
         cursor = 0
         resp = wire("/bot events 0")
