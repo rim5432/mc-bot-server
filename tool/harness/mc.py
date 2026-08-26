@@ -334,8 +334,13 @@ def cmd_cat(path: str) -> int:
             print(json.dumps(state, indent=2))
         elif field == "inventory":
             print(json.dumps(state.get("items", {}), indent=2))
+        elif field == "inventory/free":
+            print(json.dumps(state.get("freeSlots", 0)))
         elif field == "pos":
             print(json.dumps(state.get("pos", [])))
+        elif field == "health":
+            print(json.dumps({"healthHearts": state.get("healthHearts"),
+                              "freeSlots": state.get("freeSlots")}))
         elif field == "menu":
             # /bot status does not carry a menu field yet (D1 menu commands
             # are pending). Report unsupported rather than silently returning

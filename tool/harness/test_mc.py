@@ -368,6 +368,23 @@ class RecipeMaterializationTest(McCliTest):
         self.assertEqual(self.wire_calls, ['recipes "nothing_here"'])
 
 
+class HealthFieldTest(McCliTest):
+    """0013 slice 2: healthHearts + freeSlots ride /bot status."""
+
+    def test_cat_health(self):
+        self.queue({"ok": True, "state": {"healthHearts": 17,
+                                          "freeSlots": 12}})
+        code, out, _ = self.run_verb(mc.cmd_cat, "/player/health")
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out)["healthHearts"], 17)
+
+    def test_cat_inventory_free(self):
+        self.queue({"ok": True, "state": {"freeSlots": 30}})
+        code, out, _ = self.run_verb(mc.cmd_cat, "/player/inventory/free")
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out), 30)
+
+
 class WorldReadsTest(McCliTest):
     """0013 slice 1: block / blocks / entities / nearby / follow."""
 

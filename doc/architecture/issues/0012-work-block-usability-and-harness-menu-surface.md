@@ -266,6 +266,8 @@ layer; it does not sink to D5 invariants.
 - Wire: `freeSlots` joins `BotState` (one integer, rides `getState`).
   `itemCounts` is type-to-count and cannot derive free slots. `health`
   joins `BotState` the same way before `/player/health` can go live.
+  (Both landed 2026-08-26 via issue 0013 R5 - bucketed hearts keep the
+  change-detect cadence honest.)
 - Transport: `tool/rcon.py` already exists. `mc.py` reuses its
   `run_command` directly - zero transport duplication.
 
@@ -286,7 +288,7 @@ harness-side CLI translation. Both workflows develop against this table.
 | `cat` | `/player/inventory` | `/bot status` (items field) | live |
 | `cat` | `/player/pos` | `/bot status` (pos field) | live |
 | `cat` | `/player/status` | `/bot status` (full) | live |
-| `cat` | `/player/health` | `/bot status` (health field) | pending: `health` joins `BotState` |
+| `cat` | `/player/health` | `/bot status` (healthHearts field) | live via 0013 R5 (bucketed hearts + freeSlots) |
 | `cat` | `/player/menu` | `/bot status` (menu field, pending D3) | pending |
 | `cat` | `/tasks/current` | `/bot status` (task field - displayName summary, never a wait-correlatable id) | live |
 | `cat` | `/tasks/<id>` | `/bot events 0` filtered by `attrs.taskId` (client-side derivation; strict id match, display-name `task` key never correlates) | live |
