@@ -85,35 +85,4 @@ public record MenuView(String type, CellPos sourcePos, ItemView carried,
     public SlotView slot(int index) {
         return slots.get(index);
     }
-
-    /**
-     * Whether any slot in the menu holds the given item id.
-     *
-     * @param itemId the item id to search for; never null
-     * @return true if at least one non-empty slot matches
-     */
-    public boolean contains(String itemId) {
-        for (SlotView slot : slots) {
-            if (!slot.isEmpty() && slot.item().itemId().equals(itemId)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Count total items of the given id across all slots.
-     *
-     * @param itemId the item id to count; never null
-     * @return total count (0 if not present)
-     */
-    public int countOf(String itemId) {
-        int total = 0;
-        for (SlotView slot : slots) {
-            if (!slot.isEmpty() && slot.item().itemId().equals(itemId)) {
-                total += slot.item().count();
-            }
-        }
-        return total;
-    }
 }
