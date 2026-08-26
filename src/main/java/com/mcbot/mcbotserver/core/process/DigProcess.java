@@ -16,7 +16,7 @@ import com.mcbot.mcbotserver.api.world.ViewMode;
  * must re-issue {@code Intent.Dig} per tick while this process is
  * seated.
  *
- * <p>The directive is {@code GoalNear(target, 3)}: pathing walks the
+ * <p>The directive is {@code GoalNear(target, 2)}: pathing walks the
  * bot into interaction reach first (goto-then-dig for free) and holds
  * it there. Dig progress accrues only once the executor's own reach
  * check passes; out-of-reach claims are ignored honestly by the
@@ -96,7 +96,7 @@ public final class DigProcess implements BotProcess, TerminalMission {
     public Directive onTick(WorldView world) {
         if (!active) {
             // Terminal hold: the arbiter retires us on the next lap.
-            return Directive.of(new GoalNear(target, 3));
+            return Directive.of(new GoalNear(target, 2));
         }
         if (initialBlockId == null) {
             BlockSnapshot snap = world.getBlock(target, ViewMode.LIVE);
@@ -120,7 +120,7 @@ public final class DigProcess implements BotProcess, TerminalMission {
             succeeded = true;
             active = false;
         }
-        return Directive.of(new GoalNear(target, 3));
+        return Directive.of(new GoalNear(target, 2));
     }
 
     @Override
@@ -180,6 +180,6 @@ public final class DigProcess implements BotProcess, TerminalMission {
     private Directive fail(String reason) {
         failure = reason;
         active = false;
-        return Directive.of(new GoalNear(target, 3));
+        return Directive.of(new GoalNear(target, 2));
     }
 }

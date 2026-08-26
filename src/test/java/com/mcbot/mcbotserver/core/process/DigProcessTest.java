@@ -37,7 +37,7 @@ class DigProcessTest {
         // Terminal tick still answers a directive: onTick must never
         // return null while the process exists (BotProcess contract).
         assertEquals(new com.mcbot.mcbotserver.api.goal.GoalNear(
-            TARGET, 3), directive.goal());
+            TARGET, 2), directive.goal());
     }
 
     @Test
