@@ -4,6 +4,7 @@ import com.mcbot.mcbotserver.api.inventory.ItemView;
 import com.mcbot.mcbotserver.api.menu.CraftingView;
 import com.mcbot.mcbotserver.api.menu.MenuClick;
 import com.mcbot.mcbotserver.api.menu.MenuView;
+import com.mcbot.mcbotserver.api.menu.RecipeView;
 import com.mcbot.mcbotserver.api.menu.SlotRole;
 import com.mcbot.mcbotserver.api.menu.SlotView;
 
@@ -175,6 +176,184 @@ class MenuPlannerTest {
             () -> MenuPlanner.planTakeResult(menu));
     }
 
+    // ── recipe-driven fill ───────────────────────────────────
+
+    private static final String OAK = "minecraft:oak_planks";
+    private static final String BIRCH = "minecraft:birch_planks";
+
+    /** Sticks-shaped recipe: width 1, two plank cells (pattern
+     * positions 0 and 1). */
+    private static RecipeView sticksRecipe() {
+        return new RecipeView("minecraft:stick", "minecraft:stick",
+            4, 1, Map.of(0, List.of(OAK, BIRCH),
+                1, List.of(OAK, BIRCH)));
+    }
+
+    @Test
+    void recipeResolvesAndAnchorsTopLeftOnATable() {
+        CraftingView menu = table(builder()
+            .put(SlotRole.HOTBAR, 37, OAK, 64));
+        // Pattern rows 0..1 map onto the 3x3 as grid cells 0 and 3.
+        assertEquals(List.of(
+            new MenuPlanner.Step(37, 0, MenuClick.PICKUP),
+            new MenuPlanner.Step(1, 1, MenuClick.PICKUP),
+            new MenuPlanner.Step(4, 1, MenuClick.PICKUP),
+            new MenuPlanner.Step(37, 0, MenuClick.PICKUP)),
+            MenuPlanner.planRecipe(menu, sticksRecipe()));
+    }
+
+    @Test
+    void recipeFallsBackToLaterAcceptedKinds() {
+        CraftingView menu = table(builder()
+            .put(SlotRole.HOTBAR, 38, BIRCH, 64));
+        assertEquals(List.of(
+            new MenuPlanner.Step(38, 0, MenuClick.PICKUP),
+            new MenuPlanner.Step(1, 1, MenuClick.PICKUP),
+            new MenuPlanner.Step(4, 1, MenuClick.PICKUP),
+            new MenuPlanner.Step(38, 0, MenuClick.PICKUP)),
+            MenuPlanner.planRecipe(menu, sticksRecipe()));
+    }
+
+    @Test
+    void recipeSplitsAcrossKindsWhenFirstRunsOut() {
+        CraftingView menu = table(builder()
+            .put(SlotRole.HOTBAR, 37, OAK, 1)
+            .put(SlotRole.HOTBAR, 38, BIRCH, 64));
+        // Cell 0 takes the last oak; cell 1 falls to birch. Two
+        // single-material sub-plans chained, cursor clean between.
+        assertEquals(List.of(
+            new MenuPlanner.Step(37, 0, MenuClick.PICKUP),
+            new MenuPlanner.Step(1, 1, MenuClick.PICKUP),
+            new MenuPlanner.Step(38, 0, MenuClick.PICKUP),
+            new MenuPlanner.Step(4, 1, MenuClick.PICKUP),
+            new MenuPlanner.Step(38, 0, MenuClick.PICKUP)),
+            MenuPlanner.planRecipe(menu, sticksRecipe()));
+    }
+
+    @Test
+    void recipeOnTheTwoByTwoInventoryGridMapsDifferently() {
+        CraftingView inv2x2 = inventoryGridMenu(builder()
+            .put(SlotRole.HOTBAR, 36, OAK, 64));
+        // Pattern rows 0..1 map onto the 2x2 as grid cells 0 and 2;
+        // the 62-item remainder returns to its hotbar source.
+        assertEquals(List.of(
+            new MenuPlanner.Step(36, 0, MenuClick.PICKUP),
+            new MenuPlanner.Step(1, 1, MenuClick.PICKUP),
+            new MenuPlanner.Step(3, 1, MenuClick.PICKUP),
+            new MenuPlanner.Step(36, 0, MenuClick.PICKUP)),
+            MenuPlanner.planRecipe(inv2x2, sticksRecipe()));
+    }
+
+    @Test
+    void tableOnlyRecipeRefusesTheInventoryGrid() {
+        Map<Integer, List<String>> full = new HashMap<>();
+        for (int i = 0; i < 9; i++) {
+            full.put(i, List.of("minecraft:diamond"));
+        }
+        RecipeView block = new RecipeView("t:block",
+            "minecraft:diamond_block", 1, 3, full);
+        CraftingView inv2x2 = inventoryGridMenu(builder()
+            .put(SlotRole.HOTBAR, 36, "minecraft:diamond", 64));
+        assertThrows(IllegalArgumentException.class,
+            () -> MenuPlanner.planRecipe(inv2x2, block));
+
+        // Sanity: the same recipe plans fine on the table surface -
+        // one lift, nine deposits, remainder return.
+        CraftingView menu = table(builder()
+            .put(SlotRole.HOTBAR, 37, "minecraft:diamond", 64));
+        assertEquals(11,
+            MenuPlanner.planRecipe(menu, block).size());
+    }
+
+    @Test
+    void unsatisfiableRecipeCellFailsBeforeAnyStep() {
+        CraftingView menu = table(builder()
+            .put(SlotRole.HOTBAR, 37, OAK, 1));
+        // One oak covers cell 0 only; cell 1 has no source left.
+        assertThrows(IllegalArgumentException.class,
+            () -> MenuPlanner.planRecipe(menu, sticksRecipe()));
+    }
+
+    // ── chest quick-move sequences ───────────────────────────
+
+    /** Chest-menu fake: CONTAINER 0..26, MAIN 27..53, HOTBAR
+     * 54..62 — the adapter's role table mirrored in pure data. */
+    private static MenuView chest(Builder b) {
+        b.roles.putIfAbsent(0, SlotRole.CONTAINER);
+        for (int i = 0; i <= 26; i++) {
+            b.roles.putIfAbsent(i, SlotRole.CONTAINER);
+        }
+        for (int i = 27; i <= 53; i++) {
+            b.roles.putIfAbsent(i, SlotRole.MAIN);
+        }
+        for (int i = 54; i <= 62; i++) {
+            b.roles.putIfAbsent(i, SlotRole.HOTBAR);
+        }
+        List<SlotView> slots = new ArrayList<>(63);
+        for (int i = 0; i < 63; i++) {
+            slots.add(new SlotView(i,
+                b.items.getOrDefault(i, ItemView.EMPTY),
+                b.roles.get(i)));
+        }
+        return new MenuView("chest", null, ItemView.EMPTY, 63, slots);
+    }
+
+    @Test
+    void withdrawShiftsWholeStacksUntilDemandIsMet() {
+        MenuView chest = chest(builder()
+            .put(SlotRole.CONTAINER, 3, OAK, 5)
+            .put(SlotRole.CONTAINER, 9, BIRCH, 10)
+            .put(SlotRole.CONTAINER, 14, OAK, 10));
+
+        // 5 from slot 3 already meets minCount 5 - one shift-click.
+        assertEquals(List.of(
+            new MenuPlanner.Step(3, 0, MenuClick.QUICK_MOVE)),
+            MenuPlanner.planWithdraw(chest, OAK, 5));
+
+        // minCount 6 overshoots into the second oak stack.
+        assertEquals(List.of(
+            new MenuPlanner.Step(3, 0, MenuClick.QUICK_MOVE),
+            new MenuPlanner.Step(14, 0, MenuClick.QUICK_MOVE)),
+            MenuPlanner.planWithdraw(chest, OAK, 6));
+
+        // Other kinds are never touched.
+        assertEquals(List.of(
+            new MenuPlanner.Step(9, 0, MenuClick.QUICK_MOVE)),
+            MenuPlanner.planWithdraw(chest, BIRCH, 1));
+    }
+
+    @Test
+    void withdrawRejectsShortContainersAndBadArgs() {
+        MenuView chest = chest(builder()
+            .put(SlotRole.CONTAINER, 3, OAK, 5));
+        assertThrows(IllegalArgumentException.class,
+            () -> MenuPlanner.planWithdraw(chest, OAK, 6));
+        assertThrows(IllegalArgumentException.class,
+            () -> MenuPlanner.planWithdraw(chest, null, 1));
+        assertThrows(IllegalArgumentException.class,
+            () -> MenuPlanner.planWithdraw(chest, OAK, 0));
+    }
+
+    @Test
+    void depositShiftsEveryPlayerStackOfTheKind() {
+        MenuView chest = chest(builder()
+            .put(SlotRole.MAIN, 30, "minecraft:stick", 4)
+            .put(SlotRole.HOTBAR, 55, "minecraft:stick", 12)
+            .put(SlotRole.HOTBAR, 56, OAK, 7));
+        assertEquals(List.of(
+            new MenuPlanner.Step(30, 0, MenuClick.QUICK_MOVE),
+            new MenuPlanner.Step(55, 0, MenuClick.QUICK_MOVE)),
+            MenuPlanner.planDeposit(chest, "minecraft:stick"));
+    }
+
+    @Test
+    void depositRefusesWhenNothingMatches() {
+        MenuView chest = chest(builder()
+            .put(SlotRole.CONTAINER, 0, "minecraft:stick", 4));
+        assertThrows(IllegalStateException.class,
+            () -> MenuPlanner.planDeposit(chest, "minecraft:stick"));
+    }
+
     // ── fakes ────────────────────────────────────────────────
 
     /** Mutable fixture for item placements before freezing into a
@@ -217,5 +396,26 @@ class MenuPlannerTest {
         MenuView view = new MenuView("crafting_table", null,
             ItemView.EMPTY, 46, slots);
         return CraftingView.of(view);
+    }
+
+    /** Inventory-menu fake: result 0, grid 1..4 (2x2), MAIN 9..35,
+     * HOTBAR 36..44 — the adapter's role table mirrored in pure
+     * data. */
+    private static CraftingView inventoryGridMenu(Builder b) {
+        b.roles.put(0, SlotRole.RESULT);
+        for (int i = 1; i <= 4; i++) {
+            b.roles.putIfAbsent(i, SlotRole.GRID);
+        }
+        for (int i = 36; i <= 44; i++) {
+            b.roles.putIfAbsent(i, SlotRole.HOTBAR);
+        }
+        List<SlotView> slots = new ArrayList<>(45);
+        for (int i = 0; i < 45; i++) {
+            slots.add(new SlotView(i,
+                b.items.getOrDefault(i, ItemView.EMPTY),
+                b.roles.getOrDefault(i, SlotRole.MAIN)));
+        }
+        return CraftingView.of(new MenuView("inventory", null,
+            ItemView.EMPTY, 45, slots));
     }
 }
