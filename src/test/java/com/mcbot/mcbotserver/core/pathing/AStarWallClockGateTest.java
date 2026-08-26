@@ -24,9 +24,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AStarWallClockGateTest {
 
     /**
-     * One-millisecond cap on a wide open floor: the clock cuts long
-     * before any sane node budget, and the partial still points at the
-     * goal.
+     * Steady fake clock on a wide open floor: the injected nanotime
+     * advances a fixed step per read, so the 64-node clock check
+     * crosses the deadline after a deterministic number of expansions
+     * - the cut arrives long before any sane node budget, and the
+     * partial still points at the goal. (The pre-seam version armed a
+     * real 1 ms budget and raced fast machines.)
      */
     @Test
     void clockCutYieldsBestPartialBeforeBudget() {
@@ -37,17 +40,20 @@ class AStarWallClockGateTest {
                     new CellPos(x, 63, z), "minecraft:smooth_stone"));
             }
         }
+        // Advance 300 us per nanotime read: arming reads ~0.3 ms,
+        // checks land past the 5 ms deadline around expansion ~1000.
+        long[] nanos = {0};
         var finder = new AStarPathFinder(BasicMoves::from,
             Heuristic.euclideanTo(new CellPos(110, 64, 110)),
-            1_000_000);
+            1_000_000, () -> nanos[0] += 300_000L);
 
         AStarPathFinder.PathResult result = finder.compute(world,
             new CellPos(0, 64, 0),
             new GoalBlock(new CellPos(110, 64, 110)),
-            Heuristic.euclideanTo(new CellPos(110, 64, 110)), 1L);
+            Heuristic.euclideanTo(new CellPos(110, 64, 110)), 5L);
 
         assertFalse(result.reachedGoal(),
-            "1 ms cannot cross a 120-block floor");
+            "the injected clock must cut before the far corner");
         assertTrue(result.expandedNodes() < 1_000_000,
             "the clock, not the node budget, must do the cutting");
         assertFalse(result.waypoints().isEmpty(),

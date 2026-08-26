@@ -96,6 +96,9 @@ public final class AStarPathFinder {
     private final MoveGraph graph;
     private final Heuristic heuristic;
     private final int nodeBudget;
+    /** Nanotime source arming wall-clock deadlines; injectable so
+     *  tests drive the cut deterministically. */
+    private final java.util.function.LongSupplier wallClock;
 
     /**
      * Creates a finder with the default node budget.
@@ -124,6 +127,33 @@ public final class AStarPathFinder {
             throw new IllegalArgumentException(
                 "nodeBudget must be positive");
         }
+        this.wallClock = System::nanoTime;
+        this.nodeBudget = nodeBudget;
+    }
+
+    /**
+     * Creates a finder with an explicit expansion budget and an
+     * injected nanotime source.
+     *
+     * @param graph      edge supplier; never null
+     * @param heuristic  cost-to-go estimator; must be admissible for
+     *                   optimality (the engine does not verify); never
+     *                   null
+     * @param nodeBudget safety-net cap on expansions; positive
+     * @param wallClock  monotonic nanotime supplier used to arm and
+     *                   check the wall-clock deadline; never null
+     */
+    public AStarPathFinder(MoveGraph graph, Heuristic heuristic,
+                           int nodeBudget,
+                           java.util.function.LongSupplier wallClock) {
+        this.graph = Objects.requireNonNull(graph, "graph");
+        this.heuristic = Objects.requireNonNull(heuristic, "heuristic");
+        if (nodeBudget <= 0) {
+            throw new IllegalArgumentException(
+                "nodeBudget must be positive");
+        }
+        this.wallClock = Objects.requireNonNull(wallClock,
+            "wallClock");
         this.nodeBudget = nodeBudget;
     }
 
@@ -202,7 +232,7 @@ public final class AStarPathFinder {
 
         boolean clockBounded = wallClockBudgetMs > 0;
         long deadlineNanos = clockBounded
-            ? System.nanoTime() + wallClockBudgetMs * 1_000_000L
+            ? wallClock.getAsLong() + wallClockBudgetMs * 1_000_000L
             : Long.MAX_VALUE;
 
         int expanded = 0;
@@ -212,7 +242,7 @@ public final class AStarPathFinder {
 
         while (!open.isEmpty() && expanded < nodeBudget) {
             if (clockBounded && expanded % 64 == 0
-                && System.nanoTime() > deadlineNanos) {
+                && wallClock.getAsLong() > deadlineNanos) {
                 searchCut = true;
                 break;
             }
