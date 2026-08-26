@@ -6,7 +6,8 @@ covers:
   - src/main/java/com/mcbot/mcbotserver/api/actor/Intent.java
   - src/main/java/com/mcbot/mcbotserver/adapter/BindingActor.java
   - src/main/java/com/mcbot/mcbotserver/adapter/entity/BotBodyEntity.java
-status: open
+status: resolved (archived 2026-08-27 - D1/D2 shipped and pinned; open reserves relocated to the workplan movement-vocabulary seeds)
+superseded_by: doc/guide/workplan.md
 related:
   - doc/architecture/boundaries.md
   - doc/architecture/function-map.md
@@ -296,7 +297,7 @@ current primitive set:
    ASCEND; in-engine green via `surfacesWhenAirRunsLow`). The
    discussion this finding opened — every extreme scenario, not
    just drowning — continues in issue
-   [0008](archive/0008-extreme-scenario-survival-framework.md).
+   [0008](0008-extreme-scenario-survival-framework.md).
 3. **Sprint-jump as the default long-haul gait**: players cover
    open ground sprinting, and sprint-jumps preserve momentum. A mob
    carrier pays no hunger for sprinting (`setSprinting(true)` is

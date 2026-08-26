@@ -10,7 +10,7 @@ status: resolved (all rulings shipped 2026-08-25; deferred tails recorded in sec
 superseded_by: architecture/boundaries.md
 
 related:
-  - doc/architecture/issues/0004-movement-primitive-vocabulary.md
+  - doc/architecture/issues/archive/0004-movement-primitive-vocabulary.md
   - doc/architecture/issues/0007-player-parity-interaction.md
   - doc/architecture/issues/0009-block-capability-dig.md
   - doc/architecture/issues/0010-hungryprocess-food-acquisition-planner.md

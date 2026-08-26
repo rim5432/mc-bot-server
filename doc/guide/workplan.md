@@ -422,11 +422,11 @@ the H-R4 convergence pass, and bookkeeping.
 - [ ] S  H-R4 wire-key convergence pass (code-health ledger;
          scheduled before any Stage 3 vocabulary lands so pose work
          does not churn boundary-D consumers twice).            [dep: none]
-- [ ] S  Bookkeeping: archive resolved issue 0006 per the issue
-         workflow; rule issue 0004's disposition (keep open as the
-         Stage 3 vocabulary seed vs promote); let the datapack
-         water/lava trait JSON supersede the code baseline
-         (closeout follow-up 5 residue).                        [dep: none]
+- [ ] S  Bookkeeping residue: let the datapack water/lava trait
+         JSON supersede the code baseline (closeout follow-up 5
+         residue). Issue 0004's disposition settled 2026-08-27:
+         archived with its open reserves preserved as the
+         movement-vocabulary seeds below.                       [dep: none]
 - [x] M  Dig capability, first block-interaction slice (issue 0009;
          user ruling 2026-08-25, motivated by the gravel-suffocation
          escape): INTERACT channel + Intent.Dig (claim-per-tick is
@@ -637,6 +637,33 @@ survivors are deliberate NON-executions, each with its trigger:
   sleep-poll loops stay (the flaky part was the wall-clock budget,
   fixed via the injected AStar clock); MockWorldView terrain motifs
   added opportunistically during future edits, never speculatively.
+
+### Movement-vocabulary seeds (inherited from archived issue 0004)
+
+Issue 0004 archived 2026-08-27 with rulings D1/D2 shipped; these are
+its open reserves, none blocking a current stage:
+
+- [ ] M  yya dive / ascend adapter translation for deliberate depth
+         control - unlock: first underwater scenario that needs it.
+         Requires threading the sneak bit through setDrive and a
+         gametest proving travel() consumes yya unrotated.
+                                                        [dep: none]
+- [ ] S  Pose.SWIMMING getDimensions override + pose-aware collision
+         predicates so the carrier can crawl 1-block flooded gaps -
+         rides issue 0003's pickup.      [dep: issue 0003 un-parks]
+- [ ] S  Depth-tiered fluid costs measured by gametest then
+         re-derived (shallow ~= walk, surface lane cheap-ish,
+         sub-surface expensive); the surface-lane preference falls
+         out of the tiers instead of flat Swim cost. [dep: none]
+- [ ] L  Construction Movements (pillar-up / bridge / tunnel - the
+         function-map GAP rows): ruling D5 sequencing holds -
+         inventory model -> Place/Break intents -> Movements, and
+         Movement.isViable never grows a bot-state parameter
+         (MoveGraph injection or adoption-time check instead).
+                                            [dep: frozen-boundary lift]
+- Sprint-jump candidate F6(3): already shipped via the player-feel
+  layer (BindingActor.sprintClearAhead); recorded here so nobody
+  re-imports it.
 
 ### Interaction-model executable queue (2026-08-27, issue 0015)
 
