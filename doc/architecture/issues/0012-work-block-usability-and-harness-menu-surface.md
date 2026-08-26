@@ -206,6 +206,37 @@ Step 4 (crafting -> chest switch) is the first real test of the
 close-before-open discipline and the composite-key diff (MENU_CLOSED +
 MENU_OPENED in one transition).
 
+**Verification chain EXECUTED 2026-08-26, ALL GREEN end-to-end, every
+step through mc verbs (zero raw RCON on the agent path).** Bootstrap
+notes and two findings:
+
+- Materials bootstrap through the menu surface itself: the harness
+  pre-fills a chest via `data merge block` (chest BlockEntity NBT is
+  the only RCON-side setup), the bot takes them with
+  `write .../output all`. The bot's SimpleContainer inventory has no
+  NBT persistence and `/give` is player-only - the menu path is the
+  intended and only item channel.
+- `write /stations/crafting@2,61,2/recipe "minecraft:wooden_pickaxe"`
+  crafted correctly with exact economics (3 oak_planks + 2 sticks
+  consumed, remainder visible in inventory, result x1).
+- Counted deposit `input "minecraft:wooden_pickaxe:1"` placed exactly
+  1 into the chest; counted take `output 1` took exactly 1 back -
+  the split-carry planner works live.
+- Materialization trio green: `admin dump-recipes` wrote 591 files
+  (paginated pulls over the 4KB chunk limit), `cat /recipes/<slug>`
+  reads locally (zero wire), `grep -l iron_ingot ~/.mc/recipes/*`
+  reverse-queries without any wire endpoint.
+- FINDING (grammar gap, harness session): take's value grammar is
+  `all|N` with no item addressing - "take 3 planks" from a mixed
+  chest is inexpressible (slot-order semantics). Deposit has
+  item:count; take wants the same.
+- FINDING (slug trap): `minecraft:planks` does not exist in 1.20.1
+  (real items are oak_planks, spruce_planks, ...) - bare slugs
+  silently drop from NBT merges and fail byId lookups. The dump files
+  carry namespaced ids plus a `# recipe:` header, which is richer
+  than the pinned 4-line schema and prevents this trap; agents should
+  always take ids from the dump or inventory reads, never from prose.
+
 **CLI implementation status:** `tool/harness/mc.py` ships the full
 six-verb translation layer. Goto-migration surface (`cat /player/*`,
 `cat /tasks/current`, `cat /tasks/<id>`, `write /tasks/goto`,
