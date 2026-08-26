@@ -12,7 +12,7 @@ covers:
   - src/main/java/com/mcbot/mcbotserver/adapter/RecipeCatalog.java
   - src/main/java/com/mcbot/mcbotserver/core/tick/MissionReporter.java
   - tool/harness/mc.py
-status: open (design complete - primary interaction model promoted, wire translation table as integration contract, translation-layer invariants recorded; goto migration CLI skeleton shipped 2026-08-26; menu command implementation queued behind the in-flight menu refactor)
+status: open (design complete - primary interaction model promoted, wire translation table as integration contract, translation-layer invariants recorded; goto migration CLI skeleton shipped 2026-08-26, hardened same day: typed verb discipline, /tasks/<id> derivation, admin stop/reset landing, cursor bookmark rule, 30 wire-mocked CLI tests; menu command implementation queued behind the in-flight menu refactor)
 related:
   - doc/architecture/issues/0007-player-parity-interaction.md
   - doc/architecture/issues/0011-harness-surface-convergence.md
@@ -125,7 +125,7 @@ calls; wire commands (D1) are the translation target, not the API.
 | `/player/<field>` | `cat` | flat state: inventory, pos, health, menu, status |
 | `/recipes/<item>` | `cat` | RecipeManager query (wire pending) |
 | `/stations/<type>@<x,y,z>/<role>` | `ls` / `read` / `write` | menu interaction (lazy session bind; wire pending) |
-| `/tasks/` | `ls` / `write` / `wait` | task submit, current view, wait-for-terminal |
+| `/tasks/` | `ls` / `cat` / `write` / `wait` | task submit, current view, post-hoc state by id, wait-for-terminal |
 | `/events` | `events` | incremental event drain, cursor on disk |
 
 **Six verbs:**
@@ -139,7 +139,7 @@ calls; wire commands (D1) are the translation target, not the API.
 | `mc wait <taskId> [--timeout N]` | block until task reaches terminal state | blocking (client-side poll loop) |
 | `mc events [--since N]` | incremental event drain, advances disk cursor | cursor |
 
-`cat` vs `read` is determined by path prefix: `/player/*` and `/tasks/current` are `cat` (stateless); `/stations/*` is `read` (lazy session bind). The CLI silently tolerates verb misselection (Agent types `cat` on a station path, CLI executes `read`) - the cost of a wrong verb is zero.
+`cat` vs `read` is determined by path prefix: `/player/*` and `/tasks/current` are `cat` (stateless); `/stations/*` is `read` (lazy session bind). Verb misselection is a typed error, never silent substitution: `cat` on a station path replies with the `read` suggestion and exits 1, and vice versa. `cat` is the stateless verb - executing `read` under its name would lazily bind a bot-side menu session as a side effect of a read. Unix tools suggest, they do not substitute.
 
 **Existing six-wire-verb landing table (goto migration - zero wire changes):**
 
@@ -148,9 +148,11 @@ calls; wire commands (D1) are the translation target, not the API.
 | `/bot status` | `mc cat /player/*` + `mc cat /tasks/current` | zero |
 | `/bot goto x y z tol timeout [key]` | `mc write /tasks/goto "x,y,z" --tol N --timeout N [--key K]` | zero |
 | `/bot cancel <id>` | `mc write /tasks/<id>/cancel "reason"` | zero |
-| `/bot stop` | `mc write /tasks/current/cancel "operator stop"` | zero |
+| `/bot stop` | `mc admin stop` (operator sweep; outside namespace - see note) | zero |
 | `/bot events [since]` | `mc events` (cursor on disk) | zero |
 | `/bot reset` | `mc admin reset` (deliberately outside namespace) | zero |
+
+`/bot stop` does NOT land as `write /tasks/current/cancel`: `CommandBus.submit` has no single-task gate, so multiple live missions are reachable (one seated on the arbiter, one or more registered and requesting control), and `/bot stop` sweeps the whole handler map while a cancel kills exactly one. Mapping the sweep onto cancel-current would be a silent semantic lie in precisely the multi-task case where an operator reaches for stop. Both operator panic verbs (`stop`, `reset`) land outside the namespace as `mc admin <verb>` - friction is a feature.
 
 This is NOT a "stateless -> stateful" migration. goto was never stateless -
 taskId, TASK_COMPLETED events, and the `events [since]` cursor always
@@ -183,12 +185,15 @@ close-before-open discipline and the composite-key diff (MENU_CLOSED +
 MENU_OPENED in one transition).
 
 **CLI skeleton status:** `tool/harness/mc.py` ships v1 covering the goto
-migration surface (`cat /player/*`, `write /tasks/goto`, `write
-/tasks/<id>/cancel`, `wait`, `events`, `ls /tasks/`). Menu-domain verbs
+migration surface (`cat /player/*`, `cat /tasks/current`, `cat
+/tasks/<id>`, `write /tasks/goto`, `write /tasks/<id>/cancel`, `wait`,
+`events`, `ls /tasks/`, `admin stop` / `admin reset`). Menu-domain verbs
 (`read /stations/*`, `write /stations/*/input`, `write /stations/*/craft`)
 are stubs that report "wire pending" until D1 menu commands land.
 Translation layer is transparent-first: no default values, no retries, no
-corrections - parameters pass through to wire verbatim.
+corrections - parameters pass through to wire verbatim. Covered by
+wire-mocked unit tests (`tool/harness/test_mc.py`, 30 tests, stdlib
+unittest, no server).
 
 **Receipt rule (model-layer, not wire detail):** `write` replies carry
 the direct consequence of the write plus a `seq` version number. This is
@@ -200,7 +205,8 @@ layer; it does not sink to D5 invariants.
 **Two prerequisites:**
 
 - Wire: `freeSlots` joins `BotState` (one integer, rides `getState`).
-  `itemCounts` is type-to-count and cannot derive free slots.
+  `itemCounts` is type-to-count and cannot derive free slots. `health`
+  joins `BotState` the same way before `/player/health` can go live.
 - Transport: `tool/rcon.py` already exists. `mc.py` reuses its
   `run_command` directly - zero transport duplication.
 
@@ -221,8 +227,10 @@ harness-side CLI translation. Both workflows develop against this table.
 | `cat` | `/player/inventory` | `/bot status` (items field) | live |
 | `cat` | `/player/pos` | `/bot status` (pos field) | live |
 | `cat` | `/player/status` | `/bot status` (full) | live |
+| `cat` | `/player/health` | `/bot status` (health field) | pending: `health` joins `BotState` |
 | `cat` | `/player/menu` | `/bot status` (menu field, pending D3) | pending |
 | `cat` | `/tasks/current` | `/bot status` (task field) | live |
+| `cat` | `/tasks/<id>` | `/bot events 0` filtered by `attrs.taskId` (client-side derivation; strict id match, display-name `task` key never correlates) | live |
 | `ls` | `/tasks/` | `/bot status` (task-derived) | live |
 | `write` | `/tasks/goto` | `/bot goto x y z tol timeout [key]` | live |
 | `write` | `/tasks/<id>/cancel` | `/bot cancel <id>` | live |
@@ -234,6 +242,7 @@ harness-side CLI translation. Both workflows develop against this table.
 | `write` | `/stations/<type>@<pos>/output` | `/bot menu take <role> [count]` | pending |
 | `write` | `/stations/crafting@<pos>/craft` | `/bot menu craft <recipeId>` | pending |
 | `cat` | `/recipes/<item>` | `/bot recipes <itemId>` | pending |
+| `admin` | `stop` / `reset` | `/bot stop` / `/bot reset` | live |
 
 **Menu command inventory (pending implementation - synchronous RPC, NOT CommandBus):**
 
@@ -357,6 +366,22 @@ round-trip (negligible); keeps `busy` as a pure tripwire.
 gains one additional side effect: close any active menu session. This is
 the manual escape hatch for a wedged session.
 
+**Two timeouts never merge.** `--timeout` on `write /tasks/goto` is the
+task-level movement deadline (server ticks); `--timeout` on `mc wait` is
+client patience (seconds). They share spelling and nothing else. A CLI
+that derives one from the other, or collapses them into a single knob,
+has merged a mission parameter with a harness parameter - the largest
+hiding place for migration bugs.
+
+**The disk cursor is the operator's bookmark.** Unix gives every reader
+its own file offset; the shared cursor file does not. Only a cursorless
+`mc events` advances it; `--since N` is a peek that never advances;
+`wait` reads it as a starting point but never advances it (the audit
+stream stays complete - internal consumption must not eat events).
+Concurrent programmatic consumers pass `--since` and keep their own
+offsets: two consumers sharing the bookmark each see a partition, not
+the stream.
+
 ### Data-driven maintenance ladder
 
 | Level | Cost | What it buys |
@@ -424,6 +449,16 @@ the manual escape hatch for a wedged session.
     `MissionReporter.emit` now carries both `"task"` (backward compat) and
     `"taskId"` (canonical for `wait` correlation). `CommandBus.finishTask`
     already used `"taskId"`.
+16. OVERTURNED 2026-08-26 (was: CLI silently tolerates cat-on-station by
+    executing read). Typed error with the `read` suggestion instead:
+    `cat` is the stateless verb; silent substitution would lazily bind a
+    bot-side session as a side effect of a read and contradicts the
+    transparent-first manifesto. Unix tools suggest, never substitute.
+17. `/bot stop` lands as `mc admin stop`, not `write
+    /tasks/current/cancel` (2026-08-26): `CommandBus.submit` has no
+    single-task gate, so multi-live missions are reachable; stop sweeps
+    all, cancel kills one. Operator sweeps stay outside the namespace
+    next to `admin reset` - friction is a feature.
 
 ## 5. Sequencing
 
@@ -457,7 +492,9 @@ Implementation order:
 7. **D4 goto migration validation** (can run in parallel with 1-5, since
    goto wire is already live) - shadow comparison: old path (`/bot goto`) and new
    path (`mc write /tasks/goto`) each submit once, diff replies and event
-   streams. Rewrite one real skill to `mc` syntax. Completion criterion:
+   streams. Write the first skill natively in `mc` syntax (the step-0
+   grep found the call surface empty - there are no legacy skills to
+   rewrite). Completion criterion:
    `grep -r "bot goto" skills/` returns empty + agent runs N sessions
    without touching raw RCON.
 

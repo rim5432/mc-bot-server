@@ -21,26 +21,47 @@ Wire mapping (v1 - goto migration only):
   cat /player/inventory    -> /bot status  (items field)
   cat /player/pos          -> /bot status  (pos field)
   cat /player/status       -> /bot status  (full)
+  cat /player/menu         -> unsupported (menu field pending, issue 0012 D1)
   cat /tasks/current       -> /bot status  (task field)
+  cat /tasks/<id>          -> /bot events 0, filtered by attrs.taskId
+                              (client-side derivation, zero wire change)
   write /tasks/goto "x,y,z" [--tol N] [--timeout N] [--key K] -> /bot goto
   write /tasks/<id>/cancel "reason" -> /bot cancel <id>
-  wait <taskId> [--timeout N] -> poll /bot events until TASK_COMPLETED/TASK_FAILED
+  wait <taskId> [--timeout N] -> poll /bot events until terminal kind
   events [--since N] -> /bot events <cursor>
+  admin stop|reset -> /bot stop | /bot reset  (operator verbs,
+      deliberately outside the namespace: stop sweeps ALL live
+      missions - CommandBus.submit has no single-task gate - while
+      cancel covers exactly one)
+
+Verb discipline: typed errors, never silent substitution. cat on a
+station path errors with the read suggestion; read on a non-station
+path errors with the cat suggestion. cat is the stateless verb and
+must not lazily bind a bot-side menu session as a side effect of a
+read (issue 0012 D4).
 
 Translation layer is transparent-first: no default values, no retries,
 no corrections. Parameters pass through to wire verbatim. If behavior
-diverges from raw RCON, the bug is in this file (grepable) or does not
-exist.
+diverges from raw RCON, the bug is in this file (grepable) or does
+not exist.
 
-Cursor lives at tool/.runtime/mc_cursor.txt (gitignored). The events
-verb advances it; wait reads from it but does NOT advance (audit stream
-must stay complete - internal consumption must not eat events).
+Exit codes: 0 ok; 1 rejected/unsupported; 124 wait timeout; 3 rcon
+error. (argparse usage errors exit 2 by argparse's own convention.)
+
+Cursor lives at tool/.runtime/mc_cursor.txt (gitignored). The disk
+cursor is the operator's bookmark, not a per-reader offset: only a
+cursorless `mc events` advances it; `--since N` is a peek and never
+advances; wait reads the cursor as a starting point but does not
+advance it (the audit stream must stay complete - internal
+consumption must not eat events). Concurrent programmatic consumers
+pass --since and keep their own offsets.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -130,9 +151,46 @@ def cmd_cat(path: str) -> int:
         state = resp.get("state", resp)
         print(state.get("task", "idle"))
         return 0
-    print(f"cat: unsupported path (v1 supports /player/*, /tasks/current): {path}",
-          file=sys.stderr)
+    task_match = re.fullmatch(r"/tasks/([A-Za-z0-9._:-]+)", path)
+    if task_match and path not in ("/tasks/goto",):
+        return cmd_cat_task(task_match.group(1))
+    if path == "/stations" or path.startswith("/stations/"):
+        # Typed verb error, never silent substitution: cat is the
+        # stateless verb; executing read here would lazily bind a
+        # bot-side menu session as a side effect of a read (0012 D4).
+        print(f"cat: station paths use the session verb - `mc read {path}` "
+              "(menu wire pending)", file=sys.stderr)
+        return 1
+    print(f"cat: unsupported path (v1 supports /player/*, /tasks/current, "
+          f"/tasks/<id>): {path}", file=sys.stderr)
     return 1
+
+
+def cmd_cat_task(task_id: str) -> int:
+    """Post-hoc task state by id, derived client-side from the full
+    event buffer (zero wire change).
+
+    Strict attrs.taskId match only: the wire has carried the real id
+    on every goto lifecycle kind since the 2026-08-26 unification, so
+    fuzzy matching against the display-name "task" key would add
+    translation-layer magic, not coverage. Status is the LAST matching
+    event's kind (completed/failed/cancelled/dropped/...); no events
+    means unknown - either the id never existed or the terminal event
+    fell out of the 200-deep ring, which "gap" reports honestly.
+    """
+    resp = wire("/bot events 0")
+    batch = resp.get("batch", {})
+    events = batch.get("events", [])
+    matching = [e for e in events
+                if e.get("attrs", {}).get("taskId") == task_id]
+    status = (matching[-1]["kind"].removeprefix("TASK_").lower()
+              if matching else "unknown")
+    result = {"taskId": task_id, "status": status}
+    if any(e.get("kind") == "EVENT_GAP" for e in events):
+        result["gap"] = True
+    result["events"] = matching
+    print(json.dumps(result, indent=2))
+    return 0
 
 
 def cmd_write(path: str, value: str, tol: int | None = None,
@@ -201,17 +259,23 @@ def cmd_wait(task_id: str, timeout_sec: int = 120, poll_interval: float = 1.0) -
         time.sleep(poll_interval)
     print(f"wait: timeout after {timeout_sec}s for task {task_id} "
           f"(cursor={since}, disk_cursor={read_cursor()})", file=sys.stderr)
-    return 2
+    # 124 follows GNU timeout's convention; argparse already owns 2.
+    return 124
 
 
 def cmd_events(since: int | None = None) -> int:
-    """Incremental event drain. Advances the disk cursor."""
+    """Incremental event drain.
+
+    Only a cursorless invocation advances the disk cursor: it is the
+    operator's bookmark, not a per-reader offset. An explicit --since
+    is a peek and never advances it (0012 D5 cursor invariant).
+    """
     cursor = since if since is not None else read_cursor()
     resp = wire(f"/bot events {cursor}")
     batch = resp.get("batch", {})
     latest = batch.get("latest", cursor)
     print(json.dumps(resp, indent=2))
-    if latest > cursor:
+    if since is None and latest > cursor:
         write_cursor(latest)
     return 0
 
@@ -230,10 +294,37 @@ def cmd_ls(path: str) -> int:
 
 
 def cmd_read(path: str) -> int:
-    """Menu snapshot read. v1: not yet available (menu wire pending)."""
+    """Menu snapshot read. v1: station paths only, wire pending.
+
+    Non-station paths get a typed cat suggestion, never silent
+    substitution: read is the session verb, flat state is not.
+    """
+    if not (path == "/stations" or path.startswith("/stations/")):
+        print(f"read: station paths only - {path} is flat state, "
+              f"use `mc cat {path}`", file=sys.stderr)
+        return 1
     print(f"read: menu domain pending (issue 0012 D1 menu commands): {path}",
           file=sys.stderr)
     return 1
+
+
+def cmd_admin(action: str) -> int:
+    """Operator escape hatch, deliberately outside the namespace.
+
+    stop maps to /bot stop because it sweeps ALL live missions -
+    CommandBus.submit has no single-task gate, so multi-live is
+    reachable - while write /tasks/<id>/cancel covers exactly one
+    (0012 ruling 17). reset is the ADR-0005 crash-latch escape.
+    Friction is a feature: destructive ops verbs do not get path
+    syntax.
+    """
+    if action not in ("stop", "reset"):
+        print(f"admin: unknown action (stop, reset): {action}",
+              file=sys.stderr)
+        return 1
+    resp = wire(f"/bot {action}")
+    print(json.dumps(resp, indent=2))
+    return 0 if resp.get("ok") else 1
 
 
 # ---------------------------------------------------------------------------
@@ -267,7 +358,12 @@ def main(argv: list[str] | None = None) -> int:
     p_wait.add_argument("--timeout", type=int, default=120, help="seconds")
 
     p_events = sub.add_parser("events", help="incremental event drain")
-    p_events.add_argument("--since", type=int, default=None)
+    p_events.add_argument("--since", type=int, default=None,
+                          help="peek from N; does not advance the cursor")
+
+    p_admin = sub.add_parser("admin",
+                             help="operator verbs (outside the namespace)")
+    p_admin.add_argument("action", choices=["stop", "reset"])
 
     args = parser.parse_args(argv)
 
@@ -284,6 +380,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_wait(args.task_id, args.timeout)
         if args.verb == "events":
             return cmd_events(args.since)
+        if args.verb == "admin":
+            return cmd_admin(args.action)
     except RconError as exc:
         print(f"rcon error: {exc}", file=sys.stderr)
         return 3
