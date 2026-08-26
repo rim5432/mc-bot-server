@@ -55,6 +55,8 @@ public final class BotStateJson {
         state.effectAmplifiers().forEach(effects::addProperty);
         root.add("effects", effects);
         root.addProperty("task", state.currentTaskSummary());
+        root.addProperty("healthHearts", state.healthHearts());
+        root.addProperty("freeSlots", state.freeSlots());
         return root;
     }
 }

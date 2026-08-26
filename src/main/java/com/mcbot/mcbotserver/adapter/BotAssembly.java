@@ -246,9 +246,12 @@ public final class BotAssembly {
         // transferable stack count.
         var inv = body.getInventory().snapshot();
         Map<String, Integer> items = new LinkedHashMap<>();
+        int freeSlots = 0;
         for (var slot : inv.main()) {
             if (!slot.isEmpty()) {
                 items.merge(slot.itemId(), slot.count(), Integer::sum);
+            } else {
+                freeSlots++;
             }
         }
         Map<String, Integer> effects = new LinkedHashMap<>();
@@ -257,10 +260,13 @@ public final class BotAssembly {
                     .getKey(instance.getEffect()).toString(),
                 instance.getAmplifier());
         }
+        // Health bucketed to whole hearts: 1 heart = 2 half-heart
+        // units, rounding half up so a fresh bot reads 20.
         return new BotState(poseOf(body), body.getYRot(),
             body.getXRot(), level.dimension().location().getPath(),
             items, inv.selectedSlot(), effects,
-            gotoHandler.activeTaskSummary());
+            gotoHandler.activeTaskSummary(),
+            Math.round(body.getHealth() / 2.0f), freeSlots);
     }
 
     private static CellPos poseOf(BotBodyEntity body) {

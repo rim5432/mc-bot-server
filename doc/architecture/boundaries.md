@@ -47,6 +47,12 @@ documented in [disclosure-patterns.md §1](../reference/disclosure-patterns.md#1
 The event stream carries both generic world events and `TASK_*` events
 that wrap a `TaskResult`; the state snapshot carries a model-relevant
 summary; the command channel carries the verbs the harness issues.
+State-snapshot field set (decision 32, issue 0013 R5): `pos`, `yaw`,
+`pitch`, `dimension`, `itemCounts`, `selectedHotbarSlot`,
+`effectAmplifiers`, `currentTaskSummary`, `healthHearts`,
+`freeSlots`. Health is bucketed to whole hearts (0..20) - the
+change-detect channel compares whole records, so continuous fields
+would push every tick; bucketing keeps the cadence honest.
 
 ### Command channel
 

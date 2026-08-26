@@ -28,6 +28,12 @@ import java.util.Map;
  *                           never null
  * @param currentTaskSummary one-line description of the active task or
  *                           "idle"; never null
+ * @param healthHearts       health bucketed to whole hearts (0..20);
+ *                           bucketing keeps the change-detect cadence
+ *                           honest - a raw float would push on every
+ *                           regen tick (issue 0013 R5)
+ * @param freeSlots          count of empty main-inventory slots; rides
+ *                           the same snapshot loop as itemCounts
  */
 // contract: see boundaries.md Boundary D protocol (state snapshot shape)
 public record BotState(
@@ -38,7 +44,9 @@ public record BotState(
     Map<String, Integer> itemCounts,
     int selectedHotbarSlot,
     Map<String, Integer> effectAmplifiers,
-    String currentTaskSummary) {
+    String currentTaskSummary,
+    int healthHearts,
+    int freeSlots) {
 
     /**
      * Creates a validated snapshot.
@@ -51,6 +59,8 @@ public record BotState(
      * @param selectedHotbarSlot 0..8
      * @param effectAmplifiers   must not be null
      * @param currentTaskSummary must not be null
+     * @param healthHearts       0..20
+     * @param freeSlots          non-negative
      */
     public BotState {
         if (pos == null) {
@@ -61,6 +71,14 @@ public record BotState(
                 "dimension must not be null");
         }
         itemCounts = Map.copyOf(itemCounts);
+        if (healthHearts < 0) {
+            throw new IllegalArgumentException(
+                "healthHearts must not be negative");
+        }
+        if (freeSlots < 0) {
+            throw new IllegalArgumentException(
+                "freeSlots must not be negative");
+        }
         if (selectedHotbarSlot < 0 || selectedHotbarSlot > 8) {
             throw new IllegalArgumentException(
                 "selectedHotbarSlot must be 0..8");

@@ -27,7 +27,7 @@ class StateChannelGateTest {
 
     private static BotState stateAt(int x, String task) {
         return new BotState(new CellPos(x, 64, 0), 0f, 0f, "overworld",
-            Map.of(), 0, Map.of(), task);
+            Map.of(), 0, Map.of(), task, 20, 0);
     }
 
     /**

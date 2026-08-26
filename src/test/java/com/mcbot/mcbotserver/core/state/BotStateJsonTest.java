@@ -28,7 +28,7 @@ class BotStateJsonTest {
             Map.of("minecraft:stone", 32, "minecraft:torch", 2),
             4,
             Map.of("minecraft:speed", 1),
-            "goto x=20 y=64 z=-3");
+            "goto x=20 y=64 z=-3", 20, 5);
 
         JsonObject root = JsonParser.parseString(
             BotStateJson.toJson(state)).getAsJsonObject();
@@ -52,7 +52,7 @@ class BotStateJsonTest {
     void emptyMapsRenderAsObject() {
         BotState state = new BotState(
             new CellPos(0, 0, 0), 0f, 0f,
-            "overworld", Map.of(), 0, Map.of(), "idle");
+            "overworld", Map.of(), 0, Map.of(), "idle", 20, 0);
         JsonObject root = JsonParser.parseString(
             BotStateJson.toJson(state)).getAsJsonObject();
 

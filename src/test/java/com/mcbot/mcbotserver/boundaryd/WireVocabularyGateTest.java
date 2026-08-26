@@ -193,7 +193,8 @@ class WireVocabularyGateTest {
         assertComponents(BotCommand.class, "verb", "args");
         assertComponents(BotState.class, "pos", "yaw", "pitch",
             "dimension", "itemCounts", "selectedHotbarSlot",
-            "effectAmplifiers", "currentTaskSummary");
+            "effectAmplifiers", "currentTaskSummary",
+            "healthHearts", "freeSlots");
     }
 
     private static void assertComponents(Class<?> record,
