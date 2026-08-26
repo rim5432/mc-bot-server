@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Layer-1 gate for the contract-marker convention (AGENTS.md
- * 1.4.3.1 / 1.4.9): every src/main implementer of a boundary
+ * 1.4.3.1, code-health H-R8): every src/main implementer of a boundary
  * interface carries a {@code contract: see ADR-NNNN} or
  * {@code contract: see boundaries.md section X} pointer, so a
  * future agent's "did I just break a contract?" review is one
