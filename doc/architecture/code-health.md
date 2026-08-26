@@ -1,6 +1,6 @@
 ---
 title: Code Health Ledger
-last_verified: 2026-08-26
+last_verified: 2026-08-27
 covers:
   - src/main/java/com/mcbot/mcbotserver/core/tick/BotController.java
   - src/main/java/com/mcbot/mcbotserver/core/tick/MissionReporter.java
@@ -12,6 +12,7 @@ covers:
   - src/test/java/com/mcbot/mcbotserver/hygiene/EnglishOnlyScan.java
   - src/test/java/com/mcbot/mcbotserver/hygiene/GametestInventoryCheck.java
   - src/test/java/com/mcbot/mcbotserver/core/tick/PathingTestAccess.java
+  - src/test/java/com/mcbot/mcbotserver/core/tick/TickGateFixtures.java
   - src/test/java/com/mcbot/mcbotserver/core/tick/TickPipelineGateTest.java
 ---
 

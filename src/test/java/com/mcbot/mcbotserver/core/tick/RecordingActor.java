@@ -40,4 +40,21 @@ public class RecordingActor implements Actor {
         submitted.clear();
         delegate.clearAllIntents();
     }
+
+    /**
+     * Latest submitted claim on a channel, arrival-order scan.
+     *
+     * @param channel the channel to scan for; must not be null
+     * @return the most recent matching claim, or null when the actor
+     *         has none since the last clear
+     */
+    public Claim lastClaim(Channel channel) {
+        Claim found = null;
+        for (Claim c : submitted) {
+            if (c.channel() == channel) {
+                found = c;
+            }
+        }
+        return found;
+    }
 }
