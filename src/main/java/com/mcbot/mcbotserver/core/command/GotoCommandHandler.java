@@ -15,6 +15,7 @@ import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.function.LongSupplier;
 
 /**
@@ -173,16 +174,16 @@ public final class GotoCommandHandler {
 
     private ParsedGoto parse(BotCommand command) {
         Map<String, String> args = command.args();
-        int x = requireInt(args, "x");
-        int y = requireInt(args, "y");
-        int z = requireInt(args, "z");
-        int tolerance = optionalInt(args, "tolerance", 0);
+        int x = numeric(args, "x", null, Integer::parseInt);
+        int y = numeric(args, "y", null, Integer::parseInt);
+        int z = numeric(args, "z", null, Integer::parseInt);
+        int tolerance = numeric(args, "tolerance", 0, Integer::parseInt);
         if (tolerance < 0) {
             throw new IllegalArgumentException(
                 "tolerance must not be negative");
         }
-        long timeout = optionalLong(args, "timeoutTicks",
-            DEFAULT_TIMEOUT_TICKS);
+        long timeout = numeric(args, "timeoutTicks", DEFAULT_TIMEOUT_TICKS,
+            Long::parseLong);
         if (timeout <= 0) {
             throw new IllegalArgumentException(
                 "timeoutTicks must be positive");
@@ -194,41 +195,33 @@ public final class GotoCommandHandler {
         return new ParsedGoto(goal, timeout);
     }
 
-    private int requireInt(Map<String, String> args, String key) {
+    /**
+     * Parse one numeric argument. A {@code null} fallback marks the
+     * argument required: absence rejects the command instead of
+     * defaulting.
+     *
+     * @param args     the validated command arguments; never null
+     * @param key      argument name used verbatim in error text
+     * @param fallback value returned when the key is absent, or
+     *                 {@code null} to make the argument mandatory
+     * @param parse    conversion applied to the trimmed raw string;
+     *                 must throw {@code NumberFormatException} on bad
+     *                 input
+     * @return the parsed number, never null when fallback is non-null
+     * @throws IllegalArgumentException when a required arg is missing
+     *         or the raw value does not parse
+     */
+    private <N> N numeric(Map<String, String> args, String key,
+                          N fallback, Function<String, N> parse) {
         String raw = args.get(key);
         if (raw == null) {
-            throw new IllegalArgumentException("missing arg: " + key);
-        }
-        try {
-            return Integer.parseInt(raw.trim());
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(
-                "arg " + key + " is not an integer: " + raw);
-        }
-    }
-
-    private int optionalInt(Map<String, String> args, String key,
-                            int fallback) {
-        String raw = args.get(key);
-        if (raw == null) {
+            if (fallback == null) {
+                throw new IllegalArgumentException("missing arg: " + key);
+            }
             return fallback;
         }
         try {
-            return Integer.parseInt(raw.trim());
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(
-                "arg " + key + " is not an integer: " + raw);
-        }
-    }
-
-    private long optionalLong(Map<String, String> args, String key,
-                              long fallback) {
-        String raw = args.get(key);
-        if (raw == null) {
-            return fallback;
-        }
-        try {
-            return Long.parseLong(raw.trim());
+            return parse.apply(raw.trim());
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException(
                 "arg " + key + " is not an integer: " + raw);
