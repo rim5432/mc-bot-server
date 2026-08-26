@@ -22,6 +22,7 @@ import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.api.world.WorldView;
 import com.mcbot.mcbotserver.core.behavior.IdleLook;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
+import com.mcbot.mcbotserver.core.process.DigProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.core.process.TerminalMission;
 import com.mcbot.mcbotserver.core.reflex.MinimalReflex;
@@ -480,6 +481,26 @@ public final class BotController {
         // Stage 2: arbiter picks or keeps the winner.
         arbiter.tick(world);
         Directive directive = arbiter.lastDirective();
+
+        // Mission-dig claim path (issue 0013 R1): while a DigProcess
+        // is seated, re-issue the aim + dig claims every tick - the
+        // INTERACT claim expires at each flush, so silence would
+        // reset break progress. Mirrors preemptDigClaims; reflex
+        // preemption still wins because the reflex layer runs first
+        // and parks missions.
+        if (arbiter.current() instanceof DigProcess dig
+                && dig.isActive()) {
+            CellPos digTarget = dig.target();
+            Vec3 from = cellCenter(positionSource.get());
+            Vec3 to = cellCenter(digTarget);
+            actor.submit(new Claim(Channel.ROT, dig.priority(),
+                "mission:dig:" + dig.missionTaskId(),
+                new Intent.Look(IdleLook.yawTo(from, to),
+                    IdleLook.pitchTo(from, to))));
+            actor.submit(new Claim(Channel.INTERACT, dig.priority(),
+                "mission:dig:" + dig.missionTaskId(),
+                new Intent.Dig(digTarget)));
+        }
 
         // Stage 3: behaviors claim channels per directive; reports flow
         // back into the running mission (boundary B response half).

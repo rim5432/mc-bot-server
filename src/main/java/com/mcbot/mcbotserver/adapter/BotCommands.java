@@ -78,6 +78,7 @@ public final class BotCommands {
             .requires(src -> src.hasPermission(2))
             .then(statusBranch(live))
             .then(gotoBranch(live))
+            .then(digBranch(live))
             .then(cancelBranch(live))
             .then(stopBranch(live))
             .then(eventsBranch(live))
@@ -145,6 +146,55 @@ public final class BotCommands {
             IntegerArgumentType.getInteger(ctx, "timeoutTicks")));
         SubmitResult result = ch.bus().submit(
             new BotCommand("goto", args), key);
+        JsonObject root = new JsonObject();
+        if (result instanceof SubmitResult.Ok accepted) {
+            root.addProperty("ok", true);
+            root.addProperty("task", accepted.taskId());
+            root.addProperty("replay", accepted.idempotencyReplay());
+        } else {
+            root.addProperty("ok", false);
+            root.addProperty("reason",
+                ((SubmitResult.Rejected) result).reason());
+        }
+        return answer(ctx.getSource(), root);
+    }
+
+    /**
+     * /bot dig x y z [timeoutTicks] - one-row table growth per
+     * decision 28, sanctioned by issue 0013 R1 (dig is a task: the
+     * executor is multi-tick and the INTERACT claim expires every
+     * tick, so it rides CommandBus exactly like goto).
+     */
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> digBranch(
+            Supplier<Channels> live) {
+        var pos = Commands.argument("x", IntegerArgumentType.integer())
+            .then(Commands.argument("y", IntegerArgumentType.integer())
+                .then(Commands.argument("z", IntegerArgumentType.integer())
+                    .executes(ctx -> runDig(ctx, live, 1200L))
+                    .then(Commands.argument("timeoutTicks",
+                                IntegerArgumentType.integer(1))
+                        .executes(ctx -> runDig(ctx, live,
+                            (long) IntegerArgumentType.getInteger(
+                                ctx, "timeoutTicks"))))));
+        return Commands.literal("dig").then(pos);
+    }
+
+    private static int runDig(CommandContext<CommandSourceStack> ctx,
+                              Supplier<Channels> live, long timeoutTicks) {
+        Channels ch = live.get();
+        if (ch == null) {
+            return answer(ctx.getSource(), err("no active bot"));
+        }
+        Map<String, String> args = new LinkedHashMap<>();
+        args.put("x", String.valueOf(
+            IntegerArgumentType.getInteger(ctx, "x")));
+        args.put("y", String.valueOf(
+            IntegerArgumentType.getInteger(ctx, "y")));
+        args.put("z", String.valueOf(
+            IntegerArgumentType.getInteger(ctx, "z")));
+        args.put("timeoutTicks", String.valueOf(timeoutTicks));
+        SubmitResult result = ch.bus().submit(
+            new BotCommand("dig", args), null);
         JsonObject root = new JsonObject();
         if (result instanceof SubmitResult.Ok accepted) {
             root.addProperty("ok", true);

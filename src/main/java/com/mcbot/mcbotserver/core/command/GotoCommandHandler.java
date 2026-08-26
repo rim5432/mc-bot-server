@@ -78,6 +78,9 @@ public final class GotoCommandHandler {
             throw new IllegalArgumentException("bus must not be null");
         }
         this.bus = bus;
+        // Single-handler setups self-register here; BotAssembly
+        // installs the combined router after both handlers attach,
+        // which overrides this for the full pipeline.
         bus.setCancelListener(this::onCancel);
         bus.register("goto", new CommandBus.Handler() {
             @Override
@@ -154,7 +157,7 @@ public final class GotoCommandHandler {
         return cancelled;
     }
 
-    private void onCancel(String taskId, String verb) {
+    public void onCancel(String taskId, String verb) {
         GotoProcess mission = missions.remove(taskId);
         if (mission == null) {
             return;

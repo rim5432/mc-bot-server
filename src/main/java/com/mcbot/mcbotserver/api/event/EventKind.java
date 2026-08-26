@@ -81,6 +81,11 @@ public final class EventKind {
      */
     public static final String KEEPALIVE = "KEEPALIVE";
 
+    /** A dig mission broke its target block (issue 0013, absorbing
+     *  0009 F3): pos and blockId identify the cell, taskId
+     *  correlates with the task stream. */
+    public static final String BLOCK_BROKEN = "BLOCK_BROKEN";
+
     private EventKind() {
     }
 }

@@ -69,6 +69,8 @@ class WireVocabularyGateTest {
             Map.entry("TASK_DROPPED", Set.of("task", "taskId")),
             Map.entry("TASK_CANCELLED", Set.of("task", "taskId")),
             Map.entry("BOT_CRASHED", Set.of("cause")),
+            Map.entry("BLOCK_BROKEN", Set.of(
+                "taskId", "posX", "posY", "posZ", "blockId")),
             Map.entry("KEEPALIVE", Set.of(
                 "pose", "waypointIndex", "waypointsTotal",
                 "ticksSincePlanProgress", "ticksSincePlan", "planAge",
@@ -84,6 +86,7 @@ class WireVocabularyGateTest {
         "core/event/InMemoryEventQueue.java",
         "core/command/CommandBus.java",
         "core/command/GotoCommandHandler.java",
+        "core/command/DigCommandHandler.java",
         "core/state/ChangeDetectingStateChannel.java",
         "core/tick/BotController.java",
         "core/tick/MissionReporter.java",
