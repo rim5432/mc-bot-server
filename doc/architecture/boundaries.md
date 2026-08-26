@@ -18,7 +18,7 @@ driven via the reopen triggers at the end - never vibe-driven.
 
 | ID | Sides | Contract | Status | Verification |
 |---|---|---|---|---|
-| A | Bot <-> MC engine | Read via WorldView (pure read, mockable, zero side effects). Write via Actor (intents only, idempotent, no self-computed physics); menu transactions ride the same write surface as imperative request-response methods on the actor binding (`MenuTransactions`: openMenu / openInventoryMenu / menuSnapshot / menuClick / closeMenu — never per-tick claims; ledger 29). | FROZEN (menu vocabulary grew 2026-08-26, issue 0007 §6.2 A1 ruling) | core package has zero MC imports; offline unit tests pass against mocks |
+| A | Bot <-> MC engine | Read via WorldView (pure read, mockable, zero side effects). Write via Actor (intents only, idempotent, no self-computed physics); menu transactions ride the same write surface as imperative request-response methods on the actor binding (`MenuTransactions`: openMenu / openInventoryMenu / menuSnapshot / menuClick / closeMenu — never per-tick claims; ledger 29). Slot identity: `InventoryView` (binding-flat) and `MenuView` (menu-flat + `SlotRole`) are BOTH contract index spaces, deliberately not merged (ledger 31) - SlotRole is the only legal join key, and every translation must be a named bridge, never inline arithmetic. | FROZEN (menu vocabulary grew 2026-08-26, issue 0007 §6.2 A1 ruling) | core package has zero MC imports; offline unit tests pass against mocks |
 | B | Process <-> Behavior | Process is side-effect-free; its only output is Directive{Goal, Overrides}. Behavior monopolizes Actor access through per-channel claims. Feedback flows back as ExecutionReport (see ADR-0004) - a request/response loop, not one-way commands. | FROZEN | adding a task = writing one new Process, touching zero Behaviors |
 | C | ReflexLayer <-> Arbiter | Hard call-order constraint: reflex ticks first, non-null reflex skips mission for that tick. Preemption always carries InterruptionContext; resume validates world assumptions first. Reflex never enters arbiter numerics. | FROZEN (ADR-0003) | rewriting the whole rule table is invisible to the Process tier |
 | D | Bot <-> Harness | Two protocol surfaces carrying three semantic shapes. Command channel: `submit(BotCommand) -> SubmitResult` (sealed: `Ok(taskId)` \| `Rejected(reason)`) and `cancel(taskId) -> boolean`. Event stream: `statusSnapshot(sinceEventId) -> EventBatch`. State snapshot: `getState() -> BotState`. Bot does not know the harness -- no LLM awareness, no consumer-count awareness, no polling-interval awareness. See [Boundary D protocol](#boundary-d-protocol) for the full contract (6 invariants, three-channel split, sync error / async execution split, model-relevant state fields). Signatures and protocol frozen; command vocabulary may grow. | FROZEN (signatures + protocol) | swapping the entire harness changes zero bot code |
@@ -717,6 +717,25 @@ BotState getState();
     real second consumer class ever appears, outflow policy
     belongs to the harness side or to a new ledger entry - not to
     bot-side bookkeeping.
+    31. Slot identity dual-space accepted; dual RCON protocol gains
+    an explicit re-evaluation trigger (over-engineering audit round
+    2; user delegation 2026-08-26). (a) InventoryView (binding-flat
+    36 main / 4 armor / offhand) and MenuView (menu-flat indices +
+    SlotRole annotations) remain TWO index spaces on purpose: polled
+    state and open-menu transactions have different lifetimes, and
+    unifying them would spend wire payload where a join key
+    suffices. The defect class this closes is SILENT INDEX
+    ARITHMETIC - the armor-order reversal grew from exactly that -
+    so SlotRole is the only legal join between the spaces and every
+    translation must live in a named, commented bridge (BridgeInventory
+    armor mapping is the exemplar site). (b) Task verbs riding
+    CommandBus + event stream while menu verbs answer synchronous
+    JSON on the RCON socket stays the 0012 D1 shape, but
+    re-evaluation fires when ANY of: menu-family verbs exceed ~12
+    or grow another payload mechanism beyond pagination; a second
+    non-RCON consumer materializes (the standing boundary-D reopen
+    trigger); or the harness needs a unified error model across
+    both surfaces.
 
 ## Deferred, with reopen conditions
 

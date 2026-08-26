@@ -704,3 +704,24 @@ are the deliberate NON-executions, each with its trigger:
   /bot goto brigadier path (it IS the transport mc.py translates
   onto), parked issue 0003 stays in issues/ root (parked is a legal
   root status; archive policy binds resolved only).
+
+Round-2 audit (same day) appends:
+
+- [ ] S  MenuCommands embedded mini-JSON protocol layer
+         (ok/err/answer/executeSteps) extraction into a
+         MenuCommandJson helper: deferred until the concurrent 0012
+         batch lands - the same files are in flight and must not be
+         churned twice.                  [dep: issue 0012 batch closes]
+- [ ] M  Split BotSliceGameTests (~2260L) into per-family holders
+         (movement / menu / interaction / crafting): mechanical, but
+         GametestInventoryCheck.EXPECTED pins class names, so its
+         map updates in the same commit.
+                                             [dep: lean items close]
+- Ruled KEEP on purpose (round 2): BotController crash-policy
+  extraction REJECTED for now - pure relocation of ~75 lines behind
+  a seven-collaborator constructor, and it would move the four
+  `invariant: see ADR-0005` markers away from their write sites;
+  carve-out happens together with the seat wiring after issue 0010
+  rules on the facade. PathingBehavior's four ctors kept - three
+  are test-convenience overloads encoding valid default pairs,
+  removal trades ~20 main lines for noise at every test site.
