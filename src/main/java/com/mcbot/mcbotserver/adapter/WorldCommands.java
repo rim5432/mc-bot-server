@@ -3,7 +3,10 @@ package com.mcbot.mcbotserver.adapter;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
+import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.api.types.Direction;
+import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.api.world.BlockSnapshot;
 import com.mcbot.mcbotserver.api.world.EntitySnapshot;
 import com.mcbot.mcbotserver.api.world.ViewMode;
@@ -49,7 +52,8 @@ public final class WorldCommands {
      *               entity listings); never null
      */
     public record Live(WorldView view, Supplier<CellPos> botPos,
-                       Supplier<String> botId) {
+                       Supplier<String> botId,
+                       InteractBlockExecutor interact) {
     }
 
     /**
@@ -86,9 +90,78 @@ public final class WorldCommands {
                     .executes(ctx -> runEntities(live, ctx.getSource(),
                         IntegerArgumentType.getInteger(ctx, "radius"),
                         IntegerArgumentType.getInteger(ctx, "limit")))));
+        var place = Commands.literal("place")
+            .requires(src -> src.hasPermission(2))
+            .then(Commands.argument("x", IntegerArgumentType.integer())
+                .then(Commands.argument("y", IntegerArgumentType.integer())
+                    .then(Commands.argument("z", IntegerArgumentType.integer())
+                        .then(Commands.argument("face",
+                                    com.mojang.brigadier.arguments
+                                        .StringArgumentType.word())
+                            .executes(ctx -> runPlace(ctx, live))))));
         dispatcher.register(block);
         dispatcher.register(blocks);
         dispatcher.register(entities);
+        dispatcher.register(place);
+    }
+
+    /**
+     * Synchronous one-shot place (issue 0013 R2): the executor is
+     * rising-edge instant, so the command calls it directly between
+     * ticks (MenuCommands precedent) and closes the executor's
+     * silent-no-op gap with a post-state read - the reply says
+     * placed or gives the distinguishable rejection reasons.
+     */
+    private static int runPlace(CommandContext<CommandSourceStack> ctx,
+                                Supplier<Live> live) {
+        Live l = live.get();
+        if (l == null) {
+            return answer(ctx.getSource(), err("no active bot"));
+        }
+        String faceWord = com.mojang.brigadier.arguments.StringArgumentType
+            .getString(ctx, "face").toUpperCase(java.util.Locale.ROOT);
+        Direction face;
+        try {
+            face = Direction.valueOf(faceWord);
+        } catch (IllegalArgumentException e) {
+            return answer(ctx.getSource(),
+                err("unknown face: " + faceWord
+                    + " (up, down, north, south, east, west)"));
+        }
+        CellPos target = new CellPos(
+            IntegerArgumentType.getInteger(ctx, "x"),
+            IntegerArgumentType.getInteger(ctx, "y"),
+            IntegerArgumentType.getInteger(ctx, "z"));
+        CellPos at = face.relative(target);
+        BlockSnapshot before = l.view().getBlock(at, ViewMode.LIVE);
+        if (before == null) {
+            return answer(ctx.getSource(), err("chunk not loaded"));
+        }
+        if (!before.isAir()) {
+            return answer(ctx.getSource(),
+                err("cell not air: " + before.blockId()));
+        }
+        // hitPos is contractually non-null but unused by the executor.
+        l.interact().place(new Intent.InteractBlock(target, face,
+            new Vec3(target.x() + 0.5, target.y() + 0.5,
+                target.z() + 0.5)));
+        BlockSnapshot after = l.view().getBlock(at, ViewMode.LIVE);
+        JsonObject root = ok();
+        root.addProperty("placed", !after.isAir());
+        JsonArray p = new JsonArray();
+        p.add(at.x());
+        p.add(at.y());
+        p.add(at.z());
+        root.add("at", p);
+        root.addProperty("block", after.blockId());
+        if (after.isAir()) {
+            root.addProperty("ok", false);
+            root.addProperty("reason",
+                "rejected (no block item in the selected slot,"
+                    + " cannot survive, or obstructed)");
+            return answer(ctx.getSource(), root);
+        }
+        return answer(ctx.getSource(), root);
     }
 
     /**

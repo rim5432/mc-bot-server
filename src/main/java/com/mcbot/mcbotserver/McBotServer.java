@@ -320,7 +320,7 @@ public class McBotServer {
      */
     private com.mcbot.mcbotserver.adapter.WorldCommands.Live worldLive() {
         if (activeView == null || activeBody == null
-                || !activeBody.isAlive()) {
+                || activeActor == null || !activeBody.isAlive()) {
             return null;
         }
         return new com.mcbot.mcbotserver.adapter.WorldCommands.Live(
@@ -328,7 +328,8 @@ public class McBotServer {
             () -> new com.mcbot.mcbotserver.api.types.CellPos(
                 activeBody.getBlockX(), activeBody.getBlockY(),
                 activeBody.getBlockZ()),
-            () -> String.valueOf(activeBody.getUUID()));
+            () -> String.valueOf(activeBody.getUUID()),
+            activeActor == null ? null : activeActor.interactExecutor());
     }
 
     private com.mcbot.mcbotserver.adapter.MenuCommands.Live menuLive() {

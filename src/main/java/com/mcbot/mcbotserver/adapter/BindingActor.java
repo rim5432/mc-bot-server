@@ -49,6 +49,18 @@ public final class BindingActor implements Actor, MenuTransactions {
     private final DigExecutor dig;
     /** One-shot block placement from the selected hotbar slot (0007). */
     private final InteractBlockExecutor interact;
+
+    /**
+     * The one-shot place executor for the synchronous /bot place verb
+     * (issue 0013 R2). Public for the McBotServer wiring (root
+     * package); adapter-internal semantics - a rising-edge instant
+     * action, safe to call between ticks like the menu transactions.
+     *
+     * @return the executor; never null
+     */
+    public InteractBlockExecutor interactExecutor() {
+        return interact;
+    }
     /** Menu transactions: one facade+opener pair per body (0007 A1). */
     private final MenuOpener menus;
     private boolean lastUsePressing;
