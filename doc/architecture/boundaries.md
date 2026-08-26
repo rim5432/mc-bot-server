@@ -755,6 +755,43 @@ BotState getState();
     the H-R4 friction protocol - WireVocabularyGateTest component
     pin, DisclosureGateTest field set, this state section, and
     BotStateJson change together or not at all.
+    33. Harness interaction model codified: space is a namespace,
+    time is job control (issue 0015; user ruling 2026-08-27 "the
+    architecture is no longer enough - the interaction norms
+    become core design considerations, not a subordinate surface").
+    The model emerged through issues 0011-0014 and now has a
+    first-class canonical home: doc/architecture/harness-interaction.md
+    owns the principles, the grammar tables, and the endgame; this
+    entry is the binding summary and supersedes decision 28's
+    "the table lives in the issue" clause - new verb and path rows
+    still ship with their process issue, but the doc is where the
+    table lives. (a) World state is read through path-addressed
+    NOUNS under a fixed six-verb shell: a new capability must
+    answer "which path does this read or write", never mint a
+    verb. (b) Multi-tick processes are JOBS: write submits, the
+    taskId is the receipt, wait joins, and THE TERMINAL EVENT IS
+    THE VERDICT - completed-vs-failed-with-reason must be
+    machine-decidable from the event alone, because harness exit
+    codes derive from it; a TASK_FAILED without a machine-readable
+    reason is a contract break. (c) Loops divide at engine speed:
+    a loop needing per-tick world feedback lives device-side as a
+    process (MineProcess, 0014, is the exemplar) - the harness
+    never polls the world to drive a loop, it polls the event
+    stream; between-task orchestration lives harness-side as
+    skills over the six verbs, and the CLI never grows control
+    flow - the shell is the language. (d) Reads heavier than the
+    4KB RCON frame materialize once to disk and are served locally
+    (dump-recipes + ~/.mc/recipes + grep, 0012): the wire carries
+    the first copy, never the query load. (e) Vocabulary fidelity:
+    registry ids travel verbatim and quoted (Brigadier word()
+    rejects colons - bitten twice, menu verbs then mine), and the
+    cursor truth (latestEventId / resetAt) is never filtered
+    client-side - display narrowing rides the server-side [only]
+    filter. Living-water re-evaluation: every new task verb, every
+    new path root, and every new consumer kind re-opens the
+    model's audit in the shipping issue; the model itself
+    re-opens when a flow cannot be expressed without breaking
+    (a)-(e).
 
 ## Deferred, with reopen conditions
 
