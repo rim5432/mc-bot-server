@@ -12,7 +12,7 @@ covers:
   - src/main/java/com/mcbot/mcbotserver/adapter/RecipeCatalog.java
   - src/main/java/com/mcbot/mcbotserver/core/tick/MissionReporter.java
   - tool/harness/mc.py
-status: open (design complete - primary interaction model promoted, wire translation table as integration contract, translation-layer invariants recorded; goto migration CLI skeleton shipped 2026-08-26, hardened same day: typed verb discipline, /tasks/<id> derivation, admin stop/reset landing, cursor bookmark rule, 30 wire-mocked CLI tests; menu command implementation queued behind the in-flight menu refactor)
+status: open (design complete - primary interaction model promoted, wire translation table as integration contract, translation-layer invariants recorded; goto migration CLI skeleton shipped 2026-08-26, hardened same day: typed verb discipline, /tasks/<id> derivation, admin stop/reset landing, cursor bookmark rule, 30 wire-mocked CLI tests; goto shadow comparison ALL GREEN 2026-08-26 on identical-failure pairs + cancel chain, COMPLETED sample pending healthy body movement; menu command implementation queued behind the in-flight menu refactor)
 related:
   - doc/architecture/issues/0007-player-parity-interaction.md
   - doc/architecture/issues/0011-harness-surface-convergence.md
@@ -490,11 +490,21 @@ Implementation order:
    `write /stations/*/input`, `write /stations/*/craft` become real
    translations against D1 commands. Run the 6-step verification chain.
 7. **D4 goto migration validation** (can run in parallel with 1-5, since
-   goto wire is already live) - shadow comparison: old path (`/bot goto`) and new
-   path (`mc write /tasks/goto`) each submit once, diff replies and event
-   streams. Write the first skill natively in `mc` syntax (the step-0
-   grep found the call surface empty - there are no legacy skills to
-   rewrite). Completion criterion:
+   goto wire is already live) - shadow comparison EXECUTED 2026-08-26
+   via `tool/harness/shadow_compare.py` (old raw-RCON path vs
+   `mc write /tasks/goto`, 5 checks): ALL GREEN on identical-failure
+   pairs (TIMEOUT x2, then STUCK x2) plus the cancel chain - wire
+   command byte-identical, receipts same shape, bare `taskId` on every
+   terminal kind both paths, `cat /tasks/<id>` derivation agrees with
+   `wait`. No TASK_COMPLETED sample yet: on the live dev server the
+   body does not move (plan produced, waypoint cursor advances, body
+   frozen -> STUCK); movement execution is the pathing workstream's
+   active area - rerun the script for a COMPLETED sample once healthy.
+   The run also fixed a real CLI bug: negative-coordinate write values
+   hit argparse option parsing twice (token classification + argv=None
+   bypassing the shim). Remaining: write the first skill natively in
+   `mc` syntax (the step-0 grep found the call surface empty - there
+   are no legacy skills to rewrite). Completion criterion:
    `grep -r "bot goto" skills/` returns empty + agent runs N sessions
    without touching raw RCON.
 
