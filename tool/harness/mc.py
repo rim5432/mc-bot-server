@@ -332,6 +332,11 @@ def cmd_admin(action: str) -> int:
 # ---------------------------------------------------------------------------
 
 def main(argv: list[str] | None = None) -> int:
+    # Normalize early: the CLI entry calls main() with argv=None and
+    # argparse would then read sys.argv itself, bypassing the
+    # negative-value shim below (found live by shadow_compare).
+    argv = sys.argv[1:] if argv is None else argv
+
     parser = argparse.ArgumentParser(
         prog="mc",
         description="Unix-style CLI for MC Bot Server boundary-D surface")
@@ -365,8 +370,15 @@ def main(argv: list[str] | None = None) -> int:
                              help="operator verbs (outside the namespace)")
     p_admin.add_argument("action", choices=["stop", "reset"])
 
-    args = parser.parse_args(argv)
+    # Negative coordinates ("-60,64,200") look like option tokens to
+    # argparse (its negative-number exemption only covers pure digits).
+    # Reorder write's value behind "--" so the dash survives.
+    if argv and argv[0] == "write" and len(argv) >= 3:
+        path, value, rest = argv[1], argv[2], argv[3:]
+        if value.startswith("-"):
+            argv = ["write", path, *rest, "--", value]
 
+    args = parser.parse_args(argv)
     try:
         if args.verb == "ls":
             return cmd_ls(args.path)

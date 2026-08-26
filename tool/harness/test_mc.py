@@ -311,6 +311,18 @@ class MainDispatchTest(McCliTest):
         self.assertEqual(code, 1)
         self.assertEqual(self.wire_calls, [])
 
+    def test_main_write_accepts_negative_coordinates(self):
+        # Found live by shadow_compare: "-60,64,0" parses as an option
+        # token; the reorder shim must route it through as the value.
+        self.queue({"ok": True, "task": "t9", "replay": False})
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), \
+                contextlib.redirect_stderr(err):
+            code = mc.main(["write", "/tasks/goto", "-60,64,0",
+                            "--tol", "1"])
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["/bot goto -60 64 0 1 1200"])
+
 
 if __name__ == "__main__":
     unittest.main()
