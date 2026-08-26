@@ -12,22 +12,31 @@ Six verbs over a path namespace:
 
 Namespace:
   /player/<field>          cat only (inventory, pos, health, menu, status)
-  /recipes/<item>          cat only (RecipeManager query - wire pending)
-  /stations/<type>@<x,y,z>/<role>  ls/read/write (menu domain - wire pending)
+  /recipes/<item>          cat only (RecipeManager query)
+  /stations/<type>@<x,y,z>/<role>  ls/read/write (menu domain)
   /tasks/                  write (submit goto), wait, cancel
   /events                  events verb only
 
-Wire mapping (v1 - goto migration only):
+Wire mapping:
   cat /player/inventory    -> /bot status  (items field)
   cat /player/pos          -> /bot status  (pos field)
   cat /player/status       -> /bot status  (full)
   cat /player/menu         -> unsupported (menu field pending, issue 0012 D1)
+  cat /recipes/<item>      -> recipes <item>
   cat /tasks/current       -> /bot status  (task field - a displayName
                               summary like "goto:t14", NOT a
                               wait-correlatable id; ids come from
                               write receipts)
   cat /tasks/<id>          -> /bot events 0, filtered by attrs.taskId
                               (client-side derivation, zero wire change)
+  ls /stations/             -> scan 16 50  (nearby container discovery)
+  read /stations/<t>@<pos>/ -> menu open -> menu snapshot -> menu close
+                              (lazy session bind, stateless per-call)
+  read /stations/<t>@<pos>/<role> -> same + client-side role filter
+  write /stations/<t>@<pos>/input "item:count"  -> menu deposit INPUT
+  write /stations/<t>@<pos>/fuel "item:count"   -> menu deposit FUEL
+  write /stations/<t>@<pos>/output "all"|"N"    -> menu take OUTPUT [N]
+  write /stations/crafting@<pos>/recipe "id"     -> menu craft <id>
   write /tasks/goto "x,y,z" [--tol N] [--timeout N] [--key K] -> /bot goto
                               (receipt carries the id under the "task"
                               key - legacy wire naming, echoed as
@@ -81,6 +90,13 @@ from rcon import load_config, run_command, RconError  # noqa: E402
 
 TOOL_DIR = Path(__file__).resolve().parent.parent
 CURSOR_PATH = TOOL_DIR / ".runtime" / "mc_cursor.txt"
+
+# Materialized recipe cache: `mc admin dump-recipes` writes one file
+# per shaped recipe here. Thereafter `mc cat /recipes/<slug>` reads
+# locally (zero wire), and grep over this directory is the reverse
+# lookup ("what can I make with iron_ingot?"). Vanilla recipes are
+# static; re-run dump after a datapack reload.
+RECIPES_DIR = Path.home() / ".mc" / "recipes"
 
 # Terminal task states for wait correlation. Includes CANCELLED and
 # DROPPED: a cancel-then-wait must not burn the full timeout, and a
@@ -147,6 +163,166 @@ def write_cursor(value: int) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Station path parsing and session management (menu domain)
+# ---------------------------------------------------------------------------
+
+# Roles that map to deposit (homogeneous input slots).
+DEPOSIT_ROLES = frozenset({"INPUT", "FUEL"})
+# Roles that map to take (output slots).
+TAKE_ROLES = frozenset({"OUTPUT"})
+# recipe is the craft trigger: write recipeId -> menu craft.
+CRAFT_ROLE = "RECIPE"
+# All known role segments (for error messages).
+ALL_ROLES = DEPOSIT_ROLES | TAKE_ROLES | frozenset({CRAFT_ROLE})
+
+
+def parse_station_path(path: str) -> dict | None:
+    """Parse /stations/<type>@<x,y,z>/<role> into a dict.
+
+    Returns None if the path is not a valid station path. role is None
+    when the path addresses the whole menu (no role segment). The role
+    is uppercased in the returned dict for case-insensitive matching.
+    """
+    if not path.startswith("/stations/"):
+        return None
+    rest = path[len("/stations/"):]
+    if not rest or rest == "/":
+        return None  # /stations/ itself is handled by cmd_ls
+    parts = rest.split("/", 1)
+    station = parts[0]
+    role = parts[1].rstrip("/") if len(parts) > 1 and parts[1] else None
+    if "@" not in station:
+        return None
+    type_, pos_str = station.split("@", 1)
+    try:
+        x, y, z = (int(p.strip()) for p in pos_str.split(","))
+    except (ValueError, AttributeError):
+        return None
+    return {"type": type_, "x": x, "y": y, "z": z,
+            "role": role.upper() if role else None}
+
+
+def station_open(station: dict) -> dict:
+    """Open a station menu. Returns the open reply dict."""
+    return wire(f"menu open {station['x']} {station['y']} {station['z']}")
+
+
+def station_close() -> None:
+    """Close the current station menu. Best-effort, never raises.
+
+    Called in a finally block so a failed operation never leaves a
+    dangling session (the bot-side lease is the backstop, but closing
+    proactively keeps the session state honest).
+    """
+    try:
+        wire("menu close")
+    except RconError:
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Recipe materialization (static data -> disk files -> grep takes over)
+# ---------------------------------------------------------------------------
+
+def fits_inventory_grid(recipe: dict) -> bool:
+    """Client-side replica of RecipeView.fitsInventoryGrid().
+
+    A recipe fits the 2x2 inventory crafting grid when every occupied
+    pattern cell sits in the top-left 2x2. Otherwise it needs a
+    crafting_table. This derivation is pure — no wire call needed.
+    """
+    width = recipe.get("patternWidth", 3)
+    for pos_str in recipe.get("placements", {}):
+        pos = int(pos_str)
+        if pos // width > 1 or pos % width > 1:
+            return False
+    return True
+
+
+def derive_inputs(recipe: dict) -> dict[str, int]:
+    """Derive the economics-view inputs from a recipe's placements.
+
+    Each pattern cell accepts one or more item ids (tag-expanded). For
+    the materialized file we take the first accepted id per cell as the
+    representative and count occurrences. This is the "what does it
+    cost" view; exact placement is the bot's internal concern at craft
+    time (RecipeCatalog.byId -> MenuDriver clicks).
+    """
+    from collections import Counter
+    counts: Counter[str] = Counter()
+    for accepted in recipe.get("placements", {}).values():
+        if accepted:
+            counts[accepted[0]] += 1
+    return dict(counts)
+
+
+def format_recipe_file(recipe: dict) -> str:
+    """Format one shaped recipe as a Unix-style text file.
+
+    Schema (four sections, no shape grid — that is the bot's internal
+    detail):
+        # recipe: <registry-id>
+        station: inventory|crafting_table
+        inputs:
+          <item-id> x<count>
+        output:
+          <item-id> x<count>
+    """
+    station = "inventory" if fits_inventory_grid(recipe) else "crafting_table"
+    inputs = derive_inputs(recipe)
+    lines = [
+        f"# recipe: {recipe['recipeId']}",
+        f"station: {station}",
+        "inputs:",
+    ]
+    for item, count in sorted(inputs.items()):
+        lines.append(f"  {item} x{count}")
+    lines.append("output:")
+    lines.append(f"  {recipe['resultItemId']} x{recipe['resultCount']}")
+    return "\n".join(lines) + "\n"
+
+
+def cmd_admin_dump_recipes() -> int:
+    """Dump every shaped recipe to ~/.mc/recipes/<slug>.
+
+    Pages through `/bot recipes list` (RCON payload cap makes a single
+    call impossible), writes one file per recipe. The slug is the
+    recipe id with the namespace stripped (minecraft:wooden_pickaxe ->
+    wooden_pickaxe); non-vanilla namespaces are preserved in the
+    filename to avoid collisions. Thereafter `mc cat /recipes/<slug>`
+    reads locally and grep over the directory is reverse lookup.
+    """
+    RECIPES_DIR.mkdir(parents=True, exist_ok=True)
+    offset = 0
+    total = None
+    written = 0
+    while True:
+        resp = wire(f"recipes list {offset} 50")
+        if not resp.get("ok"):
+            print(f"dump-recipes: list failed at offset {offset}: "
+                  f"{resp.get('reason', 'unknown')}", file=sys.stderr)
+            return 1
+        batch = resp.get("recipes", [])
+        total = resp.get("total", total)
+        if not batch:
+            break
+        for recipe in batch:
+            rid = recipe.get("recipeId", "")
+            # Strip "minecraft:" prefix for vanilla; keep other namespaces.
+            slug = rid.split(":", 1)[1] if rid.startswith("minecraft:") else rid
+            if not slug:
+                continue
+            (RECIPES_DIR / slug).write_text(
+                format_recipe_file(recipe), encoding="utf-8")
+            written += 1
+        offset += len(batch)
+        if total is not None and offset >= total:
+            break
+    print(f"dumped {written} recipes to {RECIPES_DIR}")
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # Verb implementations (v1 - goto migration surface)
 # ---------------------------------------------------------------------------
 
@@ -181,6 +357,22 @@ def cmd_cat(path: str) -> int:
     task_match = re.fullmatch(r"/tasks/([A-Za-z0-9._:-]+)", path)
     if task_match and path not in ("/tasks/goto",):
         return cmd_cat_task(task_match.group(1))
+    if path == "/recipes" or path.startswith("/recipes/"):
+        item = path[len("/recipes/"):] if path.startswith("/recipes/") else ""
+        if not item:
+            print("cat: /recipes/<item> needs an item id", file=sys.stderr)
+            return 1
+        # Local materialized file first (zero wire). After `mc admin
+        # dump-recipes`, every shaped recipe lives at ~/.mc/recipes/<slug>
+        # and cat reads it directly — the wire byResult query is only the
+        # fallback for items not yet dumped.
+        local = RECIPES_DIR / item
+        if local.exists():
+            sys.stdout.write(local.read_text(encoding="utf-8"))
+            return 0
+        resp = wire(f'recipes "{item}"')
+        print(json.dumps(resp, indent=2))
+        return 0 if resp.get("ok") else 1
     if path == "/stations" or path.startswith("/stations/"):
         # Typed verb error, never silent substitution: cat is the
         # stateless verb; executing read here would lazily bind a
@@ -253,9 +445,95 @@ def cmd_write(path: str, value: str, tol: int | None = None,
         resp = wire(f"/bot cancel {task_id}")
         print(json.dumps(resp, indent=2))
         return 0 if resp.get("ok") else 1
-    print(f"write: unsupported path (v1 supports /tasks/goto, /tasks/<id>/cancel): {path}",
+    if path.startswith("/stations/"):
+        return cmd_write_station(path, value)
+    print(f"write: unsupported path (v1 supports /tasks/goto, /tasks/<id>/cancel, "
+          f"/stations/<type>@<pos>/<role>): {path}",
           file=sys.stderr)
     return 1
+
+
+def cmd_write_station(path: str, value: str) -> int:
+    """Write to a station role. Opens, deposits/takes/crafts, closes.
+
+    Path is role-segmented: /input and /fuel map to deposit (value is
+    "item:count"), /output maps to take (value is "all" or "N"),
+    /recipe maps to craft (value is recipeId). The role is the last
+    path segment, never a verb — this is the Unix-style design from
+    0012 D4: paths carry roles, values carry data.
+    """
+    station = parse_station_path(path)
+    if station is None:
+        print(f"write: invalid station path "
+              f"(expected /stations/<type>@<x,y,z>/<role>): {path}",
+              file=sys.stderr)
+        return 1
+    role = station["role"]
+    if not role:
+        print(f"write: station path needs a role segment "
+              f"(input/fuel/output/recipe): "
+              f"/stations/{station['type']}@.../input",
+              file=sys.stderr)
+        return 1
+    if role not in ALL_ROLES:
+        print(f"write: unknown role '{role.lower()}' "
+              f"(input/fuel/output/recipe)", file=sys.stderr)
+        return 1
+
+    # Pre-validate value format before opening the menu: an invalid
+    # value must not consume a session (the bot-side lease is the
+    # backstop, but failing fast keeps the wire call count honest).
+    if role in DEPOSIT_ROLES and ":" not in value:
+        print(f"write: deposit value must be 'item:count': {value}",
+              file=sys.stderr)
+        return 1
+    if role in DEPOSIT_ROLES:
+        _, count_str = value.rsplit(":", 1)
+        try:
+            int(count_str.strip())
+        except ValueError:
+            print(f"write: count must be integer: {count_str}",
+                  file=sys.stderr)
+            return 1
+    if role in TAKE_ROLES and value.lower() not in ("all", ""):
+        try:
+            int(value.strip())
+        except ValueError:
+            print(f"write: take value must be 'all' or integer: {value}",
+                  file=sys.stderr)
+            return 1
+
+    open_reply = station_open(station)
+    if not open_reply.get("ok"):
+        print(f"write: cannot open {station['type']}@"
+              f"{station['x']},{station['y']},{station['z']}: "
+              f"{open_reply.get('reason', 'unknown')}", file=sys.stderr)
+        return 1
+    try:
+        if role == CRAFT_ROLE:
+            # craft: value is recipeId
+            reply = wire(f'menu craft "{value}"')
+        elif role in DEPOSIT_ROLES:
+            # deposit: value is "item:count" (validated above)
+            item, count_str = value.rsplit(":", 1)
+            count = int(count_str.strip())
+            reply = wire(f'menu deposit {role} "{item.strip()}" {count}')
+        elif role in TAKE_ROLES:
+            # take: value is "all" or "N" (validated above)
+            if value.lower() == "all" or value == "":
+                reply = wire(f"menu take {role}")
+            else:
+                count = int(value.strip())
+                reply = wire(f"menu take {role} {count}")
+        else:
+            # Unreachable: ALL_ROLES check above covers this.
+            print(f"write: unknown role '{role.lower()}'", file=sys.stderr)
+            return 1
+
+        print(json.dumps(reply, indent=2))
+        return 0 if reply.get("ok") else 1
+    finally:
+        station_close()
 
 
 def cmd_wait(task_id: str, timeout_sec: int = 120, poll_interval: float = 1.0) -> int:
@@ -345,31 +623,75 @@ def cmd_events(since: int | None = None) -> int:
 
 
 def cmd_ls(path: str) -> int:
-    """Discovery. v1: /tasks/ lists current task (status-derived)."""
+    """Discovery. /tasks/ -> current task; /stations/ -> scan nearby."""
     if path == "/tasks/" or path == "/tasks":
         resp = wire("/bot status")
         state = resp.get("state", resp)
         current = state.get("task", "idle")
         print(f"current: {current}")
         return 0
-    print(f"ls: unsupported path (v1 supports /tasks/; /stations/ pending menu wire): {path}",
+    if path == "/stations/" or path == "/stations":
+        # scan with default radius=16, limit=50 (0012 D1 defaults).
+        resp = wire("scan 16 50")
+        if not resp.get("ok"):
+            print(f"ls: scan failed: {resp.get('reason', 'unknown')}",
+                  file=sys.stderr)
+            return 1
+        containers = resp.get("containers", [])
+        for c in containers:
+            print(f"{c['type']}@{c['x']},{c['y']},{c['z']}")
+        if resp.get("truncated"):
+            print("... truncated (limit=50)", file=sys.stderr)
+        return 0
+    print(f"ls: unsupported path (v1 supports /tasks/, /stations/): {path}",
           file=sys.stderr)
     return 1
 
 
 def cmd_read(path: str) -> int:
-    """Menu snapshot read. v1: station paths only, wire pending.
+    """Menu snapshot read. Station paths: open, snapshot, close.
 
     Non-station paths get a typed cat suggestion, never silent
     substitution: read is the session verb, flat state is not.
+    A role segment (/input, /fuel, /output) filters the snapshot
+    client-side (zero wire change).
     """
     if not (path == "/stations" or path.startswith("/stations/")):
         print(f"read: station paths only - {path} is flat state, "
               f"use `mc cat {path}`", file=sys.stderr)
         return 1
-    print(f"read: menu domain pending (issue 0012 D1 menu commands): {path}",
-          file=sys.stderr)
-    return 1
+    station = parse_station_path(path)
+    if station is None:
+        print(f"read: invalid station path "
+              f"(expected /stations/<type>@<x,y,z>/[<role>]): {path}",
+              file=sys.stderr)
+        return 1
+    open_reply = station_open(station)
+    if not open_reply.get("ok"):
+        print(f"read: cannot open {station['type']}@"
+              f"{station['x']},{station['y']},{station['z']}: "
+              f"{open_reply.get('reason', 'unknown')}", file=sys.stderr)
+        return 1
+    try:
+        snap = wire("menu snapshot")
+        if not snap.get("ok"):
+            print(f"read: snapshot failed: "
+                  f"{snap.get('reason', 'unknown')}", file=sys.stderr)
+            return 1
+        if station["role"]:
+            # Client-side filter by role (zero wire change).
+            slots = snap.get("slots", [])
+            filtered = [s for s in slots
+                        if s.get("role", "").upper() == station["role"]]
+            print(json.dumps({"type": snap.get("type"),
+                               "pos": snap.get("pos"),
+                               "role": station["role"].lower(),
+                               "slots": filtered}, indent=2))
+        else:
+            print(json.dumps(snap, indent=2))
+        return 0
+    finally:
+        station_close()
 
 
 def cmd_admin(action: str) -> int:
@@ -379,11 +701,15 @@ def cmd_admin(action: str) -> int:
     CommandBus.submit has no single-task gate, so multi-live is
     reachable - while write /tasks/<id>/cancel covers exactly one
     (0012 ruling 17). reset is the ADR-0005 crash-latch escape.
-    Friction is a feature: destructive ops verbs do not get path
-    syntax.
+    dump-recipes is a CLI-internal composite: pages through `/bot
+    recipes list` and writes one file per recipe to ~/.mc/recipes/.
+    Friction is a feature: destructive ops and maintenance verbs do
+    not get path syntax.
     """
+    if action == "dump-recipes":
+        return cmd_admin_dump_recipes()
     if action not in ("stop", "reset"):
-        print(f"admin: unknown action (stop, reset): {action}",
+        print(f"admin: unknown action (stop, reset, dump-recipes): {action}",
               file=sys.stderr)
         return 1
     resp = wire(f"/bot {action}")
@@ -432,7 +758,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_admin = sub.add_parser("admin",
                              help="operator verbs (outside the namespace)")
-    p_admin.add_argument("action", choices=["stop", "reset"])
+    p_admin.add_argument("action", choices=["stop", "reset", "dump-recipes"])
 
     # Negative coordinates ("-60,64,200") look like option tokens to
     # argparse (its negative-number exemption only covers pure digits).

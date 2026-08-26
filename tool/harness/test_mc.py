@@ -94,11 +94,20 @@ class VerbDisciplineTest(McCliTest):
         self.assertEqual(code, 1)
         self.assertIn("cat", err)
 
-    def test_read_station_path_reports_wire_pending(self):
-        code, _, err = self.run_verb(mc.cmd_read, "/stations/chest@1,2,3/")
-        self.assertEqual(code, 1)
-        self.assertIn("pending", err)
+    def test_read_station_path_does_not_suggest_cat(self):
+        # Station paths are read's correct domain: it must not suggest
+        # cat (that would be a verb-discipline violation). It opens,
+        # snapshots, and closes.
+        self.queue(
+            {"ok": True},  # menu open
+            {"ok": True, "type": "chest", "pos": [1, 2, 3], "slots": []},
+            {"ok": True},  # menu close
+        )
+        code, out, err = self.run_verb(mc.cmd_read, "/stations/chest@1,2,3/")
+        self.assertEqual(code, 0)
         self.assertNotIn("`mc cat", err)
+        self.assertEqual(self.wire_calls,
+                         ["menu open 1 2 3", "menu snapshot", "menu close"])
 
     def test_cat_player_menu_is_unsupported_not_task_summary(self):
         self.queue({"ok": True, "state": {"task": "goto:t1"}})
@@ -393,7 +402,7 @@ class MainDispatchTest(McCliTest):
         out, err = io.StringIO(), io.StringIO()
         with contextlib.redirect_stdout(out), \
                 contextlib.redirect_stderr(err):
-            code = mc.main(["cat", "/recipes/stick"])
+            code = mc.main(["cat", "/unknown/path"])
         self.assertEqual(code, 1)
         self.assertEqual(self.wire_calls, [])
 
@@ -408,6 +417,270 @@ class MainDispatchTest(McCliTest):
                             "--tol", "1"])
         self.assertEqual(code, 0)
         self.assertEqual(self.wire_calls, ["/bot goto -60 64 0 1 1200"])
+
+
+class StationPathParseTest(unittest.TestCase):
+    """parse_station_path: /stations/<type>@<x,y,z>/<role>."""
+
+    def test_full_path_with_role(self):
+        result = mc.parse_station_path("/stations/furnace@10,64,28/input")
+        self.assertIsNotNone(result)
+        self.assertEqual(result["type"], "furnace")
+        self.assertEqual(result["x"], 10)
+        self.assertEqual(result["y"], 64)
+        self.assertEqual(result["z"], 28)
+        self.assertEqual(result["role"], "INPUT")
+
+    def test_path_without_role(self):
+        result = mc.parse_station_path("/stations/chest@1,2,3/")
+        self.assertIsNotNone(result)
+        self.assertEqual(result["type"], "chest")
+        self.assertEqual(result["role"], None)
+
+    def test_role_is_case_insensitive(self):
+        result = mc.parse_station_path("/stations/furnace@1,2,3/Fuel")
+        self.assertEqual(result["role"], "FUEL")
+
+    def test_stations_root_returns_none(self):
+        # /stations/ itself is handled by cmd_ls, not parse.
+        self.assertIsNone(mc.parse_station_path("/stations/"))
+        self.assertIsNone(mc.parse_station_path("/stations"))
+
+    def test_missing_at_returns_none(self):
+        self.assertIsNone(mc.parse_station_path("/stations/chest1,2,3/"))
+
+    def test_malformed_coords_returns_none(self):
+        self.assertIsNone(mc.parse_station_path("/stations/chest@1,2/"))
+        self.assertIsNone(mc.parse_station_path("/stations/chest@a,b,c/"))
+
+    def test_negative_coordinates_parse(self):
+        result = mc.parse_station_path("/stations/chest@-60,64,0/")
+        self.assertIsNotNone(result)
+        self.assertEqual(result["x"], -60)
+        self.assertEqual(result["z"], 0)
+
+
+class LsStationsTest(McCliTest):
+    """ls /stations/ -> scan 16 50."""
+
+    def test_translates_to_scan_with_defaults(self):
+        self.queue({"ok": True, "containers": [
+            {"type": "chest", "x": 10, "y": 64, "z": 20},
+            {"type": "furnace", "x": 12, "y": 64, "z": 22},
+        ], "truncated": False})
+        code, out, _ = self.run_verb(mc.cmd_ls, "/stations/")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["scan 16 50"])
+        lines = out.strip().split("\n")
+        self.assertEqual(lines, ["chest@10,64,20", "furnace@12,64,22"])
+
+    def test_reports_truncated_on_stderr(self):
+        self.queue({"ok": True, "containers": [], "truncated": True})
+        code, _, err = self.run_verb(mc.cmd_ls, "/stations/")
+        self.assertEqual(code, 0)
+        self.assertIn("truncated", err)
+
+    def test_scan_failure_exits_one(self):
+        self.queue({"ok": False, "reason": "out of range"})
+        code, _, err = self.run_verb(mc.cmd_ls, "/stations/")
+        self.assertEqual(code, 1)
+        self.assertIn("scan failed", err)
+
+
+class ReadStationTest(McCliTest):
+    """read /stations/<t>@<pos>/[<role>] -> open + snapshot + close."""
+
+    def test_full_snapshot_opens_snapshots_closes(self):
+        self.queue(
+            {"ok": True},  # open
+            {"ok": True, "type": "chest", "pos": [1, 2, 3],
+             "slots": [{"role": "INPUT", "index": 0,
+                        "item": "iron_ingot", "count": 8}]},
+            {"ok": True},  # close
+        )
+        code, out, _ = self.run_verb(mc.cmd_read, "/stations/chest@1,2,3/")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls,
+                         ["menu open 1 2 3", "menu snapshot", "menu close"])
+        result = json.loads(out)
+        self.assertEqual(result["type"], "chest")
+        self.assertEqual(len(result["slots"]), 1)
+
+    def test_role_filter_is_client_side(self):
+        self.queue(
+            {"ok": True},
+            {"ok": True, "type": "furnace", "pos": [1, 2, 3], "slots": [
+                {"role": "INPUT", "index": 0, "item": "iron_ore", "count": 8},
+                {"role": "FUEL", "index": 1, "item": "coal", "count": 16},
+                {"role": "OUTPUT", "index": 2, "item": "iron_ingot", "count": 3},
+            ]},
+            {"ok": True},
+        )
+        code, out, _ = self.run_verb(
+            mc.cmd_read, "/stations/furnace@1,2,3/output")
+        self.assertEqual(code, 0)
+        # Only one wire snapshot (no role param on wire).
+        self.assertEqual(self.wire_calls[1], "menu snapshot")
+        result = json.loads(out)
+        self.assertEqual(result["role"], "output")
+        self.assertEqual(len(result["slots"]), 1)
+        self.assertEqual(result["slots"][0]["item"], "iron_ingot")
+
+    def test_open_failure_exits_one_without_snapshot_or_close(self):
+        self.queue({"ok": False, "reason": "out of reach"})
+        code, _, err = self.run_verb(mc.cmd_read, "/stations/chest@1,2,3/")
+        self.assertEqual(code, 1)
+        self.assertIn("cannot open", err)
+        self.assertEqual(self.wire_calls, ["menu open 1 2 3"])
+
+    def test_snapshot_failure_still_closes(self):
+        self.queue(
+            {"ok": True},  # open
+            {"ok": False, "reason": "no menu open"},
+            {"ok": True},  # close (finally)
+        )
+        code, _, err = self.run_verb(mc.cmd_read, "/stations/chest@1,2,3/")
+        self.assertEqual(code, 1)
+        self.assertIn("snapshot failed", err)
+        self.assertEqual(self.wire_calls,
+                         ["menu open 1 2 3", "menu snapshot", "menu close"])
+
+    def test_invalid_path_exits_one(self):
+        code, _, err = self.run_verb(mc.cmd_read, "/stations/chest1,2,3/")
+        self.assertEqual(code, 1)
+        self.assertIn("invalid station path", err)
+        self.assertEqual(self.wire_calls, [])
+
+
+class WriteStationTest(McCliTest):
+    """write /stations/<t>@<pos>/<role> <value> -> deposit/take/craft."""
+
+    def test_deposit_input_translates_to_menu_deposit(self):
+        self.queue(
+            {"ok": True},  # open
+            {"ok": True, "placed": 8},
+            {"ok": True},  # close
+        )
+        code, out, _ = self.run_verb(
+            mc.cmd_write, "/stations/chest@1,2,3/input", "iron_ingot:8")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls,
+                         ["menu open 1 2 3",
+                          "menu deposit INPUT \"iron_ingot\" 8",
+                          "menu close"])
+        self.assertEqual(json.loads(out)["placed"], 8)
+
+    def test_deposit_fuel_translates_to_fuel_role(self):
+        self.queue({"ok": True}, {"ok": True, "placed": 16}, {"ok": True})
+        code, _, _ = self.run_verb(
+            mc.cmd_write, "/stations/furnace@1,2,3/fuel", "coal:16")
+        self.assertEqual(code, 0)
+        self.assertIn('menu deposit FUEL "coal" 16', self.wire_calls)
+
+    def test_take_output_all_omits_count(self):
+        self.queue({"ok": True}, {"ok": True, "taken": [
+            {"item": "iron_ingot", "count": 3}]}, {"ok": True})
+        code, _, _ = self.run_verb(
+            mc.cmd_write, "/stations/furnace@1,2,3/output", "all")
+        self.assertEqual(code, 0)
+        self.assertIn("menu take OUTPUT", self.wire_calls)
+        # "all" must NOT append a count argument.
+        self.assertNotIn("menu take OUTPUT all", self.wire_calls)
+
+    def test_take_output_n_appends_count(self):
+        self.queue({"ok": True}, {"ok": True, "taken": []}, {"ok": True})
+        code, _, _ = self.run_verb(
+            mc.cmd_write, "/stations/chest@1,2,3/output", "8")
+        self.assertEqual(code, 0)
+        self.assertIn("menu take OUTPUT 8", self.wire_calls)
+
+    def test_craft_recipe_translates_to_menu_craft(self):
+        self.queue({"ok": True},
+                   {"ok": True, "result": "wooden_pickaxe", "count": 1},
+                   {"ok": True})
+        code, out, _ = self.run_verb(
+            mc.cmd_write, "/stations/crafting@1,2,3/recipe", "wooden_pickaxe")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls,
+                         ["menu open 1 2 3",
+                          "menu craft \"wooden_pickaxe\"",
+                          "menu close"])
+        self.assertEqual(json.loads(out)["result"], "wooden_pickaxe")
+
+    def test_deposit_without_colon_rejected_before_wire(self):
+        code, _, err = self.run_verb(
+            mc.cmd_write, "/stations/chest@1,2,3/input", "iron_ingot")
+        self.assertEqual(code, 1)
+        self.assertIn("item:count", err)
+        self.assertEqual(self.wire_calls, [])
+
+    def test_take_with_invalid_value_rejected(self):
+        code, _, err = self.run_verb(
+            mc.cmd_write, "/stations/chest@1,2,3/output", "half")
+        self.assertEqual(code, 1)
+        self.assertIn("all", err)
+        self.assertEqual(self.wire_calls, [])
+
+    def test_unknown_role_rejected(self):
+        code, _, err = self.run_verb(
+            mc.cmd_write, "/stations/chest@1,2,3/armor", "diamond:1")
+        self.assertEqual(code, 1)
+        self.assertIn("unknown role", err)
+        self.assertEqual(self.wire_calls, [])
+
+    def test_missing_role_rejected(self):
+        code, _, err = self.run_verb(
+            mc.cmd_write, "/stations/chest@1,2,3/", "iron_ingot:8")
+        self.assertEqual(code, 1)
+        self.assertIn("role segment", err)
+        self.assertEqual(self.wire_calls, [])
+
+    def test_open_failure_exits_one_without_operation(self):
+        self.queue({"ok": False, "reason": "out of reach"})
+        code, _, err = self.run_verb(
+            mc.cmd_write, "/stations/chest@1,2,3/input", "iron_ingot:8")
+        self.assertEqual(code, 1)
+        self.assertIn("cannot open", err)
+        self.assertEqual(self.wire_calls, ["menu open 1 2 3"])
+
+    def test_operation_failure_still_closes(self):
+        self.queue(
+            {"ok": True},
+            {"ok": False, "reason": "not enough", "have": 3},
+            {"ok": True},
+        )
+        code, out, _ = self.run_verb(
+            mc.cmd_write, "/stations/chest@1,2,3/input", "iron_ingot:8")
+        self.assertEqual(code, 1)
+        self.assertEqual(json.loads(out)["reason"], "not enough")
+        self.assertEqual(self.wire_calls,
+                         ["menu open 1 2 3",
+                          "menu deposit INPUT \"iron_ingot\" 8",
+                          "menu close"])
+
+
+class CatRecipesTest(McCliTest):
+    """cat /recipes/<item> -> recipes <item>."""
+
+    def test_translates_to_recipes(self):
+        self.queue({"ok": True, "recipeId": "minecraft:stick",
+                    "result": "stick", "count": 4,
+                    "inputs": [{"item": "plank", "count": 2}]})
+        code, out, _ = self.run_verb(mc.cmd_cat, "/recipes/stick")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ['recipes "stick"'])
+        self.assertEqual(json.loads(out)["result"], "stick")
+
+    def test_empty_item_rejected(self):
+        code, _, err = self.run_verb(mc.cmd_cat, "/recipes/")
+        self.assertEqual(code, 1)
+        self.assertIn("item id", err)
+        self.assertEqual(self.wire_calls, [])
+
+    def test_recipes_failure_exits_one(self):
+        self.queue({"ok": False, "reason": "unknown item"})
+        code, _, _ = self.run_verb(mc.cmd_cat, "/recipes/nonexistent")
+        self.assertEqual(code, 1)
 
 
 if __name__ == "__main__":

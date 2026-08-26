@@ -141,6 +141,28 @@ calls; wire commands (D1) are the translation target, not the API.
 
 `cat` vs `read` is determined by path prefix: `/player/*` and `/tasks/current` are `cat` (stateless); `/stations/*` is `read` (lazy session bind). Verb misselection is a typed error, never silent substitution: `cat` on a station path replies with the `read` suggestion and exits 1, and vice versa. `cat` is the stateless verb - executing `read` under its name would lazily bind a bot-side menu session as a side effect of a read. Unix tools suggest, they do not substitute.
 
+**Path segment discipline (the core design principle):** the last path
+segment under `/stations/` is always a *role*, never a *verb*. This is
+what makes the interaction Unix-native rather than a custom RPC dressed
+up as paths:
+
+- `/input` and `/fuel` map to `deposit` (homogeneous input slots); the
+  value is `item:count` (data, not a command).
+- `/output` maps to `take`; the value is `all` or `N` (data, not a
+  command verb like `"take"`).
+- `/recipe` maps to `craft`; the value is the recipeId (data). The
+  path segment is `recipe` (the role of the crafting grid's result
+  slot), NOT `craft` (which would be a verb in the path — a Unix
+  anti-pattern). Writing to the recipe slot triggers the craft, just as
+  writing to a device file triggers an I/O operation.
+
+This discipline means the CLI has exactly six verbs and the path
+namespace carries all semantic differentiation. Adding a new menu kind
+(furnace, brewing stand, enchantment table) requires zero new verbs —
+only new role segments under that station's path, and the wire
+translation table grows one row. The LLM discovers capabilities by
+`ls`-ing the path, not by reading a tool schema.
+
 **Existing six-wire-verb landing table (goto migration - zero wire changes):**
 
 | Existing wire | Namespace landing | Wire change |
@@ -174,7 +196,7 @@ comparison testing.
 ```
 mc ls /stations/                          # scan: find crafting_table + chest
 mc cat /player/inventory                  # confirm materials
-mc write /stations/crafting@x,y,z/craft "wooden_pickaxe"   # reply carries inventory delta
+mc write /stations/crafting@x,y,z/recipe "wooden_pickaxe"   # reply carries inventory delta
 mc read /stations/chest@x,y,z/            # station switch: close-before-open
 mc write /stations/chest@x,y,z/input "wooden_pickaxe:1"
 mc cat /player/inventory                  # confirm pickaxe left inventory
@@ -184,16 +206,22 @@ Step 4 (crafting -> chest switch) is the first real test of the
 close-before-open discipline and the composite-key diff (MENU_CLOSED +
 MENU_OPENED in one transition).
 
-**CLI skeleton status:** `tool/harness/mc.py` ships v1 covering the goto
-migration surface (`cat /player/*`, `cat /tasks/current`, `cat
-/tasks/<id>`, `write /tasks/goto`, `write /tasks/<id>/cancel`, `wait`,
-`events`, `ls /tasks/`, `admin stop` / `admin reset`). Menu-domain verbs
-(`read /stations/*`, `write /stations/*/input`, `write /stations/*/craft`)
-are stubs that report "wire pending" until D1 menu commands land.
-Translation layer is transparent-first: no default values, no retries, no
-corrections - parameters pass through to wire verbatim. Covered by
-wire-mocked unit tests (`tool/harness/test_mc.py`, 30 tests, stdlib
-unittest, no server).
+**CLI implementation status:** `tool/harness/mc.py` ships the full
+six-verb translation layer. Goto-migration surface (`cat /player/*`,
+`cat /tasks/current`, `cat /tasks/<id>`, `write /tasks/goto`,
+`write /tasks/<id>/cancel`, `wait`, `events`, `ls /tasks/`, `admin
+stop` / `admin reset`) is live against existing wire. Menu-domain
+verbs (`ls /stations/`, `read /stations/*`, `write /stations/*/input`,
+`write /stations/*/fuel`, `write /stations/*/output`,
+`write /stations/*/recipe`, `cat /recipes/*`) are implemented in the
+translation layer but require D1 wire commands to land before they
+function against a live server. The path-segment-is-role design
+(`/recipe` not `/craft`, `/output` value is `all` or `N` not a
+command verb) is pinned in the translation layer and covered by
+wire-mocked unit tests. Translation layer is transparent-first: no
+default values (except goto server-default mirroring, documented), no
+retries, no corrections. Covered by wire-mocked unit tests
+(`tool/harness/test_mc.py`, 65 tests, stdlib unittest, no server).
 
 **Receipt rule (model-layer, not wire detail):** `write` replies carry
 the direct consequence of the write plus a `seq` version number. This is
@@ -236,11 +264,13 @@ harness-side CLI translation. Both workflows develop against this table.
 | `write` | `/tasks/<id>/cancel` | `/bot cancel <id>` | live |
 | `wait` | `<taskId>` | poll `/bot events` until terminal | live |
 | `events` | `/events` | `/bot events <cursor>` | live |
-| `ls` | `/stations/` | `/bot scan [radius] [limit]` | pending |
-| `read` | `/stations/<type>@<pos>/` | `/bot menu snapshot` | pending |
-| `write` | `/stations/<type>@<pos>/input` | `/bot menu deposit <role> <item> <count>` | pending |
-| `write` | `/stations/<type>@<pos>/output` | `/bot menu take <role> [count]` | pending |
-| `write` | `/stations/crafting@<pos>/craft` | `/bot menu craft <recipeId>` | pending |
+| `ls` | `/stations/` | `/bot scan [radius] [limit]` | live |
+| `read` | `/stations/<type>@<pos>/` | `/bot menu open` + `/bot menu snapshot` + `/bot menu close` (CLI-managed session, lazy bind) | live |
+| `read` | `/stations/<type>@<pos>/<role>` | same + client-side role filter (zero wire change) | live |
+| `write` | `/stations/<type>@<pos>/input` | `/bot menu deposit INPUT <item> <count>` (value is `item:count`; item id is a quoted string arg) | live |
+| `write` | `/stations/<type>@<pos>/fuel` | `/bot menu deposit FUEL <item> <count>` | live |
+| `write` | `/stations/<type>@<pos>/output` | `/bot menu take OUTPUT [count]` (value is `all` or `N`) | live |
+| `write` | `/stations/crafting@<pos>/recipe` | `/bot menu craft <recipeId>` (value is recipeId; path segment is the recipe role, NOT a verb) | live |
 | `cat` | `/recipes/<item>` | `/bot recipes <itemId>` | pending |
 | `admin` | `stop` / `reset` | `/bot stop` / `/bot reset` | live |
 
@@ -263,6 +293,7 @@ No taskId, no event-stream result reporting - the result IS the RCON reply.
 | `menu take <slotRole> [count]` | bot-side composite: shift-click from slot to inventory | `{ok:true, taken:N}` |
 | `menu craft <recipeId>` | bot-side composite: `RecipeCatalog.byId`, place ingredients, take result | `{ok:true, result:item, count:N}` or `{ok:false, reason, blockers:[]}` |
 | `scan [radius] [limit]` | read-only: nearby container block entities | `{containers:[...], truncated:bool}` |
+| `recipes list [offset] [limit]` | read-only paginated full listing: `RecipeCatalog.list` (shaped recipes only, shapeless skipped) | `{recipes:[...], total:N, offset:M, limit:L, truncated:bool}` |
 | `recipes <itemId>` | read-only: `RecipeCatalog.byResult` | `{recipes:[...]}` |
 
 `deposit`/`take` operate on homogeneous slots (chest, furnace
@@ -276,6 +307,65 @@ mapping is `menu craft`, not `menu deposit`.
 Atomicity: sufficiency check and click loop execute inside the same latch
 scope (`server.execute()` post). On insufficient items, ZERO clicks
 perform - no partial deposit.
+
+**Recipe listing and materialization (static data -> disk -> grep):**
+
+D1 wire batch LANDED 2026-08-26 (two coordinated sessions): menu
+open / open-inventory / snapshot / close / deposit / take / craft, scan,
+recipes (+ paginated recipes list). Semantics of the composites follow
+the planner's real capabilities: deposit and take are ROLE-addressed
+with exact counts via split carries (lift, right-click one item per
+place, return the remainder; `MenuPlanner.planDepositCounted` /
+`planTakeRole`), and role words resolve per menu kind - furnace /
+blast_furnace / smoker carry real INPUT / FUEL / OUTPUT slots
+(`BindingMenu.roleOf` furnace case, `SlotRole` grown by three); every
+other kind maps intent roles onto the single CONTAINER region
+(`MenuCommands.resolveRole`). The D0 zero-per-kind open path landed
+with them: any standard `MenuProvider` block opens through
+`state.getMenuProvider().createMenu(...)` with the block key tail as
+the snapshot type (MenuOpener generic fallback).
+
+The full recipe set is too large for one RCON payload (Source RCON caps
+around 4 KB; vanilla has hundreds of shaped recipes). `recipes list`
+pages through with offset/limit; the reply carries `total` and
+`truncated` so the caller knows when to stop. Default offset=0,
+limit=50, max limit=200.
+
+`mc admin dump-recipes` is the harness-side consumer: it pages through
+`recipes list`, writes one file per recipe to `~/.mc/recipes/<slug>`,
+and thereafter `mc cat /recipes/<slug>` reads locally (zero wire). The
+slug strips the `minecraft:` namespace for vanilla recipes; non-vanilla
+namespaces are preserved to avoid collisions.
+
+Materialized recipe file schema (no shape grid — placement is the bot's
+internal concern at craft time via `RecipeCatalog.byId`):
+
+```
+# recipe: minecraft:wooden_pickaxe
+station: crafting_table
+inputs:
+  minecraft:oak_planks x3
+  minecraft:stick x2
+output:
+  minecraft:wooden_pickaxe x1
+```
+
+`station` is derived from `RecipeView.fitsInventoryGrid()`: `inventory`
+for 2x2-fit recipes, `crafting_table` otherwise. `inputs` takes the
+first accepted item id per pattern cell (tag-expanded at query time) and
+counts occurrences — the economics view ("what does it cost"), not the
+placement view.
+
+This makes three recipe queries pure file-system operations:
+- `cat ~/.mc/recipes/iron_pickaxe` — forward lookup (how to make X)
+- `ls ~/.mc/recipes/ | grep pick` — name search (what pickaxes exist)
+- `grep -l "iron_ingot" ~/.mc/recipes/*` — reverse lookup (what can I
+  make with Y)
+
+No `byIngredients` wire command needed — grep is the reverse index.
+Invalidation is manual: re-run `dump-recipes` after a datapack reload
+(vanilla recipes never change; no epoch detection or mtime comparison in
+v1 — that is complexity for a problem that does not exist yet).
 
 ### D2 Self-describing disclosure (the data-driven half)
 
