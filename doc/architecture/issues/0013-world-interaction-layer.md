@@ -141,7 +141,8 @@ spelling.
 | `cat /player/health` | `/bot status` (healthHearts field) | state | live 2026-08-27 (10 hearts = 20 HP full) |
 | `cat /player/inventory/free` | `/bot status` (freeSlots field) | state | live 2026-08-27 |
 | `write /tasks/dig "x,y,z"` | `/bot dig x y z [timeoutTicks]` | task | live 2026-08-27 (TASK_COMPLETED + BLOCK_BROKEN, block gone) |
-| `write /actions/place "x,y,z,face"` | `place x y z face` | sync action | rejection paths live (cell-not-air with the real pre-state); success path blocked on equip (no hotbar-selection verb yet) |
+| `write /actions/place "x,y,z,face"` | `place x y z face` | sync action | live 2026-08-27 (rejection paths + success path via equip) |
+| `write /actions/equip <slot>` | `equip <slot>` (0..8) | sync action | live 2026-08-27 (unlocks place success path; updates body.selectedSlot + inventory mirror) |
 
 Live findings recorded: (1) GoalNear(target, 3) admits chebyshev-3
 stops that are ~5.2 euclidean eye-to-block - beyond DigExecutor's 4.5
