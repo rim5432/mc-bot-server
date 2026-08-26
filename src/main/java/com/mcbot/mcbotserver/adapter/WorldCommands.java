@@ -17,6 +17,7 @@ import com.mojang.brigadier.context.CommandContext;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.IntConsumer;
 import java.util.function.Supplier;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -50,10 +51,16 @@ public final class WorldCommands {
      *               never null
      * @param botId  the bot body's UUID string (self-flagging in
      *               entity listings); never null
+     * @param interact the block-placement executor; never null
+     * @param equip  hotbar selection writer (0..8); updates both the
+     *               body's selectedSlot field and the inventory binding's
+     *               mirror so place/drop and state disclosure agree;
+     *               never null
      */
     public record Live(WorldView view, Supplier<CellPos> botPos,
                        Supplier<String> botId,
-                       InteractBlockExecutor interact) {
+                       InteractBlockExecutor interact,
+                       IntConsumer equip) {
     }
 
     /**
@@ -100,10 +107,16 @@ public final class WorldCommands {
                                     com.mojang.brigadier.arguments
                                         .StringArgumentType.word())
                             .executes(ctx -> runPlace(ctx, live))))));
+        var equip = Commands.literal("equip")
+            .requires(src -> src.hasPermission(2))
+            .then(Commands.argument("slot",
+                        IntegerArgumentType.integer(0, 8))
+                .executes(ctx -> runEquip(ctx, live)));
         dispatcher.register(block);
         dispatcher.register(blocks);
         dispatcher.register(entities);
         dispatcher.register(place);
+        dispatcher.register(equip);
     }
 
     /**
@@ -162,6 +175,31 @@ public final class WorldCommands {
                     + " cannot survive, or obstructed)");
             return answer(ctx.getSource(), root);
         }
+        return answer(ctx.getSource(), root);
+    }
+
+    /**
+     * Synchronous hotbar selection (issue 0013 deferred: equip). Writes
+     * the selected slot through the {@code equip} consumer, which updates
+     * both the body's {@code selectedSlot} field (used by place/drop) and
+     * the inventory binding's mirror (used by state disclosure). The
+     * reply carries the newly selected slot and the item now in hand so
+     * the caller can confirm the equip landed on the intended item.
+     */
+    private static int runEquip(CommandContext<CommandSourceStack> ctx,
+                                 Supplier<Live> live) {
+        Live l = live.get();
+        if (l == null) {
+            return answer(ctx.getSource(), err("no active bot"));
+        }
+        int slot = IntegerArgumentType.getInteger(ctx, "slot");
+        l.equip().accept(slot);
+        var inv = l.view().getInventory();
+        var held = inv.main().get(slot);
+        JsonObject root = ok();
+        root.addProperty("selectedSlot", slot);
+        root.addProperty("item", held.isEmpty() ? "" : held.itemId());
+        root.addProperty("count", held.count());
         return answer(ctx.getSource(), root);
     }
 

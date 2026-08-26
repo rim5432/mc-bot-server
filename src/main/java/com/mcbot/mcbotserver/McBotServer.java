@@ -329,7 +329,11 @@ public class McBotServer {
                 activeBody.getBlockX(), activeBody.getBlockY(),
                 activeBody.getBlockZ()),
             () -> String.valueOf(activeBody.getUUID()),
-            activeActor == null ? null : activeActor.interactExecutor());
+            activeActor == null ? null : activeActor.interactExecutor(),
+            slot -> {
+                activeBody.selectedSlot = slot;
+                activeBody.getInventory().setSelectedSlot(slot);
+            });
     }
 
     private com.mcbot.mcbotserver.adapter.MenuCommands.Live menuLive() {
