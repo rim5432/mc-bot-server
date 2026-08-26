@@ -138,9 +138,12 @@ def main() -> int:
     except json.JSONDecodeError:
         new_receipt = {}
     new_id = new_receipt.get("task")
-    check("1. wire command identical",
+    check("1. new-path submit succeeds",
           write.returncode == 0 and new_receipt.get("ok") is True,
-          f"rc={write.returncode}, receipt={json.dumps(new_receipt)}")
+          f"rc={write.returncode}, receipt={json.dumps(new_receipt)} "
+          f"(wire-command identity is pinned by mc unit tests, "
+          f"not compared here - mc.py's wire call is not observable "
+          f"from this subprocess)")
     check("2. receipt shape matches old path",
           (new_receipt.get("ok") == old_receipt.get("ok")
            and new_receipt.get("replay") is False

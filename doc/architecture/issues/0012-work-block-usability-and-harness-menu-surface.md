@@ -229,7 +229,7 @@ harness-side CLI translation. Both workflows develop against this table.
 | `cat` | `/player/status` | `/bot status` (full) | live |
 | `cat` | `/player/health` | `/bot status` (health field) | pending: `health` joins `BotState` |
 | `cat` | `/player/menu` | `/bot status` (menu field, pending D3) | pending |
-| `cat` | `/tasks/current` | `/bot status` (task field) | live |
+| `cat` | `/tasks/current` | `/bot status` (task field - displayName summary, never a wait-correlatable id) | live |
 | `cat` | `/tasks/<id>` | `/bot events 0` filtered by `attrs.taskId` (client-side derivation; strict id match, display-name `task` key never correlates) | live |
 | `ls` | `/tasks/` | `/bot status` (task-derived) | live |
 | `write` | `/tasks/goto` | `/bot goto x y z tol timeout [key]` | live |

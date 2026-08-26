@@ -22,10 +22,16 @@ Wire mapping (v1 - goto migration only):
   cat /player/pos          -> /bot status  (pos field)
   cat /player/status       -> /bot status  (full)
   cat /player/menu         -> unsupported (menu field pending, issue 0012 D1)
-  cat /tasks/current       -> /bot status  (task field)
+  cat /tasks/current       -> /bot status  (task field - a displayName
+                              summary like "goto:t14", NOT a
+                              wait-correlatable id; ids come from
+                              write receipts)
   cat /tasks/<id>          -> /bot events 0, filtered by attrs.taskId
                               (client-side derivation, zero wire change)
   write /tasks/goto "x,y,z" [--tol N] [--timeout N] [--key K] -> /bot goto
+                              (receipt carries the id under the "task"
+                              key - legacy wire naming, echoed as
+                              "taskId:" on stderr here)
   write /tasks/<id>/cancel "reason" -> /bot cancel <id>
   wait <taskId> [--timeout N] -> poll /bot events until terminal kind
   events [--since N] -> /bot events <cursor>
@@ -285,9 +291,11 @@ def cmd_wait(task_id: str, timeout_sec: int = 120, poll_interval: float = 1.0) -
                   file=sys.stderr)
             continue
         for evt in events:
-            evt_task = evt.get("attrs", {}).get("taskId",
-                         evt.get("attrs", {}).get("task", ""))
-            if evt_task == task_id and evt.get("kind") in TERMINAL_KINDS:
+            # Strict taskId match only: an event without the key
+            # carries displayName under "task" ("goto:t14") and must
+            # never correlate - same rule as cmd_cat_task.
+            if (evt.get("attrs", {}).get("taskId") == task_id
+                    and evt.get("kind") in TERMINAL_KINDS):
                 print(json.dumps(evt, indent=2))
                 return 0
             # EVENT_GAP means we lost history - reconcile and restart
