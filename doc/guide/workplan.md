@@ -296,121 +296,46 @@ test count when red).
 
 ### Stage 2 closeout follow-ups
 
-1. RESOLVED 2026-08-23 (issue 0002): the five disabled
-   world/collision cases are re-enabled and green under the
-   settled contract - STEP_UP_REACH / STANDABLE_THRESHOLD split
-   (step-up reach vs standability floor are different physical
-   quantities), a BODY_WIDTH footprint rule on walkableTop, and
-   fence-as-wall semantics replacing the physically-impossible
-   squeeze-past expectation. Settled semantics now recorded as
-   boundaries.md decision ledger 19b (issue 0002 archived).
-2. RESOLVED 2026-08-23: gauntlet gametest shipped as
-   GauntletGameTests and green in-engine via build runGameTest
-   (7/7 with the slice and combat suites). Sections: bottom-slab
-   carpet (auto-step), one-block plateau (JumpUp execution),
-   drop off the far edge, fence wall with a single missing-post
-   gap, plus a focused gap-routing test. Building it exposed the
-   executor half of the climb vocabulary: steering's jump flag
-   was never actuated because setJumping consumption is dead
-   under the swapped-out MoveControl - BotBodyEntity now fires
-   jumpFromGround directly (documented deviation). Water/lava
-   sections stay out: no swim Movement exists; the function
-   map's GAP rows own that growth.
-3. RESOLVED 2026-08-23: PathingBehavior (738 lines) decomposed
-   into an orchestration shell plus four package-private
-   single-concern collaborators in core.behavior - WaypointCursor
-   (126), PlanProgressFuse (159, Ruling-a invariants verbatim),
-   ReplanGate (101), PlanLifecycle (235, Chebyshev freshness);
-   shell now 500 lines. Behaviour zero-change: verdicts, tick
-   order, keepalive keys, and ctor overloads all pinned by the
-   existing gates; tickpipeline reflection centralised in
-   PathingTestAccess. Verified offline (159 cases, 0 skips) and
-   in-engine (7/7 gametests).
-4. OPEN 2026-08-23: RCON console bridge shipped (boundary-D
-   command surface + tool/rcon.py session ledger) - the first
-   external transport. Acceptance is convergence criterion 2's
-   rehearsal: one body driven unattended through /bot verbs for
-   10 minutes of overworld, surviving without human input; the
-   run's telemetry lands in tool/sessions/<run>/ and its verdict
-   closes this entry.
-5. OPEN 2026-08-23: swim vocabulary landed after the acceptance
-   rehearsal found a body stranded in a lake - every surrounding
-   cell read unstunnable (empty collision shape) and the planner
-   answered NO_PATH correctly for a vocabulary that could not
-   swim. Swim/SwimUp now read the liquid trait (decision 19a:
-   precondition derivable from Shape plus Traits), Drop accepts a
-   liquid landing, and BindingWorldView carries a baseline trait
-   registry (water/lava) wired in both the live entry class and
-   the gametest rig; datapack JSON supersedes the code baseline as
-   a follow-up. PLAN_WALL_CLOCK_MS raised 50 -> 200: with the
-   larger edge set, a budget-cut no-route search returned a
-   misleading partial instead of concluding NO_PATH. Verified by
-   BasicMovesSwimTest offline and crossesWaterTrench in-engine;
-   gametests 8/8.
-6. OPEN 2026-08-24: unreachable-goal escalation (NoPathEscalator,
-   boundaries.md decision 21) landed after the verif-1 live session
-   showed a floating goal burning the full 600-tick mission budget
-   through a budget-cut partial loop (21s planning churn, 1-2-cell
-   partial adoptions, TIMEOUT instead of NO_PATH). Offline-gated
-   (NoPathEscalatorTest + NoPathEscalationGateTest); the emergent
-   partial-loop shape itself is async/wall-clock field behaviour,
-   so acceptance is a live rerun of the verif-1 scenario: floating
-   goal must fail NO_PATH within seconds and the keepalive stream
-   must show noPathWitnesses climbing to 3 first.
-7. OPEN 2026-08-25: gameTestServer shares the run/ game directory
-   with the server run (no gameDirectory configured in build.gradle
-   runs), so a live runServer holds run/world/session.lock and any
-   gametest attempt dies in DirectoryLock.create - observed when a
-   leftover soak server blocked runGameTest for an hour. The tool's
-   run.<task> lock namespaces assume game tasks only read shared
-   files; that holds for client (run/saves) but NOT for
-   gameTestServer (run/world, same as server). Fix direction: a
-   dedicated gameDirectory for the gameTestServer run (e.g.
-   run/gametest) in build.gradle; also decide whether the tool
-   should serialize run.runServer vs run.runGameTest as a
-   documentation note until then (a live server + gametest cannot
-   coexist today).
-8. RESOLVED 2026-08-25 (gametest fidelity hardening): the gametest
-   rig and the /botspawn wiring built the same pipeline by hand and
-   had drifted - the rig lacked the engage reflex, the engage
-   mission factory, the LevelThreatSensor feed and the pre-tick
-   lava flag. Both now assemble through one factory
-   (adapter.BotAssembly) and the rig's driveTick mirrors the server
-   listener's tick order, so wiring drift is impossible by
-   construction. Consequences and additions in the same pass:
-   - defendsByKillingZombie converted to the production reflex-
-     engage chain (no test-side mission submission); the refusal
-     scenario moved its skeleton to the 8-cell standoff so the
-     direct-submission refusal stays isolated from reflex churn,
-     and its vacuous NoAi health assertion became a 15-tick
-     refusal window.
-   - New scenarios (+5): crash-latch (ADR-0005 in-engine: latch,
-     MinimalReflex-only, reset recovery), production-path
-     integration (real /botspawn + /bot goto + ServerTickEvent,
-     no test-side pipeline access), retaliation (AI zombie fights
-     back under a sun-blocking roof), sight-blocked combat (wall-
-     blind engage, zero damage through a full wall, honest TIMEOUT),
-     and lava trench (fire-resistance harness; closes issue 0004's
-     tracked lava-scenario follow-up).
-   - gauntletEndToEnd's plateau checkpoint was dead code since
-     introduction (absolute Y vs relative constant, the f98bf9d
-     defect class, masked by the || !isActive() escape) - fixed.
-   - Suite 10 -> 15 scenarios, all green via build runGameTest;
-     GametestInventoryCheck pins the new inventory.
-9. RESOLVED 2026-08-25 (threat visibility - user ruling): "the world
-   treats the bot as a player, otherwise how would crafting-table
-   interaction work later" - the ruling lands on the threat axis now:
-   BotBodyEntity runs a carrier-side presence pass (every 20 ticks;
-   free target slot + line of sight + the monster's own FOLLOW_RANGE;
-   no-AI mobs stay frozen) so hostiles acquire the body on sight and
-   unprovoked combat exists, which is what makes the survival gate's
-   night acceptance honest. Pinned in-engine by hostilesAggroOnSight
-   (zombie at 7 cells, outside the 6-cell engage trigger - only the
-   world can start that fight). The interaction axis of the same
-   ruling stays with the BotPlayerFacade plan (issue 0007 Path A):
-   menus ask through typed Player parameters, which entity scans
-   never see - the facade answers those, the presence pass answers
-   scans. Suite 16/16 green.
+1. RESOLVED 2026-08-23 (issue 0002): disabled world/collision cases
+   green under the settled contract - STEP_UP_REACH / STANDABLE_
+   THRESHOLD split, BODY_WIDTH footprint, fence-as-wall; recorded as
+   boundaries.md ledger 19b.
+2. RESOLVED 2026-08-23: gauntlet shipped as GauntletGameTests (7/7
+   with slice + combat suites); exposed the jump-execution half -
+   setJumping consumption is dead under the swapped MoveControl, so
+   BotBodyEntity fires jumpFromGround directly (documented deviation).
+3. RESOLVED 2026-08-23: PathingBehavior decomposed into an
+   orchestration shell + WaypointCursor / PlanProgressFuse /
+   ReplanGate / PlanLifecycle; verdicts, tick order, keepalive keys
+   pinned by the existing gates (159 offline cases, 7/7 engine).
+4. OPEN 2026-08-23: RCON console bridge shipped (boundary-D command
+   surface + tool/rcon.py session ledger) - the first external
+   transport. Acceptance = the survival-gate 10-minute rehearsal
+   below; its verdict closes this entry.
+5. OPEN (vocabulary landed 2026-08-23): swim vocabulary + 
+   PLAN_WALL_CLOCK_MS 50->200 after the lake stranding; verified by
+   BasicMovesSwimTest offline + crossesWaterTrench in-engine.
+   Residue: datapack water/lava trait JSON supersedes the code
+   baseline (bookkeeping item in the survival-gate section).
+6. OPEN (escalator landed 2026-08-24): NoPathEscalator offline-gated
+   (boundaries.md decision 21) after verif-1 burned the full budget
+   on a floating goal. Acceptance = live rerun of that scenario:
+   NO_PATH within seconds, noPathWitnesses climbing to 3 first.
+7. OPEN 2026-08-25: gameTestServer shares run/world with runServer,
+   so a live server blocks gametests via DirectoryLock (observed as
+   an hour-long deadlock). Fix direction: dedicated gameDirectory
+   (run/gametest) or serialize the two tasks; until then they cannot
+   coexist.
+8. RESOLVED 2026-08-25: gametest rig + /botspawn wiring assemble
+   through one factory (adapter.BotAssembly); driveTick mirrors the
+   listener tick order so wiring drift is impossible by construction;
+   crash-latch, production-path, retaliation, sight-blocked, lava-
+   trench scenarios added (suite 15/15, GametestInventoryCheck pins).
+9. RESOLVED 2026-08-25 (user ruling: the world treats the bot as a
+   player): carrier-side presence pass (every 20 ticks; free target
+   slot + line of sight + FOLLOW_RANGE) so hostiles acquire the body
+   on sight - unprovoked combat exists (hostilesAggroOnSight pins).
+   Interaction axis stays with issue 0007's facade plan.
 
 ## Pre-Stage-3 survival gate - basic survival capability
 
@@ -667,80 +592,51 @@ freeze lifts.
 
 ### Lean-round deferrals (2026-08-26 whole-repo over-engineering audit)
 
-Rulings from the delegated lean round (user: "you make the rulings,
-lean direction"). Executed same day: goto-migration scaffolding
-removal, six-way RecordingActor / eight-way floorTo / six-way
-repoRoot helper consolidation + SanityCheck deletion, one numeric
-parser in GotoCommandHandler, consumer-count drain-lock retirement
-(boundaries.md ledger 30), resetAt doc-truth fix. The items below
-are the deliberate NON-executions, each with its trigger:
+Delegated lean-round rulings; executed items are recorded in the
+commit history (goto-migration scaffolding removal, helper
+consolidations, drain-lock retirement, resetAt doc-truth fix). The
+survivors are deliberate NON-executions, each with its trigger:
 
 - [ ] S  Deterministic clock seam for wall-clock gates:
          AStarWallClockGateTest arms a real 1 ms budget (fast machines
-         can finish the search inside it and flip the assertion);
-         AdoptFreshnessGateTest and PlanWorkerGateTest sleep-poll the
-         async worker. Inject a deadline/clock into AStarPathFinder +
-         PlanWorker instead. No fake clock exists anywhere yet.
-                                                        [dep: none]
-- [ ] S  RecipeCatalog.list(offset, limit) / RecipePage (uncommitted
-         backend of the recipes-list wire verb) ships without any
-         offline test - add one for clamping, ordering, and the
-         shapeless-skip rule before or with that commit.
-                                                        [dep: none]
-- [ ] S  Menu-family disposition (BridgeInventory 333L vs
-         BindingInventory 148L overlap; BotInventoryMenu thin fork of
-         BotCraftingMenu): rides the issue 0010 BotPlayerFacade /
-         FoodData lifecycle ruling - do not churn vanilla-interaction
-         adapter code twice.
-                                            [dep: issue 0010 ruling]
-- [ ] S  CombatOrder permits exactly Attack (single-subtype sealed
-         hierarchy): flatten onto Overrides' payload at the Stage 3
-         review - boundary-B Directive shape is frozen until then.
-                                        [dep: stage 3 review opens]
-- Verified non-findings kept on purpose: Heuristic interface
-  (decision 7 injected seam; planned climbs/drops will supply second
-  suppliers - same reserved-seam class as ViewMode.SNAPSHOT),
-  PresenceLayer/IdleLook/BodyPositionSource (BodyPositionSource feeds
-  PathingBehavior + CombatBehavior aiming - not cosmetic),
-  /bot goto brigadier path (it IS the transport mc.py translates
-  onto), parked issue 0003 stays in issues/ root (parked is a legal
-  root status; archive policy binds resolved only).
-
-Round-2 audit (same day) appends:
-
-- [ ] S  MenuCommands embedded mini-JSON protocol layer
-         (ok/err/answer/executeSteps) extraction into a
-         MenuCommandJson helper: deferred until the concurrent 0012
-         batch lands - the same files are in flight and must not be
-         churned twice.                  [dep: issue 0012 batch closes]
+         can flip it); AdoptFreshnessGateTest / PlanWorkerGateTest
+         sleep-poll the worker. Inject a deadline/clock into
+         AStarPathFinder + PlanWorker.          [dep: none]
+- [ ] S  RecipeCatalog.list(offset, limit) / RecipePage ships without
+         an offline test - add clamping / ordering / shapeless-skip
+         coverage before or with that commit.   [dep: none]
+- [ ] S  Menu-family disposition (BridgeInventory vs BindingInventory
+         overlap; BotInventoryMenu thin fork): rides the issue 0010
+         BotPlayerFacade ruling - do not churn vanilla-interaction
+         adapter code twice.                  [dep: issue 0010 ruling]
+- [ ] S  CombatOrder permits exactly Attack: flatten onto Overrides'
+         payload at the Stage 3 review - boundary-B Directive shape
+         is frozen until then.            [dep: stage 3 review opens]
+- [ ] S  MenuCommands embedded mini-JSON protocol extraction
+         (MenuCommandJson helper): deferred while those files were
+         in flight from the concurrent 0012 batch, which has since
+         landed - re-evaluate freely.                 [dep: none]
+- Verified non-findings kept on purpose (do not re-litigate without
+  new evidence): Heuristic interface (decision 7 seam; planned
+  climbs/drops supply second suppliers), PresenceLayer / IdleLook /
+  BodyPositionSource (BodyPositionSource feeds PathingBehavior +
+  CombatBehavior aiming), /bot goto brigadier path (it IS the
+  transport mc.py translates onto), parked issue 0003 stays in
+  issues/ root (parked is a legal root status).
+- Round-2 KEEP rulings: BotController crash-policy extraction
+  REJECTED for now - relocation would move the four
+  `invariant: see ADR-0005` markers off their write sites; carve-out
+  rides the seat wiring after issue 0010 rules on the facade.
+  PathingBehavior's four ctors kept (three are valid default pairs).
 - [x] M  Split BotSliceGameTests into per-family holders - LANDED
-         2026-08-27 as five files (Locomotion/Combat/HazardReflex/
-         Inventory/Crafting), EXPECTED rekeyed same commit, engine
-         gate 39/39 then 40/40 with the pagination scenario.
-                                             [dep: lean items close]
-- Ruled KEEP on purpose (round 2): BotController crash-policy
-  extraction REJECTED for now - pure relocation of ~75 lines behind
-  a seven-collaborator constructor, and it would move the four
-  `invariant: see ADR-0005` markers away from their write sites;
-  carve-out happens together with the seat wiring after issue 0010
-  rules on the facade. PathingBehavior's four ctors kept - three
-  are test-convenience overloads encoding valid default pairs,
-  removal trades ~20 main lines for noise at every test site.
-
-Lean-round-3 kept-rulings appendix (2026-08-27):
-
-- EngageReflexGateTest (508L) stays whole: ~55% scaffolding (Rig +
-  StubFight + ThreatInput); a three-way split hoists all of it for
-  marginal readability. Re-evaluate only if a fourth scenario family
-  appears.
-- PlanWorkerGateTest / AdoptFreshnessGateTest sleep-poll loops stay:
-  bounded x100 retries with no assertion flip; the correctness-risky
-  flake was the wall-clock budget race and that is fixed via the
-  injected AStarPathFinder clock.
-- MockWorldView presets(): terrain motifs only if encountered
-  opportunistically during future test edits (water/shore families);
-  entity-driven and deliberately-empty setups stay bespoke because
-  they ARE the scenario's assertion payload.
+         2026-08-27 as Locomotion / Combat / HazardReflex /
+         Inventory / Crafting, EXPECTED rekeyed same commit, engine
+         gate 40/40.
+- Round-3 kept-rulings: EngageReflexGateTest stays whole (~55%
+  scaffolding; re-evaluate on a fourth scenario family);
+  sleep-poll loops stay (the flaky part was the wall-clock budget,
+  fixed via the injected AStar clock); MockWorldView terrain motifs
+  added opportunistically during future edits, never speculatively.
 
 ### Interaction-model executable queue (2026-08-27, issue 0015)
 
