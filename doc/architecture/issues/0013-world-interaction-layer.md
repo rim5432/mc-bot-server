@@ -17,7 +17,7 @@ related:
   - doc/architecture/issues/0007-player-parity-interaction.md
   - doc/architecture/issues/0009-block-capability-dig.md
   - doc/architecture/issues/0010-hungryprocess-food-acquisition-planner.md
-  - doc/architecture/issues/0012-work-block-usability-and-harness-menu-surface.md
+  - doc/architecture/issues/archive/0012-work-block-usability-and-harness-menu-surface.md
   - doc/architecture/function-map.md
 ---
 

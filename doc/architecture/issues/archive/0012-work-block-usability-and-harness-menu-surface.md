@@ -12,7 +12,8 @@ covers:
   - src/main/java/com/mcbot/mcbotserver/adapter/RecipeCatalog.java
   - src/main/java/com/mcbot/mcbotserver/core/tick/MissionReporter.java
   - tool/harness/mc.py
-status: open (design complete - primary interaction model promoted, wire translation table as integration contract, translation-layer invariants recorded; goto migration CLI skeleton shipped 2026-08-26, hardened same day: typed verb discipline, /tasks/<id> derivation, admin stop/reset landing, cursor bookmark rule, 36 wire-mocked CLI tests; goto shadow comparison ALL GREEN with the TASK_COMPLETED sample + cancel chain; step 4 done - skills/patrol.py first mc-syntax skill 4/4 legs live; three live findings recorded: resetAt cursor re-anchoring, missing entity-ticking ticket on bare servers, resetAt not surviving JVM restarts; menu command implementation queued behind the in-flight menu refactor)
+status: resolved (archived 2026-08-27 - design complete and absorbed: the D4 interaction model is canon via harness-interaction.md + decision 33, the D1 table stays the integration contract, rulings 1-17 recorded below are executed or overturned-on-record; goto migration verified ALL GREEN incl. skills/patrol.py 4/4 live; residual implementation items inherited into issue 0015)
+superseded_by: doc/architecture/harness-interaction.md + boundaries.md ledger entry 33 (residual executable items: issue 0015)
 related:
   - doc/architecture/issues/0007-player-parity-interaction.md
   - doc/architecture/issues/0011-harness-surface-convergence.md

@@ -6,10 +6,10 @@ covers:
   - doc/architecture/boundaries.md
   - tool/harness/mc.py
   - tool/harness/test_mc.py
-status: open (filed 2026-08-27; the executable arm of boundaries.md decision 33 and the harness-interaction.md canonical doc)
+status: open (filed 2026-08-27; the executable arm of boundaries.md decision 33 and the harness-interaction.md canonical doc; heir of the archived issue 0012 menu-surface implementation queue)
 related:
   - doc/architecture/issues/0011-harness-surface-convergence.md
-  - doc/architecture/issues/0012-work-block-usability-and-harness-menu-surface.md
+  - doc/architecture/issues/archive/0012-work-block-usability-and-harness-menu-surface.md
   - doc/architecture/issues/0013-world-interaction-layer.md
   - doc/architecture/issues/0014-mineprocess-composite-mining-task.md
 ---
@@ -66,7 +66,7 @@ evidence attached, and the ledger summary follows.
   event, pipeline stops). Device-side; owned by 0014 section 6.
 - `ls /tasks` as a real listing needs a list-tasks wire verb;
   today the CLI derives only the current task from status.
-- FUSE mount as a second frontend: owned by 0012 section 6.
+- FUSE mount as a second frontend: owned by archived 0012 section 6.
 
 ## 6. Verification criteria
 
@@ -75,3 +75,46 @@ evidence attached, and the ledger summary follows.
 - Live: a skill chains two tasks through `wait &&` and the chain
   halts correctly on an induced failure (mine a nonexistent block
   id, then assert the second leg never submits).
+
+## 7. Inherited menu-surface queue (issue 0012, archived 2026-08-27)
+
+The 0012 design is resolved - D4 promoted into the canonical model,
+its wire table standing as the integration contract, rulings 1-17
+executed or overturned on record - but the implementation queue
+never ran past goto migration. These inherit here; shapes per the
+archived D1 table and its rulings:
+
+- [ ] L  D1 menu wire verbs - open / open-inventory / snapshot /
+         close / deposit / take / craft / scan / recipes -
+         brigadier-direct synchronous RPC against MenuTransactions /
+         RecipeCatalog, NOT CommandBus submissions.
+                                [dep: Stage 3 menu facade (0007 Path A)]
+- [ ] M  D3 derivation events - MENU_OPENED / MENU_CLOSED from
+         MissionReporter diffing BindingActor.currentMenuKind()
+         ({kind,x,y,z} composite key; same-tick open-close invisible;
+         no cause field); `/bot status` gains a menu field.
+                                                    [dep: D1 batch]
+- [ ] S  D5 translation-layer wiring - lease auto-close (30-60s idle,
+         busy tripwire), `/bot reset` clears the session, CLI
+         timeout=unknown with reconcile-not-retry, close-before-open
+         discipline, disk-cursor bookmark rules (peek vs advance;
+         beyond-head restart signal).               [dep: D1 batch]
+- [ ] S  D2 first L1 row - furnace INPUT / FUEL / OUTPUT roles +
+         burn/cook progress disclosure (freeSlots already shipped
+         via ledger 32).                            [dep: D1 batch]
+- [ ] S  Entity-ticking ticket gap found live: on a bare dedicated
+         server nothing grants the bot's chunks an entity-ticking
+         ticket and the body freezes until `forceload add` -
+         CompanionChunkLoader-class capability candidate, or runbook
+         automation; manual prep documented in shadow_compare.py.
+                                                        [dep: none]
+- [ ] S  resetAt epoch honesty - EventQueue promises a monotonic
+         bot-restart marker but a fresh queue restarts it at 1;
+         either seed from a persistent counter or amend the
+         EventQueue doc to the beyond-head client rule (the CLI
+         ships beyond-head today).                  [dep: none]
+
+Reopen triggers that live only inside the archived 0012 body
+(brewing / enchant cast overrides, L2 JSON role table, cast mixin,
+multi-client arbitration, full-chain acquire): their archive path is
+the standing pointer - they reopen from there when fired.

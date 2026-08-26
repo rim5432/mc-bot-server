@@ -10,7 +10,7 @@ covers:
   - skills/patrol.py
 related:
   - doc/architecture/issues/0011-harness-surface-convergence.md
-  - doc/architecture/issues/0012-work-block-usability-and-harness-menu-surface.md
+  - doc/architecture/issues/archive/0012-work-block-usability-and-harness-menu-surface.md
   - doc/architecture/issues/0013-world-interaction-layer.md
   - doc/architecture/issues/0014-mineprocess-composite-mining-task.md
   - doc/architecture/issues/0015-interaction-model-executable-queue.md
