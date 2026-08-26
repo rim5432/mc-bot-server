@@ -162,7 +162,9 @@ public final class GotoCommandHandler {
         try {
             events.push(new BotEvent(EventKind.TASK_CANCELLED,
                 daySupplier.getAsLong(), timeOfDaySupplier.getAsLong(),
-                false, Map.of("task", mission.displayName()),
+                false,
+                Map.of("task", mission.displayName(),
+                       "taskId", mission.taskId()),
                 mission.displayName() + ": cancelled by harness"));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down with it.

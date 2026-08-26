@@ -66,8 +66,8 @@ final class MissionReporter {
         }
         if (mission.missionSucceeded()) {
             emit(EventKind.TASK_COMPLETED, day, tod,
-                mission.missionTaskId(), "goal reached",
-                mission.verdictAttrs());
+                mission.missionTaskId(), mission.missionTaskId(),
+                "goal reached", mission.verdictAttrs());
         } else if (previous.isActive()) {
             // Swapped out while still active (preemption path already
             // reported); nothing terminal to announce.
@@ -79,7 +79,8 @@ final class MissionReporter {
                 mission.verdictAttrs());
             extra.put("reason", shown);
             emit(EventKind.TASK_FAILED, day, tod,
-                mission.missionTaskId(), "failed: " + shown, extra);
+                mission.missionTaskId(), mission.missionTaskId(),
+                "failed: " + shown, extra);
         }
     }
 
@@ -96,12 +97,15 @@ final class MissionReporter {
      * A reflex parked a mission mid-flight.
      *
      * @param taskName display name of the parked mission; never null
+     * @param taskId   machine-correlation id of the parked mission, or
+     *                 null when the process is not a TerminalMission
      * @param day      game day for event stamping
      * @param tod      time-of-day ticks for event stamping
      * @param detail   human-readable pause reason; never null
      */
-    void paused(String taskName, long day, long tod, String detail) {
-        emit(EventKind.TASK_PAUSED, day, tod, taskName, detail,
+    void paused(String taskName, String taskId, long day, long tod,
+                String detail) {
+        emit(EventKind.TASK_PAUSED, day, tod, taskName, taskId, detail,
             Map.of());
     }
 
@@ -109,12 +113,15 @@ final class MissionReporter {
      * A parked mission was evicted or invalidated, not completed.
      *
      * @param taskName display name of the dropped mission; never null
+     * @param taskId   machine-correlation id of the dropped mission, or
+     *                 null when the process is not a TerminalMission
      * @param day      game day for event stamping
      * @param tod      time-of-day ticks for event stamping
      * @param detail   human-readable drop reason; never null
      */
-    void dropped(String taskName, long day, long tod, String detail) {
-        emit(EventKind.TASK_DROPPED, day, tod, taskName, detail,
+    void dropped(String taskName, String taskId, long day, long tod,
+                 String detail) {
+        emit(EventKind.TASK_DROPPED, day, tod, taskName, taskId, detail,
             Map.of());
     }
 
@@ -124,15 +131,16 @@ final class MissionReporter {
      * @param resumed  true when world assumptions held and the mission
      *                 re-seated; false when they invalidated and the
      *                 mission was dropped
-     * @param taskName display name of the revalidated mission;
-     *                 never null
+     * @param taskName display name of the revalidated mission; never null
+     * @param taskId   machine-correlation id of the revalidated mission,
+     *                 or null when the process is not a TerminalMission
      * @param day      game day for event stamping
      * @param tod      time-of-day ticks for event stamping
      */
-    void resumeVerdict(boolean resumed, String taskName,
+    void resumeVerdict(boolean resumed, String taskName, String taskId,
                        long day, long tod) {
         emit(resumed ? EventKind.TASK_RESUMED : EventKind.TASK_DROPPED,
-            day, tod, taskName,
+            day, tod, taskName, taskId,
             resumed ? "world assumptions held"
                 : "world assumptions invalidated; task dropped",
             Map.of());
@@ -142,14 +150,28 @@ final class MissionReporter {
      * Push one mission lifecycle event. PAUSED and DROPPED count as
      * urgent; everything else is informational. Never throws - a
      * poisoned outbox must not take the tick pipeline with it.
+     *
+     * @param taskId machine-correlation id, or null when the caller does
+     *               not hold a TerminalMission (the event then carries
+     *               only the human-readable "task" key)
      */
     private void emit(String kind, long day, long tod, String taskName,
-                      String detail, Map<String, String> extraAttrs) {
+                      String taskId, String detail,
+                      Map<String, String> extraAttrs) {
         boolean urgent = EventKind.TASK_PAUSED.equals(kind)
             || EventKind.TASK_DROPPED.equals(kind);
         try {
             var attrs = new LinkedHashMap<String, String>();
             attrs.put("task", taskName);
+            // taskId is the canonical machine-correlation key. Only
+            // present when the caller holds a real id (TerminalMission
+            // .missionTaskId()); paused/dropped/resumeVerdict call sites
+            // pass it from the process object. The "task" key stays for
+            // backward compatibility (human display name). issue 0012 D4
+            // wait semantics correlate on taskId.
+            if (taskId != null) {
+                attrs.put("taskId", taskId);
+            }
             attrs.putAll(extraAttrs);
             events.push(new BotEvent(kind, day, tod, urgent,
                 Map.copyOf(attrs), taskName + ": " + detail));

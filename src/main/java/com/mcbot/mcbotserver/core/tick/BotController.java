@@ -23,6 +23,7 @@ import com.mcbot.mcbotserver.api.world.WorldView;
 import com.mcbot.mcbotserver.core.behavior.IdleLook;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
+import com.mcbot.mcbotserver.core.process.TerminalMission;
 import com.mcbot.mcbotserver.core.reflex.MinimalReflex;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
 
@@ -467,9 +468,13 @@ public final class BotController {
                     || (decision == null
                         && !fightAwaitingSeat
                         && !rescueAwaitingSeat))) {
-            String resumingTask = arbiter.paused().displayName();
+            BotProcess resuming = arbiter.paused();
+            String resumingTask = resuming.displayName();
+            String resumingId = (resuming instanceof TerminalMission tm)
+                ? tm.missionTaskId() : null;
             boolean resumed = arbiter.tryResume();
-            missions.resumeVerdict(resumed, resumingTask, day, tod);
+            missions.resumeVerdict(resumed, resumingTask, resumingId,
+                day, tod);
         }
 
         // Stage 2: arbiter picks or keeps the winner.
@@ -530,21 +535,27 @@ public final class BotController {
         if (arbiter.paused() != null && arbiter.current() != null
                 && arbiter.current().isActive()
                 && arbiter.paused() != arbiter.current()) {
-            String evictedName = arbiter.paused().displayName();
+            BotProcess evicted = arbiter.paused();
+            String evictedName = evicted.displayName();
+            String evictedId = (evicted instanceof TerminalMission tm)
+                ? tm.missionTaskId() : null;
             if (arbiter.requeuePausedOrDrop()
                     == TaskArbiter.PausedEviction.DROPPED) {
-                missions.dropped(evictedName, day, tod,
+                missions.dropped(evictedName, evictedId, day, tod,
                     "context invalidated by reflex chain requeue");
             }
         }
         InterruptionContext ctx = new InterruptionContext(tickCounter,
             positionSource.get(), activeName(),
             "reflex-preempt:" + decision.ruleName(), "");
-        String pausedTask = activeName();
+        BotProcess current = arbiter.current();
+        String pausedTask = current != null ? current.displayName() : "";
+        String pausedId = (current instanceof TerminalMission tm)
+            ? tm.missionTaskId() : null;
         boolean announceVerdict = false;
         switch (arbiter.forcePauseAll(ctx)) {
             case PARKED -> {
-                missions.paused(pausedTask, day, tod,
+                missions.paused(pausedTask, pausedId, day, tod,
                     "paused by reflex " + decision.ruleName());
                 // No current while parked: the transition detector
                 // must not fire on stale state.
