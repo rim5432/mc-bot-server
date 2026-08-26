@@ -474,6 +474,23 @@ def cmd_write(path: str, value: str, tol: int | None = None,
         resp = wire(f"place {x} {y} {z} {face.lower()}")
         print(json.dumps(resp, indent=2))
         return 0 if resp.get("ok") and resp.get("placed") else 1
+    if path == "/actions/equip":
+        # value is a hotbar slot index 0..8. Synchronous selection;
+        # the wire updates both body.selectedSlot and the inventory
+        # mirror so place/drop and state disclosure agree (0013).
+        try:
+            slot = int(value.strip())
+        except ValueError:
+            print("write /actions/equip: value must be an integer 0..8",
+                  file=sys.stderr)
+            return 1
+        if slot < 0 or slot > 8:
+            print("write /actions/equip: slot must be 0..8",
+                  file=sys.stderr)
+            return 1
+        resp = wire(f"equip {slot}")
+        print(json.dumps(resp, indent=2))
+        return 0 if resp.get("ok") else 1
     if path == "/tasks/dig":
         # Same shape as goto: value "x,y,z", wire-required timeout
         # mirrored from DigCommandHandler.DEFAULT_TIMEOUT_TICKS.

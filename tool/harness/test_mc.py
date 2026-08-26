@@ -395,6 +395,34 @@ class PlaceActionTest(McCliTest):
         self.assertEqual(self.wire_calls, [])
 
 
+class EquipActionTest(McCliTest):
+    """0013 deferred: write /actions/equip -> equip (sync hotbar select)."""
+
+    def test_equip_translates_slot(self):
+        self.queue({"ok": True, "selectedSlot": 2,
+                    "item": "minecraft:stone", "count": 64})
+        code, out, _ = self.run_verb(mc.cmd_write, "/actions/equip", "2")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["equip 2"])
+        self.assertEqual(json.loads(out)["selectedSlot"], 2)
+
+    def test_equip_rejection_exits_one(self):
+        self.queue({"ok": False, "reason": "no active bot"})
+        code, _, _ = self.run_verb(mc.cmd_write, "/actions/equip", "0")
+        self.assertEqual(code, 1)
+
+    def test_equip_out_of_range_rejected_before_wire(self):
+        code, _, err = self.run_verb(mc.cmd_write, "/actions/equip", "9")
+        self.assertEqual(code, 1)
+        self.assertIn("0..8", err)
+        self.assertEqual(self.wire_calls, [])
+
+    def test_equip_non_integer_rejected_before_wire(self):
+        code, _, _ = self.run_verb(mc.cmd_write, "/actions/equip", "hotbar")
+        self.assertEqual(code, 1)
+        self.assertEqual(self.wire_calls, [])
+
+
 class DigTaskTest(McCliTest):
     """0013 slice 3: write /tasks/dig -> /bot dig (task family)."""
 
