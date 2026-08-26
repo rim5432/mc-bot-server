@@ -9,7 +9,7 @@ Generated: 2026-08-27. Validate anytime with `python tool/mcbot_tool.py doc chec
 |---|---|---|---|
 | [archive/0001-vertical-replan-failure-branches.md](architecture/archive/0001-vertical-replan-failure-branches.md) | PathingBehavior has three vertical-displacement failure branches and a fuse measuring the wrong quantity | 2026-08-24 | ok |
 | [archive/0002-world-collision-slab-fence.md](architecture/archive/0002-world-collision-slab-fence.md) | 5 disabled world/collision tests - shape-predicate contract conflicts (walkableTop threshold, Box Y range, fence passability) | 2026-08-23 | ok |
-| [boundaries.md](architecture/boundaries.md) | Boundary Contracts and Decision Ledger | 2026-08-27 | ok |
+| [boundaries.md](architecture/boundaries.md) | Boundary Contracts | 2026-08-27 | ok |
 | [code-health.md](architecture/code-health.md) | Code Health Ledger | 2026-08-27 | ok |
 | [function-map.md](architecture/function-map.md) | Functional Convergence Map (device-layer capability envelope) | 2026-08-27 | ok |
 | [glossary.md](architecture/glossary.md) | Glossary - the loaded terms, pinned before they mislead | 2026-08-27 | ok |
@@ -27,6 +27,7 @@ Generated: 2026-08-27. Validate anytime with `python tool/mcbot_tool.py doc chec
 | [issues/archive/0006-scan-radius-leash-gap.md](architecture/issues/archive/0006-scan-radius-leash-gap.md) | Scan radius / leash gap in DefendProcess | 2026-08-25 | ok |
 | [issues/archive/0008-extreme-scenario-survival-framework.md](architecture/issues/archive/0008-extreme-scenario-survival-framework.md) | Extreme-scenario survival framework - the vital-sign ladder beyond drowning | 2026-08-25 | ok |
 | [issues/archive/0012-work-block-usability-and-harness-menu-surface.md](architecture/issues/archive/0012-work-block-usability-and-harness-menu-surface.md) | Work-block usability - vanilla construction delegation and the harness manual menu surface | 2026-08-27 | ok |
+| [ledger.md](architecture/ledger.md) | Decision Ledger (append-only) | 2026-08-27 | ok |
 | [overview.md](architecture/overview.md) | Architecture Overview | 2026-08-27 | ok |
 
 ## guide/

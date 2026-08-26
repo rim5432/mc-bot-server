@@ -118,7 +118,8 @@ The doc/ hierarchy is the project memory. Every doc has front-matter
 |---|---|---|
 | *(language rule)* | **All repository markdown is English-only — zero CJK characters in any `.md` file**: root `AGENTS.md`, `tool/*.md`, `doc/**`. Same rationale as §1.4.1: a half-translated doc is a half-written document, and mixed languages break global search. Citations from non-English sources are written as English translations, never as reproduced original text. | Applies to every edit |
 | `doc/architecture/overview.md` | High-level system shape | Edits happen with the architecture, not before |
-| `doc/architecture/boundaries.md` | **Live contract** for the four boundaries (A/B/C/D) | Signatures + protocol frozen; vocabulary may grow |
+| `doc/architecture/boundaries.md` | **Live contract** for the four boundaries (A/B/C/D) | Signatures + protocol frozen; vocabulary may grow; decision index resolves every `decision N` citation |
+| `doc/architecture/ledger.md` | Append-only decision ledger - verdict texts, dates, amendment chains | Entries extend only forward; amendments annotate both entries; absorbing an issue means archiving it in the same commit |
 | `doc/architecture/harness-interaction.md` | **Canonical interaction model** (decision 33): path/jobs/loops grammar, canonical verb + path tables, endgame | Clause changes land here first with evidence; the ledger summary follows. Living-water triggers: new task verb / path root / consumer kind re-opens the audit |
 | `doc/decisions/0001`..`0005` | ADRs — accepted decisions with rationale | **Frozen** under the current freeze order; new decisions go in `workplan.md` follow-up items, evaluated at Stage 1 review |
 | `doc/guide/workplan.md` | Stage 0/1/2 checklist with effort sizes | Updated as items are checked off; items reorder by dependency, not by date |
