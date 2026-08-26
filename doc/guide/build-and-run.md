@@ -11,7 +11,8 @@ All build/test/run entry points go through `tool/mcbot_tool.py`.
 Never call `gradlew.bat` or `gradle` directly — it bypasses the
 cross-process lock that multi-agent collaboration depends on.
 Full rules live in the root `AGENTS.md` (§0.2 mandatory rules,
-§3.5 full tool reference); this page is the quick path.
+§3.5 command essentials); this page is the quick path, and
+`tool/README.md` carries the full subcommand table.
 
 ## Everyday commands
 

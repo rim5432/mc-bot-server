@@ -80,8 +80,9 @@ vocabulary lookup.
   direct `./gradlew` or bare `gradle` — even if the wrapper is ever
   fixed — because a direct call bypasses the cross-process lock that
   every other agent relies on. The tool wraps the lock, hang-proof
-  logging, and the correct gradle flags. Full subcommand reference:
-  §3.5 of this file.
+  logging, and the correct gradle flags. Command essentials in
+  §3.5 of this file; the full subcommand table lives in
+  `tool/README.md`.
   - `python tool/mcbot_tool.py build compile`
   - `python tool/mcbot_tool.py test`
   - `python tool/mcbot_tool.py build runServer` (long-running; Ctrl+C)
@@ -566,84 +567,33 @@ python tool/mcbot_tool.py doc check
 
 When in doubt about a build issue: `python tool/mcbot_tool.py
 status` → `python tool/mcbot_tool.py log tail -n 100` → `python
-tool/mcbot_tool.py log cat <task>` (in that order). The §3.5 Failure
-triage table is the canonical cheat sheet.
+tool/mcbot_tool.py log cat <task>` (in that order); the failure-
+symptom table lives in `tool/README.md`.
 
 ### 3.5 Tool reference (`tool/mcbot_tool.py`)
 
-Why the tool exists: the wrapper jar was broken and gradle failed
-silently; direct calls were un-debuggable and uncoordinated. The tool
-provides:
-
-1. **Self-locating gradle** — reads the version from
-   `gradle-wrapper.properties`, globs `~/.gradle/wrapper/dists/` for a
-   local full distribution, falls back to PATH. Zero external deps.
-2. **Hang-proof logs** — Popen + realtime readline, dual-written to
-   console and file; gradle never stalls on a full pipe buffer.
-3. **Cross-process lock** — a second concurrent build fails fast with
-   holder info instead of silently fighting over the daemon.
-4. **Auto log tail on failure** — last 30 lines printed, plus the
-   `log cat <task>` pointer to the full log.
-5. **Stale-lock takeover** — a dead holder PID is detected and taken
-   over automatically.
-
-Subcommand table:
-
-| Command | Purpose | Lock |
-|---|---|---|
-| `build compile` | compile Java | yes |
-| `build jar` | package mod jar | yes |
-| `build build` | full build (compile + test + jar) | yes |
-| `build clean` | wipe build dir | yes |
-| `build sync` | generate IDEA / Eclipse project files | yes |
-| `build runClient` / `build runServer` | launch MC (long-running) | yes |
-| `build runData` | datagen | yes |
-| `build runGameTest` | run gametests server-side | yes |
-| `test` | JUnit tests | yes |
-| `gradle <args>` | pass-through any gradle invocation | yes |
-| `tasks` / `deps` | task list / dependency tree | no (read-only) |
-| `status` | lock + live processes + last log path + docs health | no |
-| `log tail` / `log list` / `log cat <task>` | inspect logs | no |
-| `lock status` / `lock clear` / `lock takeover` | lock management | no |
-| `proc list` / `proc killdaemon --yes` | process management | no |
-| `doc list` / `doc check` | docs health overview / rot audit | no |
-| `doc touch <name>` / `doc new <cat> <slug>` / `doc index` | docs maintenance (writes under `doc/`) | no |
-
-Pass extra gradle flags after `--`; force configuration-cache with
-`--cc` or `MCBOT_CC=1`:
+Why the tool exists: direct gradle calls bypassed the cross-process
+lock and failed un-debuggably. The tool adds self-locating gradle,
+hang-proof realtime logs, a fail-fast cross-process build lock with
+stale-PID takeover, and an auto log tail on failure. The four
+commands every session needs:
 
 ```bash
-python tool/mcbot_tool.py build compile -- --info --stacktrace
-python tool/mcbot_tool.py test -- --tests com.mcbot.mcbotserver.SomeTest
-python tool/mcbot_tool.py build compile --cc
-MCBOT_CC=1 python tool/mcbot_tool.py build compile
+python tool/mcbot_tool.py build compile   # verify before any commit
+python tool/mcbot_tool.py test            # no commit on red
+python tool/mcbot_tool.py status          # locks + live runs + docs health
+python tool/mcbot_tool.py doc check       # doc rot audit (the gate)
 ```
 
-Failure triage, in this order:
+Lock discipline: everything writing `build/` serializes on the
+global lock; long-running `build runClient` / `runServer` hold
+their own `run.<task>` lock until MC exits; a second caller of the
+same namespace fails fast with `BUSY: holder pid=...`. Failure
+triage order: `status` -> `log tail -n 100` -> `log cat <task>`;
+still opaque -> snapshot and escalate to the coordinating agent.
 
-1. `status` — is it a lock problem or a build problem?
-2. `log tail -n 100` — what did the build say?
-3. `log cat <task>` — full log of the failing task.
-4. Still opaque: snapshot everything
-   (`status > debug-snapshot.txt`, then `log list >> debug-snapshot.txt`)
-   and hand it to the coordinating agent.
-
-Typical failure patterns:
-
-| Symptom | Check |
-|---|---|
-| `BUSY: holder pid=...` | `lock status`; holder dead → re-run (auto takeover) or `lock clear` |
-| `gradle not found` | wrapper properties present? gradle-8.8 distribution under `~/.gradle/wrapper/dists/`? PATH fallback? |
-| `BUILD FAILED`, no trace visible | `log cat <task>` for the full log; usually a Java error in `compileJava` |
-| gradle stuck, no output | `status`: if the output counter stopped growing it is truly hung; take over the lock and retry |
-| OOM on a repeat build | raise `-Xmx1G` → `-Xmx2G` in `gradle.properties` (first builds need 2G+) |
-
-Runtime artifacts, all gitignored, under `tool/.runtime/`: `build.lock`
-(+ `.meta.json`), `build-last.log` (pointer to the latest),
-`build-<task>-<timestamp>.log` (history).
-
----
-
+**Full subcommand table, flag passthrough (`--`, `--cc`), failure-
+symptom table, runtime artifacts: `tool/README.md`.**
 ## 4. Reading Order (when picking up the project cold)
 
 1. **`doc/architecture/overview.md`** — the 30-second picture.
