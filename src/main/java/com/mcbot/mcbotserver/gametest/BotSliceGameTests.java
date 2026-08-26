@@ -21,6 +21,7 @@ import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.menu.MenuPlanner;
 import com.mcbot.mcbotserver.core.process.DefendProcess;
+import com.mcbot.mcbotserver.core.process.GotoProcess;
 import com.mcbot.mcbotserver.core.reflex.EscapeLavaRule;
 import com.mcbot.mcbotserver.core.reflex.DigOnSuffocationRule;
 import com.mcbot.mcbotserver.core.reflex.FreezeOnLowHealthRule;
@@ -41,6 +42,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.inventory.CraftingContainer;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.phys.Vec3;
@@ -2241,6 +2243,159 @@ public final class BotSliceGameTests {
             "byResult must find the stick recipe among producers");
 
         helper.succeed();
+    }
+
+    /**
+     * Scenario: the Phase 3 acceptance loop verbatim — given a
+     * recipe id, the bot pulls materials from a chest, crafts at the
+     * table, and banks the product back. Three goto legs chain in
+     * one sequence; every material movement rides the planner
+     * (planWithdraw → planRecipe → planTakeResult → planDeposit),
+     * never raw container writes. Timeout is widened past TIMEOUT
+     * because three mission arcs must fit inside one test.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 700)
+    public static void pullsCraftsAndBanksByRecipeId(
+            GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 3));
+
+        BlockPos chestLocal = new BlockPos(4, GametestRig.WALK_Y, 6);
+        helper.setBlock(chestLocal, Blocks.CHEST);
+        BlockPos chestAbs = helper.absolutePos(chestLocal);
+        var chestEntity = helper.getLevel().getBlockEntity(chestAbs);
+        check(chestEntity instanceof ChestBlockEntity,
+            "the chest must carry a block entity to seed");
+        ((ChestBlockEntity) chestEntity).setItem(0,
+            new ItemStack(Items.OAK_PLANKS, 16));
+
+        BlockPos tableLocal = new BlockPos(10, GametestRig.WALK_Y,
+            10);
+        helper.setBlock(tableLocal, Blocks.CRAFTING_TABLE);
+        BlockPos tableAbs = helper.absolutePos(tableLocal);
+
+        CellPos chestStand = localToCell(helper,
+            new BlockPos(4, GametestRig.WALK_Y, 5));
+        CellPos tableStand = localToCell(helper,
+            new BlockPos(10, GametestRig.WALK_Y, 9));
+
+        var catalog = new RecipeCatalog(helper.getLevel());
+        RecipeView stickRecipe =
+            catalog.byId("minecraft:stick").orElse(null);
+        check(stickRecipe != null,
+            "the stick recipe must be cataloged");
+
+        var actor = rig.actor();
+        GotoProcess[] mission = {null};
+        var chestCell = new CellPos(chestAbs.getX(), chestAbs.getY(),
+            chestAbs.getZ());
+        var tableCell = new CellPos(tableAbs.getX(), tableAbs.getY(),
+            tableAbs.getZ());
+
+        helper.startSequence()
+            // Leg 1: walk to the chest and pull materials.
+            .thenExecute(() -> mission[0] = submitGoto(rig,
+                chestStand))
+            .thenWaitUntil(driveUntil(rig, () -> check(
+                reached(rig.body(), chestStand),
+                "waiting for arrival at the chest")))
+            .thenExecuteFor(3, driveOnly(rig))
+            .thenExecuteAfter(0, () -> {
+                check(mission[0].missionSucceeded(),
+                    "the walk to the chest must succeed");
+                var view = actor.openMenu(chestCell);
+                check(view != null, "the chest must open");
+                for (var step : MenuPlanner.planWithdraw(view,
+                        "minecraft:oak_planks", 2)) {
+                    view = actor.menuClick(step.slot(),
+                        step.button(), step.kind());
+                }
+                actor.closeMenu();
+                check(countItems(rig, Items.OAK_PLANKS) == 16,
+                    "whole-stack withdrawal must land all 16 planks"
+                        + ", got " + countItems(rig, Items.OAK_PLANKS));
+            })
+            // Leg 2: walk to the table and craft by recipe id.
+            .thenExecute(() -> mission[0] = submitGoto(rig,
+                tableStand))
+            .thenWaitUntil(driveUntil(rig, () -> check(
+                reached(rig.body(), tableStand),
+                "waiting for arrival at the table")))
+            .thenExecuteFor(3, driveOnly(rig))
+            .thenExecuteAfter(0, () -> {
+                check(mission[0].missionSucceeded(),
+                    "the walk to the table must succeed");
+                var view = actor.openMenu(tableCell);
+                check(view != null, "the table must open");
+                CraftingView craft = CraftingView.of(view);
+                for (var step : MenuPlanner.planRecipe(craft,
+                        stickRecipe)) {
+                    view = actor.menuClick(step.slot(),
+                        step.button(), step.kind());
+                }
+                checkEquals("minecraft:stick",
+                    view.slot(craft.result().index()).item()
+                        .itemId(),
+                    "sticks must resolve on the grid");
+                for (var step : MenuPlanner.planTakeResult(
+                        CraftingView.of(view))) {
+                    view = actor.menuClick(step.slot(),
+                        step.button(), step.kind());
+                }
+                actor.closeMenu();
+                check(countItems(rig, Items.STICK) == 4,
+                    "exactly 4 sticks after the craft, got "
+                        + countItems(rig, Items.STICK));
+            })
+            // Leg 3: return to the chest and bank the product.
+            .thenExecute(() -> mission[0] = submitGoto(rig,
+                chestStand))
+            .thenWaitUntil(driveUntil(rig, () -> check(
+                reached(rig.body(), chestStand),
+                "waiting for arrival back at the chest, at="
+                    + positionOf(rig.body()) + " goal=" + chestStand
+                    + " active=" + mission[0].isActive()
+                    + " ok=" + mission[0].missionSucceeded())))
+            .thenExecuteFor(3, driveOnly(rig))
+            .thenExecuteAfter(0, () -> {
+                check(mission[0].missionSucceeded(),
+                    "the walk back must succeed");
+                var view = actor.openMenu(chestCell);
+                check(view != null, "the chest must reopen");
+                for (var step : MenuPlanner.planDeposit(view,
+                        "minecraft:stick")) {
+                    view = actor.menuClick(step.slot(),
+                        step.button(), step.kind());
+                }
+                actor.closeMenu();
+
+                var bank = helper.getLevel()
+                    .getBlockEntity(chestAbs);
+                check(bank instanceof ChestBlockEntity,
+                    "the chest entity must persist to the end");
+                int sticksInChest = 0;
+                int planksInChest = 0;
+                var storage = (ChestBlockEntity) bank;
+                for (int i = 0; i < storage.getContainerSize(); i++) {
+                    ItemStack stack = storage.getItem(i);
+                    if (stack.is(Items.STICK)) {
+                        sticksInChest += stack.getCount();
+                    }
+                    if (stack.is(Items.OAK_PLANKS)) {
+                        planksInChest += stack.getCount();
+                    }
+                }
+                checkEquals(4, sticksInChest,
+                    "the banked sticks must sit in the chest");
+                checkEquals(0, planksInChest,
+                    "no planks may ride back into the chest");
+                checkEquals(14, countItems(rig, Items.OAK_PLANKS),
+                    "two planks must be consumed by the craft");
+                checkEquals(0, countItems(rig, Items.STICK),
+                    "every stick must be banked");
+
+                rig.body().discard();
+            })
+            .thenSucceed();
     }
 
     /** Total count of one item kind across the whole binding

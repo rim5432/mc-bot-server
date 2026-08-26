@@ -73,7 +73,8 @@ class GametestInventoryCheck {
             "equipsArmorThroughMenuClicks",
             "craftsViaMenuTransactions",
             "walksToTableAndCrafts",
-            "catalogsShapedRecipes"),
+            "catalogsShapedRecipes",
+            "pullsCraftsAndBanksByRecipeId"),
         "GauntletGameTests", Set.of(
             "gauntletEndToEnd",
             "routesThroughFenceGap"),
