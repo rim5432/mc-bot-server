@@ -12,6 +12,7 @@ Generated: 2026-08-27. Validate anytime with `python tool/mcbot_tool.py doc chec
 | [boundaries.md](architecture/boundaries.md) | Boundary Contracts and Decision Ledger | 2026-08-27 | ok |
 | [code-health.md](architecture/code-health.md) | Code Health Ledger | 2026-08-27 | ok |
 | [function-map.md](architecture/function-map.md) | Functional Convergence Map (device-layer capability envelope) | 2026-08-27 | ok |
+| [glossary.md](architecture/glossary.md) | Glossary - the loaded terms, pinned before they mislead | 2026-08-27 | ok |
 | [harness-interaction.md](architecture/harness-interaction.md) | Harness Interaction Model - the canonical architecture of the bot's command surface | 2026-08-27 | ok |
 | [issues/0003-sneak-pose-and-edge-walk.md](architecture/issues/0003-sneak-pose-and-edge-walk.md) | Sneak pose and edge walk - pose-aware collision, SNEAK channel, shield block | 2026-08-26 | ok |
 | [issues/0004-movement-primitive-vocabulary.md](architecture/issues/0004-movement-primitive-vocabulary.md) | Movement primitive vocabulary - misnomers, fluid propulsion, missing key semantics | 2026-08-27 | ok |

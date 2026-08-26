@@ -32,6 +32,10 @@ Its defining constraint is a clean separation between two layers:
 3. **Everything is event-sourced.** Bot actions and world observations are
    logged as discrete events so a harness can replay and reason about them.
 
+Loaded terms (dumb, pure, one seam, reflex bypass...) are pinned in the
+[glossary](glossary.md) - the definition sentence is the contract, the
+term name alone has misled external review before.
+
 ## Entry points
 
 | What | Where |
