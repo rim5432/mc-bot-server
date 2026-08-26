@@ -663,3 +663,44 @@ freeze lifts.
          unattended survival loop (mine -> craft -> equip ->
          fight -> eat).                                         [dep: P3]
 
+
+### Lean-round deferrals (2026-08-26 whole-repo over-engineering audit)
+
+Rulings from the delegated lean round (user: "you make the rulings,
+lean direction"). Executed same day: goto-migration scaffolding
+removal, six-way RecordingActor / eight-way floorTo / six-way
+repoRoot helper consolidation + SanityCheck deletion, one numeric
+parser in GotoCommandHandler, consumer-count drain-lock retirement
+(boundaries.md ledger 30), resetAt doc-truth fix. The items below
+are the deliberate NON-executions, each with its trigger:
+
+- [ ] S  Deterministic clock seam for wall-clock gates:
+         AStarWallClockGateTest arms a real 1 ms budget (fast machines
+         can finish the search inside it and flip the assertion);
+         AdoptFreshnessGateTest and PlanWorkerGateTest sleep-poll the
+         async worker. Inject a deadline/clock into AStarPathFinder +
+         PlanWorker instead. No fake clock exists anywhere yet.
+                                                        [dep: none]
+- [ ] S  RecipeCatalog.list(offset, limit) / RecipePage (uncommitted
+         backend of the recipes-list wire verb) ships without any
+         offline test - add one for clamping, ordering, and the
+         shapeless-skip rule before or with that commit.
+                                                        [dep: none]
+- [ ] S  Menu-family disposition (BridgeInventory 333L vs
+         BindingInventory 148L overlap; BotInventoryMenu thin fork of
+         BotCraftingMenu): rides the issue 0010 BotPlayerFacade /
+         FoodData lifecycle ruling - do not churn vanilla-interaction
+         adapter code twice.
+                                            [dep: issue 0010 ruling]
+- [ ] S  CombatOrder permits exactly Attack (single-subtype sealed
+         hierarchy): flatten onto Overrides' payload at the Stage 3
+         review - boundary-B Directive shape is frozen until then.
+                                        [dep: stage 3 review opens]
+- Verified non-findings kept on purpose: Heuristic interface
+  (decision 7 injected seam; planned climbs/drops will supply second
+  suppliers - same reserved-seam class as ViewMode.SNAPSHOT),
+  PresenceLayer/IdleLook/BodyPositionSource (BodyPositionSource feeds
+  PathingBehavior + CombatBehavior aiming - not cosmetic),
+  /bot goto brigadier path (it IS the transport mc.py translates
+  onto), parked issue 0003 stays in issues/ root (parked is a legal
+  root status; archive policy binds resolved only).
