@@ -360,9 +360,6 @@ public final class PathingBehavior implements Behavior {
         }
 
         cursor.advance(position);
-        if (cursor.exhausted()) {
-            return ExecutionReport.running();
-        }
         if (departHoldTicks > 0) {
             // Departure hold (issue 0005 P2.1): planning and cursor
             // bookkeeping above already ran; only the drive claims
@@ -371,6 +368,10 @@ public final class PathingBehavior implements Behavior {
             departHoldTicks--;
             return ExecutionReport.running();
         }
+        // No exhausted early-return: steerTarget() clamps to the
+        // last waypoint once the cursor runs past it, so a brake
+        // undershoot keeps pushing into the goal cell instead of
+        // idling one cell short until the mission budget dies.
         steerTowardCurrentWaypoint(position, actor);
         return ExecutionReport.running();
     }

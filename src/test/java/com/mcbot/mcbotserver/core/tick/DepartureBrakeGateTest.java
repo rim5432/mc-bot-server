@@ -112,6 +112,47 @@ class DepartureBrakeGateTest {
     }
 
     /**
+     * Regression pin (pullsCraftsAndBanksByRecipeId engine stall):
+     * when a brake undershoot leaves the body short of the goal cell
+     * while the cursor has already consumed every waypoint, steering
+     * must KEEP claiming drive toward the clamped terminal waypoint.
+     * The old exhausted early-return idled the body one cell away
+     * until the mission budget died as TIMEOUT/STUCK.
+     */
+    @Test
+    void windDownKeepsSteeringAfterCursorExhaustsShortOfGoal() {
+        Vec3[] position = {new Vec3(39.75, 64, 0.5)};
+        PathingBehavior mover = new PathingBehavior("mover",
+            () -> position[0], BasicMoves::from);
+        RecordingActor actor = new RecordingActor();
+        MockWorldView world = floorTo(60);
+        Directive directive = Directive.of(
+            new GoalBlock(new CellPos(40, 64, 0)));
+
+        for (int i = 0; i <= PathingBehavior.DEPARTURE_DELAY_TICKS; i++) {
+            mover.tick(world, directive, actor);
+        }
+        assertTrue(PathingTestAccess.waypoints(mover).size() >= 1,
+            "a plan must be adopted before the wind-down scenario");
+
+        // Force the exact defect geometry: the body stands 0.75 from
+        // the terminal waypoint centre (inside WAYPOINT_REACH) but in
+        // cell 39, not the goal cell 40 - then the cursor is pushed
+        // past its end.
+        PathingTestAccess.writeWaypointIndex(mover,
+            PathingTestAccess.waypoints(mover).size());
+        assertTrue(PathingTestAccess.steerTarget(mover)
+                .equals(new CellPos(40, 64, 0)),
+            "steerTarget must clamp to the terminal waypoint");
+
+        actor.submitted.clear();
+        mover.tick(world, directive, actor);
+        assertTrue(hasMoveClaim(actor),
+            "an exhausted cursor must keep steering toward the "
+                + "goal, not idle one cell short");
+    }
+
+    /**
      * Inside BRAKE_DISTANCE the drive scales with remaining distance
      * (2.6 m to go -> forward 2.6/3); far away it stays exactly 1.0.
      */
