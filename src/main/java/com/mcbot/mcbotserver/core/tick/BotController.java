@@ -415,7 +415,8 @@ public final class BotController {
         return true;
     }
 
-    private void runPipeline(WorldView world) {        CellPos position = positionSource.get();
+    private void runPipeline(WorldView world) {
+        CellPos position = positionSource.get();
         float health = healthSource.get();
         long day = clock.day();
         long tod = clock.timeOfDayTicks();
