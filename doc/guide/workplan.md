@@ -678,3 +678,10 @@ arm. Harness-side only, zero wire change:
          events --only surfaced from the wire's narrowing; ls /
          root discovery + mc help. Mock tests pin each.
                                                           [dep: issue 0015]
+### Deferred infrastructure queue
+
+- [ ] S  EventQueue `JsonlJournal` persistence for cross-restart
+         replay (event queue ships in-memory only today);
+         inherited from the retired AGENTS.md open questions -
+         `resetAt` epoch honesty is already queued as issue 0015
+         section 7.                                         [dep: none]

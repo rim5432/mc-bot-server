@@ -35,6 +35,7 @@ Generated: 2026-08-27. Validate anytime with `python tool/mcbot_tool.py doc chec
 | Document | Title | Verified | Status |
 |---|---|---|---|
 | [build-and-run.md](guide/build-and-run.md) | Build & Run Guide | 2026-08-27 | ok |
+| [onboarding.md](guide/onboarding.md) | Onboarding Guide | 2026-08-27 | ok |
 | [workplan.md](guide/workplan.md) | Work Plan (effort-sized checklist) | 2026-08-27 | ok |
 
 ## reference/
@@ -64,4 +65,4 @@ Generated: 2026-08-27. Validate anytime with `python tool/mcbot_tool.py doc chec
 - Workflow after editing covered code: update the affected docs, run
   `doc check`, then `doc touch <name>` on what you re-verified.
 - Superseded docs move to `archive/` with a `superseded_by:` pointer.
-- Full contract: root `AGENTS.md` (§3.5 tool reference).
+- Hard constraints: root `AGENTS.md`; full tool table: tool/README.md.

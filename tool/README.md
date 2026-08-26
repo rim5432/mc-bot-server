@@ -7,7 +7,7 @@ that unifies build / test / logs / process management / multi-agent
 concurrency gating.
 
 > Multi-agent collaboration rules live in the root `AGENTS.md`
-> (§0.2 mandatory rules, §3.5 command essentials). This README is the
+> (§0.2 mandatory rules). This README is the
 > human-facing quick reference and the full subcommand table.
 
 ## Quick start
