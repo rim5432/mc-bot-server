@@ -77,7 +77,8 @@ public final class WorldCommands {
                 .then(Commands.argument("y", IntegerArgumentType.integer())
                     .then(Commands.argument("z", IntegerArgumentType.integer())
                         .then(volumeArg("dx", live,
-                            volumeArg("dy", live, null))))));
+                            volumeArg("dy", live,
+                                volumeArg("dz", live, null)))))));
         var entities = Commands.literal("entities")
             .requires(src -> src.hasPermission(2))
             .executes(ctx -> runEntities(live, ctx.getSource(), 8, 32))
