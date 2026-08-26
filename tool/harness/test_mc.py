@@ -21,10 +21,10 @@ from unittest import mock
 import mc
 
 
-def batch(events, latest=0):
+def batch(events, latest=0, reset_at=0):
     """One /bot events reply in the exact EventBatchJson shape."""
     return {"ok": True,
-            "batch": {"latest": latest, "resetAt": 0, "dropped": 0,
+            "batch": {"latest": latest, "resetAt": reset_at, "dropped": 0,
                       "events": events}}
 
 
@@ -270,6 +270,57 @@ class EventsCursorTest(McCliTest):
         self.assertEqual(code, 0)
         self.assertEqual(self.wire_calls, ["/bot events 3"])
         self.assertEqual(self.cursor_value(), 0)
+
+
+class StreamResetTest(McCliTest):
+    """Cross-restart cursor trap, found live by shadow_compare: the
+    event stream does not survive bot restarts (boundary D), so a
+    stored bookmark from a previous epoch points past the new head and
+    wait would stare at nothing forever. resetAt is the wire signal."""
+
+    def write_stale_bookmark(self, event_id, epoch):
+        mc.CURSOR_PATH.write_text(f"{event_id} {epoch}\n",
+                                  encoding="utf-8")
+
+    def test_wait_reanchors_on_epoch_change(self):
+        self.write_stale_bookmark(500, 3)
+        # First poll (stale since=500) carries the NEW epoch; the
+        # re-anchored second poll (since=0) delivers the terminal.
+        self.queue(
+            batch([], latest=500, reset_at=7),
+            batch([event("TASK_COMPLETED", task_id="t14")],
+                  latest=12, reset_at=7),
+        )
+        code, _, err = self.run_verb(mc.cmd_wait, "t14",
+                                     timeout_sec=0.5, poll_interval=0)
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["/bot events 500",
+                                           "/bot events 0"])
+        self.assertIn("reset", err)
+        # wait re-anchors in-memory only; the bookmark stays untouched.
+        self.assertEqual(mc.read_cursor_state(), (500, 3))
+
+    def test_events_reanchors_and_rewrites_bookmark(self):
+        self.write_stale_bookmark(500, 3)
+        self.queue(
+            batch([], latest=500, reset_at=7),
+            batch([], latest=12, reset_at=7),
+        )
+        code, _, err = self.run_verb(mc.cmd_events)
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["/bot events 500",
+                                           "/bot events 0"])
+        self.assertEqual(mc.read_cursor_state(), (12, 7))
+        self.assertIn("reset", err)
+
+    def test_cursor_state_roundtrip_and_legacy_format(self):
+        mc.write_cursor_state(5, 9)
+        self.assertEqual(mc.read_cursor_state(), (5, 9))
+        mc.CURSOR_PATH.write_text("5\n", encoding="utf-8")
+        # Legacy single-int file parses as epoch 0, which never
+        # matches a live stream (resetAt starts at 1) - one-time
+        # re-anchor on first comparison, by design.
+        self.assertEqual(mc.read_cursor_state(), (5, 0))
 
 
 class AdminVerbTest(McCliTest):

@@ -48,13 +48,16 @@ not exist.
 Exit codes: 0 ok; 1 rejected/unsupported; 124 wait timeout; 3 rcon
 error. (argparse usage errors exit 2 by argparse's own convention.)
 
-Cursor lives at tool/.runtime/mc_cursor.txt (gitignored). The disk
-cursor is the operator's bookmark, not a per-reader offset: only a
-cursorless `mc events` advances it; `--since N` is a peek and never
-advances; wait reads the cursor as a starting point but does not
-advance it (the audit stream must stay complete - internal
-consumption must not eat events). Concurrent programmatic consumers
-pass --since and keep their own offsets.
+Cursor lives at tool/.runtime/mc_cursor.txt (gitignored), storing
+"<eventId> <resetAt>". The disk cursor is the operator's bookmark,
+not a per-reader offset: only a cursorless `mc events` advances it;
+`--since N` is a peek and never advances; wait reads the cursor as a
+starting point but does not advance it (the audit stream must stay
+complete - internal consumption must not eat events). Concurrent
+programmatic consumers pass --since and keep their own offsets. A
+changed resetAt epoch (bot restart - the event stream does not
+survive restarts by boundary-D contract) voids the bookmark: wait
+re-anchors its scan to 0, events drains the new stream from 0.
 """
 
 from __future__ import annotations
@@ -107,16 +110,34 @@ def wire(command: str) -> dict:
 # Cursor management
 # ---------------------------------------------------------------------------
 
-def read_cursor() -> int:
+def read_cursor_state() -> tuple[int, int]:
+    """Read the operator bookmark as (eventId, resetAt-epoch).
+
+    Old-format files (a bare int) parse with epoch 0, which never
+    matches a live stream (resetAt starts at 1) - first comparison
+    re-anchors once. That is the correct one-time cost: an epoch-less
+    cursor cannot be trusted against any stream.
+    """
     if CURSOR_PATH.exists():
-        text = CURSOR_PATH.read_text(encoding="utf-8").strip()
-        return int(text) if text else 0
-    return 0
+        parts = CURSOR_PATH.read_text(encoding="utf-8").split()
+        if parts:
+            event_id = int(parts[0])
+            epoch = int(parts[1]) if len(parts) > 1 else 0
+            return event_id, epoch
+    return 0, 0
+
+
+def write_cursor_state(event_id: int, epoch: int) -> None:
+    CURSOR_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CURSOR_PATH.write_text(f"{event_id} {epoch}\n", encoding="utf-8")
+
+
+def read_cursor() -> int:
+    return read_cursor_state()[0]
 
 
 def write_cursor(value: int) -> None:
-    CURSOR_PATH.parent.mkdir(parents=True, exist_ok=True)
-    CURSOR_PATH.write_text(f"{value}\n", encoding="utf-8")
+    write_cursor_state(value, read_cursor_state()[1])
 
 
 # ---------------------------------------------------------------------------
@@ -236,15 +257,25 @@ def cmd_wait(task_id: str, timeout_sec: int = 120, poll_interval: float = 1.0) -
 
     Uses the disk cursor as starting point but does NOT advance it -
     the audit stream must stay complete for a later `mc events`.
+    Self-heals across bot restarts: a changed resetAt epoch means the
+    stream restarted and every stored cursor is void (boundary D
+    no-survive-restart); the scan re-anchors to 0 instead of staring
+    at a stale-high cursor forever.
     Returns the terminal event's kind as exit-friendly text.
     """
-    since = read_cursor()
+    since, epoch = read_cursor_state()
     deadline = time.monotonic() + timeout_sec
     while time.monotonic() < deadline:
         resp = wire(f"/bot events {since}")
         batch = resp.get("batch", {})
         events = batch.get("events", [])
         latest = batch.get("latest", since)
+        if epoch != batch.get("resetAt", epoch):
+            epoch = batch.get("resetAt", epoch)
+            since = 0
+            print(f"wait: stream reset detected (resetAt={epoch}); "
+                  "re-anchored cursor to 0", file=sys.stderr)
+            continue
         for evt in events:
             evt_task = evt.get("attrs", {}).get("taskId",
                          evt.get("attrs", {}).get("task", ""))
@@ -269,14 +300,26 @@ def cmd_events(since: int | None = None) -> int:
     Only a cursorless invocation advances the disk cursor: it is the
     operator's bookmark, not a per-reader offset. An explicit --since
     is a peek and never advances it (0012 D5 cursor invariant).
+    Self-heals across bot restarts: a changed resetAt epoch voids the
+    stored bookmark, so the drain restarts from 0 of the new stream.
     """
-    cursor = since if since is not None else read_cursor()
+    cursor, epoch = read_cursor_state()
+    if since is not None:
+        cursor = since
     resp = wire(f"/bot events {cursor}")
     batch = resp.get("batch", {})
     latest = batch.get("latest", cursor)
+    stream_epoch = batch.get("resetAt", epoch)
+    if since is None and epoch != stream_epoch:
+        print(f"events: stream reset detected (resetAt={stream_epoch}); "
+              "draining the new stream from 0", file=sys.stderr)
+        cursor = 0
+        resp = wire("/bot events 0")
+        batch = resp.get("batch", {})
+        latest = batch.get("latest", 0)
     print(json.dumps(resp, indent=2))
     if since is None and latest > cursor:
-        write_cursor(latest)
+        write_cursor_state(latest, stream_epoch)
     return 0
 
 
