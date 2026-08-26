@@ -31,8 +31,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * are adopted only when fresh (goal unchanged, start cell still ours),
  * and a search in flight never masquerades as NO_PATH.
  *
- * <p>Contract: see boundaries.md decision 17b and AGENTS.md section
- * 2.2 - the worker reads snapshots only; adoption is tick-thread work.
+ * <p>Contract: see boundaries.md ledger entry 17b - the worker reads
+ * snapshots only; adoption is tick-thread work.
  */
 class PlanWorkerGateTest {
 

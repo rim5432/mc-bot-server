@@ -17,8 +17,8 @@ import java.util.concurrent.Executors;
  * on the main thread; the worker reads only that immutable view plus
  * pure engine state, so no live world access ever crosses threads.
  *
- * <p>Contract: see boundaries.md decision 17b and AGENTS.md section
- * 2.2 - the worker never touches LIVE views, and every public method
+ * <p>Contract: see boundaries.md ledger entry 17b - the worker never
+ * touches LIVE views, and every public method
  * is annotated with its legal thread. The thread is a daemon: a
  * forgotten shutdown cannot block JVM exit.
  *

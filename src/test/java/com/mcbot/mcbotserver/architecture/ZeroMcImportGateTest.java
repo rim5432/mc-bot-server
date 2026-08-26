@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Layer-1 architecture gate: {@code api/} and {@code core/} must never
  * import Minecraft or Forge types.
  *
- * <p>Contract: see boundaries.md section A and AGENTS.md 2.1. The whole
+ * <p>Contract: see boundaries.md section A and ledger entry 5. The whole
  * point of the api/core split is that Stage 0 acceptance runs as plain
  * JUnit on a machine without a Forge runtime; a single leaked
  * {@code net.minecraft.*} import would silently break that property.

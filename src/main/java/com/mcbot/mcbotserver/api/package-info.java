@@ -4,7 +4,7 @@
  * or anywhere below it.
  *
  * <p>Contract: see boundaries.md section A (WorldView is the read half,
- * Actor is the intent half) and AGENTS.md 2.1. This package is the seam
+ * Actor is the intent half). This package is the seam
  * a non-JVM harness could in principle bind to, so it must stay pure
  * Java. Enforcement: {@code ZeroMcImportGateTest} fails the build when
  * any file under {@code api} or {@code core} imports
