@@ -23,6 +23,7 @@ Generated: 2026-08-27. Validate anytime with `python tool/mcbot_tool.py doc chec
 | [issues/0012-work-block-usability-and-harness-menu-surface.md](architecture/issues/0012-work-block-usability-and-harness-menu-surface.md) | Work-block usability - vanilla construction delegation and the harness manual menu surface | 2026-08-27 | stale? |
 | [issues/0013-world-interaction-layer.md](architecture/issues/0013-world-interaction-layer.md) | World interaction layer - perception reads, dig task, place verb, health field | 2026-08-27 | ok |
 | [issues/0014-mineprocess-composite-mining-task.md](architecture/issues/0014-mineprocess-composite-mining-task.md) | MineProcess - composite mining task with search-mine-collect loop | 2026-08-27 | ok |
+| [issues/0015-interaction-model-executable-queue.md](architecture/issues/0015-interaction-model-executable-queue.md) | Interaction model executable queue - the composition primitives the canonical doc promises | 2026-08-27 | ok |
 | [issues/archive/0006-scan-radius-leash-gap.md](architecture/issues/archive/0006-scan-radius-leash-gap.md) | Scan radius / leash gap in DefendProcess | 2026-08-25 | ok |
 | [issues/archive/0008-extreme-scenario-survival-framework.md](architecture/issues/archive/0008-extreme-scenario-survival-framework.md) | Extreme-scenario survival framework - the vital-sign ladder beyond drowning | 2026-08-25 | ok |
 | [overview.md](architecture/overview.md) | Architecture Overview | 2026-08-27 | ok |
