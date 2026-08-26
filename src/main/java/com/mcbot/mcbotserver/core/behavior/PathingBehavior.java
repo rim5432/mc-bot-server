@@ -360,6 +360,11 @@ public final class PathingBehavior implements Behavior {
         }
 
         cursor.advance(position);
+        if (cursor.isEmpty()) {
+            // No usable plan yet (a search is still in flight after
+            // a reset): nothing to steer toward this tick.
+            return ExecutionReport.running();
+        }
         if (departHoldTicks > 0) {
             // Departure hold (issue 0005 P2.1): planning and cursor
             // bookkeeping above already ran; only the drive claims
