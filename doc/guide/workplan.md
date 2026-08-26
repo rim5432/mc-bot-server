@@ -713,10 +713,10 @@ Round-2 audit (same day) appends:
          MenuCommandJson helper: deferred until the concurrent 0012
          batch lands - the same files are in flight and must not be
          churned twice.                  [dep: issue 0012 batch closes]
-- [ ] M  Split BotSliceGameTests (~2260L) into per-family holders
-         (movement / menu / interaction / crafting): mechanical, but
-         GametestInventoryCheck.EXPECTED pins class names, so its
-         map updates in the same commit.
+- [x] M  Split BotSliceGameTests into per-family holders - LANDED
+         2026-08-27 as five files (Locomotion/Combat/HazardReflex/
+         Inventory/Crafting), EXPECTED rekeyed same commit, engine
+         gate 39/39 then 40/40 with the pagination scenario.
                                              [dep: lean items close]
 - Ruled KEEP on purpose (round 2): BotController crash-policy
   extraction REJECTED for now - pure relocation of ~75 lines behind
@@ -726,3 +726,18 @@ Round-2 audit (same day) appends:
   rules on the facade. PathingBehavior's four ctors kept - three
   are test-convenience overloads encoding valid default pairs,
   removal trades ~20 main lines for noise at every test site.
+
+Lean-round-3 kept-rulings appendix (2026-08-27):
+
+- EngageReflexGateTest (508L) stays whole: ~55% scaffolding (Rig +
+  StubFight + ThreatInput); a three-way split hoists all of it for
+  marginal readability. Re-evaluate only if a fourth scenario family
+  appears.
+- PlanWorkerGateTest / AdoptFreshnessGateTest sleep-poll loops stay:
+  bounded x100 retries with no assertion flip; the correctness-risky
+  flake was the wall-clock budget race and that is fixed via the
+  injected AStarPathFinder clock.
+- MockWorldView presets(): terrain motifs only if encountered
+  opportunistically during future test edits (water/shore families);
+  entity-driven and deliberately-empty setups stay bespoke because
+  they ARE the scenario's assertion payload.
