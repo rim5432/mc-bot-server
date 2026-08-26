@@ -126,10 +126,24 @@ public final class DigProcess implements BotProcess, TerminalMission {
     @Override
     public void onExecutionReport(
             com.mcbot.mcbotserver.api.behavior.ExecutionReport report) {
-        // Dig completion is read from the world, not from behavior
-        // reports; pathing reports (STUCK on the way in) surface
-        // through the timeout instead. Deliberate simplification for
-        // the single-block v1.
+        if (!active) {
+            // Terminal state is sticky: a late report from the same
+            // tick's pipeline must never flip a terminal state.
+            return;
+        }
+        switch (report.status()) {
+            case STUCK -> fail("STUCK: " + reasonOrUnknown(report));
+            case FAILED -> fail(reasonOrUnknown(report));
+            case SUCCESS -> {
+                // PathingBehavior SUCCESS means the bot reached the
+                // GoalNear stand-off range — that is the dig position,
+                // not mission completion. The block-air read in onTick
+                // owns the success decision.
+            }
+            default -> {
+                // RUNNING stays the mover's concern this tick.
+            }
+        }
     }
 
     @Override
@@ -181,5 +195,10 @@ public final class DigProcess implements BotProcess, TerminalMission {
         failure = reason;
         active = false;
         return Directive.of(new GoalNear(target, 2));
+    }
+
+    private static String reasonOrUnknown(
+            com.mcbot.mcbotserver.api.behavior.ExecutionReport report) {
+        return report.reason() != null ? report.reason() : "UNKNOWN";
     }
 }

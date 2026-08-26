@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.core.process;
 
+import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.BlockSnapshot;
@@ -79,5 +80,67 @@ class DigProcessTest {
         org.junit.jupiter.api.Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> new DigProcess("t5", TARGET, 50, 0));
+    }
+
+    @Test
+    void stuckReportFailsBeforeTimeout() {
+        MockWorldView world = new MockWorldView()
+            .putBlock(new BlockSnapshot(TARGET, "minecraft:stone"));
+        DigProcess dig = new DigProcess("t6", TARGET, 50, 100);
+        dig.onTick(world);
+        assertTrue(dig.isActive());
+        dig.onExecutionReport(ExecutionReport.stuck("no displacement"));
+        assertFalse(dig.isActive());
+        assertFalse(dig.missionSucceeded());
+        assertTrue(dig.failureReasonOrNull().startsWith("STUCK"));
+    }
+
+    @Test
+    void failedReportFailsWithReason() {
+        MockWorldView world = new MockWorldView()
+            .putBlock(new BlockSnapshot(TARGET, "minecraft:stone"));
+        DigProcess dig = new DigProcess("t7", TARGET, 50, 100);
+        dig.onTick(world);
+        dig.onExecutionReport(ExecutionReport.failed("NO_PATH"));
+        assertFalse(dig.isActive());
+        assertEquals("NO_PATH", dig.failureReasonOrNull());
+    }
+
+    @Test
+    void successReportDoesNotCompleteDig() {
+        // PathingBehavior SUCCESS means "reached the stand-off range",
+        // not "block broken". The dig must stay active until the world
+        // read sees air.
+        MockWorldView world = new MockWorldView()
+            .putBlock(new BlockSnapshot(TARGET, "minecraft:stone"));
+        DigProcess dig = new DigProcess("t8", TARGET, 50, 100);
+        dig.onTick(world);
+        dig.onExecutionReport(ExecutionReport.success());
+        assertTrue(dig.isActive());
+        assertFalse(dig.missionSucceeded());
+    }
+
+    @Test
+    void runningReportIgnored() {
+        MockWorldView world = new MockWorldView()
+            .putBlock(new BlockSnapshot(TARGET, "minecraft:stone"));
+        DigProcess dig = new DigProcess("t9", TARGET, 50, 100);
+        dig.onTick(world);
+        dig.onExecutionReport(ExecutionReport.running());
+        assertTrue(dig.isActive());
+    }
+
+    @Test
+    void terminalStateIgnoresLateReports() {
+        // Once failed, a late SUCCESS from the same tick must not flip
+        // the terminal state (sticky terminal contract).
+        MockWorldView world = new MockWorldView()
+            .putBlock(new BlockSnapshot(TARGET, "minecraft:stone"));
+        DigProcess dig = new DigProcess("t10", TARGET, 50, 100);
+        dig.onTick(world);
+        dig.onExecutionReport(ExecutionReport.stuck("no displacement"));
+        dig.onExecutionReport(ExecutionReport.success());
+        assertFalse(dig.isActive());
+        assertFalse(dig.missionSucceeded());
     }
 }
