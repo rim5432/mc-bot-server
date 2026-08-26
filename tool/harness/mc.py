@@ -506,6 +506,33 @@ def cmd_write(path: str, value: str, tol: int | None = None,
         if resp.get("ok") and "task" in resp:
             print(f"taskId: {resp['task']}", file=sys.stderr)
         return 0 if resp.get("ok") else 1
+    if path == "/tasks/mine":
+        # Composite mining task (issue 0014): value "blockType:count",
+        # e.g. "minecraft:stone:10". The blockType is a registry id which
+        # may contain a colon, so we split on the LAST colon. timeout
+        # mirrors MineCommandHandler.DEFAULT_TIMEOUT_TICKS = 2400.
+        if ":" not in value:
+            print("write /tasks/mine: value must be 'blockType:count'",
+                  file=sys.stderr)
+            return 1
+        block_type, count_str = value.rsplit(":", 1)
+        block_type = block_type.strip()
+        try:
+            count = int(count_str.strip())
+        except ValueError:
+            print("write /tasks/mine: count must be an integer",
+                  file=sys.stderr)
+            return 1
+        if count <= 0:
+            print("write /tasks/mine: count must be positive",
+                  file=sys.stderr)
+            return 1
+        timeout_val = timeout if timeout is not None else 2400
+        resp = wire(f"/bot mine {block_type} {count} {timeout_val}")
+        print(json.dumps(resp, indent=2))
+        if resp.get("ok") and "task" in resp:
+            print(f"taskId: {resp['task']}", file=sys.stderr)
+        return 0 if resp.get("ok") else 1
     if path.startswith("/tasks/") and path.endswith("/cancel"):
         task_id = path[len("/tasks/"):-len("/cancel")]
         reason = value  # audit payload, passed through (wire ignores extra)

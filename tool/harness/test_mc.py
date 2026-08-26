@@ -451,6 +451,61 @@ class DigTaskTest(McCliTest):
         self.assertEqual(code, 1)
 
 
+class MineTaskTest(McCliTest):
+    """0014: write /tasks/mine -> /bot mine (composite task family)."""
+
+    def test_mine_translates_with_default_timeout(self):
+        self.queue({"ok": True, "task": "t9", "replay": False})
+        code, _, err = self.run_verb(mc.cmd_write, "/tasks/mine",
+                                      "minecraft:stone:3")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls,
+                         ["/bot mine minecraft:stone 3 2400"])
+        self.assertIn("taskId: t9", err)
+
+    def test_mine_passes_explicit_timeout(self):
+        self.queue({"ok": True, "task": "t10", "replay": False})
+        code, _, _ = self.run_verb(mc.cmd_write, "/tasks/mine",
+                                    "minecraft:dirt:5", timeout=600)
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls,
+                         ["/bot mine minecraft:dirt 5 600"])
+
+    def test_mine_handles_registry_id_with_colon(self):
+        # blockType is a registry id (minecraft:stone) which contains a
+        # colon; rsplit(":", 1) must split on the LAST colon only.
+        self.queue({"ok": True, "task": "t11", "replay": False})
+        code, _, _ = self.run_verb(mc.cmd_write, "/tasks/mine",
+                                    "minecraft:deepslate:2")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls,
+                         ["/bot mine minecraft:deepslate 2 2400"])
+
+    def test_mine_rejects_malformed_value(self):
+        code, _, err = self.run_verb(mc.cmd_write, "/tasks/mine", "stone")
+        self.assertEqual(code, 1)
+        self.assertEqual(self.wire_calls, [])
+        self.assertIn("blockType:count", err)
+
+    def test_mine_rejects_non_integer_count(self):
+        code, _, _ = self.run_verb(mc.cmd_write, "/tasks/mine",
+                                    "minecraft:stone:abc")
+        self.assertEqual(code, 1)
+        self.assertEqual(self.wire_calls, [])
+
+    def test_mine_rejects_non_positive_count(self):
+        code, _, _ = self.run_verb(mc.cmd_write, "/tasks/mine",
+                                    "minecraft:stone:0")
+        self.assertEqual(code, 1)
+        self.assertEqual(self.wire_calls, [])
+
+    def test_mine_rejection_exits_one(self):
+        self.queue({"ok": False, "reason": "mine wants blockType count"})
+        code, _, _ = self.run_verb(mc.cmd_write, "/tasks/mine",
+                                    "minecraft:stone:1")
+        self.assertEqual(code, 1)
+
+
 class HealthFieldTest(McCliTest):
     """0013 slice 2: healthHearts + freeSlots ride /bot status."""
 
