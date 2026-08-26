@@ -368,6 +368,33 @@ class RecipeMaterializationTest(McCliTest):
         self.assertEqual(self.wire_calls, ['recipes "nothing_here"'])
 
 
+class PlaceActionTest(McCliTest):
+    """0013 slice 4: write /actions/place -> /bot place (sync)."""
+
+    def test_place_translates_lowercase_face(self):
+        self.queue({"ok": True, "placed": True, "at": [1, 61, 2],
+                    "block": "minecraft:stone"})
+        code, out, _ = self.run_verb(mc.cmd_write, "/actions/place",
+                                     "1,61,1,south")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["/bot place 1 61 1 south"])
+        self.assertTrue(json.loads(out)["placed"])
+
+    def test_place_rejection_exits_one(self):
+        self.queue({"ok": False, "placed": False,
+                    "reason": "cell not air: minecraft:stone"})
+        code, _, _ = self.run_verb(mc.cmd_write, "/actions/place",
+                                   "1,61,2,up")
+        self.assertEqual(code, 1)
+
+    def test_place_malformed_value(self):
+        code, _, err = self.run_verb(mc.cmd_write, "/actions/place",
+                                     "1,2,3")
+        self.assertEqual(code, 1)
+        self.assertIn("x,y,z,face", err)
+        self.assertEqual(self.wire_calls, [])
+
+
 class DigTaskTest(McCliTest):
     """0013 slice 3: write /tasks/dig -> /bot dig (task family)."""
 

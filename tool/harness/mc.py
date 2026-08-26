@@ -462,6 +462,18 @@ def cmd_write(path: str, value: str, tol: int | None = None,
         resp = wire(cmd)
         print(json.dumps(resp, indent=2))
         return 0 if resp.get("ok") else 1
+    if path == "/actions/place":
+        # value "x,y,z,face" - synchronous one-shot, post-state
+        # verified on the wire (0013 R2).
+        parts = value.split(",")
+        if len(parts) != 4:
+            print("write /actions/place: value must be 'x,y,z,face'",
+                  file=sys.stderr)
+            return 1
+        x, y, z, face = (pp.strip() for pp in parts)
+        resp = wire(f"/bot place {x} {y} {z} {face.lower()}")
+        print(json.dumps(resp, indent=2))
+        return 0 if resp.get("ok") and resp.get("placed") else 1
     if path == "/tasks/dig":
         # Same shape as goto: value "x,y,z", wire-required timeout
         # mirrored from DigCommandHandler.DEFAULT_TIMEOUT_TICKS.
