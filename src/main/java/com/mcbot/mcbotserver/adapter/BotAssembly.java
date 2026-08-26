@@ -14,6 +14,7 @@ import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 import com.mcbot.mcbotserver.core.command.CommandBus;
 import com.mcbot.mcbotserver.core.command.DigCommandHandler;
 import com.mcbot.mcbotserver.core.command.GotoCommandHandler;
+import com.mcbot.mcbotserver.core.command.MineCommandHandler;
 import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.process.DefendProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
@@ -93,6 +94,7 @@ public final class BotAssembly {
                             CommandBus bus,
                             GotoCommandHandler gotoHandler,
                             DigCommandHandler digHandler,
+                            MineCommandHandler mineHandler,
                             ChangeDetectingStateChannel state) {
     }
 
@@ -223,12 +225,18 @@ public final class BotAssembly {
             () -> level.getDayTime() / 24000L,
             () -> level.getDayTime() % 24000L);
         digHandler.attach(bus);
+        MineCommandHandler mineHandler = new MineCommandHandler(
+            arbiter, events,
+            () -> level.getDayTime() / 24000L,
+            () -> level.getDayTime() % 24000L);
+        mineHandler.attach(bus);
         // The bus has ONE cancel-listener slot: route to every verb
         // handler's public cancel method (each self-guards by its
         // missions map, so no verb dispatch is needed).
         bus.setCancelListener((taskId, verb) -> {
             gotoHandler.onCancel(taskId, verb);
             digHandler.onCancel(taskId, verb);
+            mineHandler.onCancel(taskId, verb);
         });
 
         ChangeDetectingStateChannel state =
@@ -239,7 +247,7 @@ public final class BotAssembly {
                 () -> level.getDayTime() % 24000L);
 
         return new Assembled(body, view, actor, events, arbiter, reflex,
-            controller, bus, gotoHandler, digHandler, state);
+            controller, bus, gotoHandler, digHandler, mineHandler, state);
     }
 
     /**

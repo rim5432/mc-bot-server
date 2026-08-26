@@ -66,6 +66,8 @@ public class McBotServer {
     private GotoCommandHandler activeGotoHandler;
     private com.mcbot.mcbotserver.core.command.DigCommandHandler
         activeDigHandler;
+    private com.mcbot.mcbotserver.core.command.MineCommandHandler
+        activeMineHandler;
     private InMemoryEventQueue activeEvents;
     private CommandBus activeBus;
     private ChangeDetectingStateChannel activeState;
@@ -169,6 +171,9 @@ public class McBotServer {
             if (activeDigHandler != null) {
                 activeDigHandler.tick();
             }
+            if (activeMineHandler != null) {
+                activeMineHandler.tick();
+            }
             if (activeState != null) {
                 // Pull-through state capture: change detection pushes
                 // STATE_PUSH onto the stream only when the snapshot
@@ -241,6 +246,7 @@ public class McBotServer {
                 this.activeBody = body;
                 this.activeGotoHandler = a.gotoHandler();
                 this.activeDigHandler = a.digHandler();
+                this.activeMineHandler = a.mineHandler();
                 this.activeActor = a.actor();
                 this.activeCatalog =
                     new com.mcbot.mcbotserver.adapter.RecipeCatalog(
@@ -267,6 +273,7 @@ public class McBotServer {
                 this.activeBody = null;
                 this.activeGotoHandler = null;
                 this.activeDigHandler = null;
+                this.activeMineHandler = null;
                 this.activeActor = null;
                 this.activeCatalog = null;
                 int n = bodies.size();

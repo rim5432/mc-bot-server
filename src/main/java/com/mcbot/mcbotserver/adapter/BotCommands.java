@@ -79,6 +79,7 @@ public final class BotCommands {
             .then(statusBranch(live))
             .then(gotoBranch(live))
             .then(digBranch(live))
+            .then(mineBranch(live))
             .then(cancelBranch(live))
             .then(stopBranch(live))
             .then(eventsBranch(live))
@@ -195,6 +196,55 @@ public final class BotCommands {
         args.put("timeoutTicks", String.valueOf(timeoutTicks));
         SubmitResult result = ch.bus().submit(
             new BotCommand("dig", args), null);
+        JsonObject root = new JsonObject();
+        if (result instanceof SubmitResult.Ok accepted) {
+            root.addProperty("ok", true);
+            root.addProperty("task", accepted.taskId());
+            root.addProperty("replay", accepted.idempotencyReplay());
+        } else {
+            root.addProperty("ok", false);
+            root.addProperty("reason",
+                ((SubmitResult.Rejected) result).reason());
+        }
+        return answer(ctx.getSource(), root);
+    }
+
+    /**
+     * /bot mine blockType count [timeoutTicks] - composite mining task
+     * (issue 0014): search for nearby blocks of the given type, mine
+     * them, collect drops, repeat until count is met. Rides CommandBus
+     * like goto/dig; the MineProcess manages the search-mine-collect
+     * loop internally.
+     */
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> mineBranch(
+            Supplier<Channels> live) {
+        var args = Commands.argument("blockType",
+                    StringArgumentType.word())
+            .then(Commands.argument("count",
+                        IntegerArgumentType.integer(1))
+                .executes(ctx -> runMine(ctx, live, 2400L))
+                .then(Commands.argument("timeoutTicks",
+                            IntegerArgumentType.integer(1))
+                    .executes(ctx -> runMine(ctx, live,
+                        (long) IntegerArgumentType.getInteger(
+                            ctx, "timeoutTicks")))));
+        return Commands.literal("mine").then(args);
+    }
+
+    private static int runMine(CommandContext<CommandSourceStack> ctx,
+                               Supplier<Channels> live, long timeoutTicks) {
+        Channels ch = live.get();
+        if (ch == null) {
+            return answer(ctx.getSource(), err("no active bot"));
+        }
+        Map<String, String> args = new LinkedHashMap<>();
+        args.put("blockType",
+            StringArgumentType.getString(ctx, "blockType"));
+        args.put("count", String.valueOf(
+            IntegerArgumentType.getInteger(ctx, "count")));
+        args.put("timeoutTicks", String.valueOf(timeoutTicks));
+        SubmitResult result = ch.bus().submit(
+            new BotCommand("mine", args), null);
         JsonObject root = new JsonObject();
         if (result instanceof SubmitResult.Ok accepted) {
             root.addProperty("ok", true);
