@@ -578,6 +578,57 @@ public final class BotCraftingGameTests {
         helper.succeed();
     }
 
+
+    /**
+     * Scenario: the recipes-list wire verb's backend - {@link
+     * RecipeCatalog#list} - paginates a stable, recipeId-sorted view
+     * of the shaped catalog: windows are slices of one order,
+     * offset clamps to [0,total], limit clamps to [1,200], and
+     * shapeless recipes never appear (they are not representable as
+     * {@link com.mcbot.mcbotserver.api.menu.RecipeView}s).
+     *
+     * <p>Coverage ruling (round-3 recon): the catalog reads the live
+     * RecipeManager, so this contract is engine-only - no offline
+     * layer-1 test can instantiate the adapter honestly.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void paginatesRecipesSortedWithoutShapeless(
+            GameTestHelper helper) {
+        var catalog = new RecipeCatalog(helper.getLevel());
+
+        var full = catalog.list(0, 200);
+        check(full.total() > 0,
+            "the server datapack must translate at least one shaped "
+                + "recipe");
+        checkEquals((long) Math.min(full.total(), 200),
+            (long) full.recipes().size(),
+            "page size must be min(total, limit)");
+
+        for (int i = 1; i < full.recipes().size(); i++) {
+            check(full.recipes().get(i - 1).recipeId()
+                    .compareTo(full.recipes().get(i).recipeId()) <= 0,
+                "pages must be sorted by recipeId, saw "
+                    + full.recipes().get(i - 1).recipeId() + " then "
+                    + full.recipes().get(i).recipeId());
+        }
+        check(full.recipes().stream().noneMatch(r ->
+                r.recipeId().equals("minecraft:mushroom_stew")),
+            "shapeless recipes must never appear in a page");
+
+        var head = catalog.list(0, 2);
+        checkEquals(2, head.recipes().size(),
+            "a small limit must truncate the page");
+        checkEquals((List) full.recipes().subList(0, 2),
+            (List) head.recipes(),
+            "windows must be stable slices of the one sorted order");
+
+        var tail = catalog.list(full.total(), 10);
+        check(tail.recipes().isEmpty(),
+            "an offset at total must yield an empty page, not throw");
+
+        helper.succeed();
+    }
+
     /**
      * Scenario: the Phase 3 acceptance loop verbatim — given a
      * recipe id, the bot pulls materials from a chest, crafts at the

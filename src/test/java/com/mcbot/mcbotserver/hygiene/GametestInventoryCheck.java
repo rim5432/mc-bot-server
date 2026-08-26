@@ -80,7 +80,8 @@ class GametestInventoryCheck {
             "craftsViaMenuTransactions",
             "walksToTableAndCrafts",
             "catalogsShapedRecipes",
-            "pullsCraftsAndBanksByRecipeId"),
+            "pullsCraftsAndBanksByRecipeId",
+            "paginatesRecipesSortedWithoutShapeless"),
         "GauntletGameTests", Set.of(
             "gauntletEndToEnd",
             "routesThroughFenceGap"),
