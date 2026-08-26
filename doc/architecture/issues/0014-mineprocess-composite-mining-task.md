@@ -266,19 +266,11 @@ taskId attr, giving per-block progress without a new event kind.
 
 ## 5. Implementation sequence
 
-1. **DigMission interface** + DigProcess refactor (zero behavior change)
-   + BotController line 517 change. Compile + existing tests green.
-2. **MineProcess** with the full state machine. Offline unit tests:
-   state transitions, skip-set, count tracking, timeout behavior.
-3. **MineCommandHandler** (mirrors DigCommandHandler: register/cancel/
-   sweep/BLOCK_BROKEN listener) + McBotServer wiring + `/bot mine`
-   branch in BotCommands.
-4. **CLI** `write /tasks/mine` + mock tests.
-5. **Live verification**: spawn bot on a dry pad with three placed
-   targets, `/bot mine "minecraft:dirt" 3`, confirm TASK_COMPLETED +
-   3 BLOCK_BROKEN events (one per block, pinned attrs, exact
-   positions) + all three cells read air afterwards. Drop pickup is
-   not an acceptance criterion (best-effort, §6).
+Executed 2026-08-27 in five steps as planned: DigMission interface +
+DigProcess refactor (behavior-preserving), MineProcess state machine
+with offline tests, MineCommandHandler + `/bot mine` wire verb, CLI
+`write /tasks/mine`, then live verification on a dry pad. The
+step-by-step plan text lives in git history.
 
 ## 6. Deferred with reopen
 
@@ -323,18 +315,18 @@ taskId attr, giving per-block progress without a new event kind.
   suppliers disagree on liveness. Rides the respawn-cleanup ruling
   above.
 
-## 7. Verification criteria
+## 7. Verification status
 
-- Offline: MineProcessTest covers all state transitions, skip-set
-  behavior, per-target timeout skip, mission timeout fail, break-count
-  success, pre-owned-stock non-termination, injected-position centering.
-- Offline: DigProcessTest still passes (refactor is behavior-preserving).
-- Offline: WireVocabularyGateTest lists MineCommandHandler in
-  PRODUCER_FILES (the registration); BLOCK_BROKEN attrs stay the
-  pinned five.
-- Live: `/bot mine "minecraft:dirt" 3` against three placed targets
-  yields TASK_COMPLETED, 3 BLOCK_BROKEN events (pinned attrs, exact
-  positions), and all three cells read air afterwards.
-- Live: `/bot mine "minecraft:diamond_block" 1` with no diamond
-  blocks in range yields TASK_FAILED with reason "no
-  minecraft:diamond_block within 16 (0 skipped)".
+Offline: MineProcessTest pins state transitions, skip-set, per-target
+timeout skip, mission timeout fail, break-count success,
+pre-owned-stock non-termination, injected-position centering;
+DigProcessTest proves the refactor behavior-preserving;
+WireVocabularyGateTest lists MineCommandHandler in PRODUCER_FILES and
+keeps the BLOCK_BROKEN attrs pinned.
+
+Live (2026-08-27): `/bot mine "minecraft:dirt" 3` against three
+placed targets returned TASK_COMPLETED with three BLOCK_BROKEN events
+(pinned attrs, exact positions) and all three cells read air after;
+`/bot mine "minecraft:diamond_block" 1` with none in range returned
+TASK_FAILED with reason "no minecraft:diamond_block within 16
+(0 skipped)".
