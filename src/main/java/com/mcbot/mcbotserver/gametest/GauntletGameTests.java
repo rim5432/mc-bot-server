@@ -33,7 +33,7 @@ import static com.mcbot.mcbotserver.gametest.GametestRig.submitGoto;
  * 0002 Resolution (fence = wall; slabs standable; the way past a
  * fence is the missing-post EMPTY cell). Swim/SwimUp vocabulary
  * shipped after this suite was built (workplan closeout follow-up
- * 5); water traversal is gametest-gated in BotSliceGameTests
+ * 5); water traversal is gametest-gated in BotLocomotionGameTests
  * (trench + three-deep pool), and lava traversal has its own
  * scenario there (crossesLavaTrench, fire-resistance harness).
  *

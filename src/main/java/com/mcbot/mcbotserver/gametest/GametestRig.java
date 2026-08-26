@@ -5,6 +5,7 @@ import com.mcbot.mcbotserver.adapter.BindingActor;
 import com.mcbot.mcbotserver.adapter.BindingWorldView;
 import com.mcbot.mcbotserver.adapter.BotAssembly;
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
+import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
@@ -20,9 +21,11 @@ import net.minecraft.gametest.framework.GameTestAssertException;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraftforge.registries.ForgeRegistries;
 
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -50,6 +53,16 @@ final class GametestRig {
 
     /** Body cell height while standing on the paved floor. */
     static final int WALK_Y = FLOOR_Y + 1;
+
+    /** Standard scenario annotation budget (workplan slice default). */
+    static final int TIMEOUT = 400;
+
+    /**
+     * Mission-side goto budget for long corridors (deep pool leg).
+     * The DEFAULT_MISSION_BUDGET covers plain walks without this
+     * needing an explicit override.
+     */
+    static final int MISSION_BUDGET = 350;
 
     private static final int DEFAULT_MISSION_BUDGET = 350;
 
@@ -235,5 +248,40 @@ final class GametestRig {
         return new BlockPos(worldPos.getX() - origin.getX(),
             worldPos.getY() - origin.getY(),
             worldPos.getZ() - origin.getZ());
+    }
+
+    /**
+     * Total count of one item kind across the whole binding container
+     * (all 41 slots).
+     *
+     * @param rig  the wired rig; never null
+     * @param item the kind to sum; never null
+     * @return total stack-count across every container slot
+     */
+    static int countItems(Rig rig,
+                          net.minecraft.world.item.Item item) {
+        var container = rig.body().getInventory().container();
+        int total = 0;
+        for (int i = 0; i < container.getContainerSize(); i++) {
+            ItemStack stack = container.getItem(i);
+            if (!stack.isEmpty() && stack.is(item)) {
+                total += stack.getCount();
+            }
+        }
+        return total;
+    }
+
+    /**
+     * Asserts the given event kind already appeared on the stream;
+     * usable inside wait-until conditions and terminal executes.
+     *
+     * @param events the rig's event stream; never null
+     * @param kind   registered event-kind string; never null
+     */
+    static void assertEventSeen(InMemoryEventQueue events, String kind) {
+        List<String> kinds = events.statusSnapshot(0).events().stream()
+            .map(BotEvent::kind).toList();
+        check(kinds.contains(kind),
+            "expected " + kind + " in stream, got " + kinds);
     }
 }

@@ -41,38 +41,42 @@ class GametestInventoryCheck {
      * class name. Must match the {@code @GameTest} methods under
      * the gametest package exactly; any diff fails this test. */
     private static final Map<String, Set<String>> EXPECTED = Map.of(
-        "BotSliceGameTests", Set.of(
+        "BotLocomotionGameTests", Set.of(
             "walksToBlock",
             "crossesWaterTrench",
             "crossesDeepPool",
             "crossesLavaTrench",
-            "failsCleanlyWhenUnwalkable",
             "recoversWhenShoved",
+            "failsCleanlyWhenUnwalkable"),
+        "BotCombatGameTests", Set.of(
             "refusesRangedItCannotAnswer",
             "defendsByKillingZombie",
             "survivesRetaliatingZombie",
-            "hostilesAggroOnSight",
             "holdsFireWhenSightBlocked",
+            "hostilesAggroOnSight"),
+        "BotHazardReflexGameTests", Set.of(
             "surfacesWhenAirRunsLow",
             "escapesLavaToShore",
             "findsWaterWhenBurning",
             "climbsOutOfPowderSnow",
             "digsFreeWhenSuffocating",
-            "regeneratesHealthWhenBelowMax",
+            "regeneratesHealthWhenBelowMax"),
+        "BotInventoryGameTests", Set.of(
             "dropsSelectedItem",
             "placesBlockOnInteract",
-            "craftsDiamondBlockAtTable",
             "picksUpFromBackpackSlot",
-            "returnsCraftingGridOnClose",
             "rejectsMenuBeyondReach",
-            "returnsGridWithoutCorruptingOccupiedSlot0",
-            "dropsGridMaterialsWhenInventoryFull",
-            "returnsInventoryMenuGridOnClose",
+            "clickThrowsWhenBotWalksAway",
             "openingNewMenuClosesPrevious",
             "opensDoubleChestFullWidth",
             "storesAndRetrievesFromChest",
-            "clickThrowsWhenBotWalksAway",
-            "equipsArmorThroughMenuClicks",
+            "equipsArmorThroughMenuClicks"),
+        "BotCraftingGameTests", Set.of(
+            "craftsDiamondBlockAtTable",
+            "returnsCraftingGridOnClose",
+            "returnsGridWithoutCorruptingOccupiedSlot0",
+            "dropsGridMaterialsWhenInventoryFull",
+            "returnsInventoryMenuGridOnClose",
             "craftsViaMenuTransactions",
             "walksToTableAndCrafts",
             "catalogsShapedRecipes",

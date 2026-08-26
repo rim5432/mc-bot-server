@@ -98,8 +98,9 @@ do not start an item before its blockers are checked.
          falls back to `gameteststructures/<name>.snbt` relative to
          the gameTestServer working dir (`run/`). Template lives at
          repo-root `gameteststructures/empty16x8x16.snbt` and must be
-         copied to `run/gameteststructures/`. Suite:
-         gametest/BotSliceGameTests via `build runGameTest`.
+         copied to `run/gameteststructures/`. Suite: the gametest
+         family holders (Bot{Locomotion,Combat,HazardReflex,Inventory,
+         Crafting}GameTests) via `build runGameTest`.
 - [x] S  real ThreatSensor (entity scan, bearing sector incl. behind,
          creeper fuse accessor) writing blackboard in-game              [binding]
          NOTE: fuse accessor deferred - the sensor records type and
