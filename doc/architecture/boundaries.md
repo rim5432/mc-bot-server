@@ -1,6 +1,6 @@
 ---
 title: Boundary Contracts and Decision Ledger
-last_verified: 2026-08-25
+last_verified: 2026-08-26
 covers:
   - doc/decisions/0002-capability-model-task-arbiter.md
   - doc/decisions/0003-reflex-layer-preemption.md
@@ -167,7 +167,11 @@ EventBatch statusSnapshot(long sinceEventId);
 - `resetAt` is a monotonic bot-restart marker. If the harness sees
   `resetAt` change, the in-memory queue has been wiped; it must
   reconcile via `getState()`. **Events do not survive bot
-  restart.**
+  restart.** Shipped caveat: the counter seeds at 1 on every JVM
+  boot, so epochs collide across process restarts; until persistent
+  seeding lands (issue 0012 D5), a cross-boot wipe is detected by
+  the id space restarting (`since` beyond the last known id), not
+  by `resetAt` alone.
 - `BotEvent` carries a `kind` (registered type), a `day`+`t`
   game-time stamp, an `urgent` flag, structured `attrs`, and a
   human-readable `text`. Unknown kinds get a `UNKNOWN` fallback
@@ -268,7 +272,10 @@ BotState getState();
    method: [disclosure-patterns.md §3](../reference/disclosure-patterns.md#3-three-loss-prevention-invariants).
 2. **Events do not survive bot restart.** `resetAt` is the
    surface. The harness must reconcile via `getState()` when
-   `resetAt` changes.
+   `resetAt` changes. As shipped the marker does not survive a JVM
+   restart either (it reseeds at 1), so cross-boot wipes are read
+   off the id space instead; persistent seeding is tracked under
+   issue 0012 D5.
 3. **Drops are not silent.** When the event queue overflows, oldest
    events are dropped, `droppedCount` is set, and a synthetic
    `EVENT_DROPPED` event is included in the batch. The harness
@@ -697,6 +704,19 @@ BotState getState();
     deliberately excluded), and MenuView carries carried + sourcePos
     + per-slot roles so no harness or planner re-derives vanilla
     flat layouts.
+    30. Consumer-count drain-lock retired from the event stream
+    (whole-repo over-engineering audit; user delegation ruling
+    2026-08-26 "you make the rulings, lean direction"). The api
+    EventQueue carried reserved-but-never-used lock / unlock /
+    isLocked over an opaque-token holder set - a multi-consumer
+    gate that contradicted invariant 6 (the bot knows nothing
+    about consumer count) and whose only caller across the tree
+    was its own self-test. Deleted from interface and reference
+    implementation together with that test; drain stays un-gated,
+    exactly as every protocol surface already described it. If a
+    real second consumer class ever appears, outflow policy
+    belongs to the harness side or to a new ledger entry - not to
+    bot-side bookkeeping.
 
 ## Deferred, with reopen conditions
 

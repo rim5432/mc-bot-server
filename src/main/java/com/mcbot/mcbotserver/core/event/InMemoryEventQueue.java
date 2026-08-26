@@ -7,16 +7,14 @@ import com.mcbot.mcbotserver.api.event.EventQueue;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.LongSupplier;
 
 /**
  * Reference in-memory EventQueue: cursor drain, bounded backpressure,
- * restart marker, reserved multi-holder lock.
+ * restart marker.
  *
  * <p>Contract: see boundaries.md Boundary D protocol and
  * disclosure-patterns.md section 3 (loss-prevention invariants).
@@ -63,7 +61,6 @@ public final class InMemoryEventQueue implements EventQueue {
     public static final int DEFAULT_CAP = 200;
 
     private final ArrayDeque<Entry> entries = new ArrayDeque<>();
-    private final Set<String> holders = new HashSet<>();
     private final LongSupplier daySupplier;
     private final LongSupplier timeOfDaySupplier;
     private long lastEventId;
@@ -145,24 +142,6 @@ public final class InMemoryEventQueue implements EventQueue {
         }
         return new EventBatch(
             List.copyOf(page), dropped, lastEventId, resetMarker);
-    }
-
-    @Override
-    public void lock(String holder) {
-        if (holder == null || holder.isBlank()) {
-            throw new IllegalArgumentException("holder must not be blank");
-        }
-        holders.add(holder);
-    }
-
-    @Override
-    public boolean unlock(String holder) {
-        return holders.remove(holder);
-    }
-
-    @Override
-    public boolean isLocked() {
-        return !holders.isEmpty();
     }
 
     @Override

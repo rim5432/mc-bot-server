@@ -170,22 +170,6 @@ class DisclosureGateTest {
         return batch.events().stream().map(BotEvent::kind).toList();
     }
 
-    /** Multi-holder lock bookkeeping: opaque tokens, exact release. */
-    @Test
-    void lockTracksOpaqueHolders() {
-        InMemoryEventQueue queue = new InMemoryEventQueue(() -> 1L, () -> 0L);
-        assertFalse(queue.isLocked());
-        queue.lock("planner");
-        queue.lock("social");
-        assertTrue(queue.isLocked());
-        assertFalse(queue.unlock("planner-typo"),
-            "unknown token must not release anything");
-        assertTrue(queue.unlock("planner"));
-        assertTrue(queue.isLocked());
-        assertTrue(queue.unlock("social"));
-        assertFalse(queue.isLocked());
-    }
-
     /**
      * State snapshot carries only model-relevant categorical fields —
      * enforced structurally: the component list stays within the

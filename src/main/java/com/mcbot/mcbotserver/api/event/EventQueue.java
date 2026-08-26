@@ -9,10 +9,7 @@ package com.mcbot.mcbotserver.api.event;
  * no-survive-restart ({@link #reset()} bumps {@code resetAt} and wipes
  * entries), no-silent-drop (backpressure accounting plus a synthetic
  * EVENT_DROPPED entry), urgent-as-freshness (queue treats urgent as
- * ordinary payload — gating is a harness concern). The multi-holder
- * lock is reserved by the interface; Stage 0's reference implementation
- * supports any number of opaque tokens but nothing in the bot issues
- * more than one.
+ * ordinary payload — gating is a harness concern).
  *
  * <p>Implementation note: single-threaded by policy — all methods run
  * on the server tick thread; do not call from other threads.
@@ -36,30 +33,6 @@ public interface EventQueue {
      * @return the ordered page; never null
      */
     EventBatch statusSnapshot(long sinceEventId);
-
-    /**
-     * Acquire an opaque drain lock. Locks gate outflow decisions only;
-     * intake and clearing are unaffected.
-     *
-     * @param holder opaque token identifying the consumer; must not be
-     *               null or blank
-     */
-    void lock(String holder);
-
-    /**
-     * Release a previously acquired lock token.
-     *
-     * @param holder the exact token passed to {@link #lock(String)}
-     * @return true if it was held and is now released; false otherwise
-     */
-    boolean unlock(String holder);
-
-    /**
-     * Query whether any holder currently holds a lock.
-     *
-     * @return true while at least one token is outstanding
-     */
-    boolean isLocked();
 
     /**
      * Current monotonic bot-restart marker.
