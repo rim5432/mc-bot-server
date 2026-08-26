@@ -318,6 +318,203 @@ public final class MenuPlanner {
     }
 
     /**
+     * Plans an exact-count deposit into one role's slots (issue 0012
+     * D1: {@code menu deposit <slotRole> <item> <count>}).
+     *
+     * <p>Exact counts need split carries, not QUICK_MOVE (which moves
+     * whole stacks): lift a source stack with a left-click, place
+     * exactly one item per right-click onto the target, return the
+     * remainder with a final left-click on the source. The whole plan
+     * is computed before the first click - an under-supplied or
+     * over-full request performs zero clicks.
+     *
+     * <p>Capacity uses the 64-stack assumption for same-item
+     * headroom; items with smaller stack maximums simply stop filling
+     * early (vanilla rejects the excess place clicks and the remainder
+     * returns to the source), so the assumption is safe, never
+     * lossy.
+     *
+     * @param menu   snapshot of the open menu; never null
+     * @param target the role to deposit into (CONTAINER on chests,
+     *               INPUT / FUEL on furnace kinds); the wire layer
+     *               resolves intent roles per menu kind before calling
+     * @param itemId the item to move; never null or blank
+     * @param count  exact number of items to deposit; positive
+     * @return the click sequence in execution order; never null
+     * @throws IllegalArgumentException when itemId or count is
+     *         malformed, the player region holds fewer than count of
+     *         the item, or the target role's free capacity cannot
+     *         hold the deposit
+     */
+    public static List<Step> planDepositCounted(MenuView menu,
+                                                SlotRole target,
+                                                String itemId,
+                                                int count) {
+        if (itemId == null || itemId.isBlank()) {
+            throw new IllegalArgumentException(
+                "itemId must not be null or blank");
+        }
+        if (count <= 0) {
+            throw new IllegalArgumentException(
+                "count must be positive, got " + count);
+        }
+        int supply = 0;
+        for (var slot : menu.slots()) {
+            if (playerRegion(slot) && !slot.isEmpty()
+                    && slot.item().itemId().equals(itemId)) {
+                supply += slot.item().count();
+            }
+        }
+        if (supply < count) {
+            throw new IllegalArgumentException(
+                "not enough: have " + supply + ", need " + count);
+        }
+        // Target capacity: empty slots take up to 64, same-item slots
+        // take their headroom. Deposits fill targets in snapshot
+        // order.
+        record Target(int index, int room) { }
+        List<Target> targets = new ArrayList<>();
+        for (var slot : menu.slots()) {
+            if (slot.role() != target) {
+                continue;
+            }
+            int room = slot.isEmpty() ? 64
+                : slot.item().itemId().equals(itemId)
+                    ? 64 - slot.item().count()
+                    : 0;
+            if (room > 0) {
+                targets.add(new Target(slot.index(), room));
+            }
+        }
+        int capacity = targets.stream().mapToInt(Target::room).sum();
+        if (capacity < count) {
+            throw new IllegalArgumentException(
+                "target " + target + " cannot hold " + count
+                    + " (room " + capacity + ")");
+        }
+        Deque<int[]> sources = sourceLedger(menu, itemId);
+        List<Step> steps = new ArrayList<>();
+        int remaining = count;
+        int targetIdx = 0;
+        int targetRoom = targets.isEmpty() ? 0 : targets.get(0).room();
+        while (remaining > 0) {
+            int[] source = sources.pop();
+            int take = Math.min(source[1], remaining);
+            int src = source[0];
+            steps.add(new Step(src, 0, MenuClick.PICKUP));
+            for (int placed = 0; placed < take; placed++) {
+                while (targetRoom == 0) {
+                    targetIdx++;
+                    targetRoom = targets.get(targetIdx).room();
+                }
+                steps.add(new Step(targets.get(targetIdx).index(), 1,
+                    MenuClick.PICKUP));
+                targetRoom--;
+            }
+            // Return the remainder (a no-op click when the whole
+            // stack was placed: both carried and source are empty).
+            steps.add(new Step(src, 0, MenuClick.PICKUP));
+            remaining -= take;
+        }
+        return List.copyOf(steps);
+    }
+
+    /**
+     * Plans taking from one role's slots into the player region
+     * (issue 0012 D1: {@code menu take <slotRole> [count]}).
+     *
+     * <p>{@code count <= 0} drains: one QUICK_MOVE (shift-click) per
+     * non-empty role slot, whole stacks - an empty role plans zero
+     * steps and the reply honestly reports {@code taken:0}. A
+     * positive count is exact, using the same split-carry mechanics as
+     * {@link #planDepositCounted}: lift a source stack, right-click a
+     * destination player slot once per item, return the remainder.
+     *
+     * @param menu   snapshot of the open menu; never null
+     * @param source the role to take from (OUTPUT on furnace kinds,
+     *               CONTAINER on chests); the wire layer resolves
+     *               intent roles per menu kind before calling
+     * @param count  exact number of items to take, or 0/negative to
+     *               drain every non-empty source slot
+     * @return the click sequence in execution order; never null
+     * @throws IllegalArgumentException when a counted take cannot find
+     *         destination room in the player region (no empty slot
+     *         and no same-item headroom)
+     */
+    public static List<Step> planTakeRole(MenuView menu, SlotRole source,
+                                          int count) {
+        List<Step> steps = new ArrayList<>();
+        if (count <= 0) {
+            for (var slot : menu.slots()) {
+                if (slot.role() == source && !slot.isEmpty()) {
+                    steps.add(new Step(slot.index(), 0,
+                        MenuClick.QUICK_MOVE));
+                }
+            }
+            return List.copyOf(steps);
+        }
+        // Counted take: destination = first player slots with room
+        // (empty, or same-item headroom under the 64 assumption).
+        List<int[]> sourceStacks = new ArrayList<>();
+        int available = 0;
+        for (var slot : menu.slots()) {
+            if (slot.role() == source && !slot.isEmpty()) {
+                sourceStacks.add(
+                    new int[] {slot.index(), slot.item().count()});
+                available += slot.item().count();
+            }
+        }
+        int planned = Math.min(available, count);
+        List<int[]> destinations = new ArrayList<>();
+        int destRoom = 0;
+        for (var slot : menu.slots()) {
+            if (!playerRegion(slot)) {
+                continue;
+            }
+            int room = slot.isEmpty() ? 64
+                : 64 - slot.item().count();
+            if (room > 0) {
+                destinations.add(new int[] {slot.index(), room});
+                destRoom += room;
+            }
+        }
+        if (destRoom < planned) {
+            throw new IllegalArgumentException(
+                "player inventory cannot hold the take (room "
+                    + destRoom + ", need " + planned + ")");
+        }
+        int remaining = planned;
+        int destIdx = 0;
+        int room = destinations.isEmpty() ? 0 : destinations.get(0)[1];
+        for (int[] stack : sourceStacks) {
+            if (remaining <= 0) {
+                break;
+            }
+            int take = Math.min(stack[1], remaining);
+            int src = stack[0];
+            steps.add(new Step(src, 0, MenuClick.PICKUP));
+            for (int taken = 0; taken < take; taken++) {
+                while (room == 0) {
+                    destIdx++;
+                    room = destinations.get(destIdx)[1];
+                }
+                steps.add(new Step(destinations.get(destIdx)[0], 1,
+                    MenuClick.PICKUP));
+                room--;
+            }
+            steps.add(new Step(src, 0, MenuClick.PICKUP));
+            remaining -= take;
+        }
+        return List.copyOf(steps);
+    }
+
+    private static boolean playerRegion(
+            com.mcbot.mcbotserver.api.menu.SlotView slot) {
+        return slot.role() == SlotRole.MAIN
+            || slot.role() == SlotRole.HOTBAR;
+    }
+
+    /**
      * Collects the player-region slots holding the item, in snapshot
      * order (MAIN before HOTBAR on every current menu kind).
      *

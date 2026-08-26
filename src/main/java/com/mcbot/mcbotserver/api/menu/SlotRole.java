@@ -33,5 +33,15 @@ public enum SlotRole {
     ARMOR,
 
     /** Player offhand slot. */
-    OFFHAND
+    OFFHAND,
+
+    /** Furnace smelting input slot (slot 0 of the furnace layout). */
+    INPUT,
+
+    /** Furnace fuel slot (slot 1 of the furnace layout). */
+    FUEL,
+
+    /** Furnace result slot (slot 2; consumption-only, items land here
+     *  from smelting - take, never deposit). */
+    OUTPUT
 }

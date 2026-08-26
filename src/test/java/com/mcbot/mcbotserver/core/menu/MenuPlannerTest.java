@@ -369,6 +369,122 @@ class MenuPlannerTest {
         }
     }
 
+    // ── counted role deposit / take (issue 0012 D1) ──────────
+
+    /** Furnace-shaped snapshot: INPUT 0, FUEL 1, OUTPUT 2, MAIN
+     * 3..29, HOTBAR 30..38 — vanilla AbstractFurnaceMenu mirrored in
+     * pure data. */
+    private static MenuView furnace(Builder b) {
+        b.roles.putIfAbsent(0, SlotRole.INPUT);
+        b.roles.putIfAbsent(1, SlotRole.FUEL);
+        b.roles.putIfAbsent(2, SlotRole.OUTPUT);
+        for (int i = 3; i <= 29; i++) {
+            b.roles.putIfAbsent(i, SlotRole.MAIN);
+        }
+        for (int i = 30; i <= 38; i++) {
+            b.roles.putIfAbsent(i, SlotRole.HOTBAR);
+        }
+        List<SlotView> slots = new ArrayList<>(39);
+        for (int i = 0; i < 39; i++) {
+            slots.add(new SlotView(i,
+                b.items.getOrDefault(i, ItemView.EMPTY),
+                b.roles.get(i)));
+        }
+        return new MenuView("furnace", null, ItemView.EMPTY, 39,
+            slots);
+    }
+
+    @Test
+    void countedDepositLiftsPlacesExactlyAndReturnsRemainder() {
+        MenuView menu = furnace(builder()
+            .put(SlotRole.HOTBAR, 38, "minecraft:coal", 16));
+        List<MenuPlanner.Step> plan = MenuPlanner.planDepositCounted(
+            menu, SlotRole.FUEL, "minecraft:coal", 5);
+        List<MenuPlanner.Step> expected = new ArrayList<>();
+        expected.add(new MenuPlanner.Step(38, 0, MenuClick.PICKUP));
+        for (int i = 0; i < 5; i++) {
+            expected.add(new MenuPlanner.Step(1, 1, MenuClick.PICKUP));
+        }
+        expected.add(new MenuPlanner.Step(38, 0, MenuClick.PICKUP));
+        assertEquals(expected, plan);
+    }
+
+    @Test
+    void countedDepositSpansSourcesAndFillsHeadroomThenEmpty() {
+        // The INPUT slot holds 60/64 (headroom 4) and a furnace has
+        // exactly one INPUT slot: a 6-count deposit exceeds capacity
+        // and fails before any click; the 4 that fit plan as
+        // lift + 4 places + return = 6 steps.
+        MenuView menu = furnace(builder()
+            .put(SlotRole.INPUT, 0, "minecraft:iron_ore", 60)
+            .put(SlotRole.MAIN, 3, "minecraft:iron_ore", 10)
+            .put(SlotRole.MAIN, 4, "minecraft:iron_ore", 2));
+        org.junit.jupiter.api.Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> MenuPlanner.planDepositCounted(menu,
+                SlotRole.INPUT, "minecraft:iron_ore", 6));
+        assertEquals(6, MenuPlanner.planDepositCounted(menu,
+            SlotRole.INPUT, "minecraft:iron_ore", 4).size());
+    }
+
+    @Test
+    void countedDepositFailsClosedOnShortSupply() {
+        MenuView menu = furnace(builder()
+            .put(SlotRole.HOTBAR, 38, "minecraft:coal", 2));
+        IllegalArgumentException ex = assertThrows(
+            IllegalArgumentException.class,
+            () -> MenuPlanner.planDepositCounted(menu,
+                SlotRole.FUEL, "minecraft:coal", 3));
+        assertEquals("not enough: have 2, need 3", ex.getMessage());
+    }
+
+    @Test
+    void takeRoleDrainQuickMovesEveryNonEmptySlot() {
+        MenuView menu = furnace(builder()
+            .put(SlotRole.OUTPUT, 2, "minecraft:iron_ingot", 7));
+        assertEquals(List.of(new MenuPlanner.Step(2, 0,
+                MenuClick.QUICK_MOVE)),
+            MenuPlanner.planTakeRole(menu, SlotRole.OUTPUT, 0));
+    }
+
+    @Test
+    void takeRoleDrainOfEmptyRolePlansZeroSteps() {
+        MenuView menu = furnace(builder());
+        assertEquals(List.of(),
+            MenuPlanner.planTakeRole(menu, SlotRole.OUTPUT, 0));
+    }
+
+    @Test
+    void countedTakePlacesExactlyIntoPlayerRoom() {
+        MenuView menu = furnace(builder()
+            .put(SlotRole.OUTPUT, 2, "minecraft:iron_ingot", 10));
+        List<MenuPlanner.Step> plan = MenuPlanner.planTakeRole(menu,
+            SlotRole.OUTPUT, 3);
+        List<MenuPlanner.Step> expected = new ArrayList<>();
+        expected.add(new MenuPlanner.Step(2, 0, MenuClick.PICKUP));
+        for (int i = 0; i < 3; i++) {
+            expected.add(new MenuPlanner.Step(3, 1, MenuClick.PICKUP));
+        }
+        expected.add(new MenuPlanner.Step(2, 0, MenuClick.PICKUP));
+        assertEquals(expected, plan);
+    }
+
+    @Test
+    void countedTakeFailsWithoutDestinationRoom() {
+        // Player region entirely full of other items: no empty slot,
+        // no same-item headroom.
+        Builder b = builder()
+            .put(SlotRole.OUTPUT, 2, "minecraft:iron_ingot", 5);
+        for (int i = 3; i <= 38; i++) {
+            b.put(i <= 29 ? SlotRole.MAIN : SlotRole.HOTBAR, i,
+                "minecraft:cobblestone", 64);
+        }
+        org.junit.jupiter.api.Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> MenuPlanner.planTakeRole(furnace(b),
+                SlotRole.OUTPUT, 2));
+    }
+
     private static Builder builder() {
         return new Builder();
     }

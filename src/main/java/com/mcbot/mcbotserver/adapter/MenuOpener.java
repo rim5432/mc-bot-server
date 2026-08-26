@@ -3,10 +3,12 @@ package com.mcbot.mcbotserver.adapter;
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.ContainerLevelAccess;
+import net.minecraft.world.MenuProvider;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.ChestBlock;
@@ -115,6 +117,27 @@ public final class MenuOpener {
         }
         if (block instanceof ChestBlock chestBlock) {
             return openChest(chestBlock, state, pos);
+        }
+        // Generic fallback (issue 0012 D0): every standard
+        // MenuProvider block - furnace, blast furnace, smoker, barrel,
+        // dispenser, ... - opens through the block's own menu provider
+        // with zero per-kind code. The snapshot type is the block's
+        // registry key tail ("furnace", "blast_furnace", ...), which
+        // is also the harness's station-path vocabulary. Blocks with
+        // no UI return a null provider and stay unsupported.
+        MenuProvider provider = state.getMenuProvider(level, pos);
+        if (provider != null) {
+            facade.syncPosition();
+            var menu = provider.createMenu(NEXT_ID.getAndIncrement(),
+                facade.getInventory(), facade);
+            if (menu != null) {
+                facade.containerMenu = menu;
+                String type = String.valueOf(
+                    BuiltInRegistries.BLOCK.getKey(block));
+                return Optional.of(new BindingMenu(menu, facade,
+                    type.substring(type.indexOf(':') + 1),
+                    toCellPos(pos)));
+            }
         }
         return Optional.empty();
     }

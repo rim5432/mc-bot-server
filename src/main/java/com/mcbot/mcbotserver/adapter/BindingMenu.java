@@ -13,6 +13,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.AbstractFurnaceMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.ContainerSynchronizer;
 import net.minecraft.world.inventory.CraftingMenu;
@@ -203,6 +204,21 @@ public final class BindingMenu {
                 return SlotRole.OFFHAND;
             }
             return index <= 35 ? SlotRole.MAIN : SlotRole.HOTBAR;
+        }
+        // Furnace family (furnace / blast_furnace / smoker): vanilla
+        // AbstractFurnaceMenu adds slot 0 = input, 1 = fuel, 2 =
+        // result, then the standard 27 main + 9 hotbar player region.
+        if (menu instanceof AbstractFurnaceMenu) {
+            if (index == 0) {
+                return SlotRole.INPUT;
+            }
+            if (index == 1) {
+                return SlotRole.FUEL;
+            }
+            if (index == 2) {
+                return SlotRole.OUTPUT;
+            }
+            return index <= size - 10 ? SlotRole.MAIN : SlotRole.HOTBAR;
         }
         // Container menus (chest, and unknown kinds as fallback):
         // leading container slots, then main 27, then hotbar 9.

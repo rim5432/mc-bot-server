@@ -67,6 +67,8 @@ public class McBotServer {
     private InMemoryEventQueue activeEvents;
     private CommandBus activeBus;
     private ChangeDetectingStateChannel activeState;
+    private com.mcbot.mcbotserver.adapter.BindingActor activeActor;
+    private com.mcbot.mcbotserver.adapter.RecipeCatalog activeCatalog;
 
     private final com.mcbot.mcbotserver.adapter.ReflexRuleReloader
         ruleReloader = new com.mcbot.mcbotserver.adapter.ReflexRuleReloader();
@@ -191,6 +193,8 @@ public class McBotServer {
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
         BotCommands.register(event.getDispatcher(), this::channels);
+        com.mcbot.mcbotserver.adapter.MenuCommands.register(
+            event.getDispatcher(), this::menuLive);
         event.getDispatcher().register(Commands.literal("botspawn")
             .requires(src -> src.hasPermission(2))
             .executes(ctx -> {
@@ -229,6 +233,10 @@ public class McBotServer {
                 this.activeView = a.view();
                 this.activeBody = body;
                 this.activeGotoHandler = a.gotoHandler();
+                this.activeActor = a.actor();
+                this.activeCatalog =
+                    new com.mcbot.mcbotserver.adapter.RecipeCatalog(
+                        level);
 
                 String spawned = "bot spawned at " + body.blockPosition()
                     + "; drive with /bot goto x y z tolerance timeoutTicks";
@@ -250,6 +258,8 @@ public class McBotServer {
                 this.activeView = null;
                 this.activeBody = null;
                 this.activeGotoHandler = null;
+                this.activeActor = null;
+                this.activeCatalog = null;
                 int n = bodies.size();
                 String msg = "removed " + n
                     + (n == 1 ? " bot body" : " bot bodies");
@@ -285,5 +295,24 @@ public class McBotServer {
                 }
                 return wasCrashed;
             });
+    }
+
+    /**
+     * Live menu surface for the 0012 D1 command batch. The catalog is
+     * rebuilt per spawn because it reads the server RecipeManager of
+     * the spawn level.
+     *
+     * @return the menu surface, or null before the first /botspawn
+     */
+    private com.mcbot.mcbotserver.adapter.MenuCommands.Live menuLive() {
+        if (activeActor == null || activeCatalog == null
+                || activeBody == null || !activeBody.isAlive()) {
+            return null;
+        }
+        return new com.mcbot.mcbotserver.adapter.MenuCommands.Live(
+            activeActor, activeCatalog,
+            (net.minecraft.server.level.ServerLevel)
+                activeBody.level(),
+            activeBody::blockPosition);
     }
 }
