@@ -38,9 +38,7 @@ Wire mapping:
   write /stations/<t>@<pos>/output "all"|"N"    -> menu take OUTPUT [N]
   write /stations/crafting@<pos>/recipe "id"     -> menu craft <id>
   write /tasks/goto "x,y,z" [--tol N] [--timeout N] [--key K] -> /bot goto
-                              (receipt carries the id under the "task"
-                              key - legacy wire naming, echoed as
-                              "taskId:" on stderr here)
+                              (receipt carries the id under the "task" key)
   write /tasks/<id>/cancel "reason" -> /bot cancel <id>
   wait <taskId> [--timeout N] -> poll /bot events until terminal kind
   events [--since N] -> /bot events <cursor>
@@ -432,12 +430,7 @@ def cmd_write(path: str, value: str, tol: int | None = None,
         if key:
             cmd += f" {key}"
         resp = wire(cmd)
-        # /bot goto returns taskId under the "task" key (legacy naming).
-        # Echo it as "taskId" so the write->wait correlation chain uses one
-        # canonical name. The full raw response is still printed first.
         print(json.dumps(resp, indent=2))
-        if resp.get("ok") and "task" in resp:
-            print(f"taskId: {resp['task']}", file=sys.stderr)
         return 0 if resp.get("ok") else 1
     if path.startswith("/tasks/") and path.endswith("/cancel"):
         task_id = path[len("/tasks/"):-len("/cancel")]

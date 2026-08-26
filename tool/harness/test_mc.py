@@ -191,12 +191,12 @@ class WriteGotoTest(McCliTest):
             mc.cmd_write, "/tasks/goto", "100,64,200")
         self.assertEqual(code, 1)
 
-    def test_echoes_task_id_on_success(self):
+    def test_receipt_key_is_task(self):
         self.queue({"ok": True, "task": "t1", "replay": False})
         code, out, err = self.run_verb(
             mc.cmd_write, "/tasks/goto", "100,64,200")
         self.assertEqual(code, 0)
-        self.assertIn("taskId: t1", err)
+        self.assertEqual(err, "")
         # The wire receipt carries the id under the legacy "task" key
         # (BotCommands.runGoto); pin it so a wire rename trips here
         # before it silently breaks the write->wait chain.
