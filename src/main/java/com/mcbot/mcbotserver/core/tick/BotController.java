@@ -509,23 +509,14 @@ public final class BotController {
         Directive directive = arbiter.lastDirective();
 
         // Mission-dig claim path (issue 0013 R1): while a DigProcess
-        // is seated, re-issue the aim + dig claims every tick - the
-        // INTERACT claim expires at each flush, so silence would
-        // reset break progress. Mirrors preemptDigClaims; reflex
+        // is seated, re-issue the aim + dig claims every tick (see
+        // submitAimAndDig for why silence resets progress). Reflex
         // preemption still wins because the reflex layer runs first
         // and parks missions.
         if (arbiter.current() instanceof DigProcess dig
                 && dig.isActive()) {
-            CellPos digTarget = dig.target();
-            Vec3 from = cellCenter(positionSource.get());
-            Vec3 to = cellCenter(digTarget);
-            actor.submit(new Claim(Channel.ROT, dig.priority(),
-                "mission:dig:" + dig.missionTaskId(),
-                new Intent.Look(IdleLook.yawTo(from, to),
-                    IdleLook.pitchTo(from, to))));
-            actor.submit(new Claim(Channel.INTERACT, dig.priority(),
-                "mission:dig:" + dig.missionTaskId(),
-                new Intent.Dig(digTarget)));
+            submitAimAndDig(dig.priority(),
+                "mission:dig:" + dig.missionTaskId(), dig.target());
         }
 
         // Stage 3: behaviors claim channels per directive; reports flow
@@ -625,19 +616,14 @@ public final class BotController {
     }
 
     /**
-     * DIG reflex claim injection: a targeted DIG decision adds a ROT
-     * aim at the target cell and an INTERACT dig claim on top of the
-     * preemption hold. DIG carries its own geometry - hold still,
-     * aim, and hold the claim; the adapter's executor accumulates
-     * destroy progress across ticks, the same engine-carries-the-
+     * DIG reflex claim injection: a targeted DIG decision adds the
+     * shared aim-and-dig claim pair on top of the preemption hold -
+     * DIG carries its own geometry, the same engine-carries-the-
      * state shape as ASCEND's held jump. A targetless DIG (board
      * stamped inWall without a position, or the post-rescue
      * hysteresis hold where the eye is already clear) degrades to
      * the plain freeze hold - missing data must not mint a
-     * dig-at-null. The aim claim is presentation only (the executor
-     * is server-authoritative and never reads facing, exactly like
-     * vanilla's ServerPlayerGameMode); cell-center math keeps it
-     * free of eye-height constants.
+     * dig-at-null.
      *
      * @param decision the winning reflex decision; never null
      */
@@ -647,16 +633,37 @@ public final class BotController {
                 || decision.target() == null) {
             return;
         }
-        CellPos digTarget = decision.target();
+        submitAimAndDig(decision.priority(),
+            "reflex:" + decision.ruleName(), decision.target());
+    }
+
+    /**
+     * The aim-and-dig claim pair shared by the two DIG drivers (the
+     * seated DigProcess mission and the suffocation reflex). The
+     * INTERACT claim expires at each flush, so a driver re-issues
+     * the pair every tick it wants digging to continue - silence
+     * resets the adapter's accumulated destroy progress. The ROT
+     * aim is presentation only (the executor is
+     * server-authoritative and never reads facing, exactly like
+     * vanilla's ServerPlayerGameMode); cell-center math keeps it
+     * free of eye-height constants.
+     *
+     * @param priority the claim priority; both claims share it so
+     *                 the pair travels as one unit in contests
+     * @param holder   the claim holder label, e.g.
+     *                 {@code "mission:dig:<taskId>"} or
+     *                 {@code "reflex:<rule>"}
+     * @param target   the block cell to dig; must not be null
+     */
+    private void submitAimAndDig(int priority, String holder,
+                                 CellPos target) {
         Vec3 from = cellCenter(positionSource.get());
-        Vec3 to = cellCenter(digTarget);
-        actor.submit(new Claim(Channel.ROT, decision.priority(),
-            "reflex:" + decision.ruleName(),
+        Vec3 to = cellCenter(target);
+        actor.submit(new Claim(Channel.ROT, priority, holder,
             new Intent.Look(IdleLook.yawTo(from, to),
                 IdleLook.pitchTo(from, to))));
-        actor.submit(new Claim(Channel.INTERACT, decision.priority(),
-            "reflex:" + decision.ruleName(),
-            new Intent.Dig(digTarget)));
+        actor.submit(new Claim(Channel.INTERACT, priority, holder,
+            new Intent.Dig(target)));
     }
 
     /**
