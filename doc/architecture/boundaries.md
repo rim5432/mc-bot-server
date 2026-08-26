@@ -1,6 +1,6 @@
 ---
 title: Boundary Contracts and Decision Ledger
-last_verified: 2026-08-26
+last_verified: 2026-08-27
 covers:
   - doc/decisions/0002-capability-model-task-arbiter.md
   - doc/decisions/0003-reflex-layer-preemption.md
@@ -50,7 +50,8 @@ summary; the command channel carries the verbs the harness issues.
 State-snapshot field set (decision 32, issue 0013 R5): `pos`, `yaw`,
 `pitch`, `dimension`, `itemCounts`, `selectedHotbarSlot`,
 `effectAmplifiers`, `currentTaskSummary`, `healthHearts`,
-`freeSlots`. Health is bucketed to whole hearts (0..20) - the
+`freeSlots`. Health is bucketed to whole hearts (0..10; vanilla
+runs 2 HP per heart) - the
 change-detect channel compares whole records, so continuous fields
 would push every tick; bucketing keeps the cadence honest.
 
@@ -742,6 +743,18 @@ BotState getState();
     non-RCON consumer materializes (the standing boundary-D reopen
     trigger); or the harness needs a unified error model across
     both surfaces.
+    32. State-snapshot field set pinned at BotState's categorical
+    rule (issue 0013 R5). `healthHearts` (whole hearts 0..10,
+    round(HP/2) - the raw 20-HP float would push on every
+    regeneration tick, the bucket does not) and `freeSlots`
+    (unoccupied main slots of 36) joined pos / yaw / pitch /
+    dimension / itemCounts / selectedHotbarSlot /
+    effectAmplifiers / currentTaskSummary. hunger stays OUT:
+    FoodData is Player-only, BotBodyEntity carries no food state,
+    and issue 0010 owns that lifecycle. Fields enter only through
+    the H-R4 friction protocol - WireVocabularyGateTest component
+    pin, DisclosureGateTest field set, this state section, and
+    BotStateJson change together or not at all.
 
 ## Deferred, with reopen conditions
 
