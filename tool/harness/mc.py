@@ -363,7 +363,7 @@ def cmd_cat(path: str) -> int:
     block_match = re.fullmatch(r"/blocks/(-?\d+),(-?\d+),(-?\d+)", path)
     if block_match:
         x, y, z = block_match.groups()
-        resp = wire(f"/bot block {x} {y} {z}")
+        resp = wire(f"block {x} {y} {z}")
         print(json.dumps(resp, indent=2))
         return 0 if resp.get("ok") else 1
     if path == "/nearby":
@@ -372,7 +372,7 @@ def cmd_cat(path: str) -> int:
         # new capabilities are new paths, never new verbs).
         pos_resp = wire("/bot status")
         state = pos_resp.get("state", pos_resp)
-        resp = wire("/bot entities 8 32")
+        resp = wire("entities 8 32")
         if not resp.get("ok"):
             print(f"cat /nearby: entities read failed: "
                   f"{resp.get('reason', 'unknown')}", file=sys.stderr)
@@ -471,7 +471,7 @@ def cmd_write(path: str, value: str, tol: int | None = None,
                   file=sys.stderr)
             return 1
         x, y, z, face = (pp.strip() for pp in parts)
-        resp = wire(f"/bot place {x} {y} {z} {face.lower()}")
+        resp = wire(f"place {x} {y} {z} {face.lower()}")
         print(json.dumps(resp, indent=2))
         return 0 if resp.get("ok") and resp.get("placed") else 1
     if path == "/tasks/dig":
@@ -712,7 +712,7 @@ def cmd_ls(path: str) -> int:
         print(f"current: {current}")
         return 0
     if path == "/entities/" or path == "/entities":
-        resp = wire("/bot entities")
+        resp = wire("entities")
         if not resp.get("ok"):
             print(f"ls: entities read failed: "
                   f"{resp.get('reason', 'unknown')}", file=sys.stderr)
