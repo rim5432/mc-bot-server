@@ -49,16 +49,10 @@ class WorldCommandsWireShapeGateTest {
     @Test
     void volumeAxesRegisteredAndReadMatchExactly() throws Exception {
         String src = Files.readString(worldCommandsSource());
-        TreeSet<String> registered = new TreeSet<>(allMatches(
-            section(src, "private static int runBlocks"),
-            Pattern.compile("volumeArg\\(\"(\\w+)\"")));
-        // The chain is built above runBlocks' body but after its
-        // signature marker ends; re-read from the whole file for the
-        // registration side, then scope reads to the runner.
-        Matcher m = VOLUME_ARG.matcher(src);
-        while (m.find()) {
-            registered.add(m.group(1));
-        }
+        // Registration side scans the whole file: the chain lives in
+        // register(), above runBlocks.
+        TreeSet<String> registered =
+            new TreeSet<>(allMatches(src, VOLUME_ARG));
         TreeSet<String> expected = new TreeSet<>(List.of("dx", "dy",
             "dz"));
         assertEquals(expected, registered,
