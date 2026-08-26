@@ -151,38 +151,15 @@ class InventorySenseTest {
     }
 
     @Test
-    void hasItemFindsIdAcrossMainSlots() {
-        var main = emptyMain();
-        main.set(0, new ItemView("minecraft:diamond", 4));
-        main.set(20, new ItemView("minecraft:dirt", 64));
-        var inv = new InventoryView(main, 0, emptyArmor(), ItemView.EMPTY);
-        assertTrue(inv.hasItem("minecraft:diamond"));
-        assertTrue(inv.hasItem("minecraft:dirt"));
-        assertFalse(inv.hasItem("minecraft:gold_ingot"));
-    }
-
-    @Test
-    void hasItemIgnoresArmorAndOffhand() {
-        // hasItem / countOf scan main only — equipment is not transferable
-        // stack count and must not inflate the "do I have materials?" query.
+    void equipmentLivesOutsideTheMainSlice() {
+        // Consumers that aggregate or search main() must never see the
+        // armor row or offhand: equipment is not transferable stack.
         var armor = emptyArmor();
         armor.set(0, new ItemView("minecraft:iron_helmet", 1));
         var inv = new InventoryView(emptyMain(), 0, armor,
             new ItemView("minecraft:shield", 1));
-        assertFalse(inv.hasItem("minecraft:iron_helmet"));
-        assertFalse(inv.hasItem("minecraft:shield"));
-    }
-
-    @Test
-    void countOfSumsMatchingMainSlots() {
-        var main = emptyMain();
-        main.set(0, new ItemView("minecraft:diamond", 4));
-        main.set(5, new ItemView("minecraft:diamond", 2));
-        main.set(10, new ItemView("minecraft:dirt", 64));
-        var inv = new InventoryView(main, 0, emptyArmor(), ItemView.EMPTY);
-        assertEquals(6, inv.countOf("minecraft:diamond"));
-        assertEquals(64, inv.countOf("minecraft:dirt"));
-        assertEquals(0, inv.countOf("minecraft:gold_ingot"));
+        assertTrue(inv.main().stream().allMatch(ItemView.EMPTY::equals),
+            "equipment leaked into the main slice");
     }
 
     @Test

@@ -110,44 +110,6 @@ public record InventoryView(
     }
 
     /**
-     * Whether any main slot carries the given item id.
-     *
-     * @param itemId registry key to search; never null
-     * @return true when at least one non-empty main slot matches
-     */
-    public boolean hasItem(String itemId) {
-        if (itemId == null) {
-            return false;
-        }
-        for (ItemView slot : main) {
-            if (!slot.isEmpty() && itemId.equals(slot.itemId())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Total count of the given item id across all main slots. Armor and
-     * offhand are excluded — equipment is not transferable stack count.
-     *
-     * @param itemId registry key to sum; never null
-     * @return sum of counts across matching main slots; 0 when absent
-     */
-    public int countOf(String itemId) {
-        if (itemId == null) {
-            return 0;
-        }
-        int total = 0;
-        for (ItemView slot : main) {
-            if (!slot.isEmpty() && itemId.equals(slot.itemId())) {
-                total += slot.count();
-            }
-        }
-        return total;
-    }
-
-    /**
      * Read-only hotbar slice (indices 0-8 of {@link #main}).
      *
      * @return unmodifiable list of the 9 hotbar slots; never null

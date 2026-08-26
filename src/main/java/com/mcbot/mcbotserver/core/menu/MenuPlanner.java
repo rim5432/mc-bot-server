@@ -5,6 +5,7 @@ import com.mcbot.mcbotserver.api.menu.MenuClick;
 import com.mcbot.mcbotserver.api.menu.MenuView;
 import com.mcbot.mcbotserver.api.menu.RecipeView;
 import com.mcbot.mcbotserver.api.menu.SlotRole;
+import com.mcbot.mcbotserver.api.menu.SlotView;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -300,11 +301,8 @@ public final class MenuPlanner {
                 "itemId must not be null or blank");
         }
         List<Step> steps = new ArrayList<>();
-        for (var slot : menu.slots()) {
-            boolean playerRegion = slot.role() == SlotRole.MAIN
-                || slot.role() == SlotRole.HOTBAR;
-            if (playerRegion && !slot.isEmpty()
-                && slot.item().itemId().equals(itemId)) {
+        for (var slot : playerSlots(menu)) {
+            if (!slot.isEmpty() && slot.item().itemId().equals(itemId)) {
                 steps.add(new Step(slot.index(), 0,
                     MenuClick.QUICK_MOVE));
             }
@@ -359,9 +357,8 @@ public final class MenuPlanner {
                 "count must be positive, got " + count);
         }
         int supply = 0;
-        for (var slot : menu.slots()) {
-            if (playerRegion(slot) && !slot.isEmpty()
-                    && slot.item().itemId().equals(itemId)) {
+        for (var slot : playerSlots(menu)) {
+            if (!slot.isEmpty() && slot.item().itemId().equals(itemId)) {
                 supply += slot.item().count();
             }
         }
@@ -508,10 +505,23 @@ public final class MenuPlanner {
         return List.copyOf(steps);
     }
 
-    private static boolean playerRegion(
-            com.mcbot.mcbotserver.api.menu.SlotView slot) {
+    private static boolean playerRegion(SlotView slot) {
         return slot.role() == SlotRole.MAIN
             || slot.role() == SlotRole.HOTBAR;
+    }
+
+    /**
+     * Player-region slots in snapshot order (MAIN before HOTBAR on
+     * every current menu kind) — the single supply pool every plan
+     * sources from and returns remainder to.
+     *
+     * @param menu the full snapshot; never null
+     * @return the matching slots in snapshot order; never null
+     */
+    private static List<SlotView> playerSlots(MenuView menu) {
+        return menu.slots().stream()
+            .filter(MenuPlanner::playerRegion)
+            .toList();
     }
 
     /**
@@ -524,13 +534,10 @@ public final class MenuPlanner {
      *         never null
      */
     private static Deque<int[]> sourceLedger(
-            com.mcbot.mcbotserver.api.menu.MenuView menu, String itemId) {
+            MenuView menu, String itemId) {
         Deque<int[]> ledger = new ArrayDeque<>();
-        for (var slot : menu.slots()) {
-            boolean playerRegion = slot.role() == SlotRole.MAIN
-                || slot.role() == SlotRole.HOTBAR;
-            if (playerRegion && !slot.isEmpty()
-                && slot.item().itemId().equals(itemId)) {
+        for (var slot : playerSlots(menu)) {
+            if (!slot.isEmpty() && slot.item().itemId().equals(itemId)) {
                 ledger.add(new int[] {slot.index(),
                     slot.item().count()});
             }
@@ -546,12 +553,10 @@ public final class MenuPlanner {
      * @return item id → total count; never null, possibly empty
      */
     private static Map<String, Integer> playerRegionTotals(
-            com.mcbot.mcbotserver.api.menu.MenuView menu) {
+            MenuView menu) {
         Map<String, Integer> totals = new LinkedHashMap<>();
-        for (var slot : menu.slots()) {
-            boolean playerRegion = slot.role() == SlotRole.MAIN
-                || slot.role() == SlotRole.HOTBAR;
-            if (playerRegion && !slot.isEmpty()) {
+        for (var slot : playerSlots(menu)) {
+            if (!slot.isEmpty()) {
                 totals.merge(slot.item().itemId(),
                     slot.item().count(), Integer::sum);
             }
