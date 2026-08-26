@@ -355,6 +355,31 @@ def cmd_cat(path: str) -> int:
     task_match = re.fullmatch(r"/tasks/([A-Za-z0-9._:-]+)", path)
     if task_match and path not in ("/tasks/goto",):
         return cmd_cat_task(task_match.group(1))
+    block_match = re.fullmatch(r"/blocks/(-?\d+),(-?\d+),(-?\d+)", path)
+    if block_match:
+        x, y, z = block_match.groups()
+        resp = wire(f"/bot block {x} {y} {z}")
+        print(json.dumps(resp, indent=2))
+        return 0 if resp.get("ok") else 1
+    if path == "/nearby":
+        # Aggregated situational read, client-side over the entities
+        # wire read (the proposal's `view` verb collapsed into cat:
+        # new capabilities are new paths, never new verbs).
+        pos_resp = wire("/bot status")
+        state = pos_resp.get("state", pos_resp)
+        resp = wire("/bot entities 8 32")
+        if not resp.get("ok"):
+            print(f"cat /nearby: entities read failed: "
+                  f"{resp.get('reason', 'unknown')}", file=sys.stderr)
+            return 1
+        others = [e for e in resp.get("entities", [])
+                  if not e.get("self")]
+        nearby = {"pos": state.get("pos"),
+                  "task": state.get("task"),
+                  "nearby": others,
+                  "truncated": resp.get("truncated", False)}
+        print(json.dumps(nearby, indent=2))
+        return 0
     if path == "/recipes" or path.startswith("/recipes/"):
         item = path[len("/recipes/"):] if path.startswith("/recipes/") else ""
         if not item:
@@ -581,7 +606,8 @@ def cmd_wait(task_id: str, timeout_sec: int = 120, poll_interval: float = 1.0) -
     return 124
 
 
-def cmd_events(since: int | None = None) -> int:
+def cmd_events(since: int | None = None, follow: bool = False,
+               idle: int = 30) -> int:
     """Incremental event drain.
 
     Only a cursorless invocation advances the disk cursor: it is the
@@ -612,7 +638,37 @@ def cmd_events(since: int | None = None) -> int:
     print(json.dumps(resp, indent=2))
     if since is None and latest > cursor:
         write_cursor_state(latest, stream_epoch)
-    return 0
+    if not follow:
+        return 0
+    # tail -f semantics: peek-only polling (never advances the
+    # operator bookmark), one JSON line per new event, terminates
+    # after --idle seconds of silence. GAP/DROPPED reconcile the
+    # same way as wait.
+    last_seen = latest
+    epoch = stream_epoch
+    idle_deadline = time.monotonic() + idle
+    while True:
+        time.sleep(1.0)
+        resp = wire(f"/bot events {last_seen}")
+        batch = resp.get("batch", {})
+        stream_epoch = batch.get("resetAt", epoch)
+        head = batch.get("latest", last_seen)
+        if epoch != stream_epoch or last_seen > head:
+            epoch = stream_epoch
+            last_seen = 0
+            print("events: stream restarted; re-anchored to 0",
+                  file=sys.stderr)
+            idle_deadline = time.monotonic() + idle
+            continue
+        for evt in batch.get("events", []):
+            print(json.dumps(evt))
+        if head > last_seen:
+            last_seen = head
+            idle_deadline = time.monotonic() + idle
+        elif time.monotonic() >= idle_deadline:
+            print(f"events: follow idle {idle}s, stopping",
+                  file=sys.stderr)
+            return 0
 
 
 def cmd_ls(path: str) -> int:
@@ -622,6 +678,21 @@ def cmd_ls(path: str) -> int:
         state = resp.get("state", resp)
         current = state.get("task", "idle")
         print(f"current: {current}")
+        return 0
+    if path == "/entities/" or path == "/entities":
+        resp = wire("/bot entities")
+        if not resp.get("ok"):
+            print(f"ls: entities read failed: "
+                  f"{resp.get('reason', 'unknown')}", file=sys.stderr)
+            return 1
+        for e in resp.get("entities", []):
+            p_ = e.get("pos", [0, 0, 0])
+            mark = " [self]" if e.get("self") else ""
+            print(f"{e.get('type')}@{p_[0]},{p_[1]},{p_[2]} "
+                  f"hp={e.get('health')}/{e.get('maxHealth')} "
+                  f"dist={e.get('dist')}{mark}")
+        if resp.get("truncated"):
+            print("... truncated (limit=32)", file=sys.stderr)
         return 0
     if path == "/stations/" or path == "/stations":
         # scan with default radius=16, limit=50 (0012 D1 defaults).
@@ -746,6 +817,10 @@ def main(argv: list[str] | None = None) -> int:
     p_events = sub.add_parser("events", help="incremental event drain")
     p_events.add_argument("--since", type=int, default=None,
                           help="peek from N; does not advance the cursor")
+    p_events.add_argument("--follow", action="store_true",
+                          help="tail -f: keep polling, print new events")
+    p_events.add_argument("--idle", type=int, default=30,
+                          help="follow terminates after N idle seconds")
 
     p_admin = sub.add_parser("admin",
                              help="operator verbs (outside the namespace)")
@@ -772,7 +847,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.verb == "wait":
             return cmd_wait(args.task_id, args.timeout)
         if args.verb == "events":
-            return cmd_events(args.since)
+            return cmd_events(args.since, follow=getattr(args, "follow", False),
+                              idle=getattr(args, "idle", 30))
         if args.verb == "admin":
             return cmd_admin(args.action)
     except RconError as exc:

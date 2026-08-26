@@ -368,6 +368,90 @@ class RecipeMaterializationTest(McCliTest):
         self.assertEqual(self.wire_calls, ['recipes "nothing_here"'])
 
 
+class WorldReadsTest(McCliTest):
+    """0013 slice 1: block / blocks / entities / nearby / follow."""
+
+    def test_cat_block_translates(self):
+        self.queue({"ok": True, "pos": [1, 61, 2],
+                    "block": "minecraft:stone"})
+        code, out, _ = self.run_verb(mc.cmd_cat, "/blocks/1,61,2")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["/bot block 1 61 2"])
+        self.assertEqual(json.loads(out)["block"], "minecraft:stone")
+
+    def test_cat_block_negative_coords(self):
+        self.queue({"ok": True, "pos": [-3, 60, -4],
+                    "block": "minecraft:chest"})
+        code, _, _ = self.run_verb(mc.cmd_cat, "/blocks/-3,60,-4")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["/bot block -3 60 -4"])
+
+    def test_cat_block_rejects_malformed_path(self):
+        code, _, err = self.run_verb(mc.cmd_cat, "/blocks/1,2")
+        self.assertEqual(code, 1)
+        self.assertEqual(self.wire_calls, [])
+
+    def test_cat_nearby_aggregates_and_excludes_self(self):
+        self.queue(
+            {"ok": True, "state": {"pos": [0, 61, 0],
+                                   "task": "idle"}},
+            {"ok": True, "truncated": False, "entities": [
+                {"id": "self-uuid", "type": "mcbotserver:bot_body",
+                 "pos": [0, 61, 0], "health": 20.0,
+                 "maxHealth": 20.0, "dist": 0.0, "self": True},
+                {"id": "z-1", "type": "minecraft:zombie",
+                 "pos": [4, 61, 0], "health": 20.0,
+                 "maxHealth": 20.0, "dist": 4.0, "self": False},
+            ]},
+        )
+        code, out, _ = self.run_verb(mc.cmd_cat, "/nearby")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls,
+                         ["/bot status", "/bot entities 8 32"])
+        result = json.loads(out)
+        self.assertEqual(result["pos"], [0, 61, 0])
+        self.assertEqual(len(result["nearby"]), 1)
+        self.assertEqual(result["nearby"][0]["type"],
+                         "minecraft:zombie")
+
+    def test_ls_entities_prints_lines(self):
+        self.queue({"ok": True, "truncated": True, "entities": [
+            {"id": "c-1", "type": "minecraft:cow", "pos": [3, 61, 3],
+             "health": 10.0, "maxHealth": 10.0, "dist": 4.2,
+             "self": False},
+        ]})
+        code, out, err = self.run_verb(mc.cmd_ls, "/entities/")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["/bot entities"])
+        self.assertIn("minecraft:cow@3,61,3 hp=10.0/10.0 dist=4.2", out)
+        self.assertIn("truncated", err)
+
+    def test_events_follow_terminates_on_idle(self):
+        self.queue(batch([], latest=5))
+        code, out, err = self.run_verb(mc.cmd_events, follow=True,
+                                       idle=0)
+        self.assertEqual(code, 0)
+        self.assertIn("follow idle", err)
+
+    def test_events_follow_prints_new_events_then_idles(self):
+        self.queue(
+            batch([], latest=5),
+            batch([event("TASK_COMPLETED", task_id="t1")], latest=6),
+        )
+        code, out, err = self.run_verb(mc.cmd_events, follow=True,
+                                       idle=0)
+        self.assertEqual(code, 0)
+        self.assertIn("TASK_COMPLETED", out)
+        # Follow peeks: the bookmark must not advance past the drain.
+        self.assertLessEqual(mc.read_cursor(), 6)
+
+    def test_events_without_follow_unchanged(self):
+        self.queue(batch([], latest=7))
+        code, _, _ = self.run_verb(mc.cmd_events)
+        self.assertEqual(code, 0)
+        self.assertEqual(self.cursor_value(), 7)
+
+
 class StreamResetTest(McCliTest):
     """Cross-restart cursor trap, found live by shadow_compare: the
     event stream does not survive bot restarts (boundary D), so a
