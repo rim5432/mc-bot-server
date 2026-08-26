@@ -1,6 +1,6 @@
 ---
 title: Build & Run Guide
-last_verified: 2026-08-24
+last_verified: 2026-08-27
 covers:
   - tool/mcbot_tool.py
 ---

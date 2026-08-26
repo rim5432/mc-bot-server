@@ -7,7 +7,7 @@ covers:
   - src/main/java/com/mcbot/mcbotserver/adapter/BindingActor.java
   - src/main/java/com/mcbot/mcbotserver/adapter/entity/BotBodyEntity.java
 status: resolved (archived 2026-08-27 - D1/D2 shipped and pinned; open reserves relocated to the workplan movement-vocabulary seeds)
-superseded_by: doc/guide/workplan.md
+superseded_by: guide/workplan.md
 related:
   - doc/architecture/boundaries.md
   - doc/architecture/function-map.md

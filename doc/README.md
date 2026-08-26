@@ -15,25 +15,25 @@ Generated: 2026-08-27. Validate anytime with `python tool/mcbot_tool.py doc chec
 | [glossary.md](architecture/glossary.md) | Glossary - the loaded terms, pinned before they mislead | 2026-08-27 | ok |
 | [harness-interaction.md](architecture/harness-interaction.md) | Harness Interaction Model - the canonical architecture of the bot's command surface | 2026-08-27 | ok |
 | [issues/0003-sneak-pose-and-edge-walk.md](architecture/issues/0003-sneak-pose-and-edge-walk.md) | Sneak pose and edge walk - pose-aware collision, SNEAK channel, shield block | 2026-08-26 | ok |
-| [issues/0004-movement-primitive-vocabulary.md](architecture/issues/0004-movement-primitive-vocabulary.md) | Movement primitive vocabulary - misnomers, fluid propulsion, missing key semantics | 2026-08-27 | ok |
-| [issues/0005-player-feel-motion-layer.md](architecture/issues/0005-player-feel-motion-layer.md) | Player-feel motion layer - eyes, start/stop, rhythm, cosmetic fidgets | 2026-08-27 | ok |
 | [issues/0007-player-parity-interaction.md](architecture/issues/0007-player-parity-interaction.md) | Player parity - inventory, menus, crafting, and the interaction surface | 2026-08-27 | ok |
 | [issues/0009-block-capability-dig.md](architecture/issues/0009-block-capability-dig.md) | Block capability axis - dig first, pulled forward by the suffocation escape | 2026-08-27 | ok |
 | [issues/0010-hungryprocess-food-acquisition-planner.md](architecture/issues/0010-hungryprocess-food-acquisition-planner.md) | HungryProcess - food acquisition planner with self-contained initial strategies | 2026-08-27 | ok |
 | [issues/0011-harness-surface-convergence.md](architecture/issues/0011-harness-surface-convergence.md) | Harness surface convergence - the console verb contract, session runtime, and disclosure responsibilities | 2026-08-27 | ok |
-| [issues/0012-work-block-usability-and-harness-menu-surface.md](architecture/issues/0012-work-block-usability-and-harness-menu-surface.md) | Work-block usability - vanilla construction delegation and the harness manual menu surface | 2026-08-27 | stale? |
 | [issues/0013-world-interaction-layer.md](architecture/issues/0013-world-interaction-layer.md) | World interaction layer - perception reads, dig task, place verb, health field | 2026-08-27 | ok |
 | [issues/0014-mineprocess-composite-mining-task.md](architecture/issues/0014-mineprocess-composite-mining-task.md) | MineProcess - composite mining task with search-mine-collect loop | 2026-08-27 | ok |
 | [issues/0015-interaction-model-executable-queue.md](architecture/issues/0015-interaction-model-executable-queue.md) | Interaction model executable queue - the composition primitives the canonical doc promises | 2026-08-27 | ok |
+| [issues/archive/0004-movement-primitive-vocabulary.md](architecture/issues/archive/0004-movement-primitive-vocabulary.md) | Movement primitive vocabulary - misnomers, fluid propulsion, missing key semantics | 2026-08-27 | ok |
+| [issues/archive/0005-player-feel-motion-layer.md](architecture/issues/archive/0005-player-feel-motion-layer.md) | Player-feel motion layer - eyes, start/stop, rhythm, cosmetic fidgets | 2026-08-27 | ok |
 | [issues/archive/0006-scan-radius-leash-gap.md](architecture/issues/archive/0006-scan-radius-leash-gap.md) | Scan radius / leash gap in DefendProcess | 2026-08-25 | ok |
 | [issues/archive/0008-extreme-scenario-survival-framework.md](architecture/issues/archive/0008-extreme-scenario-survival-framework.md) | Extreme-scenario survival framework - the vital-sign ladder beyond drowning | 2026-08-25 | ok |
+| [issues/archive/0012-work-block-usability-and-harness-menu-surface.md](architecture/issues/archive/0012-work-block-usability-and-harness-menu-surface.md) | Work-block usability - vanilla construction delegation and the harness manual menu surface | 2026-08-27 | ok |
 | [overview.md](architecture/overview.md) | Architecture Overview | 2026-08-27 | ok |
 
 ## guide/
 
 | Document | Title | Verified | Status |
 |---|---|---|---|
-| [build-and-run.md](guide/build-and-run.md) | Build & Run Guide | 2026-08-24 | ok |
+| [build-and-run.md](guide/build-and-run.md) | Build & Run Guide | 2026-08-27 | ok |
 | [workplan.md](guide/workplan.md) | Work Plan (effort-sized checklist) | 2026-08-27 | ok |
 
 ## reference/

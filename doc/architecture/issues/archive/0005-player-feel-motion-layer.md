@@ -9,7 +9,7 @@ covers:
   - src/main/java/com/mcbot/mcbotserver/adapter/entity/BotBodyEntity.java
   - src/main/java/com/mcbot/mcbotserver/adapter/BindingActor.java
 status: resolved (archived 2026-08-27 - P0-P3 shipped and gate-pinned; the final live acceptance rides the workplan survival-gate rehearsal item)
-superseded_by: doc/guide/workplan.md
+superseded_by: guide/workplan.md
 related:
   - doc/architecture/boundaries.md
   - doc/architecture/function-map.md

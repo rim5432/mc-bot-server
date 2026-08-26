@@ -12,8 +12,8 @@ covers:
   - src/main/java/com/mcbot/mcbotserver/adapter/RecipeCatalog.java
   - src/main/java/com/mcbot/mcbotserver/core/tick/MissionReporter.java
   - tool/harness/mc.py
-status: resolved (archived 2026-08-27 - design complete and absorbed: the D4 interaction model is canon via harness-interaction.md + decision 33, the D1 table stays the integration contract, rulings 1-17 recorded below are executed or overturned-on-record; goto migration verified ALL GREEN incl. skills/patrol.py 4/4 live; residual implementation items inherited into issue 0015)
-superseded_by: doc/architecture/harness-interaction.md + boundaries.md ledger entry 33 (residual executable items: issue 0015)
+status: resolved (archived 2026-08-27 - design complete and absorbed: the D4 interaction model is canon via harness-interaction.md + decision 33, the D1 table stays the integration contract, rulings 1-17 recorded below are executed or overturned-on-record; goto migration verified ALL GREEN incl. skills/patrol.py 4/4 live; the binding summary is boundaries.md ledger entry 33; residual executable items inherited into issue 0015 section 7)
+superseded_by: architecture/harness-interaction.md
 related:
   - doc/architecture/issues/0007-player-parity-interaction.md
   - doc/architecture/issues/0011-harness-surface-convergence.md
