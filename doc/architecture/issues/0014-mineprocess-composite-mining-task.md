@@ -8,9 +8,11 @@ covers:
   - src/main/java/com/mcbot/mcbotserver/core/process/MineProcess.java
   - src/main/java/com/mcbot/mcbotserver/core/tick/BotController.java
   - src/main/java/com/mcbot/mcbotserver/core/command/MineCommandHandler.java
+  - src/main/java/com/mcbot/mcbotserver/adapter/BotCommands.java
+  - src/main/java/com/mcbot/mcbotserver/adapter/BotAssembly.java
   - src/main/java/com/mcbot/mcbotserver/McBotServer.java
   - tool/harness/mc.py
-status: open (filed 2026-08-27; first composite task; absorbs 0013's deferred composite-tasks item; pattern reference is 0010 HungryProcess)
+status: open (filed 2026-08-27, contract corrected same day after the post-landing review; first composite task; absorbs 0013's deferred composite-tasks item; multi-phase pattern precedent is DefendProcess, 0007)
 related:
   - doc/architecture/issues/0010-hungryprocess-food-acquisition-planner.md
   - doc/architecture/issues/0013-world-interaction-layer.md
@@ -23,14 +25,18 @@ related:
 ## 1. Scope and lineage
 
 Moved from 0013 deferred: "Composite tasks (mine / chop / hunt): 0010
-pattern first." 0010 (HungryProcess) is still in design phase, but its
-Process-layer state-machine pattern is well-defined enough to serve as the
-reference for this first composite task. MineProcess is the v1
-implementation; chop and hunt follow once the pattern is proven.
+pattern first." 0010 remains in design phase; the landed multi-phase
+Process precedent is DefendProcess (0007), which is the actual
+pattern reference for this first composite task. MineProcess is the
+v1 implementation; chop and hunt follow once the pattern is proven.
 
-The task: given a block type and a count, find nearby instances of that
-block, walk to each, mine it, collect the drop, and repeat until the
-inventory holds the requested count. This is the simplest composite task
+The task: given a block type and a count, find nearby instances of
+that block, walk to each, mine it, walk over the drop, and repeat
+until the requested number of blocks is broken. Termination counts
+breaks, not inventory items: a block's drop id routinely differs
+from its block id (stone drops cobblestone, ores drop raw items), so
+an inventory count keyed by the block id can never rise. Drop pickup
+is best-effort. This is the simplest composite task
 because: (a) the target is a static block (no pathing AI to chase), (b)
 the mining primitive already exists (DigProcess), (c) collection is
 vanilla auto-pickup (walk over the drop).
@@ -133,31 +139,44 @@ without touching the controller.
 └──────┘
 ```
 
+(Count = blocks broken, incremented at the DIGGING air read.)
+
 Phase transitions and their triggers:
 
 | Transition | Trigger | Directive output |
 |---|---|---|
 | IDLE → SEARCH | first onTick after submit | none (search is synchronous) |
 | SEARCH → MOVING | target found within radius | `GoalNear(target, 2)` |
-| SEARCH → FAILED | no target in radius, or all targets skipped | none (terminal) |
+| SEARCH → FAILED | no target in radius, or all targets skipped | hold goal (terminal) |
 | MOVING → DIGGING | PathingBehavior SUCCESS (within stand-off range) | `GoalNear(target, 2)` (hold position) |
 | MOVING → SEARCH | STUCK or timeout (per-target budget) | none (re-search) |
-| DIGGING → COLLECTING | target block reads air | `GoalNear(dropPos, 1)` |
-| COLLECTING → SEARCH | inventory count increased (pickup confirmed) | none (re-search) |
-| COLLECTING → DONE | inventory count >= requested | none (terminal) |
+| DIGGING → COLLECTING | target block reads air (break counted and recorded) | `GoalNear(dropPos, 1)` |
+| DIGGING → SEARCH | dig budget expired, or cell unloaded mid-dig (skip target) | none (re-search) |
+| COLLECTING → SEARCH | pickup window elapsed, breaks < requested | none (re-search) |
+| COLLECTING → DONE | breaks >= requested | hold goal (terminal) |
 
 ### 3.4 Search strategy
 
-Search is a synchronous spiral scan around the bot's current position,
-using `WorldView.getBlock(pos, LIVE)`. The scan radius is configurable
-(default 16, matching the scan command default). Blocks are collected
-into a list, sorted by Chebyshev distance, and the nearest is selected.
+Search is a synchronous cube scan around the bot's live position,
+using `WorldView.getBlock(pos, LIVE)`. The radius is fixed at 16 in
+v1 ((2r+1)^3 ≈ 36k cell reads per search entry — acceptable at one
+entry per target acquisition, not per tick). Unloaded cells read as
+null and are skipped. Candidates are sorted by Chebyshev distance;
+the nearest wins.
 
-Why spiral and not volume-read: the `blocks` volume command is a
-harness-facing wire verb; the Process reads the WorldView directly
-(boundary A: core/ has zero MC imports, but WorldView is the api-layer
-read surface). The spiral is simple and terminates fast when the target
-is common.
+The bot's position comes from a `Supplier<CellPos>` injected by the
+assembly (the body pose). WorldView deliberately exposes no
+self-position read (boundary A: the view is the world, not the
+actor), so the supplier is the only honest center. A null live read
+fails the mission ("no bot position"); the position captured at
+construction anchors failure-tick holds, because Directive rejects a
+null goal and a failure tick must not throw (that would trip the
+ADR-0005 crash latch over a mission-level failure).
+
+Why a direct scan and not the `blocks` volume verb: the volume
+command is a harness-facing wire verb; the Process reads the
+WorldView directly (boundary A: core/ has zero MC imports, but
+WorldView is the api-layer read surface).
 
 Skipped targets (STUCK or timeout) are marked in a per-mission
 skip-set so the next SEARCH pass doesn't re-pick them. The skip-set
@@ -173,17 +192,16 @@ absorbed into the inventory. MineProcess relies on this:
    position (drops spawn at the block center).
 2. COLLECTING phase outputs `GoalNear(dropPos, 1)` — stand on or
    adjacent to the drop.
-3. After a short pickup window (configurable, default 20 ticks = 1s),
-   check `WorldView.getInventory()` for the target item count.
-4. If count increased → pickup confirmed, proceed.
-5. If count did not increase after the window → the drop may have
-   fallen into lava / despawned / been picked up by another entity.
-   Mark this target as collected-but-no-drop, proceed to SEARCH.
+3. After the pickup window (default 20 ticks = 1s), the mission
+   returns to SEARCH, or DONE when the break count is met. The
+   inventory is never consulted: termination counts blocks broken,
+   because the drop id routinely differs from the block id and an
+   inventory count keyed by the block id can never rise.
 
-This is honest: the mission does not guarantee every mined block yields
-a drop, only that it tried. The final count may be less than requested
-if drops were lost; in that case the mission ends FAILED with reason
-"collected N of M (drops lost)".
+This is honest: the mission guarantees the blocks were broken and
+discloses each break (one BLOCK_BROKEN per block); it does not
+guarantee drops survived to be picked up. Lost drops are not tracked
+in v1 (see §6).
 
 ### 3.6 Timeout budgets
 
@@ -191,8 +209,9 @@ Three nested budgets:
 
 | Budget | Scope | Default | Source |
 |---|---|---|---|
-| Mission timeout | entire mine task | 1200 ticks (60s) | wire param, mirrored from DigCommandHandler |
+| Mission timeout | entire mine task | 2400 ticks (120s) | wire param; composite walks + digs per block, so the budget is per-mission — dig's 1200 does not fit N blocks |
 | Per-target move budget | MOVING phase for one target | 200 ticks (10s) | internal constant |
+| Per-target dig budget | DIGGING phase for one target | 400 ticks (20s) | internal constant; unbreakable or too-slow targets are skipped, not fatal |
 | Pickup window | COLLECTING phase wait | 20 ticks (1s) | internal constant |
 
 Per-target budget exhaustion does NOT fail the mission; it skips the
@@ -208,13 +227,17 @@ empty search result fails the mission.
 ```
 
 - `block_type`: registry id, e.g. `minecraft:stone` (the Process
-  compares against `BlockSnapshot.blockId()`)
-- `count`: positive integer, how many to collect
-- `timeoutTicks`: optional, default 1200 (mirrors DigCommandHandler)
+  compares against `BlockSnapshot.blockId()`). The Brigadier type is
+  string(), so the id MUST be quoted — a bare colon does not parse
+  (same rule as the menu verbs' item ids; word() is wrong here)
+- `count`: positive integer, how many blocks to break
+- `timeoutTicks`: optional, default 2400
 
 Returns `{ok: true, task: "<taskId>"}` on submit, or
-`{ok: false, reason: "..."}` on rejection (no active bot, invalid
-block id, count <= 0).
+`{ok: false, reason: "..."}` on rejection (no active bot,
+count <= 0). An unknown-but-well-formed block id is not rejected at
+submit; the mission fails honestly at its first search with
+"no <id> within 16".
 
 Completion is announced via the existing TerminalMission path:
 TASK_COMPLETED or TASK_FAILED with the taskId in attrs (same shape as
@@ -226,8 +249,9 @@ goto/dig).
 mc write /tasks/mine "minecraft:stone:10"
 ```
 
-Value format: `<block_type>:<count>`. The CLI parses this, calls
-`/bot mine <block_type> <count> [timeout]`, and prints the taskId.
+Value format: `<block_type>:<count>` (split on the LAST colon — the
+registry id itself contains one). The CLI quotes the id on the wire
+(`/bot mine "minecraft:stone" 10 2400`) and prints the taskId.
 `mc wait <taskId>` blocks until completion (same as goto/dig).
 
 ### 4.3 Events
@@ -250,11 +274,11 @@ taskId attr, giving per-block progress without a new event kind.
    sweep/BLOCK_BROKEN listener) + McBotServer wiring + `/bot mine`
    branch in BotCommands.
 4. **CLI** `write /tasks/mine` + mock tests.
-5. **Live verification**: spawn bot on a stone platform, `/bot mine
-   minecraft:stone 3`, confirm TASK_COMPLETED + 3 BLOCK_BROKEN events
-   + inventory has 3 cobblestone (note: stone drops cobblestone, not
-   stone — the mission tracks the drop item, not the mined block; this
-   is a v1 limitation documented in §6).
+5. **Live verification**: spawn bot on a dry pad with three placed
+   targets, `/bot mine "minecraft:dirt" 3`, confirm TASK_COMPLETED +
+   3 BLOCK_BROKEN events (one per block, pinned attrs, exact
+   positions) + all three cells read air afterwards. Drop pickup is
+   not an acceptance criterion (best-effort, §6).
 
 ## 6. Deferred with reopen
 
@@ -272,24 +296,45 @@ taskId attr, giving per-block progress without a new event kind.
   search (entities for hunt, log blocks for chop) and collection
   (hunt needs attack, which is 0013 deferred). Reopens after MineProcess
   is proven and attack lands.
-- **Drop item vs mined block mismatch**: stone → cobblestone, grass
-  block → dirt (with shears → grass), etc. v1 tracks the mined block
-  id for search but the drop item for count. A proper block→drop table
-  is deferred; v1 documents the mismatch and lets the harness request
-  the drop item directly (e.g. `/bot mine minecraft:cobblestone 10`
-  searches for stone but counts cobblestone — the search predicate and
-  count predicate are the same in v1, which is a known simplification).
+- **Item-count semantics**: v1 terminates on blocks BROKEN, not
+  items collected — the block→drop mapping (stone → cobblestone,
+  ores → raw items) never enters termination. If a harness needs
+  "N items", the block→drop table reopens; until then the harness
+  maps ids itself (request the block that drops the wanted item).
+- **Drop-loss tracking**: pickup is a walk-over best-effort; drops
+  that roll or fall away (observed live on a floating pad) are
+  silently uncollected. Reopens with drop-entity targeting
+  (GoalNear on the item entity, not the block cell).
+- **Event-ring capacity under motion**: a walking bot pushes
+  STATE_PUSH per cell crossing; sustained motion evicts older events
+  from the ring. EVENT_GAP / EVENT_DROPPED fire per the cursor
+  contract (no silent drop), but task events can churn out mid-walk,
+  so a harness polling at multi-second intervals during motion may
+  need to re-anchor. Reopens with a capacity or push-throttle ruling
+  on the disclosure channel.
+- **Bot death mid-mission**: the body's death stops the tick
+  pipeline, so an in-flight mission never reaches a terminal state
+  and its task stays pending from the harness's view. Reopens with a
+  respawn-cleanup ruling (goto/dig share the shape; observed during
+  the live round, isolation untested).
+- **Stale live suppliers after death**: `/bot status` answered from
+  the dead body's last cached snapshot (hearts 0) while the root
+  read verbs honestly answered "no active bot" — the two live
+  suppliers disagree on liveness. Rides the respawn-cleanup ruling
+  above.
 
 ## 7. Verification criteria
 
 - Offline: MineProcessTest covers all state transitions, skip-set
-  behavior, per-target timeout skip, mission timeout fail, count-met
-  success.
+  behavior, per-target timeout skip, mission timeout fail, break-count
+  success, pre-owned-stock non-termination, injected-position centering.
 - Offline: DigProcessTest still passes (refactor is behavior-preserving).
-- Offline: WireVocabularyGateTest pin updated for the new `/bot mine`
-  verb and any new attrs (none expected — reuses existing kinds).
-- Live: `/bot mine minecraft:stone 3` on a stone platform yields
-  TASK_COMPLETED, 3 BLOCK_BROKEN events, inventory count >= 3.
-- Live: `/bot mine minecraft:diamond_block 1` with no diamond blocks
-  in range yields TASK_FAILED with reason "no minecraft:diamond_block
-  within 16".
+- Offline: WireVocabularyGateTest lists MineCommandHandler in
+  PRODUCER_FILES (the registration); BLOCK_BROKEN attrs stay the
+  pinned five.
+- Live: `/bot mine "minecraft:dirt" 3` against three placed targets
+  yields TASK_COMPLETED, 3 BLOCK_BROKEN events (pinned attrs, exact
+  positions), and all three cells read air afterwards.
+- Live: `/bot mine "minecraft:diamond_block" 1` with no diamond
+  blocks in range yields TASK_FAILED with reason "no
+  minecraft:diamond_block within 16 (0 skipped)".
