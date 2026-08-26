@@ -416,6 +416,37 @@ public final class BotController {
         return true;
     }
 
+    /**
+     * The tick pipeline's real shape. ADR-0004 D1's stage ORDER
+     * holds end to end; this map exists because the interleaved
+     * machinery is what a reader actually meets, and the four-stage
+     * story alone has misled external review (2026-08-27 round)
+     * into counting drift where law was kept. Steps and their
+     * owning records:
+     * <ol>
+     * <li>reflex.tick + ENGAGE/ESCAPE seat handoff (ledger 24-27,
+     *     {@link #handoffToSeat}); a non-null reflex that does not
+     *     hand off holds the body and returns
+     * <li>resume guard: three-way dispatch on who holds the paused
+     *     slot (reflex fight / reflex rescue / original mission)
+     * <li>arbiter.tick - winner selection (Stage 2)
+     * <li>{@code DigMission} claim injection: per-tick aim+dig
+     *     claims for seated dig-family missions (issue 0013 R1,
+     *     generalized 0014; see code-health's abstraction-status
+     *     table for the next promotion trigger)
+     * <li>behaviors.tick + ExecutionReport feedback (Stage 3)
+     * <li>actor.flush - contest resolution, claim expiry, intents
+     *     (Stage 4)
+     * <li>missions.announceTransition - TASK_* disclosure
+     * <li>keepalive emission every {@code KEEPALIVE_INTERVAL} ticks
+     *     (Stage 5, observability; issue 0001 fix 2)
+     * </ol>
+     *
+     * <p>Runs on the server tick thread only. The ADR-0005 crash
+     * latch lives in {@link #onTick}'s wrapper outside this method:
+     * a latched controller runs MinimalReflex only and never
+     * reaches this pipeline.
+     */
     private void runPipeline(WorldView world) {
         CellPos position = positionSource.get();
         float health = healthSource.get();
