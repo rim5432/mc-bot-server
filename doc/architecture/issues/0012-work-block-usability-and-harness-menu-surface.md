@@ -12,7 +12,7 @@ covers:
   - src/main/java/com/mcbot/mcbotserver/adapter/RecipeCatalog.java
   - src/main/java/com/mcbot/mcbotserver/core/tick/MissionReporter.java
   - tool/harness/mc.py
-status: open (design complete - primary interaction model promoted, wire translation table as integration contract, translation-layer invariants recorded; goto migration CLI skeleton shipped 2026-08-26, hardened same day: typed verb discipline, /tasks/<id> derivation, admin stop/reset landing, cursor bookmark rule, 30+ wire-mocked CLI tests; goto shadow comparison ALL GREEN 2026-08-26 with the TASK_COMPLETED sample on both paths + cancel chain; two live findings recorded: resetAt cursor re-anchoring, missing entity-ticking ticket on bare servers; menu command implementation queued behind the in-flight menu refactor)
+status: open (design complete - primary interaction model promoted, wire translation table as integration contract, translation-layer invariants recorded; goto migration CLI skeleton shipped 2026-08-26, hardened same day: typed verb discipline, /tasks/<id> derivation, admin stop/reset landing, cursor bookmark rule, 36 wire-mocked CLI tests; goto shadow comparison ALL GREEN with the TASK_COMPLETED sample + cancel chain; step 4 done - skills/patrol.py first mc-syntax skill 4/4 legs live; three live findings recorded: resetAt cursor re-anchoring, missing entity-ticking ticket on bare servers, resetAt not surviving JVM restarts; menu command implementation queued behind the in-flight menu refactor)
 related:
   - doc/architecture/issues/0007-player-parity-interaction.md
   - doc/architecture/issues/0011-harness-surface-convergence.md
@@ -380,11 +380,17 @@ its own file offset; the shared cursor file does not. Only a cursorless
 stream stays complete - internal consumption must not eat events).
 Concurrent programmatic consumers pass `--since` and keep their own
 offsets: two consumers sharing the bookmark each see a partition, not
-the stream. The bookmark stores `<eventId> <resetAt>`; a changed
-resetAt epoch (bot restart - the stream does not survive restarts)
-voids it: `wait` re-anchors its scan to 0, `events` drains the new
-stream from 0. Found live by the shadow rerun: a stale pre-restart
-cursor made `wait` stare past the new stream head forever.
+the stream. The bookmark stores `<eventId> <resetAt>` and self-heals
+on two restart signals: a changed `resetAt` epoch (an explicit
+`reset()` mid-boot) and bookmark-beyond-stream-head (a JVM restart -
+the reliable cross-restart signal, found live: `resetAt` as shipped
+does NOT change across boots, because a fresh queue starts the marker
+at 1 again; only explicit `reset()` increments it, so epochs collide
+across restarts. The EventQueue doc's "monotonic bot-restart marker"
+overpromises as implemented - either the marker must be seeded from a
+persistent counter, or the client rule is bookmark-beyond-head. The
+CLI implements the latter). On either signal `wait` re-anchors its
+scan to 0 and `events` drains the new stream from 0.
 
 ### Data-driven maintenance ladder
 
@@ -513,9 +519,15 @@ Implementation order:
    exposed; the runbook in shadow_compare.py covers the manual prep.
    Also fixed en route: negative-coordinate write values hit argparse
    option parsing twice (token classification + argv=None bypassing
-   the shim). Remaining: write the first skill natively in `mc`
-   syntax (the step-0 grep found the call surface empty - there
-   are no legacy skills to rewrite). Completion criterion:
+   the shim). Step 4 EXECUTED same day: `skills/patrol.py` is the
+   first skill written natively in mc syntax - 4-leg walking patrol,
+   each leg submit -> wait -> cat /tasks/<id> cross-check, audit
+   drain at the end, zero raw RCON; ran 4/4 TASK_COMPLETED against
+   the live server. The grep criterion (`grep -r "bot goto" skills/`
+   empty) holds by construction. Third live finding during step 4:
+   resetAt does not signal JVM restarts as shipped (see the D5 cursor
+   invariant) - CLI detection is bookmark-beyond-head. Completion
+   criterion (agent runs N sessions without raw RCON):
    `grep -r "bot goto" skills/` returns empty + agent runs N sessions
    without touching raw RCON.
 
