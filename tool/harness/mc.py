@@ -462,6 +462,21 @@ def cmd_write(path: str, value: str, tol: int | None = None,
         resp = wire(cmd)
         print(json.dumps(resp, indent=2))
         return 0 if resp.get("ok") else 1
+    if path == "/tasks/dig":
+        # Same shape as goto: value "x,y,z", wire-required timeout
+        # mirrored from DigCommandHandler.DEFAULT_TIMEOUT_TICKS.
+        parts = value.split(",")
+        if len(parts) != 3:
+            print("write /tasks/dig: value must be 'x,y,z'",
+                  file=sys.stderr)
+            return 1
+        x, y, z = (pp.strip() for pp in parts)
+        timeout_val = timeout if timeout is not None else 1200
+        resp = wire(f"/bot dig {x} {y} {z} {timeout_val}")
+        print(json.dumps(resp, indent=2))
+        if resp.get("ok") and "task" in resp:
+            print(f"taskId: {resp['task']}", file=sys.stderr)
+        return 0 if resp.get("ok") else 1
     if path.startswith("/tasks/") and path.endswith("/cancel"):
         task_id = path[len("/tasks/"):-len("/cancel")]
         reason = value  # audit payload, passed through (wire ignores extra)

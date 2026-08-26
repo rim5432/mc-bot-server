@@ -368,6 +368,34 @@ class RecipeMaterializationTest(McCliTest):
         self.assertEqual(self.wire_calls, ['recipes "nothing_here"'])
 
 
+class DigTaskTest(McCliTest):
+    """0013 slice 3: write /tasks/dig -> /bot dig (task family)."""
+
+    def test_dig_translates_with_default_timeout(self):
+        self.queue({"ok": True, "task": "t7", "replay": False})
+        code, _, err = self.run_verb(mc.cmd_write, "/tasks/dig", "3,61,3")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["/bot dig 3 61 3 1200"])
+        self.assertIn("taskId: t7", err)
+
+    def test_dig_passes_explicit_timeout(self):
+        self.queue({"ok": True, "task": "t8", "replay": False})
+        code, _, _ = self.run_verb(mc.cmd_write, "/tasks/dig", "-3,60,-4",
+                                   timeout=600)
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["/bot dig -3 60 -4 600"])
+
+    def test_dig_rejects_malformed_value(self):
+        code, _, err = self.run_verb(mc.cmd_write, "/tasks/dig", "1,2")
+        self.assertEqual(code, 1)
+        self.assertEqual(self.wire_calls, [])
+
+    def test_dig_rejection_exits_one(self):
+        self.queue({"ok": False, "reason": "dig wants integer args"})
+        code, _, _ = self.run_verb(mc.cmd_write, "/tasks/dig", "1,2,3")
+        self.assertEqual(code, 1)
+
+
 class HealthFieldTest(McCliTest):
     """0013 slice 2: healthHearts + freeSlots ride /bot status."""
 
