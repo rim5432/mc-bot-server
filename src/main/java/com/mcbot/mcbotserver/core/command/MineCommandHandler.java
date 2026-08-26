@@ -4,6 +4,7 @@ import com.mcbot.mcbotserver.api.command.BotCommand;
 import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.event.EventQueue;
+import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.process.MineProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
 
@@ -11,17 +12,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 
 /**
  * Boundary-D verb wiring for "mine" (issue 0014): a block type + count
  * becomes a {@link MineProcess} on the arbiter; cancellation aborts the
  * mission; completion events flow through the pipeline's generic
- * TerminalMission path.
- *
- * <p>v1 simplification: BLOCK_BROKEN is emitted once at mission
- * completion (for the last mined block), not once per block. Per-block
- * disclosure is a follow-up when the mission-level event correlation
- * proves insufficient for harness progress tracking.
+ * TerminalMission path, and BLOCK_BROKEN is emitted once per broken
+ * block (issue 0014 section 4.3) by draining the process's break
+ * records on this handler's tick sweep.
  *
  * <p>Contract: see boundaries.md decision 28 (verb table grows by issue)
  * + issue 0014 §4 (mine wire surface).
@@ -36,6 +35,7 @@ public final class MineCommandHandler {
     private final EventQueue events;
     private final LongSupplier daySupplier;
     private final LongSupplier timeOfDaySupplier;
+    private final Supplier<CellPos> botPosition;
     private final Map<String, MineProcess> missions = new HashMap<>();
     private CommandBus bus;
 
@@ -46,12 +46,16 @@ public final class MineCommandHandler {
      * @param events            completion/cancellation stream; never null
      * @param daySupplier       game-day stamp accessor; never null
      * @param timeOfDaySupplier time-of-day stamp accessor; never null
+     * @param botPosition       live body-position accessor passed into
+     *                          every mission as the search center;
+     *                          never null
      */
     public MineCommandHandler(TaskArbiter arbiter, EventQueue events,
                               LongSupplier daySupplier,
-                              LongSupplier timeOfDaySupplier) {
+                              LongSupplier timeOfDaySupplier,
+                              Supplier<CellPos> botPosition) {
         if (arbiter == null || events == null || daySupplier == null
-                || timeOfDaySupplier == null) {
+                || timeOfDaySupplier == null || botPosition == null) {
             throw new IllegalArgumentException(
                 "arguments must not be null");
         }
@@ -59,6 +63,7 @@ public final class MineCommandHandler {
         this.events = events;
         this.daySupplier = daySupplier;
         this.timeOfDaySupplier = timeOfDaySupplier;
+        this.botPosition = botPosition;
     }
 
     /**
@@ -87,7 +92,8 @@ public final class MineCommandHandler {
                     ? Long.parseLong(args.get("timeoutTicks"))
                     : DEFAULT_TIMEOUT_TICKS;
                 MineProcess mission = new MineProcess(
-                    taskId, blockType, count, 50, timeout);
+                    taskId, blockType, count, 50, timeout,
+                    botPosition);
                 missions.put(taskId, mission);
                 arbiter.register(mission);
                 arbiter.requestControl(mission);
@@ -96,38 +102,43 @@ public final class MineCommandHandler {
     }
 
     /**
-     * Retire finished missions. Called once per server tick by the
-     * wiring, same cadence as the dig/goto handlers' sweep.
+     * Per-tick sweep: drain pending break records into BLOCK_BROKEN
+     * events (one per broken block), then retire finished missions.
+     * Called once per server tick by the wiring, same cadence as the
+     * dig/goto handlers' sweep.
      */
     public void tick() {
+        for (MineProcess mission : missions.values()) {
+            MineProcess.BlockBreak pending;
+            while ((pending = mission.pollBreak()) != null) {
+                pushBlockBroken(mission.missionTaskId(), pending);
+            }
+        }
+        // Retire-before-announce: the bus dedupe window closes first
+        // so a harness retry of the same verb+args submits fresh.
         missions.values().removeIf(m -> {
             if (m.isActive()) {
                 return false;
             }
             bus.retire(m.missionTaskId());
-            if (m.missionSucceeded() && m.digTarget() != null) {
-                pushBlockBroken(m);
-            }
             return true;
         });
     }
 
-    private void pushBlockBroken(MineProcess mission) {
+    private void pushBlockBroken(String taskId,
+                                 MineProcess.BlockBreak pending) {
         try {
             var attrs = new HashMap<String, String>();
-            attrs.put("taskId", mission.missionTaskId());
-            attrs.put("posX", String.valueOf(mission.digTarget().x()));
-            attrs.put("posY", String.valueOf(mission.digTarget().y()));
-            attrs.put("posZ", String.valueOf(mission.digTarget().z()));
-            attrs.put("blockId", mission.blockType());
-            attrs.put("collected", String.valueOf(mission.collectedCount()));
+            attrs.put("taskId", taskId);
+            attrs.put("posX", String.valueOf(pending.pos().x()));
+            attrs.put("posY", String.valueOf(pending.pos().y()));
+            attrs.put("posZ", String.valueOf(pending.pos().z()));
+            attrs.put("blockId", pending.blockId());
             events.push(new BotEvent(EventKind.BLOCK_BROKEN,
                 daySupplier.getAsLong(),
                 timeOfDaySupplier.getAsLong(), false,
                 Map.copyOf(attrs),
-                mission.missionTaskId() + ": mined "
-                    + mission.collectedCount() + " "
-                    + mission.blockType()));
+                taskId + ": broke " + pending.blockId()));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down with it.
         }

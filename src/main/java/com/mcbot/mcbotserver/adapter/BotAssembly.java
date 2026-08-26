@@ -228,7 +228,8 @@ public final class BotAssembly {
         MineCommandHandler mineHandler = new MineCommandHandler(
             arbiter, events,
             () -> level.getDayTime() / 24000L,
-            () -> level.getDayTime() % 24000L);
+            () -> level.getDayTime() % 24000L,
+            () -> poseOf(body));
         mineHandler.attach(bus);
         // The bus has ONE cancel-listener slot: route to every verb
         // handler's public cancel method (each self-guards by its
