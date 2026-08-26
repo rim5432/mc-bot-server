@@ -666,22 +666,20 @@ def cmd_read(path: str) -> int:
               f"{open_reply.get('reason', 'unknown')}", file=sys.stderr)
         return 1
     try:
-        snap = wire("menu snapshot")
-        if not snap.get("ok"):
-            print(f"read: snapshot failed: "
-                  f"{snap.get('reason', 'unknown')}", file=sys.stderr)
-            return 1
+        # The open reply already carries the first snapshot - a
+        # separate menu snapshot call would be a redundant round trip
+        # (nothing can change between open and read on one wire).
+        menu = open_reply.get("menu", open_reply)
         if station["role"]:
             # Client-side filter by role (zero wire change).
-            slots = snap.get("slots", [])
-            filtered = [s for s in slots
+            filtered = [s for s in menu.get("slots", [])
                         if s.get("role", "").upper() == station["role"]]
-            print(json.dumps({"type": snap.get("type"),
-                               "pos": snap.get("pos"),
+            print(json.dumps({"type": menu.get("type"),
+                               "sourcePos": menu.get("sourcePos"),
                                "role": station["role"].lower(),
                                "slots": filtered}, indent=2))
         else:
-            print(json.dumps(snap, indent=2))
+            print(json.dumps(menu, indent=2))
         return 0
     finally:
         station_close()

@@ -49,6 +49,12 @@ class McCliTest(unittest.TestCase):
         patcher = mock.patch.object(mc, "CURSOR_PATH", cursor)
         patcher.start()
         self.addCleanup(patcher.stop)
+        # Isolate the materialized recipe cache: a dump on the
+        # operator's machine must not flip local-first cat tests.
+        recipes = Path(self._tmp.name) / "recipes"
+        patcher = mock.patch.object(mc, "RECIPES_DIR", recipes)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.wire_calls: list[str] = []
         self.wire_responses: list[dict] = []
         patcher = mock.patch.object(mc, "wire", side_effect=self._wire)
@@ -96,18 +102,18 @@ class VerbDisciplineTest(McCliTest):
 
     def test_read_station_path_does_not_suggest_cat(self):
         # Station paths are read's correct domain: it must not suggest
-        # cat (that would be a verb-discipline violation). It opens,
-        # snapshots, and closes.
+        # cat (that would be a verb-discipline violation). It opens
+        # (snapshot rides the open reply) and closes.
         self.queue(
-            {"ok": True},  # menu open
-            {"ok": True, "type": "chest", "pos": [1, 2, 3], "slots": []},
+            {"ok": True, "menu": {"type": "chest",
+                                  "sourcePos": [1, 2, 3], "slots": []}},
             {"ok": True},  # menu close
         )
         code, out, err = self.run_verb(mc.cmd_read, "/stations/chest@1,2,3/")
         self.assertEqual(code, 0)
         self.assertNotIn("`mc cat", err)
         self.assertEqual(self.wire_calls,
-                         ["menu open 1 2 3", "menu snapshot", "menu close"])
+                         ["menu open 1 2 3", "menu close"])
 
     def test_cat_player_menu_is_unsupported_not_task_summary(self):
         self.queue({"ok": True, "state": {"task": "goto:t1"}})
@@ -283,6 +289,83 @@ class EventsCursorTest(McCliTest):
         self.assertEqual(code, 0)
         self.assertEqual(self.wire_calls, ["/bot events 3"])
         self.assertEqual(self.cursor_value(), 0)
+
+
+class RecipeMaterializationTest(McCliTest):
+    """dump-recipes pagination and the local-first cat /recipes."""
+
+    def page(self, offset, recipes, total):
+        return {"ok": True, "total": total, "offset": offset,
+                "count": len(recipes), "recipes": recipes}
+
+    def test_dump_pages_through_and_writes_files(self):
+        self.queue(
+            self.page(0, [
+                {"recipeId": "minecraft:stick",
+                 "resultItemId": "minecraft:stick", "resultCount": 4,
+                 "patternWidth": 1,
+                 "placements": {"0": ["minecraft:oak_planks"],
+                                "1": ["minecraft:oak_planks"]}},
+                {"recipeId": "minecraft:wooden_pickaxe",
+                 "resultItemId": "minecraft:wooden_pickaxe",
+                 "resultCount": 1, "patternWidth": 3,
+                 "placements": {"0": ["minecraft:oak_planks"],
+                                "1": ["minecraft:oak_planks"],
+                                "2": ["minecraft:oak_planks"],
+                                "4": ["minecraft:stick"],
+                                "7": ["minecraft:stick"]}},
+            ], 3),
+            self.page(2, [
+                {"recipeId": "minecraft:anvil",
+                 "resultItemId": "minecraft:anvil", "resultCount": 1,
+                 "patternWidth": 3,
+                 "placements": {"0": ["minecraft:iron_block"]}},
+            ], 3),
+        )
+        code, out, err = self.run_verb(mc.cmd_admin, "dump-recipes")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls,
+                         ["recipes list 0 50", "recipes list 2 50"])
+        pickaxe = mc.RECIPES_DIR / "wooden_pickaxe"
+        self.assertTrue(pickaxe.exists())
+        text = pickaxe.read_text(encoding="utf-8")
+        self.assertIn("station: crafting_table", text)
+        self.assertIn("minecraft:oak_planks x3", text)
+        self.assertIn("minecraft:stick x2", text)
+        self.assertIn("wooden_pickaxe x1", text)
+        stick = mc.RECIPES_DIR / "stick"
+        self.assertIn("oak_planks x2", stick.read_text(encoding="utf-8"))
+
+    def test_dump_two_by_two_grid_is_inventory_station(self):
+        self.queue(self.page(0, [
+            {"recipeId": "minecraft:stick",
+             "resultItemId": "minecraft:stick", "resultCount": 4,
+             "patternWidth": 1,
+             "placements": {"0": ["minecraft:oak_planks"],
+                            "1": ["minecraft:oak_planks"]}},
+        ], 1))
+        code, _, _ = self.run_verb(mc.cmd_admin, "dump-recipes")
+        self.assertEqual(code, 0)
+        self.assertIn("station: inventory",
+            (mc.RECIPES_DIR / "stick").read_text(encoding="utf-8"))
+
+    def test_cat_prefers_local_file_zero_wire(self):
+        recipe = mc.RECIPES_DIR / "wooden_pickaxe"
+        recipe.parent.mkdir(parents=True, exist_ok=True)
+        recipe.write_text("\n".join([
+            "station: crafting_table", "inputs:",
+            "  oak_planks x3", "  stick x2", "output:",
+            "  wooden_pickaxe x1"]) + "\n", encoding="utf-8")
+        code, out, _ = self.run_verb(mc.cmd_cat, "/recipes/wooden_pickaxe")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, [])
+        self.assertIn("crafting_table", out)
+
+    def test_cat_falls_back_to_wire_when_not_dumped(self):
+        self.queue({"ok": True, "recipes": []})
+        code, _, _ = self.run_verb(mc.cmd_cat, "/recipes/nothing_here")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ['recipes "nothing_here"'])
 
 
 class StreamResetTest(McCliTest):
@@ -490,41 +573,51 @@ class LsStationsTest(McCliTest):
 class ReadStationTest(McCliTest):
     """read /stations/<t>@<pos>/[<role>] -> open + snapshot + close."""
 
-    def test_full_snapshot_opens_snapshots_closes(self):
+    def test_full_snapshot_opens_reads_closes(self):
+        # Mocks mirror the REAL wire shape: the snapshot nests under
+        # "menu" in every menu-command reply (MenuCommands/MenuViewJson).
         self.queue(
-            {"ok": True},  # open
-            {"ok": True, "type": "chest", "pos": [1, 2, 3],
-             "slots": [{"role": "INPUT", "index": 0,
-                        "item": "iron_ingot", "count": 8}]},
+            {"ok": True, "menu": {
+                "type": "chest", "sourcePos": [1, 2, 3],
+                "containerSize": 1,
+                "slots": [{"role": "CONTAINER", "index": 0,
+                           "item": {"id": "minecraft:iron_ingot",
+                                    "count": 8}}]}},
             {"ok": True},  # close
         )
         code, out, _ = self.run_verb(mc.cmd_read, "/stations/chest@1,2,3/")
         self.assertEqual(code, 0)
         self.assertEqual(self.wire_calls,
-                         ["menu open 1 2 3", "menu snapshot", "menu close"])
+                         ["menu open 1 2 3", "menu close"])
         result = json.loads(out)
         self.assertEqual(result["type"], "chest")
         self.assertEqual(len(result["slots"]), 1)
 
     def test_role_filter_is_client_side(self):
         self.queue(
-            {"ok": True},
-            {"ok": True, "type": "furnace", "pos": [1, 2, 3], "slots": [
-                {"role": "INPUT", "index": 0, "item": "iron_ore", "count": 8},
-                {"role": "FUEL", "index": 1, "item": "coal", "count": 16},
-                {"role": "OUTPUT", "index": 2, "item": "iron_ingot", "count": 3},
-            ]},
+            {"ok": True, "menu": {
+                "type": "furnace", "sourcePos": [1, 2, 3],
+                "containerSize": 3,
+                "slots": [
+                    {"role": "INPUT", "index": 0,
+                     "item": {"id": "minecraft:iron_ore", "count": 8}},
+                    {"role": "FUEL", "index": 1,
+                     "item": {"id": "minecraft:coal", "count": 16}},
+                    {"role": "OUTPUT", "index": 2,
+                     "item": {"id": "minecraft:iron_ingot", "count": 3}},
+                ]}},
             {"ok": True},
         )
         code, out, _ = self.run_verb(
             mc.cmd_read, "/stations/furnace@1,2,3/output")
         self.assertEqual(code, 0)
-        # Only one wire snapshot (no role param on wire).
-        self.assertEqual(self.wire_calls[1], "menu snapshot")
+        self.assertEqual(self.wire_calls,
+                         ["menu open 1 2 3", "menu close"])
         result = json.loads(out)
         self.assertEqual(result["role"], "output")
         self.assertEqual(len(result["slots"]), 1)
-        self.assertEqual(result["slots"][0]["item"], "iron_ingot")
+        self.assertEqual(result["slots"][0]["item"]["id"],
+                         "minecraft:iron_ingot")
 
     def test_open_failure_exits_one_without_snapshot_or_close(self):
         self.queue({"ok": False, "reason": "out of reach"})
@@ -533,17 +626,22 @@ class ReadStationTest(McCliTest):
         self.assertIn("cannot open", err)
         self.assertEqual(self.wire_calls, ["menu open 1 2 3"])
 
-    def test_snapshot_failure_still_closes(self):
+    def test_role_filter_with_no_matching_role_is_empty(self):
         self.queue(
-            {"ok": True},  # open
-            {"ok": False, "reason": "no menu open"},
-            {"ok": True},  # close (finally)
+            {"ok": True, "menu": {
+                "type": "chest", "sourcePos": [1, 2, 3],
+                "containerSize": 1,
+                "slots": [{"role": "CONTAINER", "index": 0,
+                           "item": {"id": "minecraft:stone",
+                                    "count": 5}}]}},
+            {"ok": True},
         )
-        code, _, err = self.run_verb(mc.cmd_read, "/stations/chest@1,2,3/")
-        self.assertEqual(code, 1)
-        self.assertIn("snapshot failed", err)
+        code, out, _ = self.run_verb(
+            mc.cmd_read, "/stations/chest@1,2,3/output")
+        self.assertEqual(code, 0)
         self.assertEqual(self.wire_calls,
-                         ["menu open 1 2 3", "menu snapshot", "menu close"])
+                         ["menu open 1 2 3", "menu close"])
+        self.assertEqual(json.loads(out)["slots"], [])
 
     def test_invalid_path_exits_one(self):
         code, _, err = self.run_verb(mc.cmd_read, "/stations/chest1,2,3/")

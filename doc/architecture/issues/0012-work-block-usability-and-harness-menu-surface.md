@@ -296,7 +296,7 @@ harness-side CLI translation. Both workflows develop against this table.
 | `wait` | `<taskId>` | poll `/bot events` until terminal | live |
 | `events` | `/events` | `/bot events <cursor>` | live |
 | `ls` | `/stations/` | `/bot scan [radius] [limit]` | live |
-| `read` | `/stations/<type>@<pos>/` | `/bot menu open` + `/bot menu snapshot` + `/bot menu close` (CLI-managed session, lazy bind) | live |
+| `read` | `/stations/<type>@<pos>/` | `/bot menu open` (reply carries the first snapshot) + `/bot menu close` - per-operation session, no cross-call state | live |
 | `read` | `/stations/<type>@<pos>/<role>` | same + client-side role filter (zero wire change) | live |
 | `write` | `/stations/<type>@<pos>/input` | `/bot menu deposit INPUT <item> <count>` (value is `item:count`; item id is a quoted string arg) | live |
 | `write` | `/stations/<type>@<pos>/fuel` | `/bot menu deposit FUEL <item> <count>` | live |
