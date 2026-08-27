@@ -64,8 +64,9 @@ public final class MenuViewJson {
      *
      * @param recipe the recipe; never null
      * @return object with keys recipeId, resultItemId, resultCount,
-     *         patternWidth, placements (pattern position to accepted
-     *         item ids); never null
+     *         patternWidth, shapeless, placements (pattern position
+     *         to accepted item ids; ingredient indices when
+     *         shapeless); never null
      */
     public static JsonObject toJsonObject(RecipeView recipe) {
         JsonObject root = new JsonObject();
@@ -73,6 +74,7 @@ public final class MenuViewJson {
         root.addProperty("resultItemId", recipe.resultItemId());
         root.addProperty("resultCount", recipe.resultCount());
         root.addProperty("patternWidth", recipe.patternWidth());
+        root.addProperty("shapeless", recipe.shapeless());
         JsonObject placements = new JsonObject();
         recipe.placements().forEach((pos, kinds) -> {
             JsonArray accepted = new JsonArray();

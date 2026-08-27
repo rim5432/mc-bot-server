@@ -361,6 +361,33 @@ class RecipeMaterializationTest(McCliTest):
         self.assertIn("station: inventory",
             (mc.RECIPES_DIR / "stick").read_text(encoding="utf-8"))
 
+    def test_dump_shapeless_uses_count_rule_for_station(self):
+        # Three ingredient indices with placeholder width 3: the
+        # geometry replica would see column 2 and demand a table, but
+        # the shapeless flag switches to the vanilla count rule
+        # (n<=4 fits the inventory 2x2).
+        self.queue(self.page(0, [
+            {"recipeId": "minecraft:mushroom_stew",
+             "resultItemId": "minecraft:mushroom_stew",
+             "resultCount": 1, "patternWidth": 3, "shapeless": True,
+             "placements": {"0": ["minecraft:brown_mushroom"],
+                            "1": ["minecraft:red_mushroom"],
+                            "2": ["minecraft:bowl"]}},
+            {"recipeId": "minecraft:oak_planks",
+             "resultItemId": "minecraft:oak_planks",
+             "resultCount": 4, "patternWidth": 3, "shapeless": True,
+             "placements": {"0": ["minecraft:oak_log"]}},
+        ], 2))
+        code, _, _ = self.run_verb(mc.cmd_admin, "dump-recipes")
+        self.assertEqual(code, 0)
+        stew = (mc.RECIPES_DIR / "mushroom_stew").read_text(encoding="utf-8")
+        self.assertIn("station: inventory", stew)
+        self.assertIn("minecraft:bowl x1", stew)
+        planks = (mc.RECIPES_DIR / "oak_planks").read_text(encoding="utf-8")
+        self.assertIn("station: inventory", planks)
+        self.assertIn("minecraft:oak_log x1", planks)
+        self.assertIn("oak_planks x4", planks)
+
     def test_cat_prefers_local_file_zero_wire(self):
         recipe = mc.RECIPES_DIR / "wooden_pickaxe"
         recipe.parent.mkdir(parents=True, exist_ok=True)

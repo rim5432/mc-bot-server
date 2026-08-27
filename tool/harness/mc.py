@@ -92,10 +92,11 @@ TOOL_DIR = Path(__file__).resolve().parent.parent
 CURSOR_PATH = TOOL_DIR / ".runtime" / "mc_cursor.txt"
 
 # Materialized recipe cache: `mc admin dump-recipes` writes one file
-# per shaped recipe here. Thereafter `mc cat /recipes/<slug>` reads
-# locally (zero wire), and grep over this directory is the reverse
-# lookup ("what can I make with iron_ingot?"). Vanilla recipes are
-# static; re-run dump after a datapack reload.
+# per recipe here (shaped and shapeless). Thereafter `mc cat
+# /recipes/<slug>` reads locally (zero wire), and grep over this
+# directory is the reverse lookup ("what can I make with
+# iron_ingot?"). Vanilla recipes are static; re-run dump after a
+# datapack reload.
 RECIPES_DIR = Path.home() / ".mc" / "recipes"
 
 
@@ -240,10 +241,14 @@ def station_close() -> None:
 def fits_inventory_grid(recipe: dict) -> bool:
     """Client-side replica of RecipeView.fitsInventoryGrid().
 
-    A recipe fits the 2x2 inventory crafting grid when every occupied
-    pattern cell sits in the top-left 2x2. Otherwise it needs a
-    crafting_table. This derivation is pure — no wire call needed.
+    Shaped: a recipe fits the 2x2 inventory crafting grid when every
+    occupied pattern cell sits in the top-left 2x2. Shapeless:
+    positions are ingredient indices, so the vanilla count rule
+    decides (at most four ingredients). This derivation is pure —
+    no wire call needed.
     """
+    if recipe.get("shapeless"):
+        return len(recipe.get("placements", {})) <= 4
     width = recipe.get("patternWidth", 3)
     for pos_str in recipe.get("placements", {}):
         pos = int(pos_str)
@@ -270,7 +275,7 @@ def derive_inputs(recipe: dict) -> dict[str, int]:
 
 
 def format_recipe_file(recipe: dict) -> str:
-    """Format one shaped recipe as a Unix-style text file.
+    """Format one recipe as a Unix-style text file.
 
     Schema (four sections, no shape grid — that is the bot's internal
     detail):
@@ -296,7 +301,7 @@ def format_recipe_file(recipe: dict) -> str:
 
 
 def cmd_admin_dump_recipes() -> int:
-    """Dump every shaped recipe to ~/.mc/recipes/<slug>.
+    """Dump every recipe to ~/.mc/recipes/<slug>.
 
     Pages through `/bot recipes list` (RCON payload cap makes a single
     call impossible), writes one file per recipe. The slug is the
@@ -406,7 +411,7 @@ def cmd_cat(path: str) -> int:
             print("cat: /recipes/<item> needs an item id", file=sys.stderr)
             return 1
         # Local materialized file first (zero wire). After `mc admin
-        # dump-recipes`, every shaped recipe lives at ~/.mc/recipes/<slug>
+        # dump-recipes`, every recipe lives at ~/.mc/recipes/<slug>
         # and cat reads it directly — the wire byResult query is only the
         # fallback for items not yet dumped.
         local = RECIPES_DIR / item
@@ -489,6 +494,21 @@ def cmd_write(path: str, value: str, tol: int | None = None,
         resp = wire(f"place {x} {y} {z} {face.lower()}")
         emit_json(resp)
         return 0 if resp.get("ok") and resp.get("placed") else 1
+    if path == "/actions/use":
+        # value "x,y,z,face" - synchronous one-shot right-click chain:
+        # block interaction first, then the held item's use-on
+        # (0007 Phase 2). The executor's consumed verdict is the
+        # receipt (a pressed button springs back, so no post-state
+        # read exists).
+        parts = value.split(",")
+        if len(parts) != 4:
+            print("write /actions/use: value must be 'x,y,z,face'",
+                  file=sys.stderr)
+            return 1
+        x, y, z, face = (pp.strip() for pp in parts)
+        resp = wire(f"use {x} {y} {z} {face.lower()}")
+        emit_json(resp)
+        return 0 if resp.get("ok") and resp.get("used") else 1
     if path == "/actions/equip":
         # value is a hotbar slot index 0..8. Synchronous selection;
         # the wire updates both body.selectedSlot and the inventory

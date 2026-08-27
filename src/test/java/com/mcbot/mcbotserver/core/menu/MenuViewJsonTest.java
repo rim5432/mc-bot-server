@@ -83,7 +83,7 @@ class MenuViewJsonTest {
     }
 
     /** Pins the recipe wire keys: recipeId, resultItemId,
-     *  resultCount, patternWidth, placements{pos:[kinds]}. */
+     *  resultCount, patternWidth, shapeless, placements{pos:[kinds]}. */
     @Test
     void recipeWireKeysStayFrozen() {
         RecipeView recipe = new RecipeView(
@@ -96,9 +96,21 @@ class MenuViewJsonTest {
         assertEquals("minecraft:wooden_pickaxe", root.get("recipeId").getAsString());
         assertEquals(1, root.get("resultCount").getAsInt());
         assertEquals(3, root.get("patternWidth").getAsInt());
+        assertFalse(root.get("shapeless").getAsBoolean(), "shaped recipes must pin shapeless=false");
         var placements = root.getAsJsonObject("placements");
         assertEquals(3, placements.size());
         assertEquals("minecraft:planks", placements.getAsJsonArray("0").get(0).getAsString());
         assertEquals("minecraft:stick", placements.getAsJsonArray("6").get(0).getAsString());
+    }
+
+    /** A shapeless view must carry the flag so harness-side
+     *  geometry replicas can switch to the count rule. */
+    @Test
+    void shapelessRecipeCarriesTheFlagOnTheWire() {
+        RecipeView recipe = new RecipeView(
+                "minecraft:oak_planks", "minecraft:oak_planks", 4, 3, Map.of(0, List.of("minecraft:oak_log")), true);
+        JsonObject root = MenuViewJson.toJsonObject(recipe);
+        assertTrue(root.get("shapeless").getAsBoolean(), "shapeless recipes must pin shapeless=true");
+        assertEquals(1, root.getAsJsonObject("placements").size());
     }
 }
