@@ -33,9 +33,9 @@ here.
 | # | Item | Contract |
 |---|---|---|
 | 1 | `wait` exit codes | `0` only on TASK_COMPLETED; `1` on every other terminal kind - FAILED, REJECTED, CANCELLED, DROPPED (ruled with the fix: success is the only zero, so `wait &&` halts on every non-completion); verdict event JSON still on stdout; `124` wait timeout (GNU convention). All five terminal kinds mock-pinned in WaitTest. |
-| 2 | Stream discipline | stdout = stable JSON only; all narration (taskId hints, re-anchor notices, suggestions) on stderr; isatty may adjust human formatting. Pin in test_mc.py by capturing streams separately. |
-| 3 | `events --only PREFIX` | surface the wire's existing `[only] <kindPrefix>` narrowing (0011 D3) at the CLI; cursor-integrity kinds always pass through (server guarantees; CLI never filters). |
-| 4 | `ls /` + `mc help` | root discovery lists the mounted path roots (section 2 table of the canonical doc); per-verb help with examples. |
+| 2 | Stream discipline | SHIPPED: emit_json indents at a tty, one line piped; all 13 indent answers swapped; pinned by ResidueQueueTest. |
+| 3 | `events --only PREFIX` | SHIPPED: rides every events wire call via only_suffix (drain, re-anchor, follow); pinned. |
+| 4 | `ls /` + `mc help` | SHIPPED: ls / prints the nine canonical roots; mc help [verb] carries usage+example; pinned. |
 
 Each item ships with mock tests; none touches the wire.
 

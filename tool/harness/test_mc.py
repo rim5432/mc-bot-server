@@ -1032,5 +1032,60 @@ class CatRecipesTest(McCliTest):
         self.assertEqual(code, 1)
 
 
+class ResidueQueueTest(McCliTest):
+    """0015 near-term queue residue: events --only, ls /, help, and
+    the isatty stream discipline (piped stdout is one-line JSON)."""
+
+    def test_events_only_rides_the_wire_narrowing(self):
+        self.queue(batch([event("TASK_COMPLETED", task_id="t1")], latest=1))
+        code, _, _ = self.run_verb(mc.cmd_events, 0, only="TASK")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["/bot events 0 only TASK"])
+
+    def test_events_without_only_omits_the_clause(self):
+        self.queue(batch([event("TASK_COMPLETED", task_id="t1")], latest=1))
+        self.run_verb(mc.cmd_events, 0)
+        self.assertEqual(self.wire_calls, ["/bot events 0"])
+
+    def test_ls_root_lists_canonical_roots(self):
+        code, out, _ = self.run_verb(mc.cmd_ls, "/")
+        self.assertEqual(code, 0)
+        for root in ("/tasks/", "/player/", "/blocks/", "/entities/",
+                     "/nearby/", "/actions/", "/recipes/", "/stations/",
+                     "/events"):
+            self.assertIn(root, out)
+
+    def test_help_overview_and_per_verb(self):
+        code, out, _ = self.run_verb(mc.cmd_help)
+        self.assertEqual(code, 0)
+        self.assertIn("wait", out)
+        code2, out2, _ = self.run_verb(mc.cmd_help, "wait")
+        self.assertEqual(code2, 0)
+        self.assertIn("example:", out2)
+        self.assertIn("124", out2)
+
+    def test_unknown_help_verb_is_typed_error(self):
+        code, _, err = self.run_verb(mc.cmd_help, "frobnicate")
+        self.assertEqual(code, 1)
+        self.assertIn("frobnicate", err)
+
+    def test_piped_stdout_is_one_line_json(self):
+        self.queue({"ok": True, "selectedSlot": 3, "item": "", "count": 0})
+        code, out, _ = self.run_verb(mc.cmd_write, "/actions/equip", "3")
+        self.assertEqual(code, 0)
+        self.assertEqual(out.count(chr(10)), 1,
+                         "piped answers are one-line JSON")
+
+    def test_tty_stdout_is_indented(self):
+        out, err = io.StringIO(), io.StringIO()
+        self.queue({"ok": True, "selectedSlot": 3, "item": "", "count": 0})
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            with mock.patch.object(out, "isatty", return_value=True):
+                code = mc.cmd_write("/actions/equip", "3")
+        self.assertEqual(code, 0)
+        self.assertGreater(out.getvalue().count(chr(10)), 1,
+                           "a tty answer is human-indented")
+
+
 if __name__ == "__main__":
     unittest.main()

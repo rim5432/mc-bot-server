@@ -98,6 +98,19 @@ CURSOR_PATH = TOOL_DIR / ".runtime" / "mc_cursor.txt"
 # static; re-run dump after a datapack reload.
 RECIPES_DIR = Path.home() / ".mc" / "recipes"
 
+
+def only_suffix(only: str | None) -> str:
+    """Wire narrowing for `events --only`: rides the server-side
+    [only] kind-prefix filter (0011 D3); cursor-integrity kinds
+    survive every filter server-side, never client-side."""
+    return f" only {only}" if only else ""
+
+
+def emit_json(obj) -> None:
+    """stdout answer: stable JSON - indented for a human at a tty,
+    one line when piped (canon harness-interaction.md section 7)."""
+    print(json.dumps(obj, indent=2 if sys.stdout.isatty() else None))
+
 # Terminal task states for wait correlation. Includes CANCELLED and
 # DROPPED: a cancel-then-wait must not burn the full timeout, and a
 # reflex eviction (TASK_DROPPED) is terminal for the waiting harness.
@@ -333,9 +346,9 @@ def cmd_cat(path: str) -> int:
         resp = wire("/bot status")
         state = resp.get("state", resp)
         if field in ("", "status"):
-            print(json.dumps(state, indent=2))
+            emit_json(state)
         elif field == "inventory":
-            print(json.dumps(state.get("items", {}), indent=2))
+            emit_json(state.get("items", {}))
         elif field == "inventory/free":
             print(json.dumps(state.get("freeSlots", 0)))
         elif field == "pos":
@@ -366,7 +379,7 @@ def cmd_cat(path: str) -> int:
     if block_match:
         x, y, z = block_match.groups()
         resp = wire(f"block {x} {y} {z}")
-        print(json.dumps(resp, indent=2))
+        emit_json(resp)
         return 0 if resp.get("ok") else 1
     if path == "/nearby":
         # Aggregated situational read, client-side over the entities
@@ -385,7 +398,7 @@ def cmd_cat(path: str) -> int:
                   "task": state.get("task"),
                   "nearby": others,
                   "truncated": resp.get("truncated", False)}
-        print(json.dumps(nearby, indent=2))
+        emit_json(nearby)
         return 0
     if path == "/recipes" or path.startswith("/recipes/"):
         item = path[len("/recipes/"):] if path.startswith("/recipes/") else ""
@@ -401,7 +414,7 @@ def cmd_cat(path: str) -> int:
             sys.stdout.write(local.read_text(encoding="utf-8"))
             return 0
         resp = wire(f'recipes "{item}"')
-        print(json.dumps(resp, indent=2))
+        emit_json(resp)
         return 0 if resp.get("ok") else 1
     if path == "/stations" or path.startswith("/stations/"):
         # Typed verb error, never silent substitution: cat is the
@@ -438,7 +451,7 @@ def cmd_cat_task(task_id: str) -> int:
     if any(e.get("kind") == "EVENT_GAP" for e in events):
         result["gap"] = True
     result["events"] = matching
-    print(json.dumps(result, indent=2))
+    emit_json(result)
     return 0
 
 
@@ -462,7 +475,7 @@ def cmd_write(path: str, value: str, tol: int | None = None,
         if key:
             cmd += f" {key}"
         resp = wire(cmd)
-        print(json.dumps(resp, indent=2))
+        emit_json(resp)
         return 0 if resp.get("ok") else 1
     if path == "/actions/place":
         # value "x,y,z,face" - synchronous one-shot, post-state
@@ -474,7 +487,7 @@ def cmd_write(path: str, value: str, tol: int | None = None,
             return 1
         x, y, z, face = (pp.strip() for pp in parts)
         resp = wire(f"place {x} {y} {z} {face.lower()}")
-        print(json.dumps(resp, indent=2))
+        emit_json(resp)
         return 0 if resp.get("ok") and resp.get("placed") else 1
     if path == "/actions/equip":
         # value is a hotbar slot index 0..8. Synchronous selection;
@@ -491,7 +504,7 @@ def cmd_write(path: str, value: str, tol: int | None = None,
                   file=sys.stderr)
             return 1
         resp = wire(f"equip {slot}")
-        print(json.dumps(resp, indent=2))
+        emit_json(resp)
         return 0 if resp.get("ok") else 1
     if path == "/tasks/dig":
         # Same shape as goto: value "x,y,z", wire-required timeout
@@ -504,7 +517,7 @@ def cmd_write(path: str, value: str, tol: int | None = None,
         x, y, z = (pp.strip() for pp in parts)
         timeout_val = timeout if timeout is not None else 1200
         resp = wire(f"/bot dig {x} {y} {z} {timeout_val}")
-        print(json.dumps(resp, indent=2))
+        emit_json(resp)
         if resp.get("ok") and "task" in resp:
             print(f"taskId: {resp['task']}", file=sys.stderr)
         return 0 if resp.get("ok") else 1
@@ -534,7 +547,7 @@ def cmd_write(path: str, value: str, tol: int | None = None,
         # bare colon, so "minecraft:stone" must arrive quoted (same
         # rule as the menu verbs' item ids).
         resp = wire(f'/bot mine "{block_type}" {count} {timeout_val}')
-        print(json.dumps(resp, indent=2))
+        emit_json(resp)
         if resp.get("ok") and "task" in resp:
             print(f"taskId: {resp['task']}", file=sys.stderr)
         return 0 if resp.get("ok") else 1
@@ -542,7 +555,7 @@ def cmd_write(path: str, value: str, tol: int | None = None,
         task_id = path[len("/tasks/"):-len("/cancel")]
         reason = value  # audit payload, passed through (wire ignores extra)
         resp = wire(f"/bot cancel {task_id}")
-        print(json.dumps(resp, indent=2))
+        emit_json(resp)
         return 0 if resp.get("ok") else 1
     if path.startswith("/stations/"):
         return cmd_write_station(path, value)
@@ -629,7 +642,7 @@ def cmd_write_station(path: str, value: str) -> int:
             print(f"write: unknown role '{role.lower()}'", file=sys.stderr)
             return 1
 
-        print(json.dumps(reply, indent=2))
+        emit_json(reply)
         return 0 if reply.get("ok") else 1
     finally:
         station_close()
@@ -676,7 +689,7 @@ def cmd_wait(task_id: str, timeout_sec: int = 120, poll_interval: float = 1.0) -
             # never correlate - same rule as cmd_cat_task.
             if (evt.get("attrs", {}).get("taskId") == task_id
                     and evt.get("kind") in TERMINAL_KINDS):
-                print(json.dumps(evt, indent=2))
+                emit_json(evt)
                 # Success is the only zero (harness-interaction.md
                 # 3.4): every non-COMPLETED terminal - FAILED,
                 # REJECTED, CANCELLED, DROPPED - is a failure for
@@ -695,7 +708,7 @@ def cmd_wait(task_id: str, timeout_sec: int = 120, poll_interval: float = 1.0) -
 
 
 def cmd_events(since: int | None = None, follow: bool = False,
-               idle: int = 30) -> int:
+               idle: int = 30, only: str | None = None) -> int:
     """Incremental event drain.
 
     Only a cursorless invocation advances the disk cursor: it is the
@@ -707,7 +720,7 @@ def cmd_events(since: int | None = None, follow: bool = False,
     cursor, epoch = read_cursor_state()
     if since is not None:
         cursor = since
-    resp = wire(f"/bot events {cursor}")
+    resp = wire(f"/bot events {cursor}{only_suffix(only)}")
     batch = resp.get("batch", {})
     latest = batch.get("latest", cursor)
     stream_epoch = batch.get("resetAt", epoch)
@@ -720,10 +733,10 @@ def cmd_events(since: int | None = None, follow: bool = False,
         print(f"events: stream restarted ({why}); "
               "draining the new stream from 0", file=sys.stderr)
         cursor = 0
-        resp = wire("/bot events 0")
+        resp = wire(f"/bot events 0{only_suffix(only)}")
         batch = resp.get("batch", {})
         latest = batch.get("latest", 0)
-    print(json.dumps(resp, indent=2))
+    emit_json(resp)
     if since is None and latest > cursor:
         write_cursor_state(latest, stream_epoch)
     if not follow:
@@ -737,7 +750,7 @@ def cmd_events(since: int | None = None, follow: bool = False,
     idle_deadline = time.monotonic() + idle
     while True:
         time.sleep(1.0)
-        resp = wire(f"/bot events {last_seen}")
+        resp = wire(f"/bot events {last_seen}{only_suffix(only)}")
         batch = resp.get("batch", {})
         stream_epoch = batch.get("resetAt", epoch)
         head = batch.get("latest", last_seen)
@@ -757,6 +770,36 @@ def cmd_events(since: int | None = None, follow: bool = False,
             print(f"events: follow idle {idle}s, stopping",
                   file=sys.stderr)
             return 0
+
+
+HELP = {
+    "ls": ("ls <path>", "ls /  # list the mounted roots"),
+    "cat": ("cat <path>", "cat /tasks/t3  # one task's verdict attrs"),
+    "read": ("read /stations/<type>@<x,y,z>[/<role>]", "read /stations/chest@10,64,20"),
+    "write": ("write <path> <value> [--tol --timeout --key]",
+              "write /tasks/goto 100,64,-200 && mc wait $TASK"),
+    "wait": ("wait <taskId> [--timeout S]", "mc wait task-4; echo $?  # 0 done, 1 failed, 124 timeout"),
+    "events": ("events [--since N] [--only PREFIX] [--follow] [--idle S]",
+               "events --only TASK --follow"),
+    "admin": ("mc admin stop|reset|dump-recipes", "mc admin dump-recipes"),
+}
+
+
+def cmd_help(verb: str | None = None) -> int:
+    """Per-verb help with examples; operator meta, plain text."""
+    if verb is None:
+        print("six verbs over the bot namespace; `mc help <verb>` for detail:")
+        for name, (usage, _) in HELP.items():
+            print(f"  {usage}")
+        return 0
+    entry = HELP.get(verb)
+    if entry is None:
+        print(f"help: unknown verb {verb}; try one of: "
+              f"{', '.join(HELP)}", file=sys.stderr)
+        return 1
+    print(f"usage: mc {entry[0]}")
+    print(f"  example: {entry[1]}")
+    return 0
 
 
 def cmd_ls(path: str) -> int:
@@ -795,8 +838,14 @@ def cmd_ls(path: str) -> int:
         if resp.get("truncated"):
             print("... truncated (limit=50)", file=sys.stderr)
         return 0
-    print(f"ls: unsupported path (v1 supports /tasks/, /stations/): {path}",
-          file=sys.stderr)
+    if path == "/":
+        for root in ("/tasks/", "/player/", "/blocks/", "/entities/",
+                     "/nearby/", "/actions/", "/recipes/", "/stations/",
+                     "/events"):
+            print(root)
+        return 0
+    print(f"ls: unsupported path (supports /, /tasks/, /entities/, "
+          f"/stations/): {path}", file=sys.stderr)
     return 1
 
 
@@ -838,7 +887,7 @@ def cmd_read(path: str) -> int:
                                "role": station["role"].lower(),
                                "slots": filtered}, indent=2))
         else:
-            print(json.dumps(menu, indent=2))
+            emit_json(menu)
         return 0
     finally:
         station_close()
@@ -863,7 +912,7 @@ def cmd_admin(action: str) -> int:
               file=sys.stderr)
         return 1
     resp = wire(f"/bot {action}")
-    print(json.dumps(resp, indent=2))
+    emit_json(resp)
     return 0 if resp.get("ok") else 1
 
 
@@ -881,6 +930,9 @@ def main(argv: list[str] | None = None) -> int:
         prog="mc",
         description="Unix-style CLI for MC Bot Server boundary-D surface")
     sub = parser.add_subparsers(dest="verb", required=True)
+
+    p_help = sub.add_parser("help", help="per-verb help with examples")
+    p_help.add_argument("topic", nargs="?", default=None)
 
     p_ls = sub.add_parser("ls", help="discovery: directory listing")
     p_ls.add_argument("path", nargs="?", default="/")
@@ -909,6 +961,8 @@ def main(argv: list[str] | None = None) -> int:
                           help="tail -f: keep polling, print new events")
     p_events.add_argument("--idle", type=int, default=30,
                           help="follow terminates after N idle seconds")
+    p_events.add_argument("--only", type=str, default=None,
+                          help="server-side kind-prefix narrowing (0011 D3)")
 
     p_admin = sub.add_parser("admin",
                              help="operator verbs (outside the namespace)")
@@ -936,7 +990,10 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_wait(args.task_id, args.timeout)
         if args.verb == "events":
             return cmd_events(args.since, follow=getattr(args, "follow", False),
-                              idle=getattr(args, "idle", 30))
+                              idle=getattr(args, "idle", 30),
+                              only=getattr(args, "only", None))
+        if args.verb == "help":
+            return cmd_help(getattr(args, "topic", None))
         if args.verb == "admin":
             return cmd_admin(args.action)
     except RconError as exc:
