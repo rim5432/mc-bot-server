@@ -166,21 +166,18 @@ admitted here may encode a size cap.
   H-R7, H-R8) have zero misunderstanding history; the prose zones
   accumulated all of it.
 - **H-R10 Style law is machine-owned.** The 2026-08-27 static
-  analysis stack retired the manual section-1 review obligations:
-  checkstyle's semantic set (naming, javadoc presence on public
-  members, star/dead imports, width 120 with the `// width-120:`
-  escape hatch) fails on violation, and Spotless with
-  palantir-java-format owns layout outright - its output IS the
-  MC-ecosystem convention (4-space indent, K&R braces, 120
-  columns), so hand-reformatting is a defect, not a style choice.
-  Stays review-only by recorded decision: `final`-everywhere,
-  trailing commas, record layout (no reliable AST mapping; see the
-  checkstyle.xml header for the full ownership map). The gate rode
-  the opt-in `-Plint` suite for its first hours, then moved into
-  the default `test` flow the same day under the user ruling that
-  hygiene outweighs ~10s of build time - block-verified by probe
-  (an injected unused import fails `test` outright). PMD flips to
-  failing only after the god-class paydown round lands.
+  analysis stack retired the manual section-1 review obligations;
+  what each tool encodes lives in the config comments
+  (checkstyle.xml, ruleset.xml, build.gradle), the build-and-run.md
+  posture table, and H-R11's posture gate - this row keeps only the
+  ruling: layout is formatter-canonical (hand-reformatting is a
+  defect), review-only by recorded decision are `final`-everywhere,
+  trailing commas, record layout, javadoc tag order / voice /
+  nullability wording. The gate entered the default `test` flow the
+  day it was wired under `-Plint` (user ruling: hygiene outweighs
+  ~10s; block-verified by an injected unused import failing
+  `test`). PMD flips to failing only after the god-class paydown
+  round lands.
 - **H-R11 Lint postures are pinned.** The 2026-08-27 toolchain split
   put checkstyle and spotlessCheck on the default `test` flow and
   left PMD/CPD/SpotBugs/Error Prone behind `-Plint` as advisory
@@ -216,148 +213,26 @@ abstractions already exist.
 
 ## Closed rounds
 
-### Deep-clean round (2026-08-23)
+Each round's narrative lives in its commits - `git log` carries the
+what, how, and evidence chain. This index keeps only retrievable
+anchors; the rulings those rounds produced are absorbed into the
+Rule registry rows above.
 
-Repo-wide hygiene pass planned item-by-item and landed atomically.
-Stdlib adoption folded hand-rolled code into JDK/collection
-equivalents (A* closed set to `HashSet` in 498f7f9, `distance3D`
-into `Vec3.distanceTo` in 926ae11); boundary-D submit plumbing
-simplified to `Ok.fresh`/`replay` routing (0b3700d) and
-`canonicalArgs` collapsed to `TreeMap.toString` (3c400d9);
-`MockWorldView` relocated out of the shipped jar into the test
-source set (e88aed6); inline FQNs became imports repo-wide
-(2e01ed3); `pose` renamed to `position` ahead of the Stage 3 pose
-vocabulary while keeping wire key `"pose"` (3193e84). Main source
-set went from 8654 to 8396 lines with zero behavior change. The
-line delta is a side effect of the pass, not its evidence: the
-decomposition round below grew total lines and is equally a win -
-the binding evidence in both rounds is the offline suite (0 skips)
-and the blast radius.
+| Round | Date | Commits | Closes / affected | Evidence |
+|---|---|---|---|---|
+| Deep-clean | 08-23 | 498f7f9, 926ae11, 0b3700d, 3c400d9, e88aed6, 2e01ed3, 3193e84 | stdlib adoption, FQNs became imports, `pose`->`position` wire-key-safe rename | offline suite 0 skips; main source set 8654->8396 |
+| Gametest harness consolidation | 08-23 | c60540b, 6605068 | `GametestRig` extracted, redundant scenario removed | offline suite green |
+| PathingBehavior decomposition | 08-23 | d17c871..cede2d2, fe61a8c, 5e733bd | shell + WaypointCursor/PlanProgressFuse/ReplanGate/PlanLifecycle; routesThroughFenceGap incident recorded (H-R5 lesson) | 159 offline cases 0 skips; 7/7 gametests; blast radius stayed in core.behavior |
+| Controller and actor decomposition | 08-25 | 495bdb7, 6c49ee4, 8305564, b7c7482, 4a82b64 | MissionReporter, ReflexEngageSeat, MeleeResolver, PresenceLayer, triggerVerdict | zero test edits across all five commits (258 cases) |
+| Inline-FQN second sweep | 08-25 | 28c9a94, 7aff33c | H7 closed (H10 opened) | compile + full suite green |
+| Test-package mirroring | 08-25 | 1b59d6d | H8 closed alongside the H-R7 admission | five top-level test packages, every one a mirror or sanctioned meta |
+| Sensor-interface ruling | 08-25 | 0f0fb0a | H9 closed (`BodyPositionSource` dedup) | three-way contract collision retired; local single-consumer sources stay nested |
+| preemptDigClaims extraction | 08-25 | 6de95f0 | H10 closed | park semantics pinned by ArbiterGateTest / ReflexChainGateTest |
+| Static analysis stack | 08-27 | f8b63b2, bc86d4c, 87c3561, 174f1eb, 0bd49e8, b891d74, b02383b, 66f30b7 | H-R10 admitted, then promoted to the default `test` flow same day | baselines zeroed; Error Prone 24->20->0; suite 407/407 through the landing chain |
 
-### Gametest harness consolidation (2026-08-23)
-
-Shared rig extracted to `GametestRig` (c60540b): single construction
-path for body/controller/events plus `driveUntil`/`driveOnly`
-helpers and coordinate utilities, replacing per-test boilerplate.
-Scenario files slimmed to scenarios; the knife-edge shove-direction
-sanity case removed as redundant (6605068).
-
-### PathingBehavior decomposition (2026-08-23)
-
-738-line god class split into an orchestration shell plus four
-package-private single-concern collaborators in `core.behavior`:
-`WaypointCursor` (126), `PlanProgressFuse` (159, issue 0001 Ruling-a
-invariants migrated verbatim), `ReplanGate` (101), `PlanLifecycle`
-(235). Shell now 500 lines. Extraction sequence d17c871 -> eab5d66
--> 07c82db -> cede2d2, one collaborator per commit, offline suite
-green at every step; probe cleanup accidentally deleted
-`routesThroughFenceGap` and was restored with the incident recorded
-(5e733bd); javadoc review round fixed all drift (fe61a8c). Evidence:
-159 offline cases, 0 skips; 7/7 gametests. Blast radius stayed inside
-the behavior package: the extraction sequence touched neither
-`TaskArbiter` nor `BotController`, so the park/retirement-lap
-semantics from 17ba7a2 were never in the modified set -
-`ArbiterGateTest` and `ReflexChainGateTest` pin those semantics and
-stayed green throughout.
-
-### Controller and actor decomposition (2026-08-25)
-
-Second god-class pass, prompted by the repo-wide structure review.
-BotController (694) split its mission TASK_* emission and hand-off
-edge detection into `core.tick.MissionReporter` (495bdb7) and its
-ENGAGE-fight lifecycle into `core.tick.ReflexEngageSeat` (6c49ee4);
-the controller keeps 578 lines of pipeline orchestration plus the
-ADR-0005 frame. BindingActor (443) split USE-press melee resolution
-into `adapter.MeleeResolver` (8305564) and the issue-0005
-presentation block into `adapter.PresenceLayer` (b7c7482); the actor
-keeps 176 lines of channel-claim resolution. PathingBehavior.tick's
-trigger-evaluation block became `triggerVerdict` (4a82b64), taking
-tick() from ~135 to ~75 lines. Evidence: zero test edits across all
-five commits (258 cases, 0 skips, at extraction time); the suite
-grew to 267 mid-round from a concurrent session's dig-reflex work
-whose two transient gate failures were foreign to these changes.
-Adapter moves ride the combat and presence gametest scenarios; the
-LOS-blocked scenario comment was repointed to
-`MeleeResolver.sightBlocked` in the moving commit.
-
-### Inline-FQN second sweep (2026-08-25)
-
-H7 closed in 28c9a94 once the concurrent dig-feature session
-landed and the controller/actor files stopped moving: the residual
-inline FQNs (BotController's Supplier, BindingActor's
-ChannelArbiter delegate and sprint-clip MC types,
-PathingBehavior's AStarPathFinder budget reference, DigExecutor's
-Vec3.atCenterOf, DefendProcess's three api param FQNs) became
-imports, and DefendProcess's default-only report switch flattened
-into the comment block it always was. Zero behaviour change;
-compile + full suite green.
-
-### Test-package mirroring (2026-08-25)
-
-H8 closed alongside the H-R7 admission. The flat test
-pseudo-packages folded into mirrored main packages: tickpipeline
-into core.tick (16 files, the PathingTestAccess door included and
-its SKIPPED path repointed), corepathing plus pathing into
-core.pathing, coreprocess into core.process, reflex plus
-reflexlayer into core.reflex, world into core.world, combat into
-core.behavior (CombatBehavior's own package), and perception into
-boundarya - the boundary-A contract gates, symmetric with
-boundaryd. The test tree is now five top-level packages -
-architecture, boundarya, boundaryd, core, hygiene - every one
-either a main mirror or a sanctioned meta. Zero behaviour change:
-same classes, same tests, new homes.
-
-### Sensor-interface ruling (2026-08-25, closes H9)
-
-The five parallel sensor seams resolve without an api.sensing
-package: sensors are adapter-to-core wiring, invisible to any
-harness, and promoting them to api would thicken the surface open
-item H1 exists to trim. The real defect was contract duplication -
-PathingBehavior.PositionSource and CombatBehavior.PositionSource
-were byte-identical Vec3 suppliers under one name, and
-BotController's CellPos namesake made it a three-way collision.
-Now one shared `core.behavior.BodyPositionSource` serves both
-behaviors (the load-bearing doubles rationale travels with it),
-and the controller's block-cell source renamed to
-`CellPositionSource`. HealthSource, GameClock and OnGroundSource
-stay nested and local: single consumers, no collisions, nothing
-to consolidate.
-
-### preemptDigClaims extraction (2026-08-25, closes H10)
-
-The dig feature's claim injection (~25 lines inside
-preemptAndHold) moves to its own private method with the geometry
-rationale as its Javadoc; preemptAndHold is purely park-and-hold
-again and its Javadoc names the delegation. Guard inverted from
-the call site (if-targeted) into the method (if-not-targeted
-return), so future DIG-carrying preemption paths cannot forget it.
-
-### Static analysis stack (2026-08-27)
-
-Seven tools wired as one opt-in `-Plint` suite
-(f8b63b2); default compile/test flows stay inert for other
-agents. Checkstyle (12.3.1, semantic rules only) and
-spotlessCheck (palantir-java-format 2.97.0) fail on violation;
-PMD 7.26.0, CPD, and SpotBugs 4.10.4 (scoped `onlyAnalyze` to
-api/core, which kills the MC auxclasspath problem) run as
-advisory dashboards; Error Prone 2.42.0 rides the -Plint
-compiles with ReferenceEquality OFF under the identity-comparison
-ruling. Layout ownership moved from checkstyle's retired layout
-modules to the formatter (bc86d4c flips AGENTS section 1.6);
-the repo-wide reformat (87c3561, 198 files) is excluded from
-blame via .git-blame-ignore-revs (174f1eb).
-
-Evidence chain: zeroed baselines (75 dead import lines and 3
-missing javadocs across 39 files, plus naming drift; 0bd49e8 +
-b891d74 carry the root fixes), Error Prone 24 findings -> 20
-root-fixed -> 0 remaining, offline suite 407/407 green at every
-commit of the landing chain (each intermediate verified in a
-clean worktree; the reformat commit additionally carries the one
-scan-gate adaptation - WorldCommandsWireShapeGateTest regexes
-gained `\s*` tolerance - that the rewrap requires). Every
-"why is this rule (not) here" decision lives as a comment in
-`config/checkstyle/*.xml` / `config/pmd/ruleset.xml` /
-`build.gradle`.
+The repo-wide reformat (87c3561, 198 files) is blame-excluded via
+`.git-blame-ignore-revs`; the WorldCommandsWireShapeGateTest regexes
+gained `\s*` tolerance in that same commit for the rewrap.
 
 ## Ruling anchors in code
 
