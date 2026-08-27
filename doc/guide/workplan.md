@@ -141,7 +141,11 @@ landed (archive). Remaining:
            engine (live server holds run/world).
   - [ ] L  HungryProcess acquisition per 0010 sections 4-5 (forage
            -> hunt -> fish with failure budgets,
-           FOOD_STRATEGY_EXHAUSTED escalation).   [dep: none]
+           FOOD_STRATEGY_EXHAUSTED escalation). Ground work landed:
+           the Player-shaped ground-item pickup scan into the
+           container (0010 section 7's open dependency; gametest
+           picksUpGroundItemsByTouch staged pending engine).
+                                                        [dep: none]
   - [ ] M  Loop acceptance: unattended mine -> craft -> equip ->
            fight -> eat driven through boundary-D verbs only,
            recorded verdict in tool/sessions/ (wait exit codes
@@ -248,10 +252,12 @@ arm. Harness-side only, zero wire change:
          the only zero (ruling in issue 0015 section 2, canon
          harness-interaction.md 3.4); all five kinds mock-pinned.
                                                           [dep: none]
-- [ ] S  0015 near-term queue residue: stdout/stderr stream
-         discipline with isatty; events --only surfaced from the
-         wire's narrowing; ls / root discovery + mc help. Mock
-         tests pin each.                          [dep: issue 0015]
+- [x] S  0015 near-term queue residue: emit_json isatty discipline
+         (tty indent, pipe one-line) across all answers; events
+         --only rides the wire's narrowing on every poll; ls /
+         lists the nine canonical roots; mc help [verb] with
+         examples. Seven ResidueQueueTest cases pin the lot
+         (106 total).                              [dep: none]
 
 ### Deferred infrastructure queue
 

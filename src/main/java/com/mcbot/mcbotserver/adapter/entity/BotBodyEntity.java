@@ -93,6 +93,9 @@ public final class BotBodyEntity extends PathfinderMob {
      */
     private final net.minecraft.world.food.FoodData foodData = new net.minecraft.world.food.FoodData();
 
+    /** Player-shaped ground-item pickup into the container. */
+    private final GroundPickup groundPickup = new GroundPickup(this);
+
     /** Hunger lifecycle engine (vanilla FoodData.tick clone). */
     private final HungerTicker hungerTicker = new HungerTicker();
 
@@ -288,6 +291,7 @@ public final class BotBodyEntity extends PathfinderMob {
             hasPendingRotation = false;
         }
         tickPresence();
+        groundPickup.tick();
     }
 
     /**
