@@ -128,7 +128,15 @@ public final class BindingInventory {
      * @param stack the engine stack; never null
      * @return read-only view; never null
      */
-    private static ItemView toView(ItemStack stack) {
+    /**
+     * Converts one engine ItemStack into the api's read-only shape.
+     * Shared with {@link BindingMenu} so inventory and menu snapshots
+     * stay consistent by construction.
+     *
+     * @param stack the engine stack; never null
+     * @return read-only view; never null
+     */
+    static ItemView toView(ItemStack stack) {
         Objects.requireNonNull(stack, "stack");
         if (stack.isEmpty()) {
             return ItemView.EMPTY;

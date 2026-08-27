@@ -1,5 +1,7 @@
 package com.mcbot.mcbotserver.api.command;
 
+import javax.annotation.Nullable;
+
 /**
  * Boundary-D command channel: the harness pulls by calling, the bot
  * answers synchronously with acceptance or structural rejection.
@@ -33,7 +35,7 @@ public interface CommandChannel {
      *         {@link SubmitResult.Rejected} with the structural cause
      *         otherwise — never null
      */
-    SubmitResult submit(BotCommand command, String idempotencyKey);
+    SubmitResult submit(BotCommand command, @Nullable String idempotencyKey);
 
     /**
      * Convenience for callers that do not carry an explicit

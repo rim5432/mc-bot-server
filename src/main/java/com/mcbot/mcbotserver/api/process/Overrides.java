@@ -1,5 +1,7 @@
 package com.mcbot.mcbotserver.api.process;
 
+import javax.annotation.Nullable;
+
 /**
  * Behavior-layer parameter adjustments attached to a directive. The
  * frozen contract named the field; combat is its first real component
@@ -15,7 +17,7 @@ package com.mcbot.mcbotserver.api.process;
  *               claims) so the combat behavior owns USE/ROT
  */
 // contract: see ADR-0002 section 1 + boundaries.md decision 11
-public record Overrides(CombatOrder combat) {
+public record Overrides(@Nullable CombatOrder combat) {
 
     /**
      * Creates the no-combat override used by every locomotive task.

@@ -1,5 +1,7 @@
 package com.mcbot.mcbotserver.api.behavior;
 
+import javax.annotation.Nullable;
+
 /**
  * One behavior's verdict for this tick — the feedback half of boundary
  * B that keeps processes side-effect-free.
@@ -9,7 +11,7 @@ package com.mcbot.mcbotserver.api.behavior;
  * behavior that owns motion history; processes consume reports and
  * never read world state themselves.
  */
-public record ExecutionReport(Status status, String reason) {
+public record ExecutionReport(Status status, @Nullable String reason) {
 
     /** Terminal and ongoing states, closed per ADR-0004 D3. */
     public enum Status {

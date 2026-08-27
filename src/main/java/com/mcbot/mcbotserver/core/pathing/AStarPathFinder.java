@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.PriorityQueue;
+import java.util.Set;
 
 /**
  * The A* engine over the move graph: g-scores, a binary-heap open set
@@ -269,7 +270,7 @@ public final class AStarPathFinder {
             PriorityQueue<Node> open,
             Map<CellPos, Double> gScore,
             Map<CellPos, CellPos> cameFrom,
-            HashSet<CellPos> closed) {
+            Set<CellPos> closed) {
         for (Movement move : graph.movesFrom(current.pos())) {
             if (!move.isViable(world)) {
                 continue;

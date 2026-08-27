@@ -1,6 +1,7 @@
 package com.mcbot.mcbotserver.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
@@ -52,4 +53,17 @@ class BytecodeArchitectureGateTest {
             .should()
             .dependOnClassesThat()
             .resideInAnyPackage("com.mcbot.mcbotserver.adapter..", "com.mcbot.mcbotserver.client..");
+
+    /**
+     * Top-level modules are acyclic: api, core, adapter, client,
+     * gametest form a strict layering. A cycle at this granularity means
+     * a boundary has been inverted. Subpackage cycles within a module
+     * are documented separately (build-and-run.md): api.behavior ↔
+     * api.process is the boundary B feedback loop (contract-endemic);
+     * adapter.rescue ↔ adapter ↔ adapter.entity is a known parent-child
+     * smell filed for refactoring.
+     */
+    @ArchTest
+    static final ArchRule NO_MODULE_CYCLES =
+            slices().matching("com.mcbot.mcbotserver.(*)..").should().beFreeOfCycles();
 }

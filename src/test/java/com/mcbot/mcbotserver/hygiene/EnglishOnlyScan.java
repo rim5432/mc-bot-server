@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -108,7 +109,7 @@ class EnglishOnlyScan {
             lines.get(i).codePoints().forEach(cp -> {
                 if (isCjk(cp)) {
                     violations.add(relative + ":" + lineNumber
-                            + ": U+" + Integer.toHexString(cp).toUpperCase()
+                            + ": U+" + Integer.toHexString(cp).toUpperCase(Locale.ROOT)
                             + " '" + new String(Character.toChars(cp)) + "'");
                 }
             });

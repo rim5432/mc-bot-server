@@ -48,12 +48,12 @@ Postures after the 2026-08-27 promotion:
 
 | Suite | Posture | Notes |
 |---|---|---|
-| Checkstyle | **hard gate, default `test` flow** | semantic/style rules only; layout ownership moved to Spotless |
+| Checkstyle | **hard gate, default `test` flow** | naming, imports, Javadoc, modifier order, EmptyBlock; 2026-08-27 added TodoComment, IllegalCatch (narrowed), IllegalThrows, MissingDeprecated, JavadocVariable (public constants), RegexpSinglelineJava (bans printStackTrace() and System.exit()) |
 | Spotless check | **hard gate, default `test` flow** | `palantirJavaFormat` output == ecosystem standard (4-space / 120 cols / K&R); `spotlessApply` runs ungated any time |
 | PMD main + test | **RED WALL, `-Plint` fails on violation** | zero findings held since the 2026-08-27 paydown (17 -> 0 via per-channel/per-kind/stage extractions); only project-documented `@SuppressWarnings("PMD.TooManyMethods")` exemptions remain on MineProcess and BotController
-| CPD | advisory, never fails | duplicate blocks >=100 tokens for dedup rounds |
+| CPD | advisory, never fails | duplicate blocks >=100 tokens; 2026-08-27 fixed BotCommands/WorldCommands response-helper duplication (extracted CommandResponse) and runDig/runMine/goto duplication (extracted submitCommand); 11 remain (3 main, 8 test) for a future dedup round |
 | SpotBugs (api+core scope only) | **advisory dashboard** (`ignoreFailures`) | `onlyAnalyze` limits to engine-free packages, which need no MC auxclasspath; first pass flagged ThreatBlackboard dead fields, EI2 exposures |
-| Error Prone (on `-Plint` compiles) | **warnings, compiles on** | core pinned 2.42.0 (last JDK17 runtime); ReferenceEquality OFF project-wide (identity-intent ruling); ~20 install-round findings fixed at root |
+| Error Prone (on `-Plint` compiles) | **11 checks at ERROR + NullAway, rest warnings** | core pinned 2.42.0 (last JDK17 runtime); ReferenceEquality OFF; promoted guards: StreamResourceLeak, JdkObsolete, DefaultCharset, StringCharset, MissingOverride, EqualsIncompatibleType, InterruptedExceptionSwallowed, StringCaseLocaleUsage, SystemOut, NonApiType — zero-violation baseline; NullAway enforces @Nullable/@NonNull on api.. (jsr305), 6 annotated nullable sites, off for test code |
 | JaCoCo coverage | **manual lens** (`gradle jacocoTestReport`) | offline-layer truth only: adapter/gametest/client read 0% by design (engine-covered), core layers 86-97%; watch `core/command`, `api/interrupt`, `api/state` |
 | PIT mutation | **manual lens** (`gradle pitest`) | baseline 2026-08-27: 34.2% overall kill, ~82% within covered code; weakest gates: PathingBehavior 36 survivors, MineProcess 31, BasicMoves 14 |
 
@@ -73,6 +73,28 @@ CC=23 behind ADR-0005 invariants, AStar compute CC=19, plus GodClass x3.
 
 Bytecode purity + dependency direction are plain JUnit gates under
 `architecture/` (run by `test`): see `BytecodeArchitectureGateTest`.
+Contract-marker and invariant-marker conventions are source-scan
+gates: `BoundaryContractMarkerTest` (boundary-interface implementers
+carry `contract: see ADR-NNNN`) and `InvariantMarkerGateTest`
+(BotController.onTick call-chain methods carry `invariant: see ADR-0005`),
+both pinned-list with anchors.
+
+Top-level module acyclicity is an ArchUnit slice rule
+(`NO_MODULE_CYCLES` in `BytecodeArchitectureGateTest`): api, core,
+adapter, client, gametest must not form cycles. Two known subpackage
+cycles are deliberately below its resolution and documented here:
+
+- `api.behavior ↔ api.process` — contract-endemic. `Behavior.tick()`
+  consumes `Directive` (api.process); `BotProcess.onExecutionReport()`
+  consumes `ExecutionReport` (api.behavior). This is boundary B's
+  feedback loop by design; breaking it requires extracting both DTOs
+  to a shared contract package, a refactoring decision not a defect.
+- `adapter.rescue ↔ adapter ↔ adapter.entity` — parent-child smell.
+  The root `adapter` package holds both wiring (`BotAssembly`, depends
+  on subpackages) and shared types (`BindingInventory`, depended on by
+  subpackages). Clean fix is extracting `BindingInventory` to
+  `adapter.inventory`; filed for a future refactoring round, not a
+  static-check task.
 
 ## When a build fails
 

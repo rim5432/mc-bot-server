@@ -1,5 +1,7 @@
 package com.mcbot.mcbotserver.api.reflex;
 
+import javax.annotation.Nullable;
+
 /**
  * One row of the reflex rule table: a dynamic priority function over
  * the blackboard. Rules decide IF and HOW URGENT; the layer decides
@@ -60,7 +62,7 @@ public interface ReflexRule {
      * @return the action target cell, or null when the action needs
      *         none or the board carries no position
      */
-    default com.mcbot.mcbotserver.api.types.CellPos actionTarget(ThreatBlackboard board) {
+    default @Nullable com.mcbot.mcbotserver.api.types.CellPos actionTarget(ThreatBlackboard board) {
         return null;
     }
 }

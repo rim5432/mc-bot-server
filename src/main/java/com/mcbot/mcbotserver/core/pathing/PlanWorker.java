@@ -21,8 +21,9 @@ import java.util.concurrent.Executors;
  * is annotated with its legal thread. The thread is a daemon: a
  * forgotten shutdown cannot block JVM exit.
  *
- * <p>TODO adapter: shut the worker down on server stop once a mod
- * lifecycle hook exists (Ref: workplan Stage 2 async item).
+ * <p>TODO adapter: shut worker down on server stop (Ref: workplan
+ * Stage 2 async item). Needs a mod lifecycle hook; the thread is
+ * daemon so a forgotten shutdown cannot block JVM exit.
  */
 public final class PlanWorker {
 

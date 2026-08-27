@@ -43,7 +43,9 @@ import org.slf4j.Logger;
  */
 @Mod(McBotServer.MODID)
 public class McBotServer {
+    /** Mod identifier; matches gradle.properties mod_id and the mixin config package. */
     public static final String MODID = "mcbotserver";
+
     private static final Logger LOGGER = LogUtils.getLogger();
 
     private static final DeferredRegister<EntityType<?>> ENTITIES =

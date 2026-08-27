@@ -27,15 +27,15 @@ public interface CrashReporter {
      *
      * @return a best-effort reporter writing to standard error
      */
+    @SuppressWarnings("SystemOut")
     static CrashReporter consoleFallback() {
         return context -> {
             try {
                 System.err.println("[mcbot][CRASH] tick=" + context.tick() + " cause=" + context.causeSummary());
                 System.err.println(context.stackTrace());
-                // TODO adapter: append crash lines to the run-dir file
-                //  as well (ADR-0005 D4 fallback half); needs the
-                //  runtime dir, which only the adapter knows
-                //  (Ref: workplan Stage 1).
+                // TODO adapter: append crash to run-dir file (Ref: workplan
+                //  Stage 1). ADR-0005 D4 fallback half; needs the runtime
+                //  dir, which only the adapter knows.
             } catch (RuntimeException ignored) {
                 // Nothing left to fall back to; truly silent.
             }

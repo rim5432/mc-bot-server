@@ -1,6 +1,5 @@
 package com.mcbot.mcbotserver.adapter;
 
-import com.mcbot.mcbotserver.api.inventory.ItemView;
 import com.mcbot.mcbotserver.api.menu.MenuClick;
 import com.mcbot.mcbotserver.api.menu.MenuView;
 import com.mcbot.mcbotserver.api.menu.SlotRole;
@@ -10,8 +9,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.AbstractFurnaceMenu;
@@ -122,9 +119,9 @@ public final class BindingMenu {
         int size = menu.slots.size();
         List<SlotView> slots = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
-            slots.add(new SlotView(i, toView(menu.slots.get(i).getItem()), roleOf(i, size)));
+            slots.add(new SlotView(i, BindingInventory.toView(menu.slots.get(i).getItem()), roleOf(i, size)));
         }
-        return new MenuView(type, sourcePos, toView(menu.getCarried()), size, slots);
+        return new MenuView(type, sourcePos, BindingInventory.toView(menu.getCarried()), size, slots);
     }
 
     /**
@@ -309,27 +306,6 @@ public final class BindingMenu {
      */
     public AbstractContainerMenu rawMenu() {
         return menu;
-    }
-
-    /**
-     * Converts one engine ItemStack into the api's read-only shape.
-     * Mirrors {@link BindingInventory}'s conversion (same registry key
-     * + NBT digest logic) so inventory and menu snapshots are consistent.
-     *
-     * @param stack the engine stack; never null
-     * @return read-only view; never null
-     */
-    private static ItemView toView(ItemStack stack) {
-        Objects.requireNonNull(stack, "stack");
-        if (stack.isEmpty()) {
-            return ItemView.EMPTY;
-        }
-        ResourceLocation key = BuiltInRegistries.ITEM.getKey(stack.getItem());
-        String id = key != null ? key.toString() : "unknown";
-        String digest = stack.hasTag() && stack.getTag() != null
-                ? Integer.toHexString(stack.getTag().hashCode())
-                : "";
-        return new ItemView(id, stack.getCount(), digest);
     }
 
     /**

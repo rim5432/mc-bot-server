@@ -80,6 +80,13 @@
             <property name="allowMissingParamTags" value="false"/>
             <property name="allowMissingReturnTag" value="false"/>
         </module>
+        <!-- Public constants need Javadoc: 29 public static final fields
+             in api/ all carry docs today; this guards against bare
+             constants leaking in. accessModifiers=public covers only
+             public variables, so private/package constants are exempt. -->
+        <module name="JavadocVariable">
+            <property name="accessModifiers" value="public"/>
+        </module>
 
         <!-- Layout mechanics retired to Spotless (see header comment at
              this file's top); what remains here are presence rules the
@@ -90,6 +97,46 @@
         <module name="EqualsHashCode"/>
         <module name="EmptyBlock">
             <property name="option" value="text"/>
+        </module>
+
+        <!-- ===== exception hygiene (AGENTS.md 1.4 + crash-latch policy) =====
+             IllegalCatch narrowed to Throwable/Exception/Error ONLY: the
+             21 live catch(RuntimeException) sites are crash-latch
+             defenses owned by ExceptionPolicyGateTest and must not be
+             flagged. RuntimeException is deliberately absent from the
+             list. IllegalThrows and MissingDeprecated are zero-hit
+             guards today (no throws Exception, no @Deprecated). -->
+        <module name="IllegalCatch">
+            <property name="illegalClassNames"
+                      value="java.lang.Throwable, java.lang.Exception, java.lang.Error"/>
+        </module>
+        <module name="IllegalThrows"/>
+        <module name="MissingDeprecated"/>
+
+        <!-- ===== TODO format (AGENTS.md 1.4: // TODO <subsystem>: <what> (Ref: <issue>)) =====
+             Negative lookahead flags any TODO whose line does not carry
+             both a <subsystem>: prefix and a (Ref: ...) clause. Multi-line
+             TODOs must put (Ref:) on the first line so the per-line
+             matcher sees it. -->
+        <module name="TodoComment">
+            <property name="format"
+                      value="TODO(?!\s+\w+:\s.*\(Ref:)"/>
+        </module>
+
+        <!-- ===== banned anti-patterns (zero-hit guards today) =====
+             printStackTrace() to stderr is banned: the one live site
+             (BotController crash report) uses printStackTrace(PrintWriter)
+             to capture into a string, which this regex does not match.
+             System.exit() is banned: the mod never owns JVM lifecycle. -->
+        <module name="RegexpSinglelineJava">
+            <property name="format" value="printStackTrace\(\)"/>
+            <property name="message"
+                      value="printStackTrace() to stderr is banned; use a logger or printStackTrace(Writer) to capture"/>
+        </module>
+        <module name="RegexpSinglelineJava">
+            <property name="format" value="System\.exit\("/>
+            <property name="message"
+                      value="System.exit() is banned: the mod never owns JVM lifecycle"/>
         </module>
     </module>
 

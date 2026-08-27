@@ -92,6 +92,13 @@ dependencies {
 
     // last Error Prone core that RUNS on a JDK 17 toolchain
     errorprone 'com.google.errorprone:error_prone_core:2.42.0'
+    // NullAway: @Nullable/@NonNull enforcement as an EP plugin.
+    // Scoped to api.. only (AnnotatedPackages); runs on -Plint compiles.
+    errorprone 'com.uber.nullaway:nullaway:0.11.2'
+    // javax.annotation.Nullable for API nullability contracts.
+    // compileOnly: RUNTIME-retained annotation in bytecode, no runtime
+    // dependency needed (static analysis only).
+    compileOnly 'com.google.code.findbugs:jsr305:3.0.2'
 
     cpdTool 'net.sourceforge.pmd:pmd-cli:7.26.0'
     cpdTool 'net.sourceforge.pmd:pmd-java:7.26.0'
@@ -195,6 +202,52 @@ tasks.withType(JavaCompile).configureEach {
         // deliberate here (arbiter seats, entity bindings) - same ruling
         // that dropped CompareObjectsWithEquals from the PMD set
         check('ReferenceEquality', net.ltgt.gradle.errorprone.CheckSeverity.OFF)
+
+        // ===== Promoted guards (2026-08-27 static-analysis wave) =====
+        // Zero-violation baseline verified at promotion; each is a
+        // regression guard, not a paydown target. Two deliberate
+        // exemptions are annotated in source: BotControlSocket.serve
+        // restores the interrupt flag instead of suppressing, and
+        // CrashReporter.consoleFallback carries @SuppressWarnings("SystemErr")
+        // as the ADR-0005 D4 crash-terminal fallback.
+        // Preconditions is intentionally absent: zero Guava on the
+        // compile classpath makes it a no-op check.
+        check('StreamResourceLeak', net.ltgt.gradle.errorprone.CheckSeverity.ERROR)
+        check('JdkObsolete', net.ltgt.gradle.errorprone.CheckSeverity.ERROR)
+        check('DefaultCharset', net.ltgt.gradle.errorprone.CheckSeverity.ERROR)
+        check('StringCharset', net.ltgt.gradle.errorprone.CheckSeverity.ERROR)
+        // UseLocale is not a valid checker name in EP 2.42.0 (removed/
+        // renamed upstream); locale-less case conversions are rare here
+        // and covered by review.
+        check('MissingOverride', net.ltgt.gradle.errorprone.CheckSeverity.ERROR)
+        check('EqualsIncompatibleType', net.ltgt.gradle.errorprone.CheckSeverity.ERROR)
+        // NonAtomicVolatile is not a valid checker name in EP 2.42.0;
+        // the single volatile field (BotControlSocket.listener) uses
+        // simple assignment only, reviewed.
+        check('InterruptedExceptionSwallowed', net.ltgt.gradle.errorprone.CheckSeverity.ERROR)
+        check('StringCaseLocaleUsage', net.ltgt.gradle.errorprone.CheckSeverity.ERROR)
+        check('SystemOut', net.ltgt.gradle.errorprone.CheckSeverity.ERROR)
+        // SystemErr is not a separate checker in EP 2.42.0; SystemOut
+        // covers both System.out and System.err. CrashReporter carries
+        // @SuppressWarnings("SystemOut") as the ADR-0005 D4 fallback.
+        check('NonApiType', net.ltgt.gradle.errorprone.CheckSeverity.ERROR)
+
+        // ===== NullAway (2026-08-27 static-analysis wave) =====
+        // @Nullable/@NonNull enforcement for the api.. layer only.
+        // api is the harness contract; Javadoc says "never null" /
+        // "may return null" everywhere, NullAway turns that into a
+        // compile-time check. Runs on -Plint only (rides EP).
+        check('NullAway', net.ltgt.gradle.errorprone.CheckSeverity.ERROR)
+        option('NullAway:AnnotatedPackages', 'com.mcbot.mcbotserver.api')
+    }
+}
+
+// NullAway is off for test compilation: tests deliberately pass null
+// to api constructors inside assertThrows to verify null-rejection
+// contracts (e.g. new ItemView(null, 1, "")); flagging those is noise.
+tasks.named('compileTestJava').configure {
+    options.errorprone {
+        check('NullAway', net.ltgt.gradle.errorprone.CheckSeverity.OFF)
     }
 }
 
@@ -243,9 +296,14 @@ tasks.register('cpdCheck', JavaExec) {
          '--language', 'java',
          '--dir', layout.projectDirectory.dir('src/main/java').asFile.absolutePath,
          '--dir', layout.projectDirectory.dir('src/test/java').asFile.absolutePath,
-         '--minimum-tokens', '100',
+         '--minimum-tokens', '140',
          '--format', 'text'
-    ignoreExitValue = true   // advisory: findings print, no failure
+    // RED WALL at >=140 tokens: the main-side duplication backlog was
+    // cleared on 2026-08-27 (handler guards, ItemStack toView,
+    // gametest pool filler); 140 sits just above the largest surviving
+    // TEST-side copy (131) so the gate fires only on new main-scale
+    // duplication. Sub-threshold dups are periodic manual review.
+
     enabled = project.hasProperty('lint')
 }
 

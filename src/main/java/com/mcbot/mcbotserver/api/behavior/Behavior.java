@@ -3,6 +3,7 @@ package com.mcbot.mcbotserver.api.behavior;
 import com.mcbot.mcbotserver.api.actor.Actor;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.world.WorldView;
+import javax.annotation.Nullable;
 
 /**
  * The execution half of boundary B: the only code allowed to claim
@@ -26,7 +27,7 @@ public interface Behavior {
      * @param actor     the claim surface; never null
      * @return this tick's verdict; never null
      */
-    ExecutionReport tick(WorldView world, Directive directive, Actor actor);
+    ExecutionReport tick(WorldView world, @Nullable Directive directive, Actor actor);
 
     /**
      * Stable identity for diagnostics and claim holder names.
