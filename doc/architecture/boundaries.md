@@ -388,6 +388,8 @@ behind test gates, not behind prose.
 | 32 | State-snapshot field set pinned at BotState's categorical rule | - |
 | 33 | Harness interaction model codified: space is a namespace, time is job control | 2026-08-27 |
 | 34 | Carrier food lifecycle: Path A FoodData on the body, free-regen floor retired, EAT reflex consumption | 2026-08-27 |
+| 35 | Third reflex seat promotion: ReflexMissionSeat unifies ENGAGE/ESCAPE; FORAGE action + ACQUIRE rule | 2026-08-27 |
+| 36 | Shapeless recipes cataloged via ingredient-index encoding; scarce-first pattern resolution | 2026-08-27 |
 
 ## Deferred, with reopen conditions
 

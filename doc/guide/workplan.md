@@ -192,8 +192,8 @@ survivors are deliberate NON-executions, each with its trigger:
          sleep-poll the worker. Inject a deadline/clock into
          AStarPathFinder + PlanWorker.          [dep: none]
 - [ ] S  RecipeCatalog.list(offset, limit) / RecipePage ships without
-         an offline test - add clamping / ordering / shapeless-skip
-         coverage before or with that commit.   [dep: none]
+         an offline test - add clamping / ordering coverage before
+         or with that commit.   [dep: none]
 - [ ] S  Menu-family disposition (BridgeInventory vs BindingInventory
          overlap; BotInventoryMenu thin fork): rides the issue 0010
          BotPlayerFacade ruling - do not churn vanilla-interaction

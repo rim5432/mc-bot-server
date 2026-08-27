@@ -56,6 +56,47 @@ final class MenuFixtures {
                 "minecraft:stick", "minecraft:stick", 4, 1, Map.of(0, List.of(OAK, BIRCH), 1, List.of(OAK, BIRCH)));
     }
 
+    /** Planks-shapeless recipe: one log ingredient, index encoding. */
+    static RecipeView planksRecipe() {
+        return new RecipeView(
+                "minecraft:oak_planks",
+                "minecraft:oak_planks",
+                4,
+                3,
+                Map.of(0, List.of("minecraft:oak_log", "minecraft:birch_log")),
+                true);
+    }
+
+    /**
+     * Stew-shapeless recipe: three distinct ingredients (index
+     * encoding) - fits the inventory 2x2 under the vanilla count
+     * rule.
+     */
+    static RecipeView stewRecipe() {
+        return new RecipeView(
+                "minecraft:mushroom_stew",
+                "minecraft:mushroom_stew",
+                1,
+                3,
+                Map.of(
+                        0, List.of("minecraft:red_mushroom"),
+                        1, List.of("minecraft:brown_mushroom"),
+                        2, List.of("minecraft:bowl")),
+                true);
+    }
+
+    /**
+     * Five-ingredient shapeless recipe: exceeds the inventory 2x2
+     * count rule (four), fits a table.
+     */
+    static RecipeView fiveWayShapeless() {
+        Map<Integer, List<String>> placements = new HashMap<>();
+        for (int i = 0; i < 5; i++) {
+            placements.put(i, List.of("test:sugar"));
+        }
+        return new RecipeView("test:five_sugar", "test:bundle", 1, 3, placements, true);
+    }
+
     /** Crafting-table-shaped snapshot, mirror of the adapter roles. */
     static CraftingView table(Builder b) {
         b.roles.put(0, SlotRole.RESULT);

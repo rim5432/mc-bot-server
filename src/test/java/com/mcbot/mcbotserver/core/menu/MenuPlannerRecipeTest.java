@@ -1,7 +1,9 @@
 package com.mcbot.mcbotserver.core.menu;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.mcbot.mcbotserver.api.menu.CraftingView;
 import com.mcbot.mcbotserver.api.menu.MenuClick;
@@ -104,5 +106,86 @@ class MenuPlannerRecipeTest {
         CraftingView menu = MenuFixtures.table(MenuFixtures.builder().put(SlotRole.HOTBAR, 37, MenuFixtures.OAK, 1));
         // One oak covers cell 0 only; cell 1 has no source left.
         assertThrows(IllegalArgumentException.class, () -> MenuPlanner.planRecipe(menu, MenuFixtures.sticksRecipe()));
+    }
+
+    @Test
+    void shapelessFillsFirstFlatCellsOnTheInventoryGrid() {
+        // Three ingredients fit the 2x2 under the vanilla count rule;
+        // indices 0..2 map onto flat grid cells 1..3, one material
+        // group per ingredient in recipe order.
+        CraftingView menu = MenuFixtures.inventoryGridMenu(MenuFixtures.builder()
+                .put(SlotRole.HOTBAR, 36, "minecraft:red_mushroom", 64)
+                .put(SlotRole.HOTBAR, 37, "minecraft:brown_mushroom", 64)
+                .put(SlotRole.HOTBAR, 38, "minecraft:bowl", 64));
+        RecipeView stew = MenuFixtures.stewRecipe();
+        assertTrue(stew.fitsInventoryGrid(), "3 ingredients fit a 2x2");
+        assertEquals(
+                List.of(
+                        new MenuPlanner.Step(36, 0, MenuClick.PICKUP),
+                        new MenuPlanner.Step(1, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(36, 0, MenuClick.PICKUP),
+                        new MenuPlanner.Step(37, 0, MenuClick.PICKUP),
+                        new MenuPlanner.Step(2, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(37, 0, MenuClick.PICKUP),
+                        new MenuPlanner.Step(38, 0, MenuClick.PICKUP),
+                        new MenuPlanner.Step(3, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(38, 0, MenuClick.PICKUP)),
+                MenuPlanner.planRecipe(menu, stew));
+    }
+
+    @Test
+    void shapelessMoreThanFourIngredientsNeedsATable() {
+        RecipeView five = MenuFixtures.fiveWayShapeless();
+        assertFalse(five.fitsInventoryGrid(), "5 ingredients exceed a 2x2");
+        CraftingView inv2x2 =
+                MenuFixtures.inventoryGridMenu(MenuFixtures.builder().put(SlotRole.HOTBAR, 36, "test:sugar", 5));
+        assertThrows(IllegalArgumentException.class, () -> MenuPlanner.planRecipe(inv2x2, five));
+
+        // On the table the five indices fill flat cells 1..5 from one
+        // exhausted lift - no remainder return.
+        CraftingView table = MenuFixtures.table(MenuFixtures.builder().put(SlotRole.HOTBAR, 36, "test:sugar", 5));
+        assertEquals(
+                List.of(
+                        new MenuPlanner.Step(36, 0, MenuClick.PICKUP),
+                        new MenuPlanner.Step(1, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(2, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(3, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(4, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(5, 1, MenuClick.PICKUP)),
+                MenuPlanner.planRecipe(table, five));
+    }
+
+    @Test
+    void shapelessNestedAcceptanceSpendsTheScarceCellFirst() {
+        // Index 0 accepts oak-or-birch, index 1 only oak; one oak
+        // left. Scarce-first resolves index 1 (width 1) before the
+        // wide cell, so the oak lands where only oak works and the
+        // wide cell falls to birch - the vanilla multiset matcher's
+        // assignment, mirrored in supply decrements.
+        RecipeView recipe = new RecipeView(
+                "test:pair",
+                "test:bundle",
+                1,
+                3,
+                Map.of(0, List.of(MenuFixtures.OAK, MenuFixtures.BIRCH), 1, List.of(MenuFixtures.OAK)),
+                true);
+        CraftingView menu = MenuFixtures.table(MenuFixtures.builder()
+                .put(SlotRole.HOTBAR, 36, MenuFixtures.OAK, 1)
+                .put(SlotRole.HOTBAR, 37, MenuFixtures.BIRCH, 64));
+        assertEquals(
+                List.of(
+                        new MenuPlanner.Step(36, 0, MenuClick.PICKUP),
+                        new MenuPlanner.Step(2, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(37, 0, MenuClick.PICKUP),
+                        new MenuPlanner.Step(1, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(37, 0, MenuClick.PICKUP)),
+                MenuPlanner.planRecipe(menu, recipe));
+    }
+
+    @Test
+    void shapelessPositionsMustBeCompactIndices() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new RecipeView("t:x", "test:out", 1, 3, Map.of(1, List.of(MenuFixtures.OAK)), true));
     }
 }

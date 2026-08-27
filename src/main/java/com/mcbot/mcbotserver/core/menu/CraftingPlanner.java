@@ -4,6 +4,7 @@ import com.mcbot.mcbotserver.api.menu.CraftingView;
 import com.mcbot.mcbotserver.api.menu.MenuClick;
 import com.mcbot.mcbotserver.api.menu.RecipeView;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -102,11 +103,20 @@ final class CraftingPlanner {
     }
 
     /**
-     * First-fit resolution: ascending pattern positions pick the
-     * first accepted kind with remaining supply, and cells group per
-     * chosen kind so each sub-plan stays single-material. Pattern
+     * Scarce-first resolution: positions whose accepted-kind list is
+     * narrowest resolve first (stable within equal widths, so shaped
+     * position order survives), each picking the first accepted kind
+     * with remaining supply; cells group per chosen kind so each
+     * sub-plan stays single-material. Scarce-first is what makes
+     * nested acceptance sets ({@code {oak}} inside
+     * {@code {oak, birch}}) resolve the way vanilla's multiset
+     * matcher does - a naive position-order greedy would spend the
+     * last oak on the wide cell and refuse the narrow one. Pattern
      * coordinates translate onto the open surface's grid row-major,
      * anchored top-left - one recipe serves both the 2x2 and the 3x3.
+     * Shapeless views skip the geometry: ingredient index i fills
+     * flat cell i, which vanilla's arrangement-agnostic matching
+     * accepts on any surface large enough.
      *
      * @param recipe   the recipe being realized; never null
      * @param supply   mutable totals consumed as cells resolve
@@ -115,7 +125,10 @@ final class CraftingPlanner {
      */
     static Map<String, List<Integer>> resolvePattern(RecipeView recipe, Map<String, Integer> supply, int gridSide) {
         Map<String, List<Integer>> chosen = new LinkedHashMap<>();
-        for (Integer pos : recipe.placements().keySet()) {
+        List<Integer> positions = new ArrayList<>(recipe.placements().keySet());
+        positions.sort(
+                Comparator.comparingInt(pos -> recipe.placements().get(pos).size()));
+        for (Integer pos : positions) {
             String picked = null;
             for (String candidate : recipe.placements().get(pos)) {
                 Integer left = supply.get(candidate);
@@ -131,9 +144,9 @@ final class CraftingPlanner {
                         + recipe.placements().get(pos)
                         + " remain in the player region");
             }
-            int row = pos / recipe.patternWidth();
-            int col = pos % recipe.patternWidth();
-            chosen.computeIfAbsent(picked, k -> new ArrayList<>()).add(row * gridSide + col);
+            int cell =
+                    recipe.shapeless() ? pos : (pos / recipe.patternWidth()) * gridSide + pos % recipe.patternWidth();
+            chosen.computeIfAbsent(picked, k -> new ArrayList<>()).add(cell);
         }
         return chosen;
     }

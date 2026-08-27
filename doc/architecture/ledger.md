@@ -569,3 +569,27 @@ Amendment chains recorded so far (both sides annotated):
     per 0010 section 5); ReflexRuleJsonReader carries a
     GodClass-suppression ruling - it is a flat type->factory
     registry whose cohesion metric reads 0% by construction.
+    36. Shapeless recipes join the catalog through the
+    ingredient-index encoding (2026-08-27; external capability
+    review flagged planks as a progression blocker, code truth
+    confirmed). Vanilla's ShapelessRecipe.matches is
+    arrangement-agnostic (non-empty cell count equals ingredient
+    count, then multiset match), so a shapeless RecipeView carries
+    NO geometry: positions are compact ingredient indices 0..n-1,
+    patternWidth is a placeholder (3) with no geometric meaning,
+    the inventory-2x2 fit is the vanilla count rule (n<=4,
+    canCraftInDimensions(2,2)), and resolvePattern maps index i
+    onto flat grid cell i on whatever surface is open. The catalog
+    drops empty-option ingredients and compacts; more than nine
+    usable ingredients stays unrepresentable (position space caps
+    at 8, vanilla's own serializer cap is 9). Pattern resolution
+    order is now SCARCE-FIRST - positions sort by ascending
+    accepted-kind width, stable within equal widths - so nested
+    acceptance sets ({oak} inside {oak,birch}) resolve the way
+    vanilla's multiset matcher would instead of the position-order
+    greedy that spent the last oak on the wide cell and refused
+    the narrow one; shaped recipes keep their previous outcomes
+    (all existing placements sort stable at equal width). The
+    wood age is craftable end-to-end: log -> planks -> sticks ->
+    table (all offline-pinned; the engine pair - planks craft +
+    paginate-with-shapeless - rides the staged gametest batch).
