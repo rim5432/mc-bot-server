@@ -225,6 +225,19 @@ public final class BotPlayerFacade extends Player {
         setXRot(body.getXRot());
     }
 
+    /**
+     * Drive the use-item loop one tick (bow draw charge, rod hold).
+     * The facade is never player-ticked, so the charge accumulator
+     * vanilla advances from LivingEntity.tick needs an explicit pump -
+     * {@code releaseUsingItem} reads the accumulated duration to scale
+     * the released action. Syncs position first: the loop reads the
+     * entity position every tick while drawing.
+     */
+    public void tickUseLoop() {
+        syncPosition();
+        updateUsingItem(this.useItem);
+    }
+
     @Override
     public UUID getUUID() {
         return body.getUUID();

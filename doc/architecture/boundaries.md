@@ -390,6 +390,7 @@ behind test gates, not behind prose.
 | 34 | Carrier food lifecycle: Path A FoodData on the body, free-regen floor retired, EAT reflex consumption | 2026-08-27 |
 | 35 | Third reflex seat promotion: ReflexMissionSeat unifies ENGAGE/ESCAPE; FORAGE action + ACQUIRE rule | 2026-08-27 |
 | 36 | Shapeless recipes cataloged via ingredient-index encoding; scarce-first pattern resolution | 2026-08-27 |
+| 37 | Bow ranging over USE: hold-draw semantics amend decision 14; melee ranking suppressed while ranging | 2026-08-27 |
 
 ## Deferred, with reopen conditions
 

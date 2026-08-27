@@ -73,12 +73,18 @@ Admission protocol:
 | 31 | Slot identity dual-space accepted; dual-RCON re-eval trigger | 2026-08-26 |
 | 32 | State-snapshot field set pinned at BotState's categorical rule | - |
 | 33 | Harness interaction model codified: space is a namespace, time is job control | 2026-08-27 |
+| 34 | Carrier food lifecycle: Path A FoodData on the body, free-regen floor retired, EAT reflex consumption | 2026-08-27 |
+| 35 | Third reflex seat promotion: ReflexMissionSeat unifies ENGAGE/ESCAPE; FORAGE action + ACQUIRE rule | 2026-08-27 |
+| 36 | Shapeless recipes cataloged via ingredient-index encoding; scarce-first pattern resolution | 2026-08-27 |
+| 37 | Bow ranging over USE: hold-draw semantics amend decision 14; melee ranking suppressed while ranging | 2026-08-27 |
 
 ## Amendment chains
 
 Amendment chains recorded so far (both sides annotated):
 
 - 14 <- 25: INTERACT joins as the fifth channel.
+  <- 37: USE hold is first-class (sustained press charges a draw,
+  falling edge releases; orphaned charge force-released).
 - 19a <- 19b: shared-constant era settled into two predicates.
 - 24 <- 25 (rule rename DIG_ON_SUFFOCATION, ladder unchanged),
   <- 26 (ESCAPE_ON_LAVA replaces ASCEND_IN_LETHAL_FLUID; EXTINGUISH_FIRE
@@ -119,6 +125,11 @@ Amendment chains recorded so far (both sides annotated):
     reports and stay pure.
 14. Actor = four independent channels (MOVE / ROT / USE / SLOT); per-tick
     claims with priority resolution; claims expire each tick.
+    Amendment (ledger 37, 2026-08-27): a USE hold is now first-class -
+    sustained Use(true) claims charge a draw and the falling edge
+    releases it (BowItem.releaseUsing reads the accumulated duration);
+    the adapter force-releases an orphaned charge when the USE claim
+    vanishes mid-draw. Rising-edge melee semantics unchanged.
 15. Single tick entry: BotController on server tick END phase; fixed
     order reflex -> arbiter -> behaviors -> actor flush.
 16. Phase 0 includes one minimal reflex rule so the full preempt ->
@@ -593,3 +604,17 @@ Amendment chains recorded so far (both sides annotated):
     wood age is craftable end-to-end: log -> planks -> sticks ->
     table (all offline-pinned; the engine pair - planks craft +
     paginate-with-shapeless - rides the staged gametest batch).
+    37. Bow ranging joins combat over the existing USE vocabulary
+    (2026-08-27; external capability review queued the bow, the user
+    sequenced it past the 0007 6.1 review gate). Decision 14's
+    amendment above carries the semantic half; the ranking half:
+    CombatBehavior suppresses holdBestWeapon while ranging because
+    bows carry no attack-damage modifier - the melee ranking would
+    switch off the bow every tick - and the bow slot wins SLOT until
+    the target closes inside ATTACK_REACH, arrows run out, or the
+    directive drops (each force-releases an in-flight draw). The
+    draw charges 20 ticks (vanilla crit threshold) and the aim
+    point rises by ARROW_DROP_PER_BLOCK_SQUARED * range squared, a
+    constant-velocity parabola fit honest to within a block across
+    the bow band. The engine pair (draw-release onto a live target)
+    rides the staged gametest batch.

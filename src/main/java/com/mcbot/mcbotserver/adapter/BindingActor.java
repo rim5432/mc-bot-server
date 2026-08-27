@@ -13,6 +13,8 @@ import com.mcbot.mcbotserver.core.actor.ChannelArbiter;
 import java.util.Map;
 import java.util.Objects;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.BowItem;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
@@ -62,6 +64,9 @@ public final class BindingActor implements Actor, MenuTransactions {
     /** Menu transactions: one facade+opener pair per body (0007 A1). */
     private final MenuOpener menus;
 
+    /** The one Player-typed acting surface (use chain, use loop, menus). */
+    private final BotPlayerFacade facade;
+
     private boolean lastUsePressing;
     private boolean lastDropClaimed;
     private boolean lastInteractClaimed;
@@ -76,10 +81,10 @@ public final class BindingActor implements Actor, MenuTransactions {
         this.melee = new MeleeResolver(body);
         this.presence = new PresenceLayer(body);
         this.dig = new DigExecutor(body);
-        // One facade per body serves both the right-click chain and the
-        // menu transactions - a second instance would fork the
-        // containerMenu state the MenuOpener owns.
-        BotPlayerFacade facade = new BotPlayerFacade(body);
+        // One facade per body serves the right-click chain, the use
+        // loop and the menu transactions - extra instances would fork
+        // the containerMenu state the MenuOpener owns.
+        this.facade = new BotPlayerFacade(body);
         this.interact = new InteractBlockExecutor(body, facade);
         this.menus = new MenuOpener(facade);
     }
@@ -137,16 +142,40 @@ public final class BindingActor implements Actor, MenuTransactions {
     private void applyUse(Claim use) {
         if (use != null && use.intent() instanceof Intent.Use u) {
             if (u.pressing() && !lastUsePressing) {
-                // USE = act with the main hand (decision 14): an
-                // edible held item means eat, not swing - vanilla
-                // right-click semantics. One item per rising edge;
-                // the eat plays its own sound and never melees.
+                // USE = act with the main hand (decision 14, amended
+                // ledger 36 for held items): an edible held item means
+                // eat, not swing - vanilla right-click semantics. One
+                // item per rising edge; the eat plays its own sound and
+                // never melees. A bow starts its draw - the charge
+                // accumulates through the held ticks and the falling
+                // edge releases the shot.
                 if (!body.eatHeldItem()) {
-                    melee.onUsePress();
+                    if (body.getInventory()
+                                    .container()
+                                    .getItem(body.selectedSlot)
+                                    .getItem()
+                            instanceof BowItem) {
+                        facade.startUsingItem(InteractionHand.MAIN_HAND);
+                    } else {
+                        melee.onUsePress();
+                    }
                 }
+            } else if (!u.pressing() && lastUsePressing && facade.isUsingItem()) {
+                facade.releaseUsingItem();
+            }
+            if (facade.isUsingItem()) {
+                // The draw charge advances only when pumped - the facade
+                // is never player-ticked.
+                facade.tickUseLoop();
             }
             lastUsePressing = u.pressing();
         } else {
+            if (facade.isUsingItem()) {
+                // The USE claim vanished mid-draw (reflex preemption) -
+                // release now; an orphaned charge would keep the loop
+                // running with nobody watching it.
+                facade.releaseUsingItem();
+            }
             lastUsePressing = false;
         }
     }

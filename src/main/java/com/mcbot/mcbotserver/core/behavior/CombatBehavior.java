@@ -26,9 +26,10 @@ import java.util.Objects;
  *
  * <p>Contract: see boundaries.md decision 11 and decision 14 (four
  * channels - melee rides USE as "act with main hand"; the adapter
- * resolves what a swing hits). A directive without a combat order is
- * ignored on the first line: goto missions must feel nothing from
- * this behavior existing.
+ * resolves what a swing hits; amended by ledger 36: a held USE draw
+ * charges and the falling edge releases, which is how the bow fires).
+ * A directive without a combat order is ignored on the first line:
+ * goto missions must feel nothing from this behavior existing.
  *
  * <p>Implementation note: runs on the server tick thread only.
  */
@@ -61,6 +62,25 @@ public final class CombatBehavior implements Behavior {
      */
     public static final int AIM_HOLD_TICKS = 3;
 
+    /** Full bow draw in ticks before release (vanilla crit threshold). */
+    public static final int BOW_CHARGE_TICKS = 20;
+
+    /** Engagement cap for bow fire (skeleton-parity range band). */
+    public static final double BOW_RANGE = 15.0;
+
+    /**
+     * Arrow-drop approximation at full draw, blocks of drop per
+     * block² of range (v = 3 b/t, g = 0.05 b/t² gives 0.5·g/v²). The
+     * aim point rises by drop·range² - a constant-velocity parabola
+     * fit, honest to within a block across the bow band.
+     */
+    public static final double ARROW_DROP_PER_BLOCK_SQUARED = 0.0028;
+
+    private static final String BOW_ID = "minecraft:bow";
+
+    private static final java.util.Set<String> ARROW_IDS =
+            java.util.Set.of("minecraft:arrow", "minecraft:tipped_arrow", "minecraft:spectral_arrow");
+
     private final String name;
     private final BodyPositionSource positionSource;
     private final WeaponCatalog weapons;
@@ -70,6 +90,8 @@ public final class CombatBehavior implements Behavior {
     private int ticksSinceInReach = AIM_HOLD_TICKS + 1;
     private boolean pressLatched;
     private float lastYaw;
+    private boolean drawing;
+    private int chargeTicks;
 
     /**
      * Creates a combat behavior over one body position source.
@@ -107,10 +129,10 @@ public final class CombatBehavior implements Behavior {
     @Override
     public ExecutionReport tick(WorldView world, Directive directive, Actor actor) {
         if (directive == null || directive.overrides().combat() == null) {
+            // A stale draw must not outlive its directive.
+            abortDraw(actor);
             return ExecutionReport.running();
         }
-
-        holdBestWeapon(world, actor);
 
         Vec3 position = positionSource.get();
         CellPos aimCell = aimPointOf(directive.goal());
@@ -131,8 +153,50 @@ public final class CombatBehavior implements Behavior {
             yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
             lastYaw = yaw;
         }
-        float pitch = (float) -Math.toDegrees(Math.atan2(dy, Math.max(horizontal, 0.001)));
+
+        int bowSlot = rangedSlot(world, Math.sqrt(dx * dx + dy * dy + dz * dz));
+        boolean ranging = bowSlot >= 0;
+        // Arrow drop raises the effective aim point; zero on the melee
+        // path where the swing resolves without ballistics.
+        double lift = ranging ? ARROW_DROP_PER_BLOCK_SQUARED * (dx * dx + dy * dy + dz * dz) : 0.0;
+        float pitch = (float) -Math.toDegrees(Math.atan2(dy + lift, Math.max(horizontal, 0.001)));
         actor.submit(new Claim(Channel.ROT, 20, name, new Intent.Look(yaw, pitch)));
+
+        if (ranging) {
+            // The bow owns SLOT while ranging: the melee ranking would
+            // switch off a bow every tick (bows carry no attack-damage
+            // modifier), so holdBestWeapon is suppressed, not raced.
+            InventoryView inventory = world.getInventory();
+            if (inventory.selectedSlot() != bowSlot) {
+                actor.submit(new Claim(Channel.SLOT, 20, name, new Intent.SelectSlot(bowSlot)));
+                return ExecutionReport.running();
+            }
+            if (pressLatched) {
+                // A melee swing window was open when ranging began -
+                // close it before the draw, one USE edge per tick.
+                actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(false)));
+                pressLatched = false;
+                return ExecutionReport.running();
+            }
+            // Draw pacing: sustain Use(true) across the charge (a USE
+            // gap reads as a release adapter-side), then one false tick
+            // fires BowItem.releaseUsing with the accumulated charge.
+            if (!drawing) {
+                actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(true)));
+                drawing = true;
+                chargeTicks = 1;
+            } else if (++chargeTicks > BOW_CHARGE_TICKS) {
+                actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(false)));
+                drawing = false;
+                chargeTicks = 0;
+            } else {
+                actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(true)));
+            }
+            return ExecutionReport.running();
+        }
+        abortDraw(actor);
+
+        holdBestWeapon(world, actor);
 
         // Swing pacing: hold the release until cooldown expires so the
         // adapter sees exactly one rising edge per attack window. The
@@ -156,6 +220,54 @@ public final class CombatBehavior implements Behavior {
             pressLatched = false;
         }
         return ExecutionReport.running();
+    }
+
+    /**
+     * Release an in-flight draw, if any. Called on every exit from the
+     * ranged path - a drawn bow with no watcher would hold the charge
+     * forever.
+     *
+     * @param actor claim surface; never null
+     */
+    private void abortDraw(Actor actor) {
+        if (drawing) {
+            actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(false)));
+            drawing = false;
+            chargeTicks = 0;
+        }
+    }
+
+    /**
+     * The hotbar bow slot when ranged fire is the right answer: a bow
+     * carried in the hotbar, arrows anywhere in the inventory, and the
+     * target beyond melee reach but inside the bow band.
+     *
+     * @param world read surface for the inventory; never null
+     * @param reach current distance to the aim point
+     * @return the bow's hotbar slot, or -1 to answer with melee
+     */
+    private static int rangedSlot(WorldView world, double reach) {
+        if (reach <= ATTACK_REACH || reach > BOW_RANGE) {
+            return -1;
+        }
+        InventoryView inventory = world.getInventory();
+        int bow = -1;
+        for (int slot = 0; slot < InventoryView.HOTBAR_SIZE; slot++) {
+            var item = inventory.main().get(slot);
+            if (!item.isEmpty() && BOW_ID.equals(item.itemId())) {
+                bow = slot;
+                break;
+            }
+        }
+        if (bow < 0) {
+            return -1;
+        }
+        for (var item : inventory.main()) {
+            if (!item.isEmpty() && ARROW_IDS.contains(item.itemId())) {
+                return bow;
+            }
+        }
+        return -1;
     }
 
     /**
