@@ -3,85 +3,90 @@
 Central development toolbox for mc-bot-server.
 
 **Main entry point**: [`mcbot_tool.py`](./mcbot_tool.py) — a Python CLI
-that unifies build / test / logs / process management / multi-agent
-concurrency gating.
+that unifies build / test / static analysis / logs / process management /
+multi-agent concurrency gating.
 
 > Multi-agent collaboration rules live in the root `AGENTS.md`
-> (§0.2 mandatory rules). This README is the
-> human-facing quick reference and the full subcommand table.
+> (§0.2 mandatory rules). This README is the human-facing quick
+> reference; the authoritative gate postures live in
+> [`doc/guide/build-and-run.md`](../doc/guide/build-and-run.md).
 
-## Quick start
+## Quick start — the daily loop
 
 ```bash
-# Full CLI help
-python tool/mcbot_tool.py --help
-
-# Compile Java
+# Compile Java (fast sanity check, seconds)
 python tool/mcbot_tool.py build compile
 
-# Package mod jar
-python tool/mcbot_tool.py build jar
-
-# Full build (compile + test + jar)
-python tool/mcbot_tool.py build build
-
-# Launch MC client (long-running; close the window to end)
-python tool/mcbot_tool.py build runClient
-
-# Run tests
+# Run tests — rides the hard style gates (checkstyle + spotless)
 python tool/mcbot_tool.py test
 
-# Full static-analysis dashboard round (PMD/CPD/SpotBugs + EP compiles)
+# Full static-analysis verdict: PMD + CPD red walls, SpotBugs,
+# Error Prone / NullAway on the -Plint compiles
 python tool/mcbot_tool.py lint
 
-# Pass through gradle flags
+# Package mod jar (includes reobf required by legacy Forge)
+python tool/mcbot_tool.py build jar
+
+# Launch MC client / dedicated server / gameTest server (long-running;
+# each holds its own run.<task> lock until MC exits)
+python tool/mcbot_tool.py build runClient
+python tool/mcbot_tool.py build runServer
+python tool/mcbot_tool.py build runGameTest
+```
+
+Passthrough works everywhere flags are needed:
+
+```bash
 python tool/mcbot_tool.py build compile -- --info --stacktrace
+python tool/mcbot_tool.py test -- --tests "*ReflexChainGateTest*"
 ```
 
-## Debug recipes
+## Subcommand map
 
-**When a build fails**:
+| Command | What it does |
+|---|---|
+| `build <sub>` | `compile` / `jar` / `build` / `clean` / `sync`, or launch `runClient` / `runServer` / `runData` / `runGameTest` — all behind the concurrency gate |
+| `test` | JUnit suite; **rides checkstyleMain/Test + spotlessCheck as hard gates** |
+| `lint` | one-command static-analysis verdict (`gradle qualityCheck -Plint --continue`): compiles both source sets, runs PMD + CPD red walls and the SpotBugs dashboard |
+| `gradle <args>` | any other gradle invocation with the same lock (opt-in analyzer rounds: `-Plint pmdMain ...`) |
+| `status` | one-page view: locks, live processes, last log path |
+| `log tail\|cat\|list` | recent output / full log by task fragment / log inventory |
+| `lock status\|clear` | who holds what; force-clear a dead holder |
+| `proc list\|killdaemon` | java/gradle process census; daemon kill requires `--yes` |
+| `doc ...` | documentation health: `list` / `check` / `touch` / `new` / `index` |
+| `tasks` / `deps` | raw gradle task & dependency listings |
+
+Gate postures (what fails where, and why) are pinned by
+`LintPostureGateTest` and documented in the build-and-run guide —
+a posture change is a ruling, made in those three places at once.
+
+## When a build fails
 
 ```bash
-# 1) Tail of the most recent build log
-python tool/mcbot_tool.py log tail
-
-# 2) Full log for the compile task
-python tool/mcbot_tool.py log cat compile
-
-# 3) One-page status: lock, live java processes, last log path
-python tool/mcbot_tool.py status
+python tool/mcbot_tool.py log tail -n 100   # recent output
+python tool/mcbot_tool.py log cat compile   # full log by task fragment
+python tool/mcbot_tool.py status            # lock + processes + last log
 ```
 
-**When blocked by the lock**:
+## When the lock or daemon misbehaves
 
 ```bash
-# See who holds the lock
-python tool/mcbot_tool.py lock status
-
-# If the holder process is dead, force-clear
-python tool/mcbot_tool.py lock clear
-
-# Or simply re-run the build; a stale lock is taken over automatically
-python tool/mcbot_tool.py build compile
+python tool/mcbot_tool.py lock status       # BUSY pid=... alive=? cmd=...
+python tool/mcbot_tool.py lock clear        # holder confirmed dead only
+python tool/mcbot_tool.py proc list         # every java/gradle process
+python tool/mcbot_tool.py proc killdaemon --yes   # destructive
 ```
 
-**When the gradle daemon is stuck**:
-
-```bash
-# List all java/gradle processes
-python tool/mcbot_tool.py proc list
-
-# Kill the daemon (destructive; requires --yes)
-python tool/mcbot_tool.py proc killdaemon --yes
-```
+Lock namespaces: everything writing `build/` serializes on the global
+`build` lock; long-running game launches hold their own `run.<task>`
+locks instead, so a dedicated server and a dev client coexist (they
+only read build outputs).
 
 ## Background runs with live logs
 
-`runClient` / `runServer` are long-running and hold the lock until MC
-exits. **Never pipe them through a foreground console**
+Never pipe a long-running launch through a foreground console
 (`... | Out-String` can stall the child on console buffers). Use
-`Start-Process` instead:
+`Start-Process`:
 
 ```powershell
 $log = "D:\mc-bot-server\tool\.runtime\runclient-$(Get-Date -Format yyyyMMdd-HHmmss).log"
@@ -93,7 +98,7 @@ $proc = Start-Process `
   -RedirectStandardError  "$log.stderr" `
   -NoNewWindow -PassThru
 
-# In another PowerShell window:
+# Follow progress elsewhere:
 Get-Content "$log.stdout" -Wait
 
 # When done:
@@ -107,7 +112,7 @@ direct debugging painful. `mcbot_tool.py` locates gradle itself:
 
 1. Reads the gradle version from `gradle/wrapper/gradle-wrapper.properties`
 2. Globs `~/.gradle/wrapper/dists/gradle-<ver>-bin/*/gradle-<ver>/bin/gradle.bat`
-   for an already-downloaded full distribution
+   for an already-downloaded distribution
 3. Falls back to `gradle` on `$PATH`
 4. Or uses whatever `$MCBOT_GRADLE` points at
 
@@ -185,4 +190,7 @@ every non-loopback entry untouched.
 - `gradle not found` → set `MCBOT_GRADLE` or fix PATH
 - `BUSY: holder pid=...` → `lock status`; holder dead → `lock clear`
 - First-build OOM → raise `-Xmx1G` to `-Xmx2G` in `gradle.properties`
-- `BUILD FAILED` with no lead → `log cat <task>`, then hand off to the coordinating agent
+- SpotBugs/PMD "SKIPPED" during a manual run → they ride `-Plint`;
+  use the `lint` verb
+- `BUILD FAILED` with no lead → `log cat <task>`, then hand off to the
+  coordinating agent
