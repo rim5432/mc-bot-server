@@ -245,39 +245,74 @@ public final class AStarPathFinder {
                 return new PathResult(reconstruct(cameFrom, current.pos()), expanded, true, 1.0);
             }
 
-            double g = gScore.getOrDefault(current.pos(), Double.MAX_VALUE);
-            for (Movement move : graph.movesFrom(current.pos())) {
-                if (!move.isViable(world)) {
-                    continue;
-                }
-                CellPos next = move.destination();
-                if (closed.contains(next)) {
-                    continue;
-                }
-                double tentative = g + move.cost(world);
-                if (tentative < gScore.getOrDefault(next, Double.MAX_VALUE)) {
-                    gScore.put(next, tentative);
-                    cameFrom.put(next, current.pos());
-                    open.add(new Node(next, tentative + heuristic.estimate(next)));
-                }
-            }
+            relaxNeighbors(
+                    world,
+                    heuristic,
+                    current,
+                    gScore.getOrDefault(current.pos(), Double.MAX_VALUE),
+                    open,
+                    gScore,
+                    cameFrom,
+                    closed);
         }
         searchCut |= expanded >= nodeBudget;
 
-        // Best-partial is an EXHAUSTION outcome only (node budget or
-        // wall clock): when the open set drains naturally there is
-        // definitively no path right now, and pretending otherwise
-        // would hand the executor a doomed prefix.
-        //
-        // Confidence is 1 - bestH/startH (heuristic progress ratio),
-        // clamped to [0,1]. startH == 0 means we started at the goal
-        // - that is a reachedGoal case handled above, but guard
-        // division explicitly. Below MIN_PARTIAL_CONFIDENCE the
-        // partial is collapsed to FAILED: a fractional-tick advance
-        // almost always means the frontier is unreachable from the
-        // start vocabulary, and handing the follower a doomed
-        // prefix would loop it through "walk a few cells, replan,
-        // walk a few cells, replan" forever.
+        return exhaustionOutcome(heuristic, cameFrom, start, bestPartial, bestH, searchCut, expanded);
+    }
+
+    /** Relax every viable move out of {@code current} against known costs. */
+    private void relaxNeighbors(
+            WorldView world,
+            Heuristic heuristic,
+            Node current,
+            double g,
+            PriorityQueue<Node> open,
+            Map<CellPos, Double> gScore,
+            Map<CellPos, CellPos> cameFrom,
+            HashSet<CellPos> closed) {
+        for (Movement move : graph.movesFrom(current.pos())) {
+            if (!move.isViable(world)) {
+                continue;
+            }
+            CellPos next = move.destination();
+            if (closed.contains(next)) {
+                continue;
+            }
+            double tentative = g + move.cost(world);
+            if (tentative < gScore.getOrDefault(next, Double.MAX_VALUE)) {
+                gScore.put(next, tentative);
+                cameFrom.put(next, current.pos());
+                open.add(new Node(next, tentative + heuristic.estimate(next)));
+            }
+        }
+    }
+
+    /**
+     * Resolves a search that ended without reaching the goal.
+     *
+     * <p>Best-partial is an EXHAUSTION outcome only (node budget or
+     * wall clock): when the open set drains naturally there is
+     * definitively no path right now, and pretending otherwise
+     * would hand the executor a doomed prefix.
+     *
+     * <p>Confidence is 1 - bestH/startH (heuristic progress ratio),
+     * clamped to [0,1]. startH == 0 means we started at the goal
+     * - that is a reachedGoal case handled above, but guard
+     * division explicitly. Below MIN_PARTIAL_CONFIDENCE the
+     * partial is collapsed to FAILED: a fractional-tick advance
+     * almost always means the frontier is unreachable from the
+     * start vocabulary, and handing the follower a doomed
+     * prefix would loop it through "walk a few cells, replan,
+     * walk a few cells, replan" forever.
+     */
+    private PathResult exhaustionOutcome(
+            Heuristic heuristic,
+            Map<CellPos, CellPos> cameFrom,
+            CellPos start,
+            CellPos bestPartial,
+            double bestH,
+            boolean searchCut,
+            int expanded) {
         if (searchCut && bestPartial != null && !bestPartial.equals(start)) {
             double startH = heuristic.estimate(start);
             double confidence = (startH > 0.0) ? Math.max(0.0, Math.min(1.0, 1.0 - bestH / startH)) : 0.0;

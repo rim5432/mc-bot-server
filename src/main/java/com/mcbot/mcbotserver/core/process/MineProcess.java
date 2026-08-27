@@ -52,6 +52,10 @@ import java.util.function.Supplier;
  * side-effect-free) + issue 0014 §3 (MineProcess architecture).
  */
 // contract: see boundaries.md section B + issue 0014 §3
+// TooManyMethods exempted: the count is dominated by the BotProcess
+// contract surface (interrupt quintet) plus per-field observability
+// getters consumed by the gate tests; both belong here.
+@SuppressWarnings("PMD.TooManyMethods")
 public final class MineProcess implements BotProcess, TerminalMission, DigMission {
 
     /** One completed break, drained by the handler for BLOCK_BROKEN. */
@@ -118,25 +122,7 @@ public final class MineProcess implements BotProcess, TerminalMission, DigMissio
             int priority,
             long timeoutTicks,
             Supplier<CellPos> botPosition) {
-        if (taskId == null || taskId.isBlank()) {
-            throw new IllegalArgumentException("taskId must not be null or blank");
-        }
-        if (blockType == null || blockType.isBlank()) {
-            throw new IllegalArgumentException("blockType must not be null or blank");
-        }
-        if (targetCount <= 0) {
-            throw new IllegalArgumentException("targetCount must be positive");
-        }
-        if (timeoutTicks <= 0) {
-            throw new IllegalArgumentException("timeoutTicks must be positive");
-        }
-        if (botPosition == null) {
-            throw new IllegalArgumentException("botPosition must not be null");
-        }
-        CellPos start = botPosition.get();
-        if (start == null) {
-            throw new IllegalArgumentException("botPosition must yield a non-null position");
-        }
+        requireValid(taskId, blockType, targetCount, timeoutTicks, botPosition);
         this.taskId = taskId;
         this.blockType = blockType;
         this.targetCount = targetCount;
@@ -147,7 +133,38 @@ public final class MineProcess implements BotProcess, TerminalMission, DigMissio
         this.perTargetDigBudget = DEFAULT_PER_TARGET_DIG_BUDGET;
         this.pickupWindow = DEFAULT_PICKUP_WINDOW;
         this.botPosition = botPosition;
-        this.initialPosition = start;
+        this.initialPosition = botPosition.get();
+    }
+
+    /** Rejects constructor arguments before any field is assigned. */
+    private static void requireValid(
+            String taskId, String blockType, int targetCount, long timeoutTicks, Supplier<CellPos> botPosition) {
+        requireText(taskId, "taskId");
+        requireText(blockType, "blockType");
+        requirePositive(targetCount, "targetCount");
+        requirePositive(timeoutTicks, "timeoutTicks");
+        requireNonNullPosition(botPosition);
+    }
+
+    private static void requireText(String value, String name) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(name + " must not be null or blank");
+        }
+    }
+
+    private static void requirePositive(long value, String name) {
+        if (value <= 0) {
+            throw new IllegalArgumentException(name + " must be positive");
+        }
+    }
+
+    private static void requireNonNullPosition(Supplier<CellPos> supplier) {
+        if (supplier == null) {
+            throw new IllegalArgumentException("botPosition must not be null");
+        }
+        if (supplier.get() == null) {
+            throw new IllegalArgumentException("botPosition must yield a non-null position");
+        }
     }
 
     @Override
@@ -390,17 +407,29 @@ public final class MineProcess implements BotProcess, TerminalMission, DigMissio
         return phase;
     }
 
-    /** Number of blocks broken so far (the termination counter). */
+    /**
+     * Number of blocks broken so far.
+     *
+     * @return the termination counter value
+     */
     public int brokenCount() {
         return brokenCount;
     }
 
-    /** The block type being mined. */
+    /**
+     * The block type being mined.
+     *
+     * @return the namespaced block id; never null
+     */
     public String blockType() {
         return blockType;
     }
 
-    /** The requested break count. */
+    /**
+     * The requested break count.
+     *
+     * @return the positive termination target
+     */
     public int targetCount() {
         return targetCount;
     }

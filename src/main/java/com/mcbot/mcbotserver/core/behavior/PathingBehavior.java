@@ -395,22 +395,7 @@ public final class PathingBehavior implements Behavior {
      */
     private ExecutionReport triggerVerdict(
             WorldView world, Goal goal, Vec3 position, CellPos cell, ReplanGate.TickWindow window) {
-        // Plan-progress score (ledger 20, Path A).
-        // Three OR criteria; any one counts as progress and
-        // resets the accumulator. External replan (exhaustion,
-        // offPath, freshness drop) MUST NOT clear the
-        // accumulator - only real plan-progress or the fuse
-        // itself does. The previous motion detector is gone:
-        // it was strictly weaker than plan-progress for the
-        // "moving but not progressing" case (limbo body in
-        // free fall - large per-tick 3D displacement, zero
-        // waypoint-progress).
-        if (fuse.evaluate(cursor, position, anchorCell(goal))) {
-            fuse.onProgress();
-        } else {
-            fuse.onStall();
-        }
-
+        evaluatePlanProgress(position, goal);
         boolean fuseCondition = fuse.shouldFire();
         boolean offPath = !cursor.exhausted()
                 && distanceToSegment(position, cursor.previous(), cursor.current()) > REPLAN_DISTANCE;
@@ -429,7 +414,42 @@ public final class PathingBehavior implements Behavior {
                 return ExecutionReport.failed("NO_PATH");
             }
         }
+        return settleCursorVerdict(fuseCondition);
+    }
 
+    /**
+     * Plan-progress score (ledger 20, Path A).
+     *
+     * <p>Three OR criteria; any one counts as progress and
+     * resets the accumulator. External replan (exhaustion,
+     * offPath, freshness drop) MUST NOT clear the
+     * accumulator - only real plan-progress or the fuse
+     * itself does. The previous motion detector is gone:
+     * it was strictly weaker than plan-progress for the
+     * "moving but not progressing" case (limbo body in
+     * free fall - large per-tick 3D displacement, zero
+     * waypoint-progress).
+     */
+    private void evaluatePlanProgress(Vec3 position, Goal goal) {
+        if (fuse.evaluate(cursor, position, anchorCell(goal))) {
+            fuse.onProgress();
+        } else {
+            fuse.onStall();
+        }
+    }
+
+    /**
+     * Verdict for a tick where the cursor holds nothing new: a search
+     * in flight reports RUNNING rather than inventing NO_PATH for a
+     * question in flight; a definitive no-path fails cleanly; a fuse
+     * firing while frozen between replan cooldowns latches and
+     * reports STUCK once.
+     *
+     * @param fuseCondition whether the progress fuse is currently firing
+     * @return the terminal/interim report, or null when cursor advance
+     *         should proceed
+     */
+    private ExecutionReport settleCursorVerdict(boolean fuseCondition) {
         if (cursor.isEmpty()) {
             // A search still running is not an answer: report
             // RUNNING rather than inventing NO_PATH for a

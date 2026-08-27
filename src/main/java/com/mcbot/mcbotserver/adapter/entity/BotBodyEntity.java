@@ -268,6 +268,27 @@ public final class BotBodyEntity extends PathfinderMob {
         setSpeed((float) getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED));
         setXxa(driveStrafe);
         setZza(driveForward);
+        applyDriveJump();
+        if (hasPendingRotation) {
+            // setRot does yaw%360 / pitch%360 normalization internally;
+            // setYHeadRot aligns the head with the body so the model does
+            // not lag one tick behind. Do NOT add a separate setYRot call
+            // after setRot — it would overwrite the normalized value with
+            // a raw angle and break the wrap-around for yaw outside [0,360).
+            setRot(targetYaw, targetPitch);
+            setYHeadRot(targetYaw);
+            hasPendingRotation = false;
+        }
+        tickPresence();
+    }
+
+    /**
+     * Resolves a held jump drive flag against the carrier's footing:
+     * lava ascent, water ascent, or grounded hop. Each case calls the
+     * engine routine directly - see the per-case notes for the probes
+     * that killed the subtler vanilla-flag routes.
+     */
+    private void applyDriveJump() {
         if (driveJump && isInLava() && !onGround()) {
             // Lava ascent: same direct-call deviation as the water branch
             // below — setJumping(true) produced zero vertical velocity on
@@ -305,17 +326,6 @@ public final class BotBodyEntity extends PathfinderMob {
             jumpFromGround();
             driveJump = false;
         }
-        if (hasPendingRotation) {
-            // setRot does yaw%360 / pitch%360 normalization internally;
-            // setYHeadRot aligns the head with the body so the model does
-            // not lag one tick behind. Do NOT add a separate setYRot call
-            // after setRot — it would overwrite the normalized value with
-            // a raw angle and break the wrap-around for yaw outside [0,360).
-            setRot(targetYaw, targetPitch);
-            setYHeadRot(targetYaw);
-            hasPendingRotation = false;
-        }
-        tickPresence();
     }
 
     /**

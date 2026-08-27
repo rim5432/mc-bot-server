@@ -5,41 +5,21 @@ import com.mcbot.mcbotserver.api.menu.MenuClick;
 import com.mcbot.mcbotserver.api.menu.MenuView;
 import com.mcbot.mcbotserver.api.menu.RecipeView;
 import com.mcbot.mcbotserver.api.menu.SlotRole;
-import com.mcbot.mcbotserver.api.menu.SlotView;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Plans click sequences against menu snapshots: crafting fills,
- * result takes, and chest deposits/withdrawals. Pure static planning
- * — reads the snapshot, emits {@link Step}s, touches nothing: the
- * caller executes steps through the boundary-A transaction surface
- * ({@code MenuTransactions.menuClick}) so every mutation rides the
- * vanilla menu state machine and {@code ResultSlot.onTake} keeps
- * consuming grid materials.
- *
- * <p>Contract: see boundaries.md section A (core holds no menu state)
- * and issue 0007 Phase 2 ("core click-sequence planner over the
- * read-only view"). Plans are computed from ONE snapshot; execution
- * must happen while the menu is unchanged (freshly opened menus are
- * the intended regime). Re-planning after foreign mutations is the
- * caller's job — the planner never re-reads between steps.
- *
- * <p>Click economics: one whole-stack lift sources every placement it
- * can, right-clicks deposit exactly one item per grid cell, and any
- * remainder returns to the slot it was lifted from. Mixed recipes are
- * composed by chaining single-material plans — each plan below ends
- * with the carried stack either spent or returned, so the next plan
- * starts from an empty cursor. Chest transfers ride QUICK_MOVE and
- * therefore move WHOLE stacks: withdrawals may overshoot the demanded
- * count rather than split stacks.
+ * Public planner facade: computes click sequences over snapshots of
+ * menus without performing any of them. Dispatch only - the planning
+ * implementations live in {@link CraftingPlanner} (crafting surfaces),
+ * {@link TransferPlanner} (container/furnace transfers, exact-count
+ * split carries) and the shared sourcing primitives in
+ * {@link PlayerRegion}. All plans are computed before the first
+ * click, so an invalid request performs none.
  */
-// contract: see boundaries.md §A (planner reads views; mutation only
-// through the transaction surface)
 public final class MenuPlanner {
 
     /** One click for the executor: pass the triple straight to
@@ -72,60 +52,9 @@ public final class MenuPlanner {
      *                                 count of the item
      */
     public static List<Step> planGridFill(CraftingView menu, String itemId, int... gridPos) {
-        if (itemId == null || itemId.isBlank()) {
-            throw new IllegalArgumentException("itemId must not be null or blank");
-        }
-        if (gridPos == null || gridPos.length == 0) {
-            throw new IllegalArgumentException("at least one grid position is required");
-        }
-
-        for (int p : gridPos) {
-            if (p < 0 || p >= menu.grid().size()) {
-                throw new IllegalArgumentException("grid position " + p + " out of range for a "
-                        + menu.gridSide() + "x" + menu.gridSide()
-                        + " grid");
-            }
-            if (!menu.grid().get(p).isEmpty()) {
-                throw new IllegalArgumentException("target cell " + p + " already holds "
-                        + menu.grid().get(p).item().itemId()
-                        + " — refusing to overwrite");
-            }
-        }
-        for (int i = 0; i < gridPos.length; i++) {
-            for (int j = i + 1; j < gridPos.length; j++) {
-                if (gridPos[i] == gridPos[j]) {
-                    throw new IllegalArgumentException("duplicate grid position " + gridPos[i]);
-                }
-            }
-        }
-
-        Deque<int[]> supply = sourceLedger(menu.menu(), itemId);
-        long available = 0;
-        for (int[] src : supply) {
-            available += src[1];
-        }
-        if (available < gridPos.length) {
-            throw new IllegalArgumentException(
-                    "insufficient " + itemId + ": need " + gridPos.length + ", player region carries " + available);
-        }
-
-        List<Step> steps = new ArrayList<>();
-        int carried = 0;
-        int lastSource = -1;
-        for (int p : gridPos) {
-            if (carried == 0) {
-                int[] src = supply.poll();
-                steps.add(new Step(src[0], 0, MenuClick.PICKUP));
-                carried = src[1];
-                lastSource = src[0];
-            }
-            steps.add(new Step(menu.flatGridIndex(p), 1, MenuClick.PICKUP));
-            carried--;
-        }
-        if (carried > 0) {
-            steps.add(new Step(lastSource, 0, MenuClick.PICKUP));
-        }
-        return List.copyOf(steps);
+        CraftingPlanner.requireFillableGrid(menu, itemId, gridPos);
+        Deque<int[]> supply = CraftingPlanner.checkedSupply(menu, itemId, gridPos.length);
+        return CraftingPlanner.emitGridFill(menu, itemId, supply, gridPos);
     }
 
     /**
@@ -172,31 +101,8 @@ public final class MenuPlanner {
                     recipe.recipeId() + " needs a crafting table; this" + " menu only offers a 2x2 grid");
         }
 
-        Map<String, Integer> supply = playerRegionTotals(menu.menu());
-        // First-fit resolution: ascending pattern positions, first
-        // accepted kind with remaining supply. Grouping by kind keeps
-        // each sub-plan single-material.
-        Map<String, List<Integer>> chosen = new LinkedHashMap<>();
-        for (Integer pos : recipe.placements().keySet()) {
-            String picked = null;
-            for (String candidate : recipe.placements().get(pos)) {
-                Integer left = supply.get(candidate);
-                if (left != null && left > 0) {
-                    picked = candidate;
-                    supply.put(candidate, left - 1);
-                    break;
-                }
-            }
-            if (picked == null) {
-                throw new IllegalArgumentException("cannot source cell " + pos + " of "
-                        + recipe.recipeId() + ": none of "
-                        + recipe.placements().get(pos)
-                        + " remain in the player region");
-            }
-            int row = pos / recipe.patternWidth();
-            int col = pos % recipe.patternWidth();
-            chosen.computeIfAbsent(picked, k -> new ArrayList<>()).add(row * menu.gridSide() + col);
-        }
+        Map<String, Integer> supply = PlayerRegion.totals(menu.menu());
+        Map<String, List<Integer>> chosen = CraftingPlanner.resolvePattern(recipe, supply, menu.gridSide());
 
         List<Step> steps = new ArrayList<>();
         for (Map.Entry<String, List<Integer>> group : chosen.entrySet()) {
@@ -233,16 +139,8 @@ public final class MenuPlanner {
         if (minCount <= 0) {
             throw new IllegalArgumentException("minCount must be positive, got " + minCount);
         }
-        Deque<int[]> sources = new ArrayDeque<>();
-        int available = 0;
-        for (var slot : menu.slots()) {
-            if (slot.role() == SlotRole.CONTAINER
-                    && !slot.isEmpty()
-                    && slot.item().itemId().equals(itemId)) {
-                sources.add(new int[] {slot.index(), slot.item().count()});
-                available += slot.item().count();
-            }
-        }
+        Deque<int[]> sources = new ArrayDeque<>(TransferPlanner.containerStacks(menu, itemId));
+        int available = TransferPlanner.total(sources);
         if (available < minCount) {
             throw new IllegalArgumentException(
                     "insufficient " + itemId + " in container: need " + minCount + ", holds " + available);
@@ -278,7 +176,7 @@ public final class MenuPlanner {
             throw new IllegalArgumentException("itemId must not be null or blank");
         }
         List<Step> steps = new ArrayList<>();
-        for (var slot : playerSlots(menu)) {
+        for (var slot : PlayerRegion.slots(menu)) {
             if (!slot.isEmpty() && slot.item().itemId().equals(itemId)) {
                 steps.add(new Step(slot.index(), 0, MenuClick.QUICK_MOVE));
             }
@@ -325,59 +223,20 @@ public final class MenuPlanner {
         if (count <= 0) {
             throw new IllegalArgumentException("count must be positive, got " + count);
         }
-        int supply = 0;
-        for (var slot : playerSlots(menu)) {
-            if (!slot.isEmpty() && slot.item().itemId().equals(itemId)) {
-                supply += slot.item().count();
-            }
-        }
+        int supply = PlayerRegion.countOf(menu, itemId);
         if (supply < count) {
             throw new IllegalArgumentException("not enough: have " + supply + ", need " + count);
         }
         // Target capacity: empty slots take up to 64, same-item slots
-        // take their headroom. Deposits fill targets in snapshot
-        // order.
-        record Target(int index, int room) {}
-        List<Target> targets = new ArrayList<>();
-        for (var slot : menu.slots()) {
-            if (slot.role() != target) {
-                continue;
-            }
-            int room = slot.isEmpty()
-                    ? 64
-                    : slot.item().itemId().equals(itemId) ? 64 - slot.item().count() : 0;
-            if (room > 0) {
-                targets.add(new Target(slot.index(), room));
-            }
-        }
-        int capacity = targets.stream().mapToInt(Target::room).sum();
+        // take their headroom. Deposits fill targets in snapshot order.
+        List<int[]> targets = TransferPlanner.roomForItem(slot -> slot.role() == target, itemId, menu);
+        int capacity = TransferPlanner.total(targets);
         if (capacity < count) {
             throw new IllegalArgumentException(
                     "target " + target + " cannot hold " + count + " (room " + capacity + ")");
         }
-        Deque<int[]> sources = sourceLedger(menu, itemId);
         List<Step> steps = new ArrayList<>();
-        int remaining = count;
-        int targetIdx = 0;
-        int targetRoom = targets.isEmpty() ? 0 : targets.get(0).room();
-        while (remaining > 0) {
-            int[] source = sources.pop();
-            int take = Math.min(source[1], remaining);
-            int src = source[0];
-            steps.add(new Step(src, 0, MenuClick.PICKUP));
-            for (int placed = 0; placed < take; placed++) {
-                while (targetRoom == 0) {
-                    targetIdx++;
-                    targetRoom = targets.get(targetIdx).room();
-                }
-                steps.add(new Step(targets.get(targetIdx).index(), 1, MenuClick.PICKUP));
-                targetRoom--;
-            }
-            // Return the remainder (a no-op click when the whole
-            // stack was placed: both carried and source are empty).
-            steps.add(new Step(src, 0, MenuClick.PICKUP));
-            remaining -= take;
-        }
+        TransferPlanner.splitCarry(PlayerRegion.ledger(menu, itemId), targets, count, steps);
         return List.copyOf(steps);
     }
 
@@ -415,104 +274,16 @@ public final class MenuPlanner {
         }
         // Counted take: destination = first player slots with room
         // (empty, or same-item headroom under the 64 assumption).
-        List<int[]> sourceStacks = new ArrayList<>();
-        int available = 0;
-        for (var slot : menu.slots()) {
-            if (slot.role() == source && !slot.isEmpty()) {
-                sourceStacks.add(new int[] {slot.index(), slot.item().count()});
-                available += slot.item().count();
-            }
-        }
+        List<int[]> sourceStacks = TransferPlanner.roleStacks(menu, source);
+        int available = TransferPlanner.total(sourceStacks);
         int planned = Math.min(available, count);
-        List<int[]> destinations = new ArrayList<>();
-        int destRoom = 0;
-        for (var slot : menu.slots()) {
-            if (!playerRegion(slot)) {
-                continue;
-            }
-            int room = slot.isEmpty() ? 64 : 64 - slot.item().count();
-            if (room > 0) {
-                destinations.add(new int[] {slot.index(), room});
-                destRoom += room;
-            }
-        }
+        List<int[]> destinations = TransferPlanner.roomOnPlayerSlots(menu);
+        int destRoom = TransferPlanner.total(destinations);
         if (destRoom < planned) {
             throw new IllegalArgumentException(
                     "player inventory cannot hold the take (room " + destRoom + ", need " + planned + ")");
         }
-        int remaining = planned;
-        int destIdx = 0;
-        int room = destinations.isEmpty() ? 0 : destinations.get(0)[1];
-        for (int[] stack : sourceStacks) {
-            if (remaining <= 0) {
-                break;
-            }
-            int take = Math.min(stack[1], remaining);
-            int src = stack[0];
-            steps.add(new Step(src, 0, MenuClick.PICKUP));
-            for (int taken = 0; taken < take; taken++) {
-                while (room == 0) {
-                    destIdx++;
-                    room = destinations.get(destIdx)[1];
-                }
-                steps.add(new Step(destinations.get(destIdx)[0], 1, MenuClick.PICKUP));
-                room--;
-            }
-            steps.add(new Step(src, 0, MenuClick.PICKUP));
-            remaining -= take;
-        }
+        TransferPlanner.splitCarry(sourceStacks, destinations, planned, steps);
         return List.copyOf(steps);
-    }
-
-    private static boolean playerRegion(SlotView slot) {
-        return slot.role() == SlotRole.MAIN || slot.role() == SlotRole.HOTBAR;
-    }
-
-    /**
-     * Player-region slots in snapshot order (MAIN before HOTBAR on
-     * every current menu kind) — the single supply pool every plan
-     * sources from and returns remainder to.
-     *
-     * @param menu the full snapshot; never null
-     * @return the matching slots in snapshot order; never null
-     */
-    private static List<SlotView> playerSlots(MenuView menu) {
-        return menu.slots().stream().filter(MenuPlanner::playerRegion).toList();
-    }
-
-    /**
-     * Collects the player-region slots holding the item, in snapshot
-     * order (MAIN before HOTBAR on every current menu kind).
-     *
-     * @param menu   the full snapshot; never null
-     * @param itemId the item to source; never null
-     * @return queue of {flat slot, count} pairs, front = first source;
-     *         never null
-     */
-    private static Deque<int[]> sourceLedger(MenuView menu, String itemId) {
-        Deque<int[]> ledger = new ArrayDeque<>();
-        for (var slot : playerSlots(menu)) {
-            if (!slot.isEmpty() && slot.item().itemId().equals(itemId)) {
-                ledger.add(new int[] {slot.index(), slot.item().count()});
-            }
-        }
-        return ledger;
-    }
-
-    /**
-     * Total carried count per item kind across the player region —
-     * the supply pool recipe resolution draws from.
-     *
-     * @param menu the full snapshot; never null
-     * @return item id → total count; never null, possibly empty
-     */
-    private static Map<String, Integer> playerRegionTotals(MenuView menu) {
-        Map<String, Integer> totals = new LinkedHashMap<>();
-        for (var slot : playerSlots(menu)) {
-            if (!slot.isEmpty()) {
-                totals.merge(slot.item().itemId(), slot.item().count(), Integer::sum);
-            }
-        }
-        return totals;
     }
 }

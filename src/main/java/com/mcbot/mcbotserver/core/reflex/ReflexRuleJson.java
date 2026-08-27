@@ -1,16 +1,15 @@
 package com.mcbot.mcbotserver.core.reflex;
 
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.mcbot.mcbotserver.api.reflex.ReflexRule;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 /**
- * Parser for the data-driven reflex rule table - the JSON shape of
- * the seam ADR-0003 promises is rewritable. Pure Java, offline
- * testable; the adapter only feeds it bytes and applies the result.
+ * Codec facade for the data-driven reflex rule table - the JSON shape
+ * of the seam ADR-0003 promises is rewritable. Parsing lives in
+ * {@link ReflexRuleJsonReader}; this class owns the symmetric writer
+ * so tests and future tooling can generate tables programmatically.
  *
  * <p>Format (one file, datapack path {@code
  * data/mcbotserver/reflex_rules.json}):
@@ -21,10 +20,6 @@ import java.util.Objects;
  *    "threshold": 10.0, "priority": 100}
  * ]}
  * }</pre>
- *
- * <p>Unknown rule types and out-of-range parameters are hard errors:
- * a silently ignored typo would leave a bot believing it has a
- * safety reflex it does not have.
  */
 public final class ReflexRuleJson {
 
@@ -42,24 +37,7 @@ public final class ReflexRuleJson {
      *                                  offending detail in the message
      */
     public static List<ReflexRule> parse(String json) {
-        Objects.requireNonNull(json, "json");
-        JsonObject root;
-        try {
-            root = JsonParser.parseString(json).getAsJsonObject();
-        } catch (RuntimeException e) {
-            throw new IllegalArgumentException("rule table is not a JSON object", e);
-        }
-        if (!root.has("rules") || !root.get("rules").isJsonArray()) {
-            throw new IllegalArgumentException("rule table needs a \"rules\" array");
-        }
-        var out = new ArrayList<ReflexRule>();
-        for (var element : root.getAsJsonArray("rules")) {
-            if (!element.isJsonObject()) {
-                throw new IllegalArgumentException("every rule must be an object");
-            }
-            out.add(parseRule(element.getAsJsonObject()));
-        }
-        return List.copyOf(out);
+        return ReflexRuleJsonReader.parse(json);
     }
 
     /**
@@ -74,155 +52,40 @@ public final class ReflexRuleJson {
         var root = new JsonObject();
         var array = new com.google.gson.JsonArray();
         for (ReflexRule rule : rules) {
-            var entry = new JsonObject();
-            entry.addProperty("type", rule.name());
-            if (rule instanceof FreezeOnLowHealthRule freeze) {
-                entry.addProperty("threshold", freeze.threshold());
-                entry.addProperty("priority", freeze.priority());
-            } else if (rule instanceof SurfaceOnLowAirRule surface) {
-                entry.addProperty("trigger", surface.trigger());
-                entry.addProperty("release", surface.release());
-                entry.addProperty("priority", surface.priority());
-            } else if (rule instanceof EngageOnHostileProximityRule engage) {
-                entry.addProperty("trigger", engage.trigger());
-                entry.addProperty("release", engage.release());
-                entry.addProperty("priority", engage.priority());
-            } else if (rule instanceof EscapeLavaRule lava) {
-                entry.addProperty("priority", lava.priority());
-            } else if (rule instanceof ExtinguishFireRule fire) {
-                entry.addProperty("priority", fire.priority());
-            } else if (rule instanceof DigOnSuffocationRule wall) {
-                entry.addProperty("priority", wall.priority());
-            } else if (rule instanceof ClimbOutOfPowderSnowRule snow) {
-                entry.addProperty("trigger", snow.trigger());
-                entry.addProperty("priority", snow.priority());
-            } else {
-                throw new IllegalArgumentException(
-                        "no JSON form for rule type: " + rule.getClass().getSimpleName());
-            }
-            array.add(entry);
+            array.add(entryFor(rule));
         }
         root.add("rules", array);
         return root.toString();
     }
 
-    private static ReflexRule parseRule(JsonObject rule) {
-        if (!rule.has("type")) {
-            throw new IllegalArgumentException("rule needs a \"type\"");
+    /** One document entry: the rule's type tag plus its tunable fields. */
+    private static JsonObject entryFor(ReflexRule rule) {
+        var entry = new JsonObject();
+        entry.addProperty("type", rule.name());
+        if (rule instanceof FreezeOnLowHealthRule freeze) {
+            entry.addProperty("threshold", freeze.threshold());
+            entry.addProperty("priority", freeze.priority());
+        } else if (rule instanceof SurfaceOnLowAirRule surface) {
+            entry.addProperty("trigger", surface.trigger());
+            entry.addProperty("release", surface.release());
+            entry.addProperty("priority", surface.priority());
+        } else if (rule instanceof EngageOnHostileProximityRule engage) {
+            entry.addProperty("trigger", engage.trigger());
+            entry.addProperty("release", engage.release());
+            entry.addProperty("priority", engage.priority());
+        } else if (rule instanceof EscapeLavaRule lava) {
+            entry.addProperty("priority", lava.priority());
+        } else if (rule instanceof ExtinguishFireRule fire) {
+            entry.addProperty("priority", fire.priority());
+        } else if (rule instanceof DigOnSuffocationRule wall) {
+            entry.addProperty("priority", wall.priority());
+        } else if (rule instanceof ClimbOutOfPowderSnowRule snow) {
+            entry.addProperty("trigger", snow.trigger());
+            entry.addProperty("priority", snow.priority());
+        } else {
+            throw new IllegalArgumentException(
+                    "no JSON form for rule type: " + rule.getClass().getSimpleName());
         }
-        String type = rule.get("type").getAsString();
-        if ("FREEZE_ON_LOW_HEALTH".equals(type)) {
-            return freezeRule(rule);
-        }
-        if ("SURFACE_ON_LOW_AIR".equals(type)) {
-            return surfaceRule(rule);
-        }
-        if ("ENGAGE_ON_HOSTILE_PROXIMITY".equals(type)) {
-            return engageRule(rule);
-        }
-        if ("ESCAPE_ON_LAVA".equals(type)) {
-            return escapeLavaRule(rule);
-        }
-        if ("EXTINGUISH_FIRE".equals(type)) {
-            return extinguishFireRule(rule);
-        }
-        if ("DIG_ON_SUFFOCATION".equals(type)) {
-            return suffocationRule(rule);
-        }
-        if ("CLIMB_OUT_OF_POWDER_SNOW".equals(type)) {
-            return climbPowderSnowRule(rule);
-        }
-        throw new IllegalArgumentException("unknown rule type: " + type);
-    }
-
-    private static ReflexRule freezeRule(JsonObject rule) {
-        float threshold =
-                rule.has("threshold") ? rule.get("threshold").getAsFloat() : FreezeOnLowHealthRule.FREEZE_THRESHOLD;
-        int priority = rule.has("priority") ? rule.get("priority").getAsInt() : FreezeOnLowHealthRule.FREEZE_PRIORITY;
-        try {
-            return new FreezeOnLowHealthRule(threshold, priority);
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("FREEZE_ON_LOW_HEALTH: " + e.getMessage(), e);
-        }
-    }
-
-    private static ReflexRule surfaceRule(JsonObject rule) {
-        int trigger = rule.has("trigger") ? rule.get("trigger").getAsInt() : SurfaceOnLowAirRule.TRIGGER_AIR;
-        int release = rule.has("release") ? rule.get("release").getAsInt() : SurfaceOnLowAirRule.RELEASE_AIR;
-        int priority = rule.has("priority") ? rule.get("priority").getAsInt() : SurfaceOnLowAirRule.SURFACE_PRIORITY;
-        try {
-            return new SurfaceOnLowAirRule(trigger, release, priority);
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("SURFACE_ON_LOW_AIR: " + e.getMessage(), e);
-        }
-    }
-
-    private static ReflexRule engageRule(JsonObject rule) {
-        double trigger =
-                rule.has("trigger") ? rule.get("trigger").getAsDouble() : EngageOnHostileProximityRule.TRIGGER_DISTANCE;
-        double release =
-                rule.has("release") ? rule.get("release").getAsDouble() : EngageOnHostileProximityRule.RELEASE_DISTANCE;
-        int priority =
-                rule.has("priority") ? rule.get("priority").getAsInt() : EngageOnHostileProximityRule.ENGAGE_PRIORITY;
-        try {
-            return new EngageOnHostileProximityRule(trigger, release, priority);
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("ENGAGE_ON_HOSTILE_PROXIMITY: " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Boolean-condition ESCAPE rules carry only their priority -
-     * trigger and release are code-level constants (the inverted 0/1
-     * signal's thresholds are not tunable data), so the JSON form
-     * stays one field wide. ESCAPE_ON_LAVA is the renamed successor
-     * of ASCEND_IN_LETHAL_FLUID (issue 0008 D2): the old type string
-     * is intentionally a hard parse error now - a datapack still
-     * naming it must be updated, never silently ignored.
-     * EXTINGUISH_FIRE is the D5-revised fire find-water rule (issue
-     * 0008 D5): fires only in the burn-to-death band.
-     */
-    private static ReflexRule escapeLavaRule(JsonObject rule) {
-        int priority = rule.has("priority") ? rule.get("priority").getAsInt() : EscapeLavaRule.LAVA_ESCAPE_PRIORITY;
-        try {
-            return new EscapeLavaRule(priority);
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("ESCAPE_ON_LAVA: " + e.getMessage(), e);
-        }
-    }
-
-    private static ReflexRule extinguishFireRule(JsonObject rule) {
-        int priority =
-                rule.has("priority") ? rule.get("priority").getAsInt() : ExtinguishFireRule.FIRE_EXTINGUISH_PRIORITY;
-        try {
-            return new ExtinguishFireRule(priority);
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("EXTINGUISH_FIRE: " + e.getMessage(), e);
-        }
-    }
-
-    private static ReflexRule suffocationRule(JsonObject rule) {
-        int priority =
-                rule.has("priority") ? rule.get("priority").getAsInt() : DigOnSuffocationRule.SUFFOCATION_PRIORITY;
-        try {
-            return new DigOnSuffocationRule(priority);
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("DIG_ON_SUFFOCATION: " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Powder-snow freeze climb carries trigger + priority only -
-     * freezeTicks changes at most 2/tick so no hysteresis deadband
-     * is needed (same flat-priority shape as EscapeLavaRule).
-     */
-    private static ReflexRule climbPowderSnowRule(JsonObject rule) {
-        int trigger = rule.has("trigger") ? rule.get("trigger").getAsInt() : ClimbOutOfPowderSnowRule.TRIGGER_FREEZE;
-        int priority = rule.has("priority") ? rule.get("priority").getAsInt() : ClimbOutOfPowderSnowRule.CLIMB_PRIORITY;
-        try {
-            return new ClimbOutOfPowderSnowRule(trigger, priority);
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("CLIMB_OUT_OF_POWDER_SNOW: " + e.getMessage(), e);
-        }
+        return entry;
     }
 }
