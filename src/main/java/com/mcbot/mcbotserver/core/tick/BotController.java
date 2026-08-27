@@ -127,15 +127,26 @@ public final class BotController {
     /** Mission TASK_* emission and hand-off edge detection. */
     private final MissionReporter missions;
     /** Reflex-owned ENGAGE fight seat bookkeeping. */
-    private final ReflexEngageSeat engageSeat;
+    /** Engage-seat resubmit cadence (fights resolve fast). */
+    private static final int ENGAGE_RESUBMIT_COOLDOWN = 40;
+
+    /** Pathing-seat resubmit cadence (rescue and forage missions). */
+    private static final int PATHING_RESUBMIT_COOLDOWN = 80;
+
+    private final ReflexMissionSeat engageSeat;
     /**
      * Reflex-owned ESCAPE rescue mission factory; null degrades ESCAPE
      * decisions to the freeze hold (rigs without rescue wiring park
      * the mission instead of routing to safety).
      */
     private final Supplier<BotProcess> rescueMissionFactory;
+    /** Supplies one fresh forage mission per acquire submission. */
+    private final Supplier<BotProcess> hungryMissionFactory;
     /** Reflex-owned ESCAPE rescue seat bookkeeping. */
-    private final ReflexRescueSeat rescueSeat;
+    private final ReflexMissionSeat rescueSeat;
+
+    /** Reflex-owned forage mission seat (ledger 34, HungryProcess). */
+    private final ReflexMissionSeat hungrySeat;
 
     private long tickCounter;
     private boolean crashed;
@@ -268,6 +279,58 @@ public final class BotController {
             CrashReporter crashReporter,
             Supplier<BotProcess> engageMissionFactory,
             Supplier<BotProcess> rescueMissionFactory) {
+        this(
+                reflex,
+                arbiter,
+                behaviors,
+                actor,
+                positionSource,
+                healthSource,
+                clock,
+                events,
+                crashReporter,
+                engageMissionFactory,
+                rescueMissionFactory,
+                null);
+    }
+
+    /**
+     * Assembles the pipeline with combat, rescue, and forage wiring.
+     * All collaborators stay plain constructor arguments - no service
+     * lookup, no optional wiring.
+     *
+     * @param reflex        survival bypass; never null
+     * @param arbiter       task-channel winner selector; never null
+     * @param behaviors     execution tier; never null, may be empty
+     * @param actor         claim surface; never null
+     * @param positionSource body position accessor; never null
+     * @param healthSource  body health accessor; never null
+     * @param clock         game-time accessor; never null
+     * @param events        event stream for the primary crash channel;
+     *                      never null
+     * @param crashReporter fallback reporter; never null
+     * @param engageMissionFactory supplies one fresh defend mission
+     *                      per reflex engage submission; may be null
+     * @param rescueMissionFactory supplies one fresh rescue mission
+     *                      per reflex escape submission; may be null
+     * @param hungryMissionFactory supplies one fresh forage mission
+     *                      (HungryProcess) per acquire-food reflex
+     *                      submission; may be null - FORAGE then
+     *                      degrades to the freeze hold
+     */
+    public BotController(
+            SurvivalReflexLayer reflex,
+            TaskArbiter arbiter,
+            List<Behavior> behaviors,
+            Actor actor,
+            CellPositionSource positionSource,
+            HealthSource healthSource,
+            GameClock clock,
+            EventQueue events,
+            CrashReporter crashReporter,
+            Supplier<BotProcess> engageMissionFactory,
+            Supplier<BotProcess> rescueMissionFactory,
+            Supplier<BotProcess> hungryMissionFactory) {
         this.reflex = Objects.requireNonNull(reflex, "reflex");
         this.arbiter = Objects.requireNonNull(arbiter, "arbiter");
         this.behaviors = List.copyOf(behaviors);
@@ -279,9 +342,11 @@ public final class BotController {
         this.crashReporter = Objects.requireNonNull(crashReporter, "crashReporter");
         this.engageMissionFactory = engageMissionFactory;
         this.rescueMissionFactory = rescueMissionFactory;
+        this.hungryMissionFactory = hungryMissionFactory;
         this.missions = new MissionReporter(arbiter, events);
-        this.engageSeat = new ReflexEngageSeat(arbiter);
-        this.rescueSeat = new ReflexRescueSeat(arbiter);
+        this.engageSeat = new ReflexMissionSeat(arbiter, ENGAGE_RESUBMIT_COOLDOWN);
+        this.rescueSeat = new ReflexMissionSeat(arbiter, PATHING_RESUBMIT_COOLDOWN);
+        this.hungrySeat = new ReflexMissionSeat(arbiter, PATHING_RESUBMIT_COOLDOWN);
         this.claimInjector = new ReflexClaimInjector(actor, positionSource::get);
     }
 
@@ -500,6 +565,7 @@ public final class BotController {
         long tod = clock.timeOfDayTicks();
         engageSeat.tickCooldown();
         rescueSeat.tickCooldown();
+        hungrySeat.tickCooldown();
 
         // Stage 1: reflex bypass — non-null decision skips the mission,
         // except the ENGAGE kind, which spends exactly one tick on the
@@ -600,6 +666,13 @@ public final class BotController {
         if (engageDecision && engageMissionFactory != null) {
             return handoffToSeat(engageSeat, engageMissionFactory, decision, day, tod);
         }
+        if (decision.action() == ReflexAction.FORAGE && hungryMissionFactory != null) {
+            // FORAGE hands off the food-acquisition mission (ledger
+            // 34): a factory finding no bush returns a mission that
+            // fails fast as FOOD_STRATEGY_EXHAUSTED, or null degrades
+            // to the freeze hold - same shape as the rescue handoff.
+            return handoffToSeat(hungrySeat, hungryMissionFactory, decision, day, tod);
+        }
         if (decision.action() == ReflexAction.ESCAPE && rescueMissionFactory != null) {
             // ESCAPE hands off a pathing goal (lava shore, water
             // source); a factory finding no reachable target returns
@@ -640,13 +713,14 @@ public final class BotController {
      *                    this tick
      */
     private void resumeParkedMission(boolean reflexFired, long day, long tod) {
-        boolean fightIsParked = engageSeat.fightIsParked();
-        boolean fightAwaitingSeat = engageSeat.fightAwaitingSeat();
-        boolean rescueIsParked = rescueSeat.rescueIsParked();
-        boolean rescueAwaitingSeat = rescueSeat.rescueAwaitingSeat();
+        boolean reflexMissionParked =
+                engageSeat.missionIsParked() || rescueSeat.missionIsParked() || hungrySeat.missionIsParked();
+        boolean reflexMissionAwaiting = engageSeat.missionAwaitingSeat()
+                || rescueSeat.missionAwaitingSeat()
+                || hungrySeat.missionAwaitingSeat();
         if (arbiter.paused() != null
                 && arbiter.current() == null
-                && (fightIsParked || rescueIsParked || (!reflexFired && !fightAwaitingSeat && !rescueAwaitingSeat))) {
+                && (reflexMissionParked || (!reflexFired && !reflexMissionAwaiting))) {
             BotProcess resuming = arbiter.paused();
             String resumingTask = resuming.displayName();
             String resumingId = (resuming instanceof TerminalMission tm) ? tm.missionTaskId() : null;

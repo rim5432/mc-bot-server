@@ -87,7 +87,7 @@ public final class BotBodyEntity extends PathfinderMob {
      * vanilla {@link net.minecraft.world.food.FoodData} owned and
      * ticked by the carrier - Path A facade, user ruling 2026-08-27.
      * FoodData has zero Player-field dependencies except its
-     * {@code tick(Player)} signature; {@link #tickHunger()} carries
+     * {@code tick(Player)} signature; {@link HungerTicker#tick} carries
      * the same math with {@code this} in the player's seat
      * (decompiled FoodData.java, dossier 2026-08-27).
      */

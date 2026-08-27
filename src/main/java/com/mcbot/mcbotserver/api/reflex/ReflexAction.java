@@ -84,5 +84,18 @@ public enum ReflexAction {
      * this action: that is issue 0010's escalation contract, not a
      * body reflex.
      */
-    EAT
+    EAT,
+
+    /**
+     * Submit a reflex-owned forage mission (issue 0010, ledger 34):
+     * the controller parks the current mission for one tick (FREEZE
+     * hold) and submits a HungryProcess to the arbiter through the
+     * forage seat - the same handoff shape as ENGAGE and ESCAPE. The
+     * rule only fires hungry-without-food; the mission walks to the
+     * sensed berry bush, digs it, and completes when pickup lands
+     * food in inventory - from there the EAT reflex chews. A
+     * factory-less or sensor-empty handoff degrades to the freeze
+     * hold (park and escalate per 0010 section 5).
+     */
+    FORAGE
 }

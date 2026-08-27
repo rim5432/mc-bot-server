@@ -38,6 +38,11 @@
       "type": "EAT_WHEN_HUNGRY",
       "trigger": 16,
       "priority": 85
+    },
+    {
+      "type": "ACQUIRE_FOOD_WHEN_HUNGRY",
+      "trigger": 16,
+      "priority": 80
     }
   ]
 }

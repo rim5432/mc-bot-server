@@ -553,3 +553,19 @@ Amendment chains recorded so far (both sides annotated):
     safe-defaulted 20/5.0/-1. Hungry-with-no-food never fires a
     reflex - acquisition (forage/hunt/fish, HungryProcess) stays
     open in 0010 as the escalation side.
+    35. Third reflex seat landed with the reserved promotion
+    (2026-08-27): the arch-drift no-generalization ruling held seat
+    dispatch un-promoted until the third seat existed; landing the
+    forage trigger was that event. ReflexMissionSeat now unifies the
+    ENGAGE/ESCAPE mirror classes (they differed only in cooldown
+    constant and naming) - the controller's resume dispatch is
+    seat-generic, a fourth seat is one construction away, and
+    EngageReflexGateTest stayed green through the refactor.
+    ReflexAction.FORAGE + rule ACQUIRE_FOOD_WHEN_HUNGRY (priority
+    80, one rung below EAT) is the eat rule's EXACT complement:
+    hungry-with-food eats, hungry-without-food forages, the pair is
+    mutually exclusive by construction (pinned). HungryProcess rides
+    the seat (HungryProcess v1, FOOD_STRATEGY_EXHAUSTED escalation
+    per 0010 section 5); ReflexRuleJsonReader carries a
+    GodClass-suppression ruling - it is a flat type->factory
+    registry whose cohesion metric reads 0% by construction.

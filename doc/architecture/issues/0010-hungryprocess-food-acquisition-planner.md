@@ -6,7 +6,7 @@ covers:
   - doc/architecture/boundaries.md
   - src/main/java/com/mcbot/mcbotserver/api/reflex/ThreatBlackboard.java
   - src/main/java/com/mcbot/mcbotserver/core/process/
-status: open (consumption LANDED 2026-08-27: carrier FoodData lifecycle + EAT_WHEN_HUNGRY reflex, ledger 34; ground pickup + ForageSensor + HungryProcess v1 (forage, offline-gated) landed the same day - REMAINING: the third reflex-owned seat trigger, the promotion point the arch-drift ruling reserved, plus hunt/fish strategies)
+status: open (forage strategy COMPLETE 2026-08-27: consumption reflex (ledger 34) + ground pickup + ForageSensor + HungryProcess + the third reflex seat with ACQUIRE_FOOD_WHEN_HUNGRY (ledger 35, seat dispatch promoted to ReflexMissionSeat). REMAINING: hunt/fish strategies only)
 related:
   - doc/architecture/issues/0008-extreme-scenario-survival-framework.md
   - doc/architecture/issues/0007-player-parity-interaction.md

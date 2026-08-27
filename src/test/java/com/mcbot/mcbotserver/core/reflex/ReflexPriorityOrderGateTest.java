@@ -53,6 +53,8 @@ class ReflexPriorityOrderGateTest {
         // Issue 0010 D6: combat first, hunger is routine - the eat
         // reflex sits below ENGAGE.
         expect("EAT_WHEN_HUNGRY", 85);
+        // Acquisition is the eat rule's complement, one rung below.
+        expect("ACQUIRE_FOOD_WHEN_HUNGRY", 80);
     }
 
     private static final Pattern BLOCK = Pattern.compile("\\{[^{}]*}");

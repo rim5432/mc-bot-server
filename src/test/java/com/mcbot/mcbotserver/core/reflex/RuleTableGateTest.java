@@ -190,7 +190,8 @@ class RuleTableGateTest {
                         "EXTINGUISH_FIRE",
                         "CLIMB_OUT_OF_POWDER_SNOW",
                         "ENGAGE_ON_HOSTILE_PROXIMITY",
-                        "EAT_WHEN_HUNGRY"),
+                        "EAT_WHEN_HUNGRY",
+                        "ACQUIRE_FOOD_WHEN_HUNGRY"),
                 names,
                 "the datapack table and the code default table must stay "
                         + "in lockstep or /reload silently drops rules");

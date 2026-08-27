@@ -100,7 +100,7 @@ final class HungerTicker {
             Difficulty difficulty = body.level().getDifficulty();
             if (body.getHealth() > 10.0F
                     || difficulty == Difficulty.HARD
-                    || body.getHealth() > 1.0F && difficulty == Difficulty.NORMAL) {
+                    || (body.getHealth() > 1.0F && difficulty == Difficulty.NORMAL)) {
                 body.hurt(body.damageSources().starve(), 1.0F);
             }
             tickTimer = 0;

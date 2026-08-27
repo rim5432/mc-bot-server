@@ -16,6 +16,12 @@ import java.util.Objects;
  * a silently ignored typo would leave a bot believing it has a
  * safety reflex it does not have.
  */
+// Ruling (2026-08-27 third-seat round): this class is a flat type->
+// factory registry - one leaf method per rule kind, zero shared
+// fields, so GodClass's cohesion axis reads 0% by construction and
+// cannot see registry shape. Suppressed with the ruling; the WMC
+// growth lever is the FACTORIES map, not method sprawl.
+@SuppressWarnings("PMD.GodClass")
 final class ReflexRuleJsonReader {
 
     private ReflexRuleJsonReader() {}
@@ -62,7 +68,8 @@ final class ReflexRuleJsonReader {
                     "EXTINGUISH_FIRE", ReflexRuleJsonReader::extinguishFireRule,
                     "DIG_ON_SUFFOCATION", ReflexRuleJsonReader::suffocationRule,
                     "CLIMB_OUT_OF_POWDER_SNOW", ReflexRuleJsonReader::climbPowderSnowRule,
-                    "EAT_WHEN_HUNGRY", ReflexRuleJsonReader::eatRule);
+                    "EAT_WHEN_HUNGRY", ReflexRuleJsonReader::eatRule,
+                    "ACQUIRE_FOOD_WHEN_HUNGRY", ReflexRuleJsonReader::acquireRule);
 
     private static ReflexRule parseRule(JsonObject rule) {
         if (!rule.has("type")) {
@@ -187,6 +194,20 @@ final class ReflexRuleJsonReader {
             return new EatWhenHungryRule(trigger, priority);
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("EAT_WHEN_HUNGRY: " + e.getMessage(), e);
+        }
+    }
+    /**
+     * Acquire-food-when-hungry carries trigger + priority only - it
+     * fires exactly when the eat rule cannot (hungry, no sensed
+     * food) and hands off to the forage seat (flat priority shape).
+     */
+    private static ReflexRule acquireRule(JsonObject rule) {
+        int trigger = fInt(rule, "trigger", AcquireFoodWhenHungryRule.TRIGGER_FOOD);
+        int priority = fInt(rule, "priority", AcquireFoodWhenHungryRule.ACQUIRE_PRIORITY);
+        try {
+            return new AcquireFoodWhenHungryRule(trigger, priority);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("ACQUIRE_FOOD_WHEN_HUNGRY: " + e.getMessage(), e);
         }
     }
 }

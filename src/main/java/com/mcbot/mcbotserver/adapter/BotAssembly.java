@@ -200,6 +200,9 @@ public final class BotAssembly {
         // Eat reflex sits below ENGAGE (0010 D6: combat first) and
         // only fires while the sensor sees both hunger and food.
         reflex.addRule(new com.mcbot.mcbotserver.core.reflex.EatWhenHungryRule());
+        // Acquisition is the eat rule's complement (0010): fires only
+        // hungry-without-food, hands off to the forage seat.
+        reflex.addRule(new com.mcbot.mcbotserver.core.reflex.AcquireFoodWhenHungryRule());
 
         Behavior mover = new PathingBehavior(
                 "mover",
@@ -231,6 +234,20 @@ public final class BotAssembly {
         // the FREEZE hold (park and escalate).
         Supplier<com.mcbot.mcbotserver.api.process.BotProcess> rescueFactory = new RescueMissionFactory(view, body);
 
+        // One fresh reflex-owned forage mission per acquire
+        // submission (ledger 34): the sensor runs once per mission,
+        // and a berry-less range lands FOOD_STRATEGY_EXHAUSTED.
+        var forageCounter = new AtomicInteger();
+        Supplier<com.mcbot.mcbotserver.api.process.BotProcess> forageFactory =
+                () -> new com.mcbot.mcbotserver.core.process.HungryProcess(
+                        "reflex-forage-" + forageCounter.incrementAndGet(),
+                        com.mcbot.mcbotserver.api.process.PriorityBands.requireLegal(50),
+                        600,
+                        () -> poseOf(body),
+                        () -> com.mcbot.mcbotserver.adapter.sensing.ForageSensor.nearestBerryBush(
+                                level, poseOf(body), 16),
+                        new VanillaFoodCatalog());
+
         BotController controller = new BotController(
                 reflex,
                 arbiter,
@@ -242,7 +259,8 @@ public final class BotAssembly {
                 events,
                 CrashReporter.consoleFallback(),
                 engageFactory,
-                rescueFactory);
+                rescueFactory,
+                forageFactory);
         // The eat reflex executes against the same best-food ranking
         // the sensor stamps (one source of truth for both ends).
         controller.setEatSlotSupplier(bestFoodSlot);

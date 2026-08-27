@@ -139,16 +139,17 @@ landed (archive). Remaining:
            Offline: EatWhenHungryRuleTest + gate updates; gametests
            eatsWhenHungry + food-driven regen rewrite staged pending
            engine (live server holds run/world).
-  - [ ] L  HungryProcess acquisition per 0010 sections 4-5. Landed
-           2026-08-27: ground pickup (GroundPickup, gametest staged),
-           ForageSensor (once-per-mission berry-bush scan), and
-           HungryProcess v1 (SEEK -> DIG via DigMission claims ->
-           FOOD_ACQUIRED; FOOD_STRATEGY_EXHAUSTED one-shot budget;
-           HungryProcessTest x6) - offline-gated, unwired. The
-           trigger is the THIRD reflex-owned seat: the promotion
-           point the arch-drift no-generalization ruling reserved
-           (generalize seat dispatch when it lands). Hunt/fish
-           strategies follow.                      [dep: none]
+  - [x] M  Forage strategy COMPLETE (2026-08-27, ledger 35): the
+           third reflex seat landed with the reserved promotion -
+           ReflexMissionSeat unifies the fight/rescue mirror classes
+           (EngageReflexGateTest stayed green through the refactor),
+           FORAGE action + ACQUIRE_FOOD_WHEN_HUNGRY (80, the eat
+           rule's exact complement, exclusivity-pinned) hands off to
+           HungryProcess through it.
+  - [ ] M  Hunt strategy: passive-mob target classification (0010
+           D3) + drop collection follow-up.          [dep: none]
+  - [ ] M  Fish strategy: rod-cast timing behavior (0010 section 7
+           open dependency).                          [dep: none]
   - [ ] M  Loop acceptance: unattended mine -> craft -> equip ->
            fight -> eat driven through boundary-D verbs only,
            recorded verdict in tool/sessions/ (wait exit codes
