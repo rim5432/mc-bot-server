@@ -10,6 +10,8 @@ import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventBatch;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.state.BotState;
+import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.core.state.BotStateJson;
 import com.mcbot.mcbotserver.testsupport.RepoRoot;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -200,6 +202,31 @@ class WireVocabularyGateTest {
                 "currentTaskSummary",
                 "healthHearts",
                 "freeSlots");
+    }
+
+    /** Pins the serialized wire keys of the state snapshot: the
+     *  record-component pin above freezes the shape, this freezes
+     *  the JSON dialect - five components serialize to shortened
+     *  keys and nothing may rename either side independently
+     *  (H-R4: the key survives field renames). */
+    @Test
+    void stateJsonWireKeysStayFrozen() {
+        BotState sample = new BotState(
+                new CellPos(1, 2, 3),
+                10.0f,
+                20.0f,
+                "minecraft:overworld",
+                Map.of("minecraft:stone", 5),
+                2,
+                Map.of(),
+                "goto:task-1",
+                8,
+                12);
+        var obj = BotStateJson.toJsonObject(sample);
+        assertEquals(
+                Set.of("pos", "yaw", "pitch", "dim", "items", "slot", "effects", "task", "healthHearts", "freeSlots"),
+                obj.keySet(),
+                "serialized state wire keys drifted; the mapping is " + "documented at boundaries.md (decision 32)");
     }
 
     private static void assertComponents(Class<?> record, String... expected) {

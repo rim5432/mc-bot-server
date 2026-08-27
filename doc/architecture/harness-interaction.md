@@ -53,7 +53,7 @@ Six verbs plus an admin escape hatch, and nothing else ever:
 | `write` | `write <path> <value>` | mutate the noun the path names |
 | `wait` | `wait <taskId> [--timeout S]` | join a job; exit code is the verdict |
 | `events` | `events [--since N] [--only PREFIX] [--follow] [--idle S]` | event drain; peeking never advances the cursor |
-| `admin` | `mc admin stop\|reset` | deliberately OUTSIDE the namespace; operator verbs are not harness vocabulary |
+| `admin` | `mc admin stop\|reset\|dump-recipes` | deliberately OUTSIDE the namespace; operator verbs are not harness vocabulary |
 
 Canonical path roots (this table is where they live; a new row
 ships with its process issue but lands here - decision 33
@@ -62,17 +62,21 @@ superseding decision 28's table-lives-in-the-issue clause):
 | Root | Carries | Writer shape |
 |---|---|---|
 | `/tasks/` | job family: `goto` `dig` `mine`, `<id>` (cat), `<id>/cancel` | value encodes args; receipt is a taskId |
-| `/player/` | `health`, `inventory/free`, `menu` (pending 0012 D3) | read-only |
+| `/player/` | `health`, `inventory/free`, `menu` (pending 0012 D1) | read-only |
 | `/blocks/<x,y,z>` | one cell; volume reads aggregate nearby | endgame write target (section 10) |
 | `/entities/` | nearby entity list, distance-sorted | read-only |
+| `/nearby/` | nearby entity digest (distance-sorted, self-flagged) | read-only; rides the `entities` wire verb |
+| `/actions/` | one-shot synchronous mutations: `place` (x,y,z,face), `equip` (hotbar slot 0..8) | sync reply is the verdict (0013); not jobs, no taskId |
 | `/recipes/<slug>` | recipe pages, materialized to disk (section 6) | read-only; `dump-recipes` refreshes |
 | `/stations/<type>@<x,y,z>/<role>` | workstation sessions | last segment is always a ROLE, never a verb |
 | `/events` | the event stream | read via `events` |
 
 Wire-side namespace split (recorded wart, owned by 0013): the task
 family registers under `/bot ...` while the synchronous family
-registers at the console root (`block`, `entities`, `scan`, `menu`,
-`recipes`). The CLI hides the split; the wart is repaired only with
+registers at the console root (`block`, `blocks`, `entities`,
+`place`, `equip`, `menu`, `scan`, `recipes`); the operator verbs
+`botspawn`/`botdespawn` also register there, outside the harness
+vocabulary. The CLI hides the split; the wart is repaired only with
 a non-RCON transport that justifies touching the wire.
 
 ## 3. Jobs and verdicts
@@ -124,8 +128,10 @@ Reads are cheap, synchronous, and honest. They ride the same
 boundary-D seam (`WorldView` via wire verbs between ticks) and are
 bounded by design (radius caps, pagination). The three-channel
 responsibility table (issue 0011 section 3) binds what may appear
-where: STATE_PUSH is the authoritative current body state, status
-is the same object pulled, KEEPALIVE is plan telemetry only.
+where: STATE_PUSH is the change notification (stamped attrs:
+posX/posY/posZ/dimension/task, pushed only when the whole record
+changes), status is the authoritative full state object pulled,
+KEEPALIVE is plan telemetry only.
 
 ## 6. Materialization: heavy reads land on disk once
 
@@ -162,8 +168,10 @@ when a second heavy read class actually hurts (YAGNI until then).
   args are `string()` and the caller quotes them (bitten twice:
   menu verbs, then mine - the lesson is now law).
 - **Cursor truth is never filtered client-side.**
-  `latestEventId` / `resetAt` / `droppedCount` are the TRUE stream
-  values in every reply; display narrowing rides the server-side
+  The stream-truth wire keys `latest` / `resetAt` / `dropped` (the
+  record components `latestEventId`/`droppedCount` serialize to the
+  short keys, pinned by H-R4) are the TRUE stream values in every
+  reply; display narrowing rides the server-side
   `[only]` kind-prefix filter, and the cursor-integrity kinds
   (EVENT_GAP, EVENT_DROPPED) survive every filter.
 - **Typed errors, never silent substitution.** A wrong verb or path

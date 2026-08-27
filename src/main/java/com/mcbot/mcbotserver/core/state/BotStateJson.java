@@ -34,7 +34,12 @@ public final class BotStateJson {
      *
      * @param state the snapshot to render; never null
      * @return object with keys pos, yaw, pitch, dim, items, slot,
-     *         effects, task; never null
+     *         effects, task, healthHearts, freeSlots; never null.
+     *         Wire keys are frozen (H-R4): dim/items/slot/effects/
+     *         task are the serialized forms of the dimension/
+     *         itemCounts/selectedHotbarSlot/effectAmplifiers/
+     *         currentTaskSummary record components - the mapping
+     *         is pinned by WireVocabularyGateTest.
      */
     public static JsonObject toJsonObject(BotState state) {
         JsonObject root = new JsonObject();

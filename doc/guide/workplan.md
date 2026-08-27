@@ -60,9 +60,16 @@ the H-R4 convergence pass, and bookkeeping.
          least one reflex preemption and one failed-task recovery
          observed. Closes criterion 2 + closeout follow-ups 4 and
          5 + issue 0005's live acceptance run in one stroke.     [dep: air, idle, recovery]
-- [ ] S  H-R4 wire-key convergence pass (code-health ledger;
-         scheduled before any Stage 3 vocabulary lands so pose work
-         does not churn boundary-D consumers twice).            [dep: none]
+- [x] S  H-R4 wire-key convergence pass: canon tables reconciled
+         to the shipped surface (/actions/ + /nearby/ roots,
+         console-root enumeration, admin row, stream-truth wire
+         keys, STATE_PUSH wording, /player/menu citation);
+         component->wire-key mapping documented at boundaries.md +
+         BotStateJson and pinned by
+         WireVocabularyGateTest.stateJsonWireKeysStayFrozen;
+         finishTask now refuses reason-less TASK_FAILED. Canon-
+         ahead-of-CLI gaps stay queued in 0015 (events --only,
+         ls /).                                      [dep: none]
 - [ ] S  Bookkeeping residue: let the datapack water/lava trait
          JSON supersede the code baseline (closeout follow-up 5
          residue). Issue 0004's disposition settled 2026-08-27:
@@ -94,13 +101,15 @@ landed (archive). Remaining:
          review rules; the rest grows only boundary-D vocabulary,
          which the treaty allows.                     [dep: P3]
 
-  - [ ] M  Equip slice: admit ARMOR at MenuVerbs (deposit/take
-           accept it), equip planner over menu transactions (armor
-           clicks already landed, pinned by
-           equipsArmorThroughMenuClicks), `equip` task verb through
-           the H-R4 friction protocol + harness-interaction audit
-           reopen (0015 section 4). Offline planner gates +
-           equipsByVerb gametest.                [dep: H-R4 pass]
+  - [ ] M  Wear slice (armor): `menu wear` synchronous verb over
+           menu transactions (armor clicks already landed, pinned
+           by equipsArmorThroughMenuClicks) + core wear planner
+           with an adapter-backed armor classification catalog.
+           NOTE: the `equip` verb name is taken (0013 hotbar
+           selection), so the armor verb is `wear`; canon root
+           table row + H-R4 friction protocol + harness-interaction
+           audit reopen (0015 section 4) land with it. Offline
+           planner gates + wear gametest.           [dep: H-R4 pass]
   - [ ] S  Combat loadout: CombatBehavior SelectSlot-s the best
            weapon before ENGAGE swings (verify absent, then wire);
            offline-pinned.                             [dep: none]

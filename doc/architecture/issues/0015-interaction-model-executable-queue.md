@@ -84,11 +84,14 @@ executed or overturned on record - but the implementation queue
 never ran past goto migration. These inherit here; shapes per the
 archived D1 table and its rulings:
 
-- [ ] L  D1 menu wire verbs - open / open-inventory / snapshot /
+- [x] L  D1 menu wire verbs - open / open-inventory / snapshot /
          close / deposit / take / craft / scan / recipes -
          brigadier-direct synchronous RPC against MenuTransactions /
-         RecipeCatalog, NOT CommandBus submissions.
-                                [dep: Stage 3 menu facade (0007 Path A)]
+         RecipeCatalog, NOT CommandBus submissions. Disposition
+         2026-08-27 (H-R4 convergence): landed with the Phase 2/3
+         menu transactions in adapter MenuCommands; the
+         [dep: 0007 Path A] note pre-dated the Phase 2 facade
+         baseline (3d53037). D3/D5/D2 below remain open.
 - [ ] M  D3 derivation events - MENU_OPENED / MENU_CLOSED from
          MissionReporter diffing BindingActor.currentMenuKind()
          ({kind,x,y,z} composite key; same-tick open-close invisible;

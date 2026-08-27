@@ -72,7 +72,8 @@ public final class EventKind {
     /**
      * Periodic liveness ping emitted by the tick loop. Carries a
      * snapshot of plan-progress state (pose, waypointIndex,
-     * ticksSinceProgress, ticksSincePlan, planAge, goalCell) so a
+     * waypointsTotal, ticksSincePlanProgress, ticksSincePlan,
+     * planAge, noPathWitnesses, goalCell) so a
      * harness replaying the event stream can distinguish "bot is
      * alive and making progress" from "bot is alive but the
      * planner is silent" (issue 0001 §4 / fix 2). Not urgent; the

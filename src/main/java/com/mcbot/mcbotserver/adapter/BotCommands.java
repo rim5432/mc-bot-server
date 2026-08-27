@@ -28,7 +28,9 @@ import net.minecraft.network.chat.Component;
  * the bot knowing anything about the transport.
  *
  * <p>The verb table is frozen contract surface (issue 0011 section
- * 2): status / goto / cancel / stop / events / reset. Every answer is
+ * 2): status / goto / cancel / stop / events / reset, grown by dig
+ * (0013) and mine (0014) - one row per process kind, decided in the
+ * issue that ships the process. Every answer is
  * one JSON object with an {@code ok} boolean; failures carry a
  * machine-readable {@code reason}; output text is wire surface, same
  * status as the serializers' wire keys. New process kinds grow the

@@ -4,6 +4,7 @@ import com.mcbot.mcbotserver.api.command.BotCommand;
 import com.mcbot.mcbotserver.api.command.CommandChannel;
 import com.mcbot.mcbotserver.api.command.SubmitResult;
 import com.mcbot.mcbotserver.api.event.BotEvent;
+import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.event.EventQueue;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -226,8 +227,17 @@ public final class CommandBus implements CommandChannel {
      * @param day    game day stamp; non-negative
      * @param t      time-of-day stamp; non-negative
      * @param text   short human-readable outcome; never null
+     * @throws IllegalArgumentException if kind is TASK_FAILED - the
+     *               verdict must carry attrs.reason (canon
+     *               harness-interaction.md section 3 clause 3), so a
+     *               reason-less FAILED goes through events.push
+     *               directly with the reason stamped
      */
     public void finishTask(String taskId, String kind, long day, long t, String text) {
+        if (EventKind.TASK_FAILED.equals(kind)) {
+            throw new IllegalArgumentException("TASK_FAILED must carry attrs.reason (canon section 3); "
+                    + "push the event directly with a reason stamped");
+        }
         activeTasks.remove(taskId);
         // Terminal state closes the dedupe window the same way cancel
         // does. A retry that arrives after the task finished must see

@@ -50,7 +50,11 @@ summary; the command channel carries the verbs the harness issues.
 State-snapshot field set (decision 32, issue 0013 R5): `pos`, `yaw`,
 `pitch`, `dimension`, `itemCounts`, `selectedHotbarSlot`,
 `effectAmplifiers`, `currentTaskSummary`, `healthHearts`,
-`freeSlots`. Health is bucketed to whole hearts (0..10; vanilla
+`freeSlots`. Serialized wire keys shorten five components (H-R4:
+the key is frozen even when the field renames): `dimension`->`dim`,
+`itemCounts`->`items`, `selectedHotbarSlot`->`slot`,
+`effectAmplifiers`->`effects`, `currentTaskSummary`->`task`; the
+rest travel verbatim. Health is bucketed to whole hearts (0..10; vanilla
 runs 2 HP per heart) - the
 change-detect channel compares whole records, so continuous fields
 would push every tick; bucketing keeps the cadence honest.
