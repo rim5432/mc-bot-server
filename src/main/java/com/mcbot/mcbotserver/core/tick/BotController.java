@@ -21,7 +21,6 @@ import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.api.world.WorldView;
-import com.mcbot.mcbotserver.core.behavior.IdleLook;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.core.process.TerminalMission;
@@ -59,7 +58,13 @@ import java.util.function.Supplier;
 // pipeline contract, per-seat/per-source wiring accessors, and the
 // named reflex-routing stages extracted in the 2026-08-27 paydown -
 // each is load-bearing contract surface, not sprawl.
-@SuppressWarnings("PMD.TooManyMethods")
+// Ruling (2026-08-27 eat slice): the eat leg's setter + delegation
+// crossed PMD GodClass on the TCC axis (WMC 75, TCC 20.3%) - the
+// claim-shape extraction into ReflexClaimInjector paid the WMC
+// debt, but the cohesion ratio needs the queued reflex-preemption
+// extraction (workplan lean deferrals). Suppressed until then;
+// TooManyMethods below predates it.
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.GodClass"})
 public final class BotController {
 
     /** Body-position accessor, block-cell granularity. */
@@ -137,6 +142,10 @@ public final class BotController {
     private int crashCounter;
     private boolean inLethalFluid;
     private int airSupply = ThreatBlackboard.MAX_AIR_SUPPLY;
+
+    /** Reflex claim construction (aim-and-dig, eat select-and-use). */
+    private final ReflexClaimInjector claimInjector;
+
     private int ticksSinceKeepalive;
 
     /**
@@ -273,6 +282,7 @@ public final class BotController {
         this.missions = new MissionReporter(arbiter, events);
         this.engageSeat = new ReflexEngageSeat(arbiter);
         this.rescueSeat = new ReflexRescueSeat(arbiter);
+        this.claimInjector = new ReflexClaimInjector(actor, positionSource::get);
     }
 
     /**
@@ -295,6 +305,19 @@ public final class BotController {
      */
     public void setAirSupply(int value) {
         this.airSupply = value;
+    }
+
+    /**
+     * Feed the eat reflex's execution slot: the hotbar slot holding
+     * the best food, or -1 when none. Defaults to -1 inside the
+     * claim injector, so an unwired rig degrades an EAT decision to
+     * the plain freeze hold - stale slot data must not mint a
+     * phantom bite.
+     *
+     * @param supplier best-food hotbar slot 0..8, or -1; never null
+     */
+    public void setEatSlotSupplier(java.util.function.IntSupplier supplier) {
+        this.claimInjector.setEatSlotSupplier(supplier);
     }
 
     /**
@@ -516,7 +539,7 @@ public final class BotController {
         // preemption still wins because the reflex layer runs first
         // and parks missions.
         if (arbiter.current() instanceof DigMission dm && dm.isDigging()) {
-            submitAimAndDig(dm.priority(), "mission:dig:" + dm.missionTaskId(), dm.digTarget());
+            claimInjector.aimAndDig(dm.priority(), "mission:dig:" + dm.missionTaskId(), dm.digTarget());
         }
 
         // Stage 3: behaviors claim channels per directive; reports flow
@@ -651,7 +674,7 @@ public final class BotController {
             case NO_CURRENT -> {}
         }
         actor.submit(new Claim(Channel.MOVE, decision.priority(), "reflex:" + decision.ruleName(), hold));
-        preemptDigClaims(decision);
+        claimInjector.injectAux(decision);
         actor.flush();
         if (announceVerdict) {
             // Retirement-lap corpse: its verdict is announced here,
@@ -685,51 +708,6 @@ public final class BotController {
     }
 
     /**
-     * DIG reflex claim injection: a targeted DIG decision adds the
-     * shared aim-and-dig claim pair on top of the preemption hold -
-     * DIG carries its own geometry, the same engine-carries-the-
-     * state shape as ASCEND's held jump. A targetless DIG (board
-     * stamped inWall without a position, or the post-rescue
-     * hysteresis hold where the eye is already clear) degrades to
-     * the plain freeze hold - missing data must not mint a
-     * dig-at-null.
-     *
-     * @param decision the winning reflex decision; never null
-     */
-    private void preemptDigClaims(SurvivalReflexLayer.ReflexDecision decision) {
-        if (decision.action() != ReflexAction.DIG || decision.target() == null) {
-            return;
-        }
-        submitAimAndDig(decision.priority(), "reflex:" + decision.ruleName(), decision.target());
-    }
-
-    /**
-     * The aim-and-dig claim pair shared by the two DIG drivers (the
-     * seated DigProcess mission and the suffocation reflex). The
-     * INTERACT claim expires at each flush, so a driver re-issues
-     * the pair every tick it wants digging to continue - silence
-     * resets the adapter's accumulated destroy progress. The ROT
-     * aim is presentation only (the executor is
-     * server-authoritative and never reads facing, exactly like
-     * vanilla's ServerPlayerGameMode); cell-center math keeps it
-     * free of eye-height constants.
-     *
-     * @param priority the claim priority; both claims share it so
-     *                 the pair travels as one unit in contests
-     * @param holder   the claim holder label, e.g.
-     *                 {@code "mission:dig:<taskId>"} or
-     *                 {@code "reflex:<rule>"}
-     * @param target   the block cell to dig; must not be null
-     */
-    private void submitAimAndDig(int priority, String holder, CellPos target) {
-        Vec3 from = cellCenter(positionSource.get());
-        Vec3 to = cellCenter(target);
-        actor.submit(new Claim(
-                Channel.ROT, priority, holder, new Intent.Look(IdleLook.yawTo(from, to), IdleLook.pitchTo(from, to))));
-        actor.submit(new Claim(Channel.INTERACT, priority, holder, new Intent.Dig(target)));
-    }
-
-    /**
      * Push one keepalive event with a snapshot of plan-progress
      * state. Scans the behavior list for a {@link PathingBehavior}
      * (v1 has at most one; if more plan reporters are added later,
@@ -755,18 +733,6 @@ public final class BotController {
                 return;
             }
         }
-    }
-
-    /**
-     * Center of one block cell - the DIG reflex aims from body-cell
-     * center to target-cell center; presentation-grade geometry, not
-     * physics.
-     *
-     * @param cell the cell; never null
-     * @return the cell's center point; never null
-     */
-    private static Vec3 cellCenter(CellPos cell) {
-        return new Vec3(cell.x() + 0.5, cell.y() + 0.5, cell.z() + 0.5);
     }
 
     /**

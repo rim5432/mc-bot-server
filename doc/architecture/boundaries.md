@@ -47,14 +47,15 @@ documented in [disclosure-patterns.md §1](../reference/disclosure-patterns.md#1
 The event stream carries both generic world events and `TASK_*` events
 that wrap a `TaskResult`; the state snapshot carries a model-relevant
 summary; the command channel carries the verbs the harness issues.
-State-snapshot field set (decision 32, issue 0013 R5): `pos`, `yaw`,
-`pitch`, `dimension`, `itemCounts`, `selectedHotbarSlot`,
-`effectAmplifiers`, `currentTaskSummary`, `healthHearts`,
-`freeSlots`. Serialized wire keys shorten five components (H-R4:
-the key is frozen even when the field renames): `dimension`->`dim`,
+State-snapshot field set (decision 32, issue 0013 R5; `foodLevel`
+joined by decision 34): `pos`, `yaw`, `pitch`, `dimension`,
+`itemCounts`, `selectedHotbarSlot`, `effectAmplifiers`,
+`currentTaskSummary`, `healthHearts`, `freeSlots`, `foodLevel`.
+Serialized wire keys shorten five components (H-R4: the key is
+frozen even when the field renames): `dimension`->`dim`,
 `itemCounts`->`items`, `selectedHotbarSlot`->`slot`,
-`effectAmplifiers`->`effects`, `currentTaskSummary`->`task`; the
-rest travel verbatim. Health is bucketed to whole hearts (0..10; vanilla
+`effectAmplifiers`->`effects`, `currentTaskSummary`->`task`,
+`foodLevel`->`food` (decision 34); the rest travel verbatim. Health is bucketed to whole hearts (0..10; vanilla
 runs 2 HP per heart) - the
 change-detect channel compares whole records, so continuous fields
 would push every tick; bucketing keeps the cadence honest.
@@ -386,6 +387,7 @@ behind test gates, not behind prose.
 | 31 | Slot identity dual-space accepted; dual-RCON re-eval trigger | 2026-08-26 |
 | 32 | State-snapshot field set pinned at BotState's categorical rule | - |
 | 33 | Harness interaction model codified: space is a namespace, time is job control | 2026-08-27 |
+| 34 | Carrier food lifecycle: Path A FoodData on the body, free-regen floor retired, EAT reflex consumption | 2026-08-27 |
 
 ## Deferred, with reopen conditions
 

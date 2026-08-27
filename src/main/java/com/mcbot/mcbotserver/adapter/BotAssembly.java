@@ -118,6 +118,30 @@ public final class BotAssembly {
                 new BindingWorldView(level, traits, () -> body.getInventory().snapshot());
         BindingActor actor = new BindingActor(body);
 
+        // Best-food ranking (issue 0010 D5): highest nutrition wins,
+        // ties keep the lower hotbar slot - cooked beats raw, raw
+        // still beats starving.
+        var foodCatalog = new VanillaFoodCatalog();
+        java.util.function.IntSupplier bestFoodSlot = () -> {
+            var container = body.getInventory().container();
+            int best = -1;
+            int bestNutrition = -1;
+            for (int slot = 0; slot < com.mcbot.mcbotserver.api.inventory.InventoryView.HOTBAR_SIZE; slot++) {
+                var stack = container.getItem(slot);
+                if (stack.isEmpty()) {
+                    continue;
+                }
+                var facts = foodCatalog.facts(net.minecraftforge.registries.ForgeRegistries.ITEMS
+                        .getKey(stack.getItem())
+                        .toString());
+                if (facts != null && facts.nutrition() > bestNutrition) {
+                    best = slot;
+                    bestNutrition = facts.nutrition();
+                }
+            }
+            return best;
+        };
+
         SurvivalReflexLayer reflex = new SurvivalReflexLayer(new LevelThreatSensor(
                 () -> poseOf(body),
                 body::getAirSupply,
@@ -125,7 +149,10 @@ public final class BotAssembly {
                 body::getRemainingFireTicks,
                 body::getTicksFrozen,
                 body::isInWall,
-                () -> suffocationBlockOf(body)));
+                () -> suffocationBlockOf(body),
+                body.getFoodData()::getFoodLevel,
+                body.getFoodData()::getSaturationLevel,
+                bestFoodSlot));
         reflex.addRule(new FreezeOnLowHealthRule());
         // Air reflex outranks the freeze rule by default (SURFACE
         // _PRIORITY 110 vs FREEZE 100): freezing underwater converts
@@ -170,6 +197,9 @@ public final class BotAssembly {
         // running. Sits BELOW the survival holds: at three health
         // points the right reflex is to stop, not to start a fight.
         reflex.addRule(new EngageOnHostileProximityRule());
+        // Eat reflex sits below ENGAGE (0010 D6: combat first) and
+        // only fires while the sensor sees both hunger and food.
+        reflex.addRule(new com.mcbot.mcbotserver.core.reflex.EatWhenHungryRule());
 
         Behavior mover = new PathingBehavior(
                 "mover",
@@ -213,6 +243,9 @@ public final class BotAssembly {
                 CrashReporter.consoleFallback(),
                 engageFactory,
                 rescueFactory);
+        // The eat reflex executes against the same best-food ranking
+        // the sensor stamps (one source of truth for both ends).
+        controller.setEatSlotSupplier(bestFoodSlot);
         CommandBus bus = new CommandBus(events);
         GotoCommandHandler gotoHandler = new GotoCommandHandler(
                 arbiter, events, () -> level.getDayTime() / 24000L, () -> level.getDayTime() % 24000L);
@@ -298,7 +331,8 @@ public final class BotAssembly {
                 effects,
                 gotoHandler.activeTaskSummary(),
                 Math.round(body.getHealth() / 2.0f),
-                freeSlots);
+                freeSlots,
+                body.getFoodData().getFoodLevel());
     }
 
     private static CellPos poseOf(BotBodyEntity body) {

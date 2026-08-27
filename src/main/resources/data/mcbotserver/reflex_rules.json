@@ -33,6 +33,11 @@
       "trigger": 6.0,
       "release": 14.0,
       "priority": 90
+    },
+    {
+      "type": "EAT_WHEN_HUNGRY",
+      "trigger": 16,
+      "priority": 85
     }
   ]
 }

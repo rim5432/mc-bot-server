@@ -73,6 +73,15 @@ public final class LevelThreatSensor implements ThreatSensor {
     private final Supplier<Boolean> inWall;
     private final Supplier<CellPos> suffocationBlock;
 
+    /** Body food level (0..20), FoodData semantics. */
+    private final Supplier<Integer> foodLevel;
+
+    /** Body saturation (0..foodLevel), FoodData semantics. */
+    private final Supplier<Float> saturationLevel;
+
+    /** Best-food hotbar slot or -1, ranked by the assembly's catalog. */
+    private final java.util.function.IntSupplier bestFoodSlot;
+
     /**
      * Creates a sensor scanning around the live body position.
      *
@@ -96,6 +105,11 @@ public final class LevelThreatSensor implements ThreatSensor {
      *                   return null while the eye is clear, so an
      *                   unstamped board degrades to the freeze hold
      *                   rather than a dig-at-null
+     * @param foodLevel     body food-level supplier (0..20, FoodData
+     *                      semantics); never null
+     * @param saturationLevel body saturation supplier; never null
+     * @param bestFoodSlot  best-food hotbar slot supplier, -1 when
+     *                      the inventory carries no food; never null
      */
     public LevelThreatSensor(
             Supplier<CellPos> bodyPos,
@@ -104,15 +118,25 @@ public final class LevelThreatSensor implements ThreatSensor {
             Supplier<Integer> fireTicks,
             Supplier<Integer> freezeTicks,
             Supplier<Boolean> inWall,
-            Supplier<CellPos> suffocationBlock) {
-        if (bodyPos == null
-                || airSupply == null
-                || inLava == null
-                || fireTicks == null
-                || freezeTicks == null
-                || inWall == null
-                || suffocationBlock == null) {
-            throw new IllegalArgumentException("arguments must not be null");
+            Supplier<CellPos> suffocationBlock,
+            Supplier<Integer> foodLevel,
+            Supplier<Float> saturationLevel,
+            java.util.function.IntSupplier bestFoodSlot) {
+        for (Object arg : new Object[] {
+            bodyPos,
+            airSupply,
+            inLava,
+            fireTicks,
+            freezeTicks,
+            inWall,
+            suffocationBlock,
+            foodLevel,
+            saturationLevel,
+            bestFoodSlot
+        }) {
+            if (arg == null) {
+                throw new IllegalArgumentException("arguments must not be null");
+            }
         }
         this.bodyPos = bodyPos;
         this.airSupply = airSupply;
@@ -121,6 +145,9 @@ public final class LevelThreatSensor implements ThreatSensor {
         this.freezeTicks = freezeTicks;
         this.inWall = inWall;
         this.suffocationBlock = suffocationBlock;
+        this.foodLevel = foodLevel;
+        this.saturationLevel = saturationLevel;
+        this.bestFoodSlot = bestFoodSlot;
     }
 
     @Override
@@ -129,6 +156,9 @@ public final class LevelThreatSensor implements ThreatSensor {
         // through WorldView, so suppliers are the only honest source
         // (same category as botHealth's pipeline accessor).
         board.airSupply = airSupply.get();
+        board.foodLevel = foodLevel.get();
+        board.saturationLevel = saturationLevel.get();
+        board.foodSlot = bestFoodSlot.getAsInt();
         board.inLethalFluid = inLava.get();
         board.fireTicks = fireTicks.get();
         board.freezeTicks = freezeTicks.get();

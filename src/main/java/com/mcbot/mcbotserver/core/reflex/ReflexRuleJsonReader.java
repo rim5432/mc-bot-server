@@ -61,7 +61,8 @@ final class ReflexRuleJsonReader {
                     "ESCAPE_ON_LAVA", ReflexRuleJsonReader::escapeLavaRule,
                     "EXTINGUISH_FIRE", ReflexRuleJsonReader::extinguishFireRule,
                     "DIG_ON_SUFFOCATION", ReflexRuleJsonReader::suffocationRule,
-                    "CLIMB_OUT_OF_POWDER_SNOW", ReflexRuleJsonReader::climbPowderSnowRule);
+                    "CLIMB_OUT_OF_POWDER_SNOW", ReflexRuleJsonReader::climbPowderSnowRule,
+                    "EAT_WHEN_HUNGRY", ReflexRuleJsonReader::eatRule);
 
     private static ReflexRule parseRule(JsonObject rule) {
         if (!rule.has("type")) {
@@ -171,6 +172,21 @@ final class ReflexRuleJsonReader {
             return new ClimbOutOfPowderSnowRule(trigger, priority);
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("CLIMB_OUT_OF_POWDER_SNOW: " + e.getMessage(), e);
+        }
+    }
+    /**
+     * Eat-when-hungry carries trigger + priority only - the firing
+     * condition is a pure threshold on the sensed food level with the
+     * sensor's food slot as the availability gate (flat priority
+     * shape, same as EscapeLavaRule).
+     */
+    private static ReflexRule eatRule(JsonObject rule) {
+        int trigger = fInt(rule, "trigger", EatWhenHungryRule.TRIGGER_FOOD);
+        int priority = fInt(rule, "priority", EatWhenHungryRule.EAT_PRIORITY);
+        try {
+            return new EatWhenHungryRule(trigger, priority);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("EAT_WHEN_HUNGRY: " + e.getMessage(), e);
         }
     }
 }

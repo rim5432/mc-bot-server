@@ -35,6 +35,9 @@ import java.util.Map;
  *                           (issue 0013 R5)
  * @param freeSlots          count of empty main-inventory slots; rides
  *                           the same snapshot loop as itemCounts
+ * @param foodLevel          hunger 0..20, vanilla FoodData semantics
+ *                           (ledger 34); entered through the H-R4
+ *                           friction protocol with this component
  */
 // contract: see boundaries.md Boundary D protocol (state snapshot shape)
 public record BotState(
@@ -47,7 +50,8 @@ public record BotState(
         Map<String, Integer> effectAmplifiers,
         String currentTaskSummary,
         int healthHearts,
-        int freeSlots) {
+        int freeSlots,
+        int foodLevel) {
 
     /**
      * Creates a validated snapshot.

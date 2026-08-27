@@ -30,7 +30,8 @@ class BotStateJsonTest {
                 Map.of("minecraft:speed", 1),
                 "goto x=20 y=64 z=-3",
                 20,
-                5);
+                5,
+                17);
 
         JsonObject root = JsonParser.parseString(BotStateJson.toJson(state)).getAsJsonObject();
 
@@ -48,7 +49,8 @@ class BotStateJsonTest {
 
     @Test
     void emptyMapsRenderAsObject() {
-        BotState state = new BotState(new CellPos(0, 0, 0), 0f, 0f, "overworld", Map.of(), 0, Map.of(), "idle", 20, 0);
+        BotState state =
+                new BotState(new CellPos(0, 0, 0), 0f, 0f, "overworld", Map.of(), 0, Map.of(), "idle", 20, 0, 20);
         JsonObject root = JsonParser.parseString(BotStateJson.toJson(state)).getAsJsonObject();
 
         assertTrue(root.getAsJsonObject("items").isEmpty(), "empty items must render as {}, never null");

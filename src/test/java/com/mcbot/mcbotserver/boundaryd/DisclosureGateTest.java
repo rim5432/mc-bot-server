@@ -175,11 +175,13 @@ class DisclosureGateTest {
                 // cadence honest (raw floats would push on every regen
                 // tick); freeSlots rides the itemCounts snapshot loop.
                 "healthHearts",
-                "freeSlots");
+                "freeSlots",
+                // Ledger 34 (eat slice): hunger rides the snapshot.
+                "foodLevel");
         Set<String> components = Stream.of(BotState.class.getRecordComponents())
                 .map(java.lang.reflect.RecordComponent::getName)
                 .collect(Collectors.toSet());
         assertEquals(allowed, components, "BotState shape drifted outside the frozen model-relevant set");
-        new BotState(new CellPos(0, 64, 0), 0f, 0f, "overworld", Map.of(), 0, Map.of(), "idle", 20, 0);
+        new BotState(new CellPos(0, 64, 0), 0f, 0f, "overworld", Map.of(), 0, Map.of(), "idle", 20, 0, 20);
     }
 }

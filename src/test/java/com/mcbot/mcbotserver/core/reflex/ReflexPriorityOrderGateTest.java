@@ -50,6 +50,9 @@ class ReflexPriorityOrderGateTest {
         expect("FREEZE_ON_LOW_HEALTH", 100);
         expect("CLIMB_OUT_OF_POWDER_SNOW", 95);
         expect("ENGAGE_ON_HOSTILE_PROXIMITY", 90);
+        // Issue 0010 D6: combat first, hunger is routine - the eat
+        // reflex sits below ENGAGE.
+        expect("EAT_WHEN_HUNGRY", 85);
     }
 
     private static final Pattern BLOCK = Pattern.compile("\\{[^{}]*}");

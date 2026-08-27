@@ -531,3 +531,25 @@ Amendment chains recorded so far (both sides annotated):
     root, and every new consumer kind re-opens the model audit in
     the shipping issue; the model itself re-opens when a flow
     cannot be expressed without breaking (a)-(e).
+    34. Carrier food lifecycle ruled (user GO 2026-08-27, Stage 3
+    Phase 4 eat slice): Path A confirmed - BotBodyEntity owns and
+    ticks a vanilla FoodData; tick(Player) is cloned carrier-side
+    verbatim (exhaustion drain, saturated fast regen, foodLevel>=18
+    slow regen, starvation) with the Player parameter's four uses
+    (level difficulty/regen rule, isHurt, heal, hurt-starve) all
+    LivingEntity-available. The peaceful-style free-regen floor is
+    RETIRED by this - regeneration and starvation are food-driven,
+    exactly the one-line delete its javadoc promised. Eating is the
+    Player.eat split on a mob: finishUsingItem (sound, probability
+    effects, shrink, EAT game event) plus FoodData.eat
+    (nutrition/saturation), gated on needsFood. Consumption is a
+    reflex, not a process (0010 section 2 blesses this): rule
+    EAT_WHEN_HUNGRY at priority 85, below ENGAGE (D6 combat-first),
+    trigger 16 (D1), availability-gated on the sensor's best-food
+    slot; execution is the ReflexAction.EAT select-and-use pair,
+    one item per rising USE edge. `foodLevel` joins the state
+    snapshot through the H-R4 friction protocol (wire key `food`);
+    ThreatBlackboard carries foodLevel/saturationLevel/foodSlot
+    safe-defaulted 20/5.0/-1. Hungry-with-no-food never fires a
+    reflex - acquisition (forage/hunt/fish, HungryProcess) stays
+    open in 0010 as the escalation side.

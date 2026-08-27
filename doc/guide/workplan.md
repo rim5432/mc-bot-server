@@ -127,15 +127,21 @@ landed (archive). Remaining:
            CombatBehaviorLoadoutTest (5 cases); gametest
            equipmentMirrorFeedsAttributes staged pending engine
            (live server holds run/world, H-R5).    [dep: none]
-  - [ ] M  [review] Hunger sense: foodLevel (+saturation) into
-           BotState + BotStateJson + DisclosureGate + the ledger-32
-           state section together (H-R4 friction protocol), shape
-           riding the 0010 foodData lifecycle ruling.
-                                         [dep: stage 3 review opens]
-  - [ ] L  [review] HungryProcess per 0010 sections 4-5 (forage ->
-           hunt -> fish with failure budgets,
-           FOOD_STRATEGY_EXHAUSTED escalation), eating via
-           SelectSlot + Use(pressing).            [dep: hunger sense]
+  - [x] M  Hunger sense + consumption (landed 2026-08-27, user GO
+           = Path A ruling, ledger 34): carrier-owned FoodData with
+           verbatim tick clone (free regen floor retired - regen is
+           food-driven now), foodLevel into BotState via the H-R4
+           four-piece (wire key food), ThreatBlackboard
+           foodLevel/saturationLevel/foodSlot, EAT_WHEN_HUNGRY rule
+           at 85 (D1 trigger 16, D6 combat-first) executing the
+           ReflexAction.EAT select-and-use pair, adapter eats on the
+           USE rising edge via finishUsingItem + FoodData.eat.
+           Offline: EatWhenHungryRuleTest + gate updates; gametests
+           eatsWhenHungry + food-driven regen rewrite staged pending
+           engine (live server holds run/world).
+  - [ ] L  HungryProcess acquisition per 0010 sections 4-5 (forage
+           -> hunt -> fish with failure budgets,
+           FOOD_STRATEGY_EXHAUSTED escalation).   [dep: none]
   - [ ] M  Loop acceptance: unattended mine -> craft -> equip ->
            fight -> eat driven through boundary-D verbs only,
            recorded verdict in tool/sessions/ (wait exit codes
@@ -151,6 +157,13 @@ landed (archive). Remaining:
   SelectSlot + Use with no new Intent kind; menu-family disposition
   (BridgeInventory vs BindingInventory) and the BotController
   crash-policy carve-out ride the same ruling.
+
+- [ ] M  BotController reflex-preemption extraction: route
+         routeReflexDecision/preemptAndHold/handoffToSeat/evict/
+         resumeParkedMission into a ReflexPreemption collaborator;
+         retires the PMD.GodClass suppression on BotController
+         (TCC axis; ruled 2026-08-27 with the eat slice).
+                                                         [dep: none]
 
 ### Lean-round deferrals (2026-08-26 whole-repo over-engineering audit)
 

@@ -69,5 +69,20 @@ public enum ReflexAction {
      * lava escape outranks everything (4 HP/tick does not negotiate),
      * fire find-water slots between FREEZE and ENGAGE.
      */
-    ESCAPE
+    ESCAPE,
+
+    /**
+     * Eat the best food the sensor found: the controller holds the
+     * body still (MOVE), selects the sensed best-food hotbar slot
+     * (SLOT) and holds the use claim (USE) every tick the rule keeps
+     * firing; the adapter consumes exactly one item per rising press
+     * edge through the vanilla finishUsingItem chain (sound,
+     * probability effects, shrink, EAT game event) plus FoodData
+     * nutrition. The rising-edge gate makes one firing episode eat
+     * exactly one item - sense then sees the restored food level and
+     * the rule releases. Hungry with no sensed food never reaches
+     * this action: that is issue 0010's escalation contract, not a
+     * body reflex.
+     */
+    EAT
 }

@@ -133,7 +133,13 @@ public final class BindingActor implements Actor, MenuTransactions {
     private void applyUse(Claim use) {
         if (use != null && use.intent() instanceof Intent.Use u) {
             if (u.pressing() && !lastUsePressing) {
-                melee.onUsePress();
+                // USE = act with the main hand (decision 14): an
+                // edible held item means eat, not swing - vanilla
+                // right-click semantics. One item per rising edge;
+                // the eat plays its own sound and never melees.
+                if (!body.eatHeldItem()) {
+                    melee.onUsePress();
+                }
             }
             lastUsePressing = u.pressing();
         } else {

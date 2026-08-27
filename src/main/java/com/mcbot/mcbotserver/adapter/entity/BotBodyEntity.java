@@ -83,20 +83,28 @@ public final class BotBodyEntity extends PathfinderMob {
     private static final double PRESENCE_SCAN_HALF_WIDTH = 40.0;
 
     /**
-     * Ticks between passive regeneration ticks. Peaceful-style floor:
-     * 1 HP per second — slow enough that active combat stays dangerous,
-     * fast enough that the body can recover between fights. A mob
-     * carrier has zero vanilla regen, so without this health is
-     * monotonic and "alive indefinitely" is impossible (workplan
-     * survival gate, body recovery policy). Eating (Stage 3 UseItem)
-     * may supplement or replace this floor; the carrier deviation stays
-     * documented so a future "remove free regen" decision is a one-line
-     * delete, not an archeological dig.
+     * The body's hunger state (Phase 4 eat slice, issue 0010): a
+     * vanilla {@link net.minecraft.world.food.FoodData} owned and
+     * ticked by the carrier - Path A facade, user ruling 2026-08-27.
+     * FoodData has zero Player-field dependencies except its
+     * {@code tick(Player)} signature; {@link #tickHunger()} carries
+     * the same math with {@code this} in the player's seat
+     * (decompiled FoodData.java, dossier 2026-08-27).
      */
-    public static final int REGEN_INTERVAL_TICKS = 20;
+    private final net.minecraft.world.food.FoodData foodData = new net.minecraft.world.food.FoodData();
 
-    /** Health restored per {@link #REGEN_INTERVAL_TICKS}. */
-    public static final float REGEN_AMOUNT = 1.0f;
+    /** Hunger lifecycle engine (vanilla FoodData.tick clone). */
+    private final HungerTicker hungerTicker = new HungerTicker();
+
+    /**
+     * The body's hunger state; nutrition/saturation/exhaustion in
+     * vanilla FoodData semantics.
+     *
+     * @return the food data; never null
+     */
+    public net.minecraft.world.food.FoodData getFoodData() {
+        return foodData;
+    }
 
     /**
      * Hotbar selection echoed from the SLOT channel. A mob carrier has
@@ -241,19 +249,13 @@ public final class BotBodyEntity extends PathfinderMob {
 
     @Override
     protected void customServerAiStep() {
-        // Passive health regeneration (workplan survival gate, body
-        // recovery policy): a mob carrier has zero vanilla regen, so
-        // this is a documented carrier deviation — peaceful-style 1 HP
-        // per 20 ticks while below max. Runs regardless of crash latch:
-        // the latch freezes the BRAIN (MinimalReflex only), not the
-        // body's life support — a crashed body that stops taking damage
-        // should slowly heal, same as a player in peaceful mode. Gated
-        // on tickCount alignment so it fires exactly once per interval,
-        // not once per method entry (customServerAiStep is called once
-        // per tick by Mob.aiStep, but the gate is defensive).
-        if (tickCount % REGEN_INTERVAL_TICKS == 0 && getHealth() < getMaxHealth()) {
-            heal(REGEN_AMOUNT);
-        }
+        // Hunger lifecycle (Phase 4 eat slice, issue 0010): the old
+        // peaceful-style free-regen floor is RETIRED - regeneration
+        // and starvation are now vanilla food-driven, exactly the
+        // one-line delete the old javadoc promised. Runs regardless
+        // of crash latch: the latch freezes the BRAIN, not the body's
+        // life support.
+        hungerTicker.tick(this, foodData);
 
         // Deliberately no super call: goal selectors and MoveControl
         // would fight the binding for zza. Inputs are applied directly
@@ -268,6 +270,12 @@ public final class BotBodyEntity extends PathfinderMob {
         setSpeed((float) getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED));
         setXxa(driveStrafe);
         setZza(driveForward);
+        // Movement exhaustion, vanilla-shaped (Player.aiStep rates):
+        // sprinting burns 10x the walking cost per block; nothing on a
+        // mob accumulates exhaustion naturally, so the carrier feeds it
+        // from the distance it actually traveled this tick.
+        float movedHorizontally = (float) Math.hypot(getX() - xo, getZ() - zo);
+        foodData.addExhaustion(movedHorizontally * (isSprinting() ? 0.1f : 0.01f));
         applyDriveJump();
         if (hasPendingRotation) {
             // setRot does yaw%360 / pitch%360 normalization internally;
@@ -280,6 +288,41 @@ public final class BotBodyEntity extends PathfinderMob {
             hasPendingRotation = false;
         }
         tickPresence();
+    }
+
+    /**
+     * One tick of the hunger lifecycle - a verbatim clone of
+     * {@code FoodData.tick(Player)} (decompiled 1.20.1, dossier
+     * 2026-08-27) with {@code this} in the player's seat: the
+     * exhaustion drain, the saturated fast regen (heal saturation/6
+     * every 10 ticks, paying back what it healed), the foodLevel>=18
+     * slow regen (1 HP per 80 ticks at 6.0 exhaustion), and the
+     * foodLevel<=0 starvation branch, all gated on the level's
+     * natural-regeneration gamerule and difficulty exactly as vanilla.
+     */
+    /**
+     * Eat the held stack's top item (Phase 4 eat slice): the vanilla
+     * mob-safe chain - {@code finishUsingItem} plays the eat sound,
+     * rolls probability effects (rotten flesh, golden apples), shrinks
+     * the stack and fires the EAT game event; the separate
+     * {@code foodData.eat} adds nutrition/saturation, exactly the
+     * Player.eat split. Gated like vanilla Item.use: eating requires
+     * hunger (1.20.1 exposes no always-eat getter; the eat reflex
+     * only fires while hungry, so the golden-apple-at-full edge is
+     * out of scope).
+     *
+     * @return true when an item was consumed
+     */
+    public boolean eatHeldItem() {
+        ItemStack held = inventory.container().getItem(selectedSlot);
+        var props = held.getFoodProperties(this);
+        if (props == null || !foodData.needsFood()) {
+            return false;
+        }
+        ItemStack remainder = held.finishUsingItem(level(), this);
+        foodData.eat(held.getItem(), held, this);
+        inventory.container().setItem(selectedSlot, remainder);
+        return true;
     }
 
     /**
