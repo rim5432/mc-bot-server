@@ -17,6 +17,7 @@ covers:
   - src/test/java/com/mcbot/mcbotserver/hygiene/EnglishOnlyScan.java
   - src/test/java/com/mcbot/mcbotserver/hygiene/GametestInventoryCheck.java
   - src/test/java/com/mcbot/mcbotserver/architecture/BytecodeArchitectureGateTest.java
+  - src/test/java/com/mcbot/mcbotserver/architecture/LintPostureGateTest.java
   - src/test/java/com/mcbot/mcbotserver/core/tick/PathingTestAccess.java
   - src/test/java/com/mcbot/mcbotserver/core/tick/TickGateFixtures.java
   - src/test/java/com/mcbot/mcbotserver/core/tick/TickPipelineGateTest.java
@@ -96,6 +97,7 @@ admitted here may encode a size cap.
 | H-R8 Contract markers present | Every src/main implementer of a boundary interface carries its `contract: see` pointer (AGENTS.md 1.4.3.1) | `architecture.BoundaryContractMarkerTest` | gated 2026-08-25 |
 | H-R9 Review claims cite or are unverified | Every factual claim in a review/assessment carries a file:line or doc-anchor citation; quoted promises are checked against the anchor; "does this abstraction exist" checks the abstraction-status table first | not mechanically checkable | review-only since 2026-08-27 |
 | H-R10 Style law is machine-owned | AGENTS section 1 semantic rules (naming, javadoc presence, import purity, width) fail the checkstyle tasks; layout is formatter-canonical (Spotless/palantir) and never hand-reformatted | `checkstyle*` + `spotlessCheck` on the default `test` flow (`build.gradle`; wired f8b63b2, promoted same day) | gated (default test path) 2026-08-27 |
+| H-R11 Lint postures are pinned | The split between hard gates (checkstyle + spotlessCheck on the default `test` flow) and `-Plint` dashboards (PMD/CPD/SpotBugs/EP) cannot silently shift: a posture change is a ruling landing gate + posture table + ruling together | `architecture.LintPostureGateTest` (block wiring pins, ignoreFailures budget) | gated 2026-08-27 |
 
 ### Rule detail
 
@@ -179,6 +181,21 @@ admitted here may encode a size cap.
   hygiene outweighs ~10s of build time - block-verified by probe
   (an injected unused import fails `test` outright). PMD flips to
   failing only after the god-class paydown round lands.
+- **H-R11 Lint postures are pinned.** The 2026-08-27 toolchain split
+  put checkstyle and spotlessCheck on the default `test` flow and
+  left PMD/CPD/SpotBugs/Error Prone behind `-Plint` as advisory
+  dashboards. That split lives as wiring scattered across four
+  build.gradle blocks, and any of them drifting - a dropped
+  dependsOn, a quietly added ignoreFailures, an enabled flag
+  flipped - disarms a gate with no error anywhere.
+  LintPostureGateTest pins each block's wiring and budgets
+  `ignoreFailures = true` to exactly the two dashboards; a
+  deliberate flip (the PMD paydown graduation) updates the gate, the
+  posture table in doc/guide/build-and-run.md, and the ruling in the
+  same commit - the pinned-inventory admission pattern H-R7 and
+  H-R8 already follow. The `lint` verb in tool/mcbot_tool.py rides
+  the same ruling: it replays the canonical dashboard invocation so
+  agents cannot misremember the task set.
 
 ## Abstraction status (single lookup)
 
