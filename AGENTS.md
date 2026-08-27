@@ -158,13 +158,13 @@ advice.
 - Data carriers are `record`s; sum types are sealed interfaces with
   permitted records. Reach for `enum` only when values carry no
   fields.
-- Formatting: 4-space indent, <=120 columns (review-only, escape
-  hatch `// width-120: <reason>`), one statement per line, chains
-  over 3 segments break, `final` everywhere applicable, trailing
-  commas on multi-line lists.
-- Imports explicit, alphabetical: `java` -> third-party ->
-  `net.minecraft` -> `com.mcbot.mcbotserver.api` -> `.core`. No
-  wildcards below 20 classes from one package.
+- Formatting: canonical form comes from Spotless with
+  `palantir-java-format` (`python tool/mcbot_tool.py gradle
+  spotlessApply`; lint-gated width check at 120 via checkstyle) -
+  never hand-reformat. Still review-enforced: `final` everywhere
+  applicable, trailing commas on multi-line lists.
+- Imports explicit, no wildcards below 20 classes from one package;
+  ordering is whatever the formatter emits (single source of truth).
 
 ### 1.4 Comments (English-only, intent-first)
 
