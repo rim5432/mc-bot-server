@@ -72,6 +72,12 @@ public class McBotServer {
     private final com.mcbot.mcbotserver.adapter.ReflexRuleReloader ruleReloader =
             new com.mcbot.mcbotserver.adapter.ReflexRuleReloader();
 
+    /**
+     * Registers the mod with both Forge buses: the entity type and the
+     * attribute listener go on the mod bus (a spawned body cannot move
+     * without attributes), every {@code @SubscribeEvent} handler here on
+     * the game bus.
+     */
     public McBotServer() {
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
         ENTITIES.register(modBus);
@@ -104,6 +110,7 @@ public class McBotServer {
                         .build());
     }
 
+    /** Marks device startup in the log once a server instance exists. */
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
         LOGGER.info("McBotServer: server started, bot device active");

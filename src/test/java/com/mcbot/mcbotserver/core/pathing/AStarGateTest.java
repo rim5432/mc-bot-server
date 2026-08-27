@@ -31,10 +31,6 @@ class AStarGateTest {
         return world;
     }
 
-    private static AStarPathFinder finder() {
-        return new AStarPathFinder(BasicMoves::from, Heuristic.euclideanTo(null));
-    }
-
     /**
      * Straight corridor: path is start-first, goal-last, and every hop
      * stays on the walk plane.

@@ -151,6 +151,16 @@ public final class GotoCommandHandler {
         return cancelled;
     }
 
+    /**
+     * Aborts and forgets the goto mission registered under {@code taskId},
+     * then reports {@code TASK_CANCELLED} on the event stream. Unknown
+     * task ids are ignored.
+     *
+     * @param taskId identifier of the mission to tear down; never null
+     * @param verb   wire name of the cancelled command as reported by the
+     *               dispatcher; kept for callback-signature symmetry and
+     *               not read here
+     */
     public void onCancel(String taskId, String verb) {
         GotoProcess mission = missions.remove(taskId);
         if (mission == null) {

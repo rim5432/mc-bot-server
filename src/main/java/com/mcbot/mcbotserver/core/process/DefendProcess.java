@@ -223,7 +223,7 @@ public final class DefendProcess implements BotProcess, TerminalMission {
                 return lastDirective;
             }
             engage(nearest);
-            return directiveFor(position);
+            return directiveFor();
         }
 
         EntitySnapshot current = findTarget(world, position, targetId);
@@ -245,7 +245,7 @@ public final class DefendProcess implements BotProcess, TerminalMission {
                 fail(REASON_LOST);
                 return lastDirective;
             }
-            return directiveFor(position);
+            return directiveFor();
         }
 
         // Target genuinely absent from the hostile scan: grace, then
@@ -268,7 +268,7 @@ public final class DefendProcess implements BotProcess, TerminalMission {
             fail(REASON_ESCAPED);
             return lastDirective;
         }
-        return directiveFor(position);
+        return directiveFor();
     }
 
     @Override
@@ -365,7 +365,7 @@ public final class DefendProcess implements BotProcess, TerminalMission {
         ticksSinceSeen = 0;
     }
 
-    private Directive directiveFor(CellPos botCell) {
+    private Directive directiveFor() {
         lastDirective = new Directive(new GoalNear(targetCell, GOAL_RANGE), new Overrides(new Attack(targetId)));
         return lastDirective;
     }

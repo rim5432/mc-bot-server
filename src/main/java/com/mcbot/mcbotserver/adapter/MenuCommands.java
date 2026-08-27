@@ -218,7 +218,7 @@ public final class MenuCommands {
         if (before == null) {
             return answer(ctx.getSource(), err("no menu open"));
         }
-        SlotRole resolved = resolveRole(before, role, true);
+        SlotRole resolved = resolveRole(before, role);
         List<MenuPlanner.Step> steps;
         try {
             steps = MenuPlanner.planDepositCounted(before, resolved, item, count);
@@ -246,7 +246,7 @@ public final class MenuCommands {
         if (before == null) {
             return answer(ctx.getSource(), err("no menu open"));
         }
-        SlotRole resolved = resolveRole(before, role, false);
+        SlotRole resolved = resolveRole(before, role);
         List<MenuPlanner.Step> steps;
         try {
             steps = MenuPlanner.planTakeRole(before, resolved, count);
@@ -283,11 +283,9 @@ public final class MenuCommands {
      *
      * @param view    the open menu snapshot; never null
      * @param role    the parsed intent role; never null
-     * @param deposit true for deposit (INPUT/FUEL resolve), false for
-     *                take (OUTPUT resolves)
      * @return the concrete role to plan against; never null
      */
-    private static SlotRole resolveRole(MenuView view, SlotRole role, boolean deposit) {
+    private static SlotRole resolveRole(MenuView view, SlotRole role) {
         String type = view.type();
         boolean furnaceFamily = type.equals("furnace") || type.equals("blast_furnace") || type.equals("smoker");
         if (furnaceFamily) {
