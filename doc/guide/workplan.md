@@ -83,12 +83,51 @@ Phases 1 (inventory sense + basic interaction), 2 (menu system +
 crafting-table disclosure), and 3 (crafting automation) are fully
 landed (archive). Remaining:
 
-- [ ] XL Phase 4 - full player behaviour parity: remaining menu
-         kinds (enchanting, anvil, loom, villager, ...), Intent.
-         UseItem (eat / drink / bow / place), armor slots,
-         offhand, experience and hunger sense. Acceptance:
+- [ ] XL Phase 4 - full player behaviour parity. Acceptance:
          unattended survival loop (mine -> craft -> equip ->
-         fight -> eat).                                         [dep: P3]
+         fight -> eat). Decomposed 2026-08-27 after surface recon:
+         eat/drink orchestrate existing Intent kinds (SelectSlot +
+         Use), so the loop needs no Intent growth; the frozen-surface
+         crux is hunger sense, which ledger entry 32 pins behind the
+         0010 foodData lifecycle ruling (0007 6.3 carrier Path A/B).
+         Items tagged [review] stay backlog text until the Stage 3
+         review rules; the rest grows only boundary-D vocabulary,
+         which the treaty allows.                     [dep: P3]
+
+  - [ ] M  Equip slice: admit ARMOR at MenuVerbs (deposit/take
+           accept it), equip planner over menu transactions (armor
+           clicks already landed, pinned by
+           equipsArmorThroughMenuClicks), `equip` task verb through
+           the H-R4 friction protocol + harness-interaction audit
+           reopen (0015 section 4). Offline planner gates +
+           equipsByVerb gametest.                [dep: H-R4 pass]
+  - [ ] S  Combat loadout: CombatBehavior SelectSlot-s the best
+           weapon before ENGAGE swings (verify absent, then wire);
+           offline-pinned.                             [dep: none]
+  - [ ] M  [review] Hunger sense: foodLevel (+saturation) into
+           BotState + BotStateJson + DisclosureGate + the ledger-32
+           state section together (H-R4 friction protocol), shape
+           riding the 0010 foodData lifecycle ruling.
+                                         [dep: stage 3 review opens]
+  - [ ] L  [review] HungryProcess per 0010 sections 4-5 (forage ->
+           hunt -> fish with failure budgets,
+           FOOD_STRATEGY_EXHAUSTED escalation), eating via
+           SelectSlot + Use(pressing).            [dep: hunger sense]
+  - [ ] M  Loop acceptance: unattended mine -> craft -> equip ->
+           fight -> eat driven through boundary-D verbs only,
+           recorded verdict in tool/sessions/ (wait exit codes
+           landed; the 0015 live chain-halt check rides here).
+                                    [dep: equip, loadout, HungryProcess]
+  - XP sense, offhand, bow/drink/place Use variants, remaining menu
+    kinds (enchanting, anvil, loom, villager): stay 0007 6.1
+    backlog until the review sequences them.
+
+  Stage 3 review agenda (the freeze-lifting sitting, 0007 + 0010):
+  carrier Path A facade vs Path B ServerPlayer reopen; foodData
+  lifecycle on the never-ticked facade; confirm eat/drink reuse
+  SelectSlot + Use with no new Intent kind; menu-family disposition
+  (BridgeInventory vs BindingInventory) and the BotController
+  crash-policy carve-out ride the same ruling.
 
 ### Lean-round deferrals (2026-08-26 whole-repo over-engineering audit)
 
