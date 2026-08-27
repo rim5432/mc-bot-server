@@ -32,7 +32,7 @@ here.
 
 | # | Item | Contract |
 |---|---|---|
-| 1 | `wait` exit codes | `0` TASK_COMPLETED, `1` TASK_FAILED (verdict event JSON still on stdout), `124` wait timeout (GNU convention, already live). Regression-test both terminal kinds. |
+| 1 | `wait` exit codes | `0` only on TASK_COMPLETED; `1` on every other terminal kind - FAILED, REJECTED, CANCELLED, DROPPED (ruled with the fix: success is the only zero, so `wait &&` halts on every non-completion); verdict event JSON still on stdout; `124` wait timeout (GNU convention). All five terminal kinds mock-pinned in WaitTest. |
 | 2 | Stream discipline | stdout = stable JSON only; all narration (taskId hints, re-anchor notices, suggestions) on stderr; isatty may adjust human formatting. Pin in test_mc.py by capturing streams separately. |
 | 3 | `events --only PREFIX` | surface the wire's existing `[only] <kindPrefix>` narrowing (0011 D3) at the CLI; cursor-integrity kinds always pass through (server guarantees; CLI never filters). |
 | 4 | `ls /` + `mc help` | root discovery lists the mounted path roots (section 2 table of the canonical doc); per-verb help with examples. |
@@ -70,8 +70,8 @@ evidence attached, and the ledger summary follows.
 
 ## 6. Verification criteria
 
-- Offline: test_mc.py pins wait exit codes for both terminal kinds,
-  stream separation, --only passthrough, ls / output shape.
+- Offline: test_mc.py pins wait exit codes for all five terminal
+  kinds, stream separation, --only passthrough, ls / output shape.
 - Live: a skill chains two tasks through `wait &&` and the chain
   halts correctly on an induced failure (mine a nonexistent block
   id, then assert the second leg never submits).

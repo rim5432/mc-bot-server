@@ -88,11 +88,12 @@ A multi-tick action is a job. The contract:
    alone (`kind` + `attrs.reason`), because the harness derives its
    exit codes from it. A TASK_FAILED without a machine-readable
    reason is a contract break.
-4. `mc wait <id>` exits `0` on COMPLETED, `1` on FAILED (verdict
-   event JSON still on stdout), `124` on wait timeout following GNU
-   `timeout`'s convention. This is what makes
-   `mc wait $id && mc write /tasks/...` mean what a shell reader
-   expects.
+4. `mc wait <id>` exits `0` only on COMPLETED; `1` on every other
+   terminal kind - FAILED, REJECTED, CANCELLED, DROPPED (verdict
+   event JSON still on stdout); `124` on wait timeout following GNU
+   `timeout`'s convention. Success is the only zero: this is what
+   makes `mc wait $id && mc write /tasks/...` mean what a shell
+   reader expects.
 
 Timeout duality is deliberate and documented (0012 D5): task
 `--timeout` values are SERVER ticks; `wait --timeout` is CLIENT

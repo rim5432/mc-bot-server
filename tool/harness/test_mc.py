@@ -240,15 +240,27 @@ class WaitTest(McCliTest):
         self.assertEqual(code, 0)
         self.assertIn("TASK_COMPLETED", out)
 
-    def test_cancelled_is_terminal(self):
+    def test_returns_one_on_failed_for_matching_task(self):
+        self.queue(batch([event("TASK_FAILED", task_id="t14",
+                                reason="NO_PATH")]))
+        code, out, _ = self.wait("t14")
+        self.assertEqual(code, 1)
+        self.assertIn("TASK_FAILED", out)
+
+    def test_cancelled_is_terminal_but_exits_one(self):
         self.queue(batch([event("TASK_CANCELLED", task_id="t14")]))
         code, _, _ = self.wait("t14")
-        self.assertEqual(code, 0)
+        self.assertEqual(code, 1)
 
-    def test_dropped_is_terminal(self):
+    def test_dropped_is_terminal_but_exits_one(self):
         self.queue(batch([event("TASK_DROPPED", task_id="t14")]))
         code, _, _ = self.wait("t14")
-        self.assertEqual(code, 0)
+        self.assertEqual(code, 1)
+
+    def test_rejected_exits_one(self):
+        self.queue(batch([event("TASK_REJECTED", task_id="t14")]))
+        code, _, _ = self.wait("t14")
+        self.assertEqual(code, 1)
 
     def test_timeout_exit_124_and_cursor_not_advanced(self):
         self.queue(batch([event("TASK_COMPLETED", task_id="t99")],

@@ -167,13 +167,16 @@ The model is law (boundaries.md decision 33) and canon
 (doc/architecture/harness-interaction.md); this is its executable
 arm. Harness-side only, zero wire change:
 
-- [ ] S  0015 near-term queue: wait exit codes 0=COMPLETED /
-         1=FAILED / 124=timeout (today BOTH terminal kinds exit 0,
-         so `wait &&` chains past failures - the verdict joint is
-         broken); stdout/stderr stream discipline with isatty;
-         events --only surfaced from the wire's narrowing; ls /
-         root discovery + mc help. Mock tests pin each.
-                                                          [dep: issue 0015]
+- [x] S  0015 queue item 1: wait exit codes - 0 only on
+         TASK_COMPLETED, 1 on every other terminal kind (FAILED,
+         REJECTED, CANCELLED, DROPPED), 124 timeout; success is
+         the only zero (ruling in issue 0015 section 2, canon
+         harness-interaction.md 3.4); all five kinds mock-pinned.
+                                                          [dep: none]
+- [ ] S  0015 near-term queue residue: stdout/stderr stream
+         discipline with isatty; events --only surfaced from the
+         wire's narrowing; ls / root discovery + mc help. Mock
+         tests pin each.                          [dep: issue 0015]
 
 ### Deferred infrastructure queue
 

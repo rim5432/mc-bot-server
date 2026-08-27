@@ -58,8 +58,10 @@ no corrections. Parameters pass through to wire verbatim. If behavior
 diverges from raw RCON, the bug is in this file (grepable) or does
 not exist.
 
-Exit codes: 0 ok; 1 rejected/unsupported; 124 wait timeout; 3 rcon
-error. (argparse usage errors exit 2 by argparse's own convention.)
+Exit codes: 0 ok (wait returns it ONLY on TASK_COMPLETED); 1
+rejected/unsupported and every non-COMPLETED terminal kind; 124 wait
+timeout; 3 rcon error. (argparse usage errors exit 2 by argparse's
+own convention.)
 
 Cursor lives at tool/.runtime/mc_cursor.txt (gitignored), storing
 "<eventId> <resetAt>". The disk cursor is the operator's bookmark,
@@ -642,7 +644,10 @@ def cmd_wait(task_id: str, timeout_sec: int = 120, poll_interval: float = 1.0) -
     stream restarted and every stored cursor is void (boundary D
     no-survive-restart); the scan re-anchors to 0 instead of staring
     at a stale-high cursor forever.
-    Returns the terminal event's kind as exit-friendly text.
+    Exit codes carry the verdict (harness-interaction.md 3.4):
+    0 only on TASK_COMPLETED, 1 on every other terminal kind,
+    124 on timeout. Success is the only zero - a chaining shell
+    must never step past a failure.
     """
     since, epoch = read_cursor_state()
     deadline = time.monotonic() + timeout_sec
@@ -672,7 +677,11 @@ def cmd_wait(task_id: str, timeout_sec: int = 120, poll_interval: float = 1.0) -
             if (evt.get("attrs", {}).get("taskId") == task_id
                     and evt.get("kind") in TERMINAL_KINDS):
                 print(json.dumps(evt, indent=2))
-                return 0
+                # Success is the only zero (harness-interaction.md
+                # 3.4): every non-COMPLETED terminal - FAILED,
+                # REJECTED, CANCELLED, DROPPED - is a failure for
+                # the chaining shell.
+                return 0 if evt.get("kind") == "TASK_COMPLETED" else 1
             # EVENT_GAP means we lost history - reconcile and restart
             if evt.get("kind") == "EVENT_GAP":
                 since = int(evt.get("attrs", {}).get("oldest", since))
