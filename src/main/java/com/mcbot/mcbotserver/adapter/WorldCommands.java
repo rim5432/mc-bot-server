@@ -20,7 +20,6 @@ import java.util.function.IntConsumer;
 import java.util.function.Supplier;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
 
 /**
  * Boundary-D perception reads (issue 0013 slice 1): synchronous
@@ -126,7 +125,7 @@ public final class WorldCommands {
     private static int runPlace(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
         Live l = live.get();
         if (l == null) {
-            return answer(ctx.getSource(), err("no active bot"));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
         }
         String faceWord = com.mojang.brigadier.arguments.StringArgumentType.getString(ctx, "face")
                 .toUpperCase(java.util.Locale.ROOT);
@@ -134,7 +133,9 @@ public final class WorldCommands {
         try {
             face = Direction.valueOf(faceWord);
         } catch (IllegalArgumentException e) {
-            return answer(ctx.getSource(), err("unknown face: " + faceWord + " (up, down, north, south, east, west)"));
+            return CommandResponse.answer(
+                    ctx.getSource(),
+                    CommandResponse.err("unknown face: " + faceWord + " (up, down, north, south, east, west)"));
         }
         CellPos target = new CellPos(
                 IntegerArgumentType.getInteger(ctx, "x"),
@@ -143,17 +144,17 @@ public final class WorldCommands {
         CellPos at = face.relative(target);
         BlockSnapshot before = l.view().getBlock(at, ViewMode.LIVE);
         if (before == null) {
-            return answer(ctx.getSource(), err("chunk not loaded"));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("chunk not loaded"));
         }
         if (!before.isAir()) {
-            return answer(ctx.getSource(), err("cell not air: " + before.blockId()));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("cell not air: " + before.blockId()));
         }
         // hitPos is contractually non-null but unused by the executor.
         l.interact()
                 .place(new Intent.InteractBlock(
                         target, face, new Vec3(target.x() + 0.5, target.y() + 0.5, target.z() + 0.5)));
         BlockSnapshot after = l.view().getBlock(at, ViewMode.LIVE);
-        JsonObject root = ok();
+        JsonObject root = CommandResponse.ok();
         root.addProperty("placed", !after.isAir());
         JsonArray p = new JsonArray();
         p.add(at.x());
@@ -165,9 +166,9 @@ public final class WorldCommands {
             root.addProperty("ok", false);
             root.addProperty(
                     "reason", "rejected (no block item in the selected slot," + " cannot survive, or obstructed)");
-            return answer(ctx.getSource(), root);
+            return CommandResponse.answer(ctx.getSource(), root);
         }
-        return answer(ctx.getSource(), root);
+        return CommandResponse.answer(ctx.getSource(), root);
     }
 
     /**
@@ -181,17 +182,17 @@ public final class WorldCommands {
     private static int runEquip(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
         Live l = live.get();
         if (l == null) {
-            return answer(ctx.getSource(), err("no active bot"));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
         }
         int slot = IntegerArgumentType.getInteger(ctx, "slot");
         l.equip().accept(slot);
         var inv = l.view().getInventory();
         var held = inv.main().get(slot);
-        JsonObject root = ok();
+        JsonObject root = CommandResponse.ok();
         root.addProperty("selectedSlot", slot);
         root.addProperty("item", held.isEmpty() ? "" : held.itemId());
         root.addProperty("count", held.count());
-        return answer(ctx.getSource(), root);
+        return CommandResponse.answer(ctx.getSource(), root);
     }
 
     /**
@@ -216,7 +217,7 @@ public final class WorldCommands {
     private static int runBlock(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
         Live l = live.get();
         if (l == null) {
-            return answer(ctx.getSource(), err("no active bot"));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
         }
         CellPos pos = new CellPos(
                 IntegerArgumentType.getInteger(ctx, "x"),
@@ -224,22 +225,22 @@ public final class WorldCommands {
                 IntegerArgumentType.getInteger(ctx, "z"));
         BlockSnapshot snap = l.view().getBlock(pos, ViewMode.LIVE);
         if (snap == null) {
-            return answer(ctx.getSource(), err("chunk not loaded"));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("chunk not loaded"));
         }
-        JsonObject root = ok();
+        JsonObject root = CommandResponse.ok();
         JsonArray p = new JsonArray();
         p.add(pos.x());
         p.add(pos.y());
         p.add(pos.z());
         root.add("pos", p);
         root.addProperty("block", snap.blockId());
-        return answer(ctx.getSource(), root);
+        return CommandResponse.answer(ctx.getSource(), root);
     }
 
     private static int runBlocks(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
         Live l = live.get();
         if (l == null) {
-            return answer(ctx.getSource(), err("no active bot"));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
         }
         int x = IntegerArgumentType.getInteger(ctx, "x");
         int y = IntegerArgumentType.getInteger(ctx, "y");
@@ -262,17 +263,17 @@ public final class WorldCommands {
                 }
             }
         }
-        JsonObject root = ok();
+        JsonObject root = CommandResponse.ok();
         root.addProperty("cells", dx * dy * dz);
         root.addProperty("unknown", unknown);
         root.add("blocks", cells);
-        return answer(ctx.getSource(), root);
+        return CommandResponse.answer(ctx.getSource(), root);
     }
 
     private static int runEntities(Supplier<Live> live, CommandSourceStack src, int radius, int limit) {
         Live l = live.get();
         if (l == null) {
-            return answer(src, err("no active bot"));
+            return CommandResponse.answer(src, CommandResponse.err("no active bot"));
         }
         CellPos center = l.botPos().get();
         String selfId = l.botId().get();
@@ -298,11 +299,11 @@ public final class WorldCommands {
             node.addProperty("self", e.id().equals(selfId));
             entities.add(node);
         }
-        JsonObject root = ok();
+        JsonObject root = CommandResponse.ok();
         root.addProperty("count", found.size());
         root.addProperty("truncated", truncated);
         root.add("entities", entities);
-        return answer(src, root);
+        return CommandResponse.answer(src, root);
     }
 
     private static double dist(CellPos center, EntitySnapshot e) {
@@ -310,30 +311,6 @@ public final class WorldCommands {
         double dy = e.pos().y() - center.y();
         double dz = e.pos().z() - center.z();
         return Math.sqrt(dx * dx + dy * dy + dz * dz);
-    }
-
-    private static JsonObject ok() {
-        JsonObject root = new JsonObject();
-        root.addProperty("ok", true);
-        return root;
-    }
-
-    private static JsonObject err(String reason) {
-        JsonObject root = new JsonObject();
-        root.addProperty("ok", false);
-        root.addProperty("reason", reason);
-        return root;
-    }
-
-    private static int answer(CommandSourceStack src, JsonObject json) {
-        String line = json.toString();
-        boolean good = json.has("ok") && json.get("ok").getAsBoolean();
-        if (good) {
-            src.sendSuccess(() -> Component.literal(line), false);
-            return 1;
-        }
-        src.sendFailure(Component.literal(line));
-        return 0;
     }
 
     private WorldCommands() {}

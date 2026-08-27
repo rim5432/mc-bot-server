@@ -54,9 +54,7 @@ public final class GotoCommandHandler {
      */
     public GotoCommandHandler(
             TaskArbiter arbiter, EventQueue events, LongSupplier daySupplier, LongSupplier timeOfDaySupplier) {
-        if (arbiter == null || events == null || daySupplier == null || timeOfDaySupplier == null) {
-            throw new IllegalArgumentException("arguments must not be null");
-        }
+        CommandHandlerGuards.requireNonNullArgs(arbiter, events, daySupplier, timeOfDaySupplier);
         this.arbiter = arbiter;
         this.events = events;
         this.daySupplier = daySupplier;
@@ -69,9 +67,7 @@ public final class GotoCommandHandler {
      * @param bus the command channel to attach to; never null
      */
     public void attach(CommandBus bus) {
-        if (bus == null) {
-            throw new IllegalArgumentException("bus must not be null");
-        }
+        CommandHandlerGuards.requireBus(bus);
         this.bus = bus;
         // Single-handler setups self-register here; BotAssembly
         // installs the combined router after both handlers attach,

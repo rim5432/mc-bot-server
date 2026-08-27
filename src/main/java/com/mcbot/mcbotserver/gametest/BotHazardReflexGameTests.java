@@ -71,15 +71,7 @@ public final class BotHazardReflexGameTests {
         var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
 
         // Four-deep pool over the whole floor; stone at the bottom.
-        for (int x = 0; x < 16; x++) {
-            for (int z = 0; z < 16; z++) {
-                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y, z), Blocks.WATER);
-                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y - 1, z), Blocks.WATER);
-                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y - 2, z), Blocks.WATER);
-                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y - 3, z), Blocks.WATER);
-                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y - 4, z), Blocks.SMOOTH_STONE);
-            }
-        }
+        GametestRig.fillPool(helper, 0, 15, 4);
 
         // Teleport to the pool bottom and force low air. The body
         // stands on the stone floor (onGround=true), so the first

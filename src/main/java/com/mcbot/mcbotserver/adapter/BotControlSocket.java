@@ -120,9 +120,7 @@ public final class BotControlSocket {
                 // plus the two NUL terminators, so the payload is
                 // exactly length - 10 bytes.
                 int length = readLittleEndianInt(in);
-                if (length < 10 || length > 8192) {
-                    throw new IOException("unreasonable packet length: " + length);
-                }
+                validateLength(length);
                 int id = readLittleEndianInt(in);
                 int type = readLittleEndianInt(in);
                 String payload = readPayload(in, length - 10);
@@ -138,8 +136,11 @@ public final class BotControlSocket {
                 }
                 return;
             }
-        } catch (IOException | InterruptedException e) {
-            // Connection-level failure or shutdown: drop the client.
+        } catch (IOException e) {
+            // Connection-level failure: drop the client.
+        } catch (InterruptedException e) {
+            // Shutdown interrupted the command wait; drop the client.
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -192,6 +193,20 @@ public final class BotControlSocket {
             diff |= x[i] ^ y[i];
         }
         return diff == 0;
+    }
+
+    /**
+     * Validates the Source RCON packet length field. Extracted from
+     * serve() to keep that method's cyclomatic complexity below the
+     * PMD threshold (the two-boundary check contributed 2 branches).
+     *
+     * @param length the declared packet length
+     * @throws IOException when the length is outside the valid range
+     */
+    private static void validateLength(int length) throws IOException {
+        if (length < 10 || length > 8192) {
+            throw new IOException("unreasonable packet length: " + length);
+        }
     }
 
     private static int readLittleEndianInt(InputStream in) throws IOException {

@@ -269,4 +269,21 @@ final class GametestRig {
                 events.statusSnapshot(0).events().stream().map(BotEvent::kind).toList();
         check(kinds.contains(kind), "expected " + kind + " in stream, got " + kinds);
     }
+
+    /**
+     * Fills a water pool over the test floor across an inclusive x
+     * lane: {@code waterDepth} water layers topped by smooth stone.
+     * Shared terrain carve for hazard and locomotion scenarios.
+     */
+    public static void fillPool(
+            net.minecraft.gametest.framework.GameTestHelper helper, int xFrom, int xToInclusive, int waterDepth) {
+        for (int x = xFrom; x <= xToInclusive; x++) {
+            for (int z = 0; z < 16; z++) {
+                for (int d = 0; d < waterDepth; d++) {
+                    helper.setBlock(new BlockPos(x, FLOOR_Y - d, z), Blocks.WATER);
+                }
+                helper.setBlock(new BlockPos(x, FLOOR_Y - waterDepth, z), Blocks.SMOOTH_STONE);
+            }
+        }
+    }
 }

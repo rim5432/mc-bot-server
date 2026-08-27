@@ -134,14 +134,7 @@ public final class BotLocomotionGameTests {
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void crossesDeepPool(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
-        for (int x = 6; x <= 8; x++) {
-            for (int z = 0; z < 16; z++) {
-                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y, z), Blocks.WATER);
-                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y - 1, z), Blocks.WATER);
-                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y - 2, z), Blocks.WATER);
-                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y - 3, z), Blocks.SMOOTH_STONE);
-            }
-        }
+        GametestRig.fillPool(helper, 6, 8, 3);
         CellPos goalCell = localToCell(helper, new BlockPos(12, GametestRig.WALK_Y, 8));
         var mission = submitGoto(rig, goalCell, GametestRig.MISSION_BUDGET + 150);
 

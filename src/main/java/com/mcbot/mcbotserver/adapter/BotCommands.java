@@ -90,7 +90,7 @@ public final class BotCommands {
         return Commands.literal("status").executes(ctx -> {
             Channels ch = live.get();
             if (ch == null) {
-                return answer(ctx.getSource(), err("no active bot"));
+                return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
             }
             var snap = ch.state().current();
             // Human line first - the JSON block is contract surface
@@ -104,9 +104,9 @@ public final class BotCommands {
                                     + snap.dimension() + "; task: "
                                     + snap.currentTaskSummary()),
                             false);
-            JsonObject root = ok();
+            JsonObject root = CommandResponse.ok();
             root.add("state", BotStateJson.toJsonObject(snap));
-            return answer(ctx.getSource(), root);
+            return CommandResponse.answer(ctx.getSource(), root);
         });
     }
 
@@ -128,27 +128,13 @@ public final class BotCommands {
     }
 
     private static int runGoto(CommandContext<CommandSourceStack> ctx, Supplier<Channels> live, String key) {
-        Channels ch = live.get();
-        if (ch == null) {
-            return answer(ctx.getSource(), err("no active bot"));
-        }
         Map<String, String> args = new LinkedHashMap<>();
         args.put("x", String.valueOf(IntegerArgumentType.getInteger(ctx, "x")));
         args.put("y", String.valueOf(IntegerArgumentType.getInteger(ctx, "y")));
         args.put("z", String.valueOf(IntegerArgumentType.getInteger(ctx, "z")));
         args.put("tolerance", String.valueOf(IntegerArgumentType.getInteger(ctx, "tolerance")));
         args.put("timeoutTicks", String.valueOf(IntegerArgumentType.getInteger(ctx, "timeoutTicks")));
-        SubmitResult result = ch.bus().submit(new BotCommand("goto", args), key);
-        JsonObject root = new JsonObject();
-        if (result instanceof SubmitResult.Ok accepted) {
-            root.addProperty("ok", true);
-            root.addProperty("task", accepted.taskId());
-            root.addProperty("replay", accepted.idempotencyReplay());
-        } else {
-            root.addProperty("ok", false);
-            root.addProperty("reason", ((SubmitResult.Rejected) result).reason());
-        }
-        return answer(ctx.getSource(), root);
+        return submitCommand(ctx, live, "goto", args, key);
     }
 
     /**
@@ -170,26 +156,12 @@ public final class BotCommands {
     }
 
     private static int runDig(CommandContext<CommandSourceStack> ctx, Supplier<Channels> live, long timeoutTicks) {
-        Channels ch = live.get();
-        if (ch == null) {
-            return answer(ctx.getSource(), err("no active bot"));
-        }
         Map<String, String> args = new LinkedHashMap<>();
         args.put("x", String.valueOf(IntegerArgumentType.getInteger(ctx, "x")));
         args.put("y", String.valueOf(IntegerArgumentType.getInteger(ctx, "y")));
         args.put("z", String.valueOf(IntegerArgumentType.getInteger(ctx, "z")));
         args.put("timeoutTicks", String.valueOf(timeoutTicks));
-        SubmitResult result = ch.bus().submit(new BotCommand("dig", args), null);
-        JsonObject root = new JsonObject();
-        if (result instanceof SubmitResult.Ok accepted) {
-            root.addProperty("ok", true);
-            root.addProperty("task", accepted.taskId());
-            root.addProperty("replay", accepted.idempotencyReplay());
-        } else {
-            root.addProperty("ok", false);
-            root.addProperty("reason", ((SubmitResult.Rejected) result).reason());
-        }
-        return answer(ctx.getSource(), root);
+        return submitCommand(ctx, live, "dig", args, null);
     }
 
     /**
@@ -214,25 +186,11 @@ public final class BotCommands {
     }
 
     private static int runMine(CommandContext<CommandSourceStack> ctx, Supplier<Channels> live, long timeoutTicks) {
-        Channels ch = live.get();
-        if (ch == null) {
-            return answer(ctx.getSource(), err("no active bot"));
-        }
         Map<String, String> args = new LinkedHashMap<>();
         args.put("blockType", StringArgumentType.getString(ctx, "blockType"));
         args.put("count", String.valueOf(IntegerArgumentType.getInteger(ctx, "count")));
         args.put("timeoutTicks", String.valueOf(timeoutTicks));
-        SubmitResult result = ch.bus().submit(new BotCommand("mine", args), null);
-        JsonObject root = new JsonObject();
-        if (result instanceof SubmitResult.Ok accepted) {
-            root.addProperty("ok", true);
-            root.addProperty("task", accepted.taskId());
-            root.addProperty("replay", accepted.idempotencyReplay());
-        } else {
-            root.addProperty("ok", false);
-            root.addProperty("reason", ((SubmitResult.Rejected) result).reason());
-        }
-        return answer(ctx.getSource(), root);
+        return submitCommand(ctx, live, "mine", args, null);
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> cancelBranch(
@@ -241,11 +199,13 @@ public final class BotCommands {
                 .then(Commands.argument("taskId", StringArgumentType.word()).executes(ctx -> {
                     Channels ch = live.get();
                     if (ch == null) {
-                        return answer(ctx.getSource(), err("no active bot"));
+                        return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
                     }
                     String taskId = StringArgumentType.getString(ctx, "taskId");
                     boolean removed = ch.bus().cancel(taskId);
-                    return answer(ctx.getSource(), removed ? ok() : err("no such task: " + taskId));
+                    return CommandResponse.answer(
+                            ctx.getSource(),
+                            removed ? CommandResponse.ok() : CommandResponse.err("no such task: " + taskId));
                 }));
     }
 
@@ -254,16 +214,16 @@ public final class BotCommands {
         return Commands.literal("stop").executes(ctx -> {
             Channels ch = live.get();
             if (ch == null) {
-                return answer(ctx.getSource(), err("no active bot"));
+                return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
             }
             int cancelled = ch.stopAllTasks().getAsInt();
             ctx.getSource()
                     .sendSuccess(
                             () -> Component.literal("stopped " + cancelled + " task" + (cancelled == 1 ? "" : "s")),
                             false);
-            JsonObject root = ok();
+            JsonObject root = CommandResponse.ok();
             root.addProperty("cancelled", cancelled);
-            return answer(ctx.getSource(), root);
+            return CommandResponse.answer(ctx.getSource(), root);
         });
     }
 
@@ -290,13 +250,13 @@ public final class BotCommands {
             CommandContext<CommandSourceStack> ctx, Supplier<Channels> live, long since, String onlyPrefix) {
         Channels ch = live.get();
         if (ch == null) {
-            return answer(ctx.getSource(), err("no active bot"));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
         }
-        JsonObject root = ok();
+        JsonObject root = CommandResponse.ok();
         root.add(
                 "batch",
                 EventBatchJson.toJsonObject(ch.events().statusSnapshot(since).narrowedToKindPrefix(onlyPrefix)));
-        return answer(ctx.getSource(), root);
+        return CommandResponse.answer(ctx.getSource(), root);
     }
 
     /**
@@ -311,36 +271,48 @@ public final class BotCommands {
         return Commands.literal("reset").executes(ctx -> {
             Channels ch = live.get();
             if (ch == null) {
-                return answer(ctx.getSource(), err("no active bot"));
+                return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
             }
             boolean wasCrashed = ch.resetCrashLatch().getAsBoolean();
-            JsonObject root = ok();
+            JsonObject root = CommandResponse.ok();
             root.addProperty("crashed", wasCrashed);
-            return answer(ctx.getSource(), root);
+            return CommandResponse.answer(ctx.getSource(), root);
         });
     }
 
-    private static JsonObject ok() {
-        JsonObject root = new JsonObject();
-        root.addProperty("ok", true);
-        return root;
-    }
-
-    private static JsonObject err(String reason) {
-        JsonObject root = new JsonObject();
-        root.addProperty("ok", false);
-        root.addProperty("reason", reason);
-        return root;
-    }
-
-    private static int answer(CommandSourceStack src, JsonObject json) {
-        String line = json.toString();
-        boolean good = json.has("ok") && json.get("ok").getAsBoolean();
-        if (good) {
-            src.sendSuccess(() -> Component.literal(line), false);
-            return 1;
+    /**
+     * Submits a command through the bus and renders the standard
+     * ok/rejected JSON response. Extracted from runGoto/runDig/runMine
+     * to eliminate CPD duplication (all three shared the same null-check
+     * + submit + response-render shape).
+     *
+     * @param ctx     brigadier context for the answer target
+     * @param live    live channel supplier
+     * @param command verb name, e.g. "goto"
+     * @param args    argument map; never null
+     * @param key     idempotency key, or null for none
+     * @return brigadier command return code (1 on ok, 0 on failure)
+     */
+    private static int submitCommand(
+            CommandContext<CommandSourceStack> ctx,
+            Supplier<Channels> live,
+            String command,
+            Map<String, String> args,
+            String key) {
+        Channels ch = live.get();
+        if (ch == null) {
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
         }
-        src.sendFailure(Component.literal(line));
-        return 0;
+        SubmitResult result = ch.bus().submit(new BotCommand(command, args), key);
+        JsonObject root = new JsonObject();
+        if (result instanceof SubmitResult.Ok accepted) {
+            root.addProperty("ok", true);
+            root.addProperty("task", accepted.taskId());
+            root.addProperty("replay", accepted.idempotencyReplay());
+        } else {
+            root.addProperty("ok", false);
+            root.addProperty("reason", ((SubmitResult.Rejected) result).reason());
+        }
+        return CommandResponse.answer(ctx.getSource(), root);
     }
 }
