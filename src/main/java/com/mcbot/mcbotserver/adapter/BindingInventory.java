@@ -33,8 +33,9 @@ import net.minecraft.world.item.ItemStack;
  * {@code Inventory} constructor demands a {@code Player} (issue 0007 §3),
  * which does not exist on a PathfinderMob carrier until Phase 2's
  * BotPlayerFacade. {@code SimpleContainer} needs no player and covers the
- * Phase 1 sense requirement; armor semantics ({@code getDestroySpeed},
- * attribute modifiers) are deferred to Phase 4.
+ * Phase 1 sense requirement; attribute modifiers now flow through the
+ * body's equipment mirror (Phase 4 combat/wear slices), while
+ * {@code getDestroySpeed} (enchantment-aware dig speed) stays deferred.
  *
  * <p>Implementation note: server tick thread only. The snapshot is
  * immutable once produced; off-thread consumers (Stage 2 planner) read it

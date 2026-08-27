@@ -110,9 +110,23 @@ landed (archive). Remaining:
            table row + H-R4 friction protocol + harness-interaction
            audit reopen (0015 section 4) land with it. Offline
            planner gates + wear gametest.           [dep: H-R4 pass]
-  - [ ] S  Combat loadout: CombatBehavior SelectSlot-s the best
-           weapon before ENGAGE swings (verify absent, then wire);
-           offline-pinned.                             [dep: none]
+  - [x] S  Combat loadout (landed 2026-08-27, vanilla-mechanics
+           dossier first): mob melee has no attack-speed scaling or
+           crits, so per-hit damage is the whole ranking (axe beats
+           same-tier sword) - api WeaponCatalog + adapter
+           VanillaWeaponCatalog (generic registry scan of MAINHAND
+           ATTACK_DAMAGE modifiers) + CombatBehavior holds the best
+           hotbar weapon via one SLOT claim. Root fixes ride along:
+           BotBodyEntity equipment mirror (getItemBySlot/setItemSlot
+           over the container, so LivingEntity.detectEquipmentUpdates
+           applies weapon AND armor modifiers automatically),
+           ATTACK_DAMAGE attribute base 3.0 (zombie scale, fists
+           unchanged), MeleeResolver routed through
+           Mob.doHurtTarget (enchant bonus, knockback, Fire Aspect,
+           shield-disable for free). Offline:
+           CombatBehaviorLoadoutTest (5 cases); gametest
+           equipmentMirrorFeedsAttributes staged pending engine
+           (live server holds run/world, H-R5).    [dep: none]
   - [ ] M  [review] Hunger sense: foodLevel (+saturation) into
            BotState + BotStateJson + DisclosureGate + the ledger-32
            state section together (H-R4 friction protocol), shape

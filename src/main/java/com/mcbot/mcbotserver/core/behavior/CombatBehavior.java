@@ -6,9 +6,11 @@ import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.behavior.Behavior;
 import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
+import com.mcbot.mcbotserver.api.combat.WeaponCatalog;
 import com.mcbot.mcbotserver.api.goal.Goal;
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.goal.GoalNear;
+import com.mcbot.mcbotserver.api.inventory.InventoryView;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
@@ -61,6 +63,7 @@ public final class CombatBehavior implements Behavior {
 
     private final String name;
     private final BodyPositionSource positionSource;
+    private final WeaponCatalog weapons;
     private int ticksSinceSwing = ATTACK_COOLDOWN_TICKS;
     // Starts EXPIRED: a target that has never been in reach earns no
     // hold memory - only an actual in-reach sighting opens the window.
@@ -75,11 +78,25 @@ public final class CombatBehavior implements Behavior {
      * @param positionSource body position accessor; never null
      */
     public CombatBehavior(String name, BodyPositionSource positionSource) {
+        this(name, positionSource, WeaponCatalog.none());
+    }
+
+    /**
+     * Creates a combat behavior that also holds the best hotbar
+     * weapon while fighting.
+     *
+     * @param name            stable identity for claims; never null or
+     *                        blank
+     * @param positionSource  body position accessor; never null
+     * @param weapons         weapon ranking; never null
+     */
+    public CombatBehavior(String name, BodyPositionSource positionSource, WeaponCatalog weapons) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("name must not be blank");
         }
         this.name = name;
         this.positionSource = Objects.requireNonNull(positionSource, "positionSource");
+        this.weapons = Objects.requireNonNull(weapons, "weapons");
     }
 
     @Override
@@ -92,6 +109,8 @@ public final class CombatBehavior implements Behavior {
         if (directive == null || directive.overrides().combat() == null) {
             return ExecutionReport.running();
         }
+
+        holdBestWeapon(world, actor);
 
         Vec3 position = positionSource.get();
         CellPos aimCell = aimPointOf(directive.goal());
@@ -137,6 +156,34 @@ public final class CombatBehavior implements Behavior {
             pressLatched = false;
         }
         return ExecutionReport.running();
+    }
+
+    /**
+     * Hold the hotbar's highest per-hit weapon while fighting: mob
+     * melee has no attack-speed scaling (the strength ticker is
+     * Player-only), so per-hit damage is the whole ranking - an axe
+     * outranks a same-tier sword. One SLOT claim whenever the best
+     * slot differs from the current selection; SelectSlot is recorded
+     * body state, so an unchanged selection costs nothing per tick.
+     */
+    private void holdBestWeapon(WorldView world, Actor actor) {
+        InventoryView inventory = world.getInventory();
+        int best = -1;
+        float bestDamage = 0f;
+        for (int slot = 0; slot < InventoryView.HOTBAR_SIZE; slot++) {
+            var item = inventory.main().get(slot);
+            if (item.isEmpty()) {
+                continue;
+            }
+            float damage = weapons.perHitDamage(item.itemId());
+            if (damage > bestDamage) {
+                best = slot;
+                bestDamage = damage;
+            }
+        }
+        if (best >= 0 && best != inventory.selectedSlot()) {
+            actor.submit(new Claim(Channel.SLOT, 20, name, new Intent.SelectSlot(best)));
+        }
     }
 
     /**

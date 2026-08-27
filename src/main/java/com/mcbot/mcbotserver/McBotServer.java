@@ -114,10 +114,15 @@ public class McBotServer {
         // createMobAttributes does NOT include MOVEMENT_SPEED - each
         // mob type adds its own. Without it the binding's zza=1 drives
         // a speed-0 body: gravity works, walking never starts.
+        // ATTACK_DAMAGE base 3.0 = zombie scale, preserving the
+        // pre-attribute MeleeResolver constant for bare fists; weapons
+        // add their mainhand modifier on top through the equipment
+        // mirror (Phase 4 combat slice).
         event.put(
                 BOT_BODY.get(),
                 Mob.createMobAttributes()
                         .add(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED, 0.25)
+                        .add(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE, 3.0D)
                         .build());
     }
 

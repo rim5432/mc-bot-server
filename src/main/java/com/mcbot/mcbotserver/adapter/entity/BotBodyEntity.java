@@ -364,4 +364,52 @@ public final class BotBodyEntity extends PathfinderMob {
     public boolean removeWhenFarAway(double distance) {
         return false;
     }
+
+    /**
+     * Equipment mirror (Phase 4 combat/wear slices): the container is
+     * the source of truth, the vanilla equipment slots are a mirror
+     * over it. {@code LivingEntity.detectEquipmentUpdates} diffs
+     * {@code getItemBySlot} every tick and applies the item's
+     * attribute modifiers for exactly this view - a held sword raises
+     * ATTACK_DAMAGE and worn armor raises ARMOR with zero extra
+     * wiring, and the mob model renders held/worn items for free.
+     *
+     * @param slot the vanilla equipment slot; never null
+     * @return the container stack mapped to that slot; never null
+     */
+    @Override
+    public ItemStack getItemBySlot(net.minecraft.world.entity.EquipmentSlot slot) {
+        var container = inventory.container();
+        return switch (slot) {
+            case MAINHAND -> container.getItem(selectedSlot);
+            case OFFHAND -> container.getItem(BindingInventory.OFFHAND_SLOT);
+            case HEAD -> container.getItem(BindingInventory.ARMOR_START);
+            case CHEST -> container.getItem(BindingInventory.ARMOR_START + 1);
+            case LEGS -> container.getItem(BindingInventory.ARMOR_START + 2);
+            case FEET -> container.getItem(BindingInventory.ARMOR_START + 3);
+        };
+    }
+
+    /**
+     * Write-through keeping the equipment mirror symmetric: vanilla
+     * writers (if any ever run) land in the container instead of the
+     * dead {@code handItems}/{@code armorItems} lists. Equip sounds
+     * ride the menu-transaction path, so {@code onEquipItem} is
+     * skipped deliberately.
+     *
+     * @param slot  the vanilla equipment slot; never null
+     * @param stack the stack to place; never null
+     */
+    @Override
+    public void setItemSlot(net.minecraft.world.entity.EquipmentSlot slot, ItemStack stack) {
+        var container = inventory.container();
+        switch (slot) {
+            case MAINHAND -> container.setItem(selectedSlot, stack);
+            case OFFHAND -> container.setItem(BindingInventory.OFFHAND_SLOT, stack);
+            case HEAD -> container.setItem(BindingInventory.ARMOR_START, stack);
+            case CHEST -> container.setItem(BindingInventory.ARMOR_START + 1, stack);
+            case LEGS -> container.setItem(BindingInventory.ARMOR_START + 2, stack);
+            case FEET -> container.setItem(BindingInventory.ARMOR_START + 3, stack);
+        }
+    }
 }

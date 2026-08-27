@@ -181,7 +181,7 @@ public final class BotAssembly {
         // engage reflex submits defend missions whose Attack overrides
         // nobody executes - the production gap behind the idle
         // night-cave death.
-        Behavior combat = new CombatBehavior("combat", () -> finePoseOf(body));
+        Behavior combat = new CombatBehavior("combat", () -> finePoseOf(body), new VanillaWeaponCatalog());
 
         // One fresh reflex-owned defend per engage submission; the
         // assembly owns identity, budget and type sets.

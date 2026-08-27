@@ -35,9 +35,6 @@ final class MeleeResolver {
      */
     public static final double AIM_CONE_DEG = 45.0;
 
-    /** Damage per landed skeleton swing; zombie-scale for now. */
-    public static final float MELEE_DAMAGE = 3f;
-
     /**
      * Swing reach measured EYE TO TARGET BOUNDING-BOX SURFACE,
      * aligned with vanilla's player metric (~3.0) so the bot holds no
@@ -113,7 +110,14 @@ final class MeleeResolver {
             // bug was found by walking these lines; a future tuning
             // pass will reach for the same lever.
             LogUtils.getLogger().debug("[melee] HIT dist={} hp={}", bestDist, best.getHealth());
-            best.hurt(body.damageSources().mobAttack(body), MELEE_DAMAGE);
+            // Vanilla mob melee in full: attribute damage plus
+            // enchant bonus, knockback, Fire Aspect, and axe
+            // shield-disable all live in Mob.doHurtTarget; the old
+            // constant-3.0 hurt() skipped every one of them. The
+            // zombie-scale base now rides the ATTACK_DAMAGE attribute
+            // (3.0) with weapon modifiers added by the equipment
+            // mirror.
+            body.doHurtTarget(best);
         }
     }
 
