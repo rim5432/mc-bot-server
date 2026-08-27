@@ -93,7 +93,9 @@ public final class MockWorldView implements WorldView {
     }
 
     /**
-     * Add a fishing bobber to the visible set.
+     * Set the visible fishing bobber. Single-bobber semantics: a bot
+     * fishes one rod, so adding replaces the previous snapshot and the
+     * scan always answers the current one.
      *
      * @param snapshot the bobber; must not be null
      * @return this mock, for fluent test setup
@@ -102,6 +104,7 @@ public final class MockWorldView implements WorldView {
         if (snapshot == null) {
             throw new IllegalArgumentException("snapshot must not be null");
         }
+        bobbers.clear();
         bobbers.add(snapshot);
         return this;
     }

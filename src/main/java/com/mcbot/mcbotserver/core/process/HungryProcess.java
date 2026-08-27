@@ -9,8 +9,10 @@ import com.mcbot.mcbotserver.api.process.Attack;
 import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.api.process.DigMission;
 import com.mcbot.mcbotserver.api.process.Directive;
+import com.mcbot.mcbotserver.api.process.Fish;
 import com.mcbot.mcbotserver.api.process.Overrides;
 import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.api.world.BlockSnapshot;
 import com.mcbot.mcbotserver.api.world.EntitySnapshot;
 import com.mcbot.mcbotserver.api.world.ViewMode;
 import com.mcbot.mcbotserver.api.world.WorldView;
@@ -54,6 +56,13 @@ public final class HungryProcess implements BotProcess, TerminalMission, DigMiss
     /** Ticks spent walking to the prey's last cell hoping for drops. */
     private static final int COLLECT_TICKS = 60;
 
+    /** Water scan half-width when the fish strategy assesses (blocks). */
+    private static final int WATER_SCAN_RADIUS = 8;
+
+    private static final String WATER_ID = "minecraft:water";
+
+    private static final String ROD_ID = "minecraft:fishing_rod";
+
     private final String taskId;
     private final int priority;
     private final long timeoutTicks;
@@ -71,6 +80,7 @@ public final class HungryProcess implements BotProcess, TerminalMission, DigMiss
     private String preyId;
     private CellPos preyCell;
     private CellPos collectCell;
+    private CellPos waterCell;
     private int collectTicks;
     private Directive lastDirective = Directive.of(new GoalNear(new CellPos(0, 64, 0), 0));
 
@@ -78,7 +88,8 @@ public final class HungryProcess implements BotProcess, TerminalMission, DigMiss
         ASSESS,
         FORAGE,
         HUNT,
-        COLLECT
+        COLLECT,
+        FISH
     }
 
     /**
@@ -151,17 +162,30 @@ public final class HungryProcess implements BotProcess, TerminalMission, DigMiss
             case FORAGE -> forageTick(body);
             case HUNT -> huntTick(world, body);
             case COLLECT -> collectTick();
+            case FISH -> fishTick(world);
             default -> throw new IllegalStateException("unhandled phase: " + phase);
         }
         return lastDirective;
     }
 
-    /** ASSESS: forage outranks hunt (0010 section 4.3 - fastest path). */
+    /** ASSESS: forage outranks fish outranks hunt (0010 section 4.3). */
     private void assess(WorldView world, CellPos body) {
         if (forageTarget.get() != null) {
             phase = Phase.FORAGE;
             forageTick(body);
             return;
+        }
+        // Fish sits between forage and hunt (0010 section 4.3, as
+        // implemented): no chase and no combat exposure, so it beats
+        // hunting whenever the gear and open water both exist.
+        if (hasRod(world.getInventory())) {
+            CellPos water = findWater(world, body);
+            if (water != null) {
+                waterCell = water;
+                phase = Phase.FISH;
+                lastDirective = new Directive(new GoalNear(water, 1), new Overrides(null, new Fish(water)));
+                return;
+            }
         }
         EntitySnapshot prey = scanPrey(world, body, null);
         if (prey == null) {
@@ -172,6 +196,61 @@ public final class HungryProcess implements BotProcess, TerminalMission, DigMiss
         preyCell = prey.pos();
         phase = Phase.HUNT;
         lastDirective = new Directive(new GoalNear(preyCell, 2), new Overrides(new Attack(preyId)));
+    }
+
+    /**
+     * FISH: hold the water's edge and let the fish behavior work the
+     * rod; revalidate the water cell so an evaporated pond re-enters
+     * assessment instead of fishing a dry hole.
+     *
+     * @param world read surface for the water revalidation; never null
+     */
+    private void fishTick(WorldView world) {
+        BlockSnapshot snap = world.getBlock(waterCell, ViewMode.LIVE);
+        if (snap == null || !WATER_ID.equals(snap.blockId())) {
+            phase = Phase.ASSESS;
+            return;
+        }
+        lastDirective = new Directive(new GoalNear(waterCell, 1), new Overrides(null, new Fish(waterCell)));
+    }
+
+    /**
+     * First fishing rod in the main inventory.
+     *
+     * @param inventory the live inventory snapshot; never null
+     * @return true when a rod is carried
+     */
+    private static boolean hasRod(InventoryView inventory) {
+        for (ItemView item : inventory.main()) {
+            if (!item.isEmpty() && ROD_ID.equals(item.itemId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Nearest water cell in a flat-radius box around the body. ASSESS
+     * is a once-per-episode scan, so the small cube sweep is cheap;
+     * the first hit wins (any water within reach serves the cast).
+     *
+     * @param world read surface; never null
+     * @param body  the body's cell; never null
+     * @return a water cell, or null when none is in range
+     */
+    private static CellPos findWater(WorldView world, CellPos body) {
+        for (int dy = 0; dy >= -2; dy--) {
+            for (int dx = -WATER_SCAN_RADIUS; dx <= WATER_SCAN_RADIUS; dx++) {
+                for (int dz = -WATER_SCAN_RADIUS; dz <= WATER_SCAN_RADIUS; dz++) {
+                    CellPos probe = new CellPos(body.x() + dx, body.y() + dy, body.z() + dz);
+                    BlockSnapshot snap = world.getBlock(probe, ViewMode.LIVE);
+                    if (snap != null && WATER_ID.equals(snap.blockId())) {
+                        return probe;
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     private void forageTick(CellPos body) {
@@ -268,6 +347,7 @@ public final class HungryProcess implements BotProcess, TerminalMission, DigMiss
                 switch (phase) {
                     case FORAGE -> "forage";
                     case HUNT, COLLECT -> "hunt";
+                    case FISH -> "fish";
                     default -> "none";
                 };
         return Map.of("reason", failure, "strategy", strategy);

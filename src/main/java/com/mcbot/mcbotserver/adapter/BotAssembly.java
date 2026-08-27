@@ -219,6 +219,7 @@ public final class BotAssembly {
         // nobody executes - the production gap behind the idle
         // night-cave death.
         Behavior combat = new CombatBehavior("combat", () -> finePoseOf(body), new VanillaWeaponCatalog());
+        Behavior fisher = new com.mcbot.mcbotserver.core.behavior.FishBehavior("fish");
 
         // One fresh reflex-owned defend per engage submission; the
         // assembly owns identity, budget and type sets.
@@ -256,7 +257,7 @@ public final class BotAssembly {
         BotController controller = new BotController(
                 reflex,
                 arbiter,
-                List.of(mover, combat),
+                List.of(mover, combat, fisher),
                 actor,
                 () -> poseOf(body),
                 body::getHealth,
