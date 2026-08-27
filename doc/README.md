@@ -14,7 +14,7 @@ Generated: 2026-08-27. Validate anytime with `python tool/mcbot_tool.py doc chec
 | [function-map.md](architecture/function-map.md) | Functional Convergence Map (device-layer capability envelope) | 2026-08-27 | ok |
 | [glossary.md](architecture/glossary.md) | Glossary - the loaded terms, pinned before they mislead | 2026-08-27 | ok |
 | [harness-interaction.md](architecture/harness-interaction.md) | Harness Interaction Model - the canonical architecture of the bot's command surface | 2026-08-27 | ok |
-| [issues/0003-sneak-pose-and-edge-walk.md](architecture/issues/0003-sneak-pose-and-edge-walk.md) | Sneak pose and edge walk - pose-aware collision, SNEAK channel, shield block | 2026-08-26 | ok |
+| [issues/0003-sneak-pose-and-edge-walk.md](architecture/issues/0003-sneak-pose-and-edge-walk.md) | Sneak pose and edge walk - pose-aware collision, SNEAK channel, shield block | 2026-08-27 | ok |
 | [issues/0007-player-parity-interaction.md](architecture/issues/0007-player-parity-interaction.md) | Player parity - inventory, menus, crafting, and the interaction surface | 2026-08-27 | ok |
 | [issues/0009-block-capability-dig.md](architecture/issues/0009-block-capability-dig.md) | Block capability axis - dig first, pulled forward by the suffocation escape | 2026-08-27 | ok |
 | [issues/0010-hungryprocess-food-acquisition-planner.md](architecture/issues/0010-hungryprocess-food-acquisition-planner.md) | HungryProcess - food acquisition planner with self-contained initial strategies | 2026-08-27 | ok |
@@ -36,6 +36,7 @@ Generated: 2026-08-27. Validate anytime with `python tool/mcbot_tool.py doc chec
 |---|---|---|---|
 | [build-and-run.md](guide/build-and-run.md) | Build & Run Guide | 2026-08-27 | ok |
 | [onboarding.md](guide/onboarding.md) | Onboarding Guide | 2026-08-27 | ok |
+| [workplan-archive.md](guide/workplan-archive.md) | Work Plan Archive (shipped items) | 2026-08-27 | ok |
 | [workplan.md](guide/workplan.md) | Work Plan (effort-sized checklist) | 2026-08-27 | ok |
 
 ## reference/
@@ -45,13 +46,13 @@ Generated: 2026-08-27. Validate anytime with `python tool/mcbot_tool.py doc chec
 | [baritone-notes.md](reference/baritone-notes.md) | Baritone Architecture Notes (Design Reference) | 2026-08-21 | ok |
 | [disclosure-patterns.md](reference/disclosure-patterns.md) | Numen Disclosure Pattern Notes (Design Reference) | 2026-08-21 | ok |
 | [numen-notes.md](reference/numen-notes.md) | Numen Architecture Notes (Design Reference) | 2026-08-21 | ok |
-| [toolchain.md](reference/toolchain.md) | Toolchain Reference | 2026-08-22 | ok |
+| [toolchain.md](reference/toolchain.md) | Toolchain Reference | 2026-08-27 | ok |
 
 ## decisions/
 
 | Document | Title | Verified | Status |
 |---|---|---|---|
-| [0001-moddev-legacyforge.md](decisions/0001-moddev-legacyforge.md) | ADR-0001 Use moddev-legacyforge instead of ForgeGradle | 2026-08-22 | ok |
+| [0001-moddev-legacyforge.md](decisions/0001-moddev-legacyforge.md) | ADR-0001 Use moddev-legacyforge instead of ForgeGradle | 2026-08-27 | ok |
 | [0002-capability-model-task-arbiter.md](decisions/0002-capability-model-task-arbiter.md) | ADR-0002 Capability model and TaskArbiter | 2026-08-21 | ok |
 | [0003-reflex-layer-preemption.md](decisions/0003-reflex-layer-preemption.md) | ADR-0003 ReflexLayer preemption semantics and interruption recovery | 2026-08-21 | ok |
 | [0004-tick-pipeline-actor-channels.md](decisions/0004-tick-pipeline-actor-channels.md) | ADR-0004 Tick pipeline, Actor channels, and execution feedback | 2026-08-21 | ok |

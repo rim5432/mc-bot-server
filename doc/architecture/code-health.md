@@ -2,6 +2,11 @@
 title: Code Health Ledger
 last_verified: 2026-08-27
 covers:
+  - build.gradle
+  - config/checkstyle/checkstyle.xml
+  - config/checkstyle/suppressions.xml
+  - config/pmd/ruleset.xml
+  - .git-blame-ignore-revs
   - src/main/java/com/mcbot/mcbotserver/core/tick/BotController.java
   - src/main/java/com/mcbot/mcbotserver/core/tick/MissionReporter.java
   - src/main/java/com/mcbot/mcbotserver/core/tick/ReflexEngageSeat.java
@@ -11,6 +16,7 @@ covers:
   - src/main/java/com/mcbot/mcbotserver/core/behavior/PathingBehavior.java
   - src/test/java/com/mcbot/mcbotserver/hygiene/EnglishOnlyScan.java
   - src/test/java/com/mcbot/mcbotserver/hygiene/GametestInventoryCheck.java
+  - src/test/java/com/mcbot/mcbotserver/architecture/BytecodeArchitectureGateTest.java
   - src/test/java/com/mcbot/mcbotserver/core/tick/PathingTestAccess.java
   - src/test/java/com/mcbot/mcbotserver/core/tick/TickGateFixtures.java
   - src/test/java/com/mcbot/mcbotserver/core/tick/TickPipelineGateTest.java
@@ -89,6 +95,7 @@ admitted here may encode a size cap.
 | H-R7 Package structure | Main modules single-level, module names never reused as subpackages; test packages mirror main or are sanctioned metas | `architecture.PackageStructureGateTest` | gated 2026-08-25 |
 | H-R8 Contract markers present | Every src/main implementer of a boundary interface carries its `contract: see` pointer (AGENTS.md 1.4.3.1) | `architecture.BoundaryContractMarkerTest` | gated 2026-08-25 |
 | H-R9 Review claims cite or are unverified | Every factual claim in a review/assessment carries a file:line or doc-anchor citation; quoted promises are checked against the anchor; "does this abstraction exist" checks the abstraction-status table first | not mechanically checkable | review-only since 2026-08-27 |
+| H-R10 Style law is machine-owned | AGENTS section 1 semantic rules (naming, javadoc presence, import purity, width) fail the checkstyle tasks; layout is formatter-canonical (Spotless/palantir) and never hand-reformatted | `checkstyle*` + `spotlessCheck` gradle tasks (`build.gradle`, -Plint suite; wired in f8b63b2) | gated (-Plint) 2026-08-27 |
 
 ### Rule detail
 
@@ -156,6 +163,21 @@ admitted here may encode a size cap.
   property, not a reader property - the gated zones (H-R1, H-R4,
   H-R7, H-R8) have zero misunderstanding history; the prose zones
   accumulated all of it.
+- **H-R10 Style law is machine-owned.** The 2026-08-27 static
+  analysis stack retired the manual section-1 review obligations:
+  checkstyle's semantic set (naming, javadoc presence on public
+  members, star/dead imports, width 120 with the `// width-120:`
+  escape hatch) fails on violation, and Spotless with
+  palantir-java-format owns layout outright - its output IS the
+  MC-ecosystem convention (4-space indent, K&R braces, 120
+  columns), so hand-reformatting is a defect, not a style choice.
+  Stays review-only by recorded decision: `final`-everywhere,
+  trailing commas, record layout (no reliable AST mapping; see the
+  checkstyle.xml header for the full ownership map). The gate rides
+  the opt-in `-Plint` suite today; PMD flips to failing only after
+  the god-class paydown round, and promoting the hard gates into
+  the default `test` path is the standing recommendation once the
+  suite's runtime cost is confirmed stable across agents.
 
 ## Abstraction status (single lookup)
 
@@ -292,6 +314,33 @@ again and its Javadoc names the delegation. Guard inverted from
 the call site (if-targeted) into the method (if-not-targeted
 return), so future DIG-carrying preemption paths cannot forget it.
 
+### Static analysis stack (2026-08-27)
+
+Seven tools wired as one opt-in `-Plint` suite
+(f8b63b2); default compile/test flows stay inert for other
+agents. Checkstyle (12.3.1, semantic rules only) and
+spotlessCheck (palantir-java-format 2.97.0) fail on violation;
+PMD 7.26.0, CPD, and SpotBugs 4.10.4 (scoped `onlyAnalyze` to
+api/core, which kills the MC auxclasspath problem) run as
+advisory dashboards; Error Prone 2.42.0 rides the -Plint
+compiles with ReferenceEquality OFF under the identity-comparison
+ruling. Layout ownership moved from checkstyle's retired layout
+modules to the formatter (bc86d4c flips AGENTS section 1.6);
+the repo-wide reformat (87c3561, 198 files) is excluded from
+blame via .git-blame-ignore-revs (174f1eb).
+
+Evidence chain: zeroed baselines (75 dead import lines and 3
+missing javadocs across 39 files, plus naming drift; 0bd49e8 +
+b891d74 carry the root fixes), Error Prone 24 findings -> 20
+root-fixed -> 0 remaining, offline suite 407/407 green at every
+commit of the landing chain (each intermediate verified in a
+clean worktree; the reformat commit additionally carries the one
+scan-gate adaptation - WorldCommandsWireShapeGateTest regexes
+gained `\s*` tolerance - that the rewrap requires). Every
+"why is this rule (not) here" decision lives as a comment in
+`config/checkstyle/*.xml` / `config/pmd/ruleset.xml` /
+`build.gradle`.
+
 ## Ruling anchors in code
 
 Where the live architectural rulings physically live, so "why is it
@@ -317,3 +366,28 @@ without an anchor is a workplan item, not a row here.
   Schedule: before Stage 3 vocabulary lands - pose parameterization
   touches the same collision predicates, and trimming afterwards
   would churn boundary-D consumers twice.
+- **OPEN - god-class paydown round with PMD as the yardstick.** The
+  dashboard's 18 findings at install time are the "before" numbers:
+  MenuPlanner WMC=110 (planGridFill CC=23, planDepositCounted 22,
+  planTakeRole 19), BotController.runPipeline CC=23, MenuCommands
+  WMC=63 + TooManyMethods, ReflexRuleJson WMC=65, MineProcess ctor
+  CC=15, AStarPathFinder.compute CC=19. A round lands when the
+  numbers drop - not when the classes "feel" smaller; PMD flips to
+  failing (ignoreFailures off) the round after the metrics clear
+  the report levels.
+- **OPEN - SpotBugs first-triage queue.** api/core-scope first
+  pass flagged ThreatBlackboard's six suspected dead fields
+  (UrF/UwF), GotoCommandHandler's internal-representation exposure
+  (EI2), and DigCommandHandler's NPE-catch pattern (DCN). Triage
+  assigns each a severity or a suppression-with-ruling; dashboard
+  posture stays until then.
+- **OPEN - CPD dedup round.** ~18 duplicate blocks >=100 tokens at
+  install time, dominated by known mock-vs-server implementation
+  pairs; the pre-sorted list is `python tool/mcbot_tool.py gradle
+  cpdCheck -Plint` away, so the round starts from evidence, not
+  memory.
+- **OPEN - JavadocMethod tag-completeness graduation.** 75 live
+  @param/@return tag gaps across public API; presence is gated
+  (H-R10), completeness returns when the tag debt is paid down or
+  the rule is consciously re-scoped (config comment in
+  checkstyle.xml carries the deferral).

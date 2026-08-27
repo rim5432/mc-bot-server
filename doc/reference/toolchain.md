@@ -47,7 +47,7 @@ Do not hardcode versions into new docs; link here instead.
   opt-in `-Plint` flag; postures and deferral rationale live in
   [Build & Run Guide](../guide/build-and-run.md#static-analysis--plint).
 
-## Verified working state (2026-08-21)
+## Verified working state
 
 - `gradlew compileJava` passes end to end. First run takes ~6 min
   (NeoForm downloads MC client/server, merges, decompiles with
