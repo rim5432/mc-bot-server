@@ -153,19 +153,22 @@ advice.
 
 ### 1.2 Naming
 
-- Constants `UPPER_SNAKE_CASE`; everything else lowerCamelCase,
-  methods verb-led; no decompile residue (`var0`, `m_262824_`).
-- Data carriers are `record`s; sum types are sealed interfaces with
-  permitted records. Reach for `enum` only when values carry no
-  fields.
-- Formatting: canonical form comes from Spotless with
-  `palantir-java-format` (`python tool/mcbot_tool.py gradle
-  spotlessApply`; checkstyle + spotlessCheck fail the default
-  `test` flow on violation, width 120 included) -
-  never hand-reformat. Still review-enforced: `final` everywhere
-  applicable, trailing commas on multi-line lists.
-- Imports explicit, no wildcards below 20 classes from one package;
-  ordering is whatever the formatter emits (single source of truth).
+- Machine-held (checkstyle + Spotless fail the default `test` flow;
+  code-health H-R10): naming casings (`UPPER_SNAKE_CASE`
+  constants, lowerCamelCase otherwise), the star-import ban,
+  width 120, all layout - never argue a tool-owned rule by hand;
+  repair format drift with
+  `python tool/mcbot_tool.py gradle spotlessApply`.
+- Review-only style law (no gate owns these): names stay semantic,
+  methods verb-led; no decompile residue (`var0`, `m_262824_`);
+  `final` everywhere applicable; trailing commas on multi-line
+  lists.
+- Imports explicit, no star imports at any class count (the
+  checkstyle ban is unconditional); ordering is whatever the
+  formatter emits.
+- Data carriers are `record`s; sum types are sealed interfaces
+  with permitted records. Reach for `enum` only when values carry
+  no fields.
 
 ### 1.4 Comments (English-only, intent-first)
 
@@ -177,9 +180,11 @@ advice.
   exceptions are data, not comments: game-content strings verbatim
   (`Component.literal("Stuck")`) and byte-fidelity registry keys.
 - Class-level Javadoc states purpose plus implemented boundaries/ADRs.
-  Public/protected members get Javadoc with tag order `@param` ->
-  `@return` -> `@throws`, nullability stated (`never null` /
-  `may return null`), first sentence third-person ending in a period.
+  Javadoc presence and @param/@return completeness on public
+  members are checkstyle-gated (H-R10); review-enforced remains the
+  tag order `@param` -> `@return` -> `@throws`, nullability stated
+  (`never null` / `may return null`), first sentence third-person
+  ending in a period.
 - Frozen-boundary write site: `// contract: see ADR-NNNN` or
   `// contract: see boundaries.md §X` - the **1.4.3.1** marker
   convention, presence-gated by `BoundaryContractMarkerTest`
