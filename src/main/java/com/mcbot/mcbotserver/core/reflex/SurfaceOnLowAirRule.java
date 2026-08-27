@@ -94,17 +94,29 @@ public final class SurfaceOnLowAirRule implements ReflexRule, ReflexHysteresis {
         return board.airSupply <= trigger ? priority : -1;
     }
 
-    /** The configured firing threshold. */
+    /**
+     * The configured firing threshold.
+     *
+     * @return the low-air threshold in ticks
+     */
     public int trigger() {
         return trigger;
     }
 
-    /** The configured release threshold. */
+    /**
+     * The configured release threshold.
+     *
+     * @return the release threshold in ticks
+     */
     public int release() {
         return release;
     }
 
-    /** The configured flat priority. */
+    /**
+     * The configured flat priority.
+     *
+     * @return the flat priority
+     */
     public int priority() {
         return priority;
     }

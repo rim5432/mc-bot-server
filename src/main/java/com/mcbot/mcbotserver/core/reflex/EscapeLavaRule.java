@@ -81,7 +81,11 @@ public final class EscapeLavaRule implements ReflexRule, ReflexHysteresis {
         return board.inLethalFluid ? priority : -1;
     }
 
-    /** The configured flat priority. */
+    /**
+     * The configured flat priority.
+     *
+     * @return the flat priority
+     */
     public int priority() {
         return priority;
     }

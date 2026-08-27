@@ -148,6 +148,11 @@ public final class MineCommandHandler {
      * Cancel hook, routed by the McBotServer cancel router (the bus
      * has ONE listener slot; every verb handler's cancel method is
      * public and self-guards by its missions map).
+     *
+     * @param taskId identifier of the mission to tear down; unknown ids
+     *               are ignored, never null
+     * @param verb   wire name of the cancelled command as reported by the
+     *               dispatcher; kept for callback-signature symmetry
      */
     public void onCancel(String taskId, String verb) {
         MineProcess mission = missions.remove(taskId);

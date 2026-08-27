@@ -80,12 +80,20 @@ public final class ClimbOutOfPowderSnowRule implements ReflexRule {
         return board.freezeTicks >= trigger ? priority : -1;
     }
 
-    /** The configured firing threshold. */
+    /**
+     * The configured firing threshold.
+     *
+     * @return the freeze-tick threshold
+     */
     public int trigger() {
         return trigger;
     }
 
-    /** The configured flat priority. */
+    /**
+     * The configured flat priority.
+     *
+     * @return the flat priority
+     */
     public int priority() {
         return priority;
     }

@@ -95,7 +95,11 @@ public final class ExtinguishFireRule implements ReflexRule, ReflexHysteresis {
         return isLethalFire(board) ? priority : -1;
     }
 
-    /** The configured flat priority. */
+    /**
+     * The configured flat priority.
+     *
+     * @return the flat priority
+     */
     public int priority() {
         return priority;
     }

@@ -70,7 +70,11 @@ public final class DigProcess implements BotProcess, TerminalMission, DigMission
         return "dig:" + taskId;
     }
 
-    /** The dig target this process drives claims toward. */
+    /**
+     * The dig target this process drives claims toward.
+     *
+     * @return the target cell; never null after mission start
+     */
     public CellPos target() {
         return target;
     }
@@ -93,7 +97,11 @@ public final class DigProcess implements BotProcess, TerminalMission, DigMission
         return active;
     }
 
-    /** Block id captured on the first tick; null before that. */
+    /**
+     * Block id captured on the first tick.
+     *
+     * @return the block id; null before the first working tick
+     */
     public String initialBlockId() {
         return initialBlockId;
     }

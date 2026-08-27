@@ -49,6 +49,7 @@ public final class PlanWorker {
      * @param snapshot          immutable perception to read; never null
      * @param start             search origin; never null
      * @param goal              arrival predicate; never null
+     * @param graph             move set and costs searched by A*; never null
      * @param heuristic         cost-to-go estimator; never null
      * @param nodeBudget        safety-net expansion cap; positive
      * @param wallClockBudgetMs soft time cap in milliseconds; positive

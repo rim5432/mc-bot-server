@@ -90,14 +90,23 @@ public class McBotServer {
         LOGGER.info("McBotServer initializing — device layer for MC 1.20.1");
     }
 
-    /** Datapack reloads rewrite the reflex rule table in place. */
+    /**
+     * Datapack reloads rewrite the reflex rule table in place.
+     *
+     * @param event mod-bus callback registering that listener; never null
+     */
     @SubscribeEvent
     public void onAddReloadListeners(net.minecraftforge.event.AddReloadListenerEvent event) {
         ruleReloader.bind(null);
         event.addListener(ruleReloader);
     }
 
-    /** Attribute wiring so the body can actually move and survive. */
+    /**
+     * Attribute wiring so the body can actually move and survive.
+     *
+     * @param event mod-bus attribute-map builder fed by {@code put};
+     *              never null
+     */
     @SubscribeEvent
     public void onAttributes(EntityAttributeCreationEvent event) {
         // createMobAttributes does NOT include MOVEMENT_SPEED - each
@@ -110,7 +119,11 @@ public class McBotServer {
                         .build());
     }
 
-    /** Marks device startup in the log once a server instance exists. */
+    /**
+     * Marks device startup in the log once a server instance exists.
+     *
+     * @param event game-bus startup signal; payload unused
+     */
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
         LOGGER.info("McBotServer: server started, bot device active");
@@ -152,6 +165,8 @@ public class McBotServer {
      * surface as a {@code ReportedException} on the MC main thread.
      * Catching here and calling {@code emergencyLatch} keeps the
      * contract from ADR-0005 D2 closed at the listener boundary.
+     *
+     * @param event per-tick bus event; only Phase.END advances the pipeline
      */
     // contract: see ADR-0004 D1 + ADR-0005 D2 (single tick entry;
     //          outer catch is the last-ditch seam for the harness
@@ -198,6 +213,9 @@ public class McBotServer {
     /**
      * Debug seam: spawn one body with its full pipeline. Stage 1's
      * manual harness; a boundary-D transport replaces this later.
+     *
+     * @param event grants the server dispatcher for verb registration;
+     *              never null
      */
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {

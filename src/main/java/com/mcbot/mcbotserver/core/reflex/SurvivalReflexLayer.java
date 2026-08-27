@@ -44,7 +44,13 @@ public final class SurvivalReflexLayer {
     public record ReflexDecision(
             String ruleName, int priority, ReflexAction action, com.mcbot.mcbotserver.api.types.CellPos target) {
 
-        /** Creates a targetless decision (every kind but DIG). */
+        /**
+         * Creates a targetless decision (every kind but DIG).
+         *
+         * @param ruleName originating reflex rule id; never null
+         * @param priority scheduler ordering key; higher runs first
+         * @param action   what the controller should perform; never null
+         */
         public ReflexDecision(String ruleName, int priority, ReflexAction action) {
             this(ruleName, priority, action, null);
         }

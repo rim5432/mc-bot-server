@@ -87,17 +87,29 @@ public final class EngageOnHostileProximityRule implements ReflexRule, ReflexHys
         return board.nearestThreat != null && board.nearestThreatDistance <= trigger ? priority : -1;
     }
 
-    /** The configured firing distance. */
+    /**
+     * The configured firing distance.
+     *
+     * @return the trigger distance in blocks
+     */
     public double trigger() {
         return trigger;
     }
 
-    /** The configured release distance. */
+    /**
+     * The configured release distance.
+     *
+     * @return the release distance in blocks
+     */
     public double release() {
         return release;
     }
 
-    /** The configured flat priority. */
+    /**
+     * The configured flat priority.
+     *
+     * @return the flat priority
+     */
     public int priority() {
         return priority;
     }
