@@ -24,8 +24,7 @@ public record Attack(String targetId) implements CombatOrder {
     public Attack {
         Objects.requireNonNull(targetId, "targetId");
         if (targetId.isBlank()) {
-            throw new IllegalArgumentException(
-                "targetId must not be blank");
+            throw new IllegalArgumentException("targetId must not be blank");
         }
     }
 }

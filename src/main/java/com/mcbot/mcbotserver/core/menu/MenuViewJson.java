@@ -2,7 +2,6 @@ package com.mcbot.mcbotserver.core.menu;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-
 import com.mcbot.mcbotserver.api.inventory.ItemView;
 import com.mcbot.mcbotserver.api.menu.MenuView;
 import com.mcbot.mcbotserver.api.menu.RecipeView;
@@ -28,8 +27,7 @@ import com.mcbot.mcbotserver.api.types.CellPos;
 //            0012 D1 (menu command batch, L0 disclosure shape)
 public final class MenuViewJson {
 
-    private MenuViewJson() {
-    }
+    private MenuViewJson() {}
 
     /**
      * Render a menu snapshot for the wire.

@@ -7,11 +7,9 @@ import com.mcbot.mcbotserver.api.event.EventQueue;
 import com.mcbot.mcbotserver.api.goal.Goal;
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.goal.GoalNear;
-import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.process.GotoProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,13 +52,10 @@ public final class GotoCommandHandler {
      * @param daySupplier       game-day stamp accessor; never null
      * @param timeOfDaySupplier time-of-day stamp accessor; never null
      */
-    public GotoCommandHandler(TaskArbiter arbiter, EventQueue events,
-                              LongSupplier daySupplier,
-                              LongSupplier timeOfDaySupplier) {
-        if (arbiter == null || events == null || daySupplier == null
-            || timeOfDaySupplier == null) {
-            throw new IllegalArgumentException(
-                "arguments must not be null");
+    public GotoCommandHandler(
+            TaskArbiter arbiter, EventQueue events, LongSupplier daySupplier, LongSupplier timeOfDaySupplier) {
+        if (arbiter == null || events == null || daySupplier == null || timeOfDaySupplier == null) {
+            throw new IllegalArgumentException("arguments must not be null");
         }
         this.arbiter = arbiter;
         this.events = events;
@@ -96,8 +91,7 @@ public final class GotoCommandHandler {
             @Override
             public void execute(BotCommand command, String taskId) {
                 ParsedGoto parsed = parse(command);
-                GotoProcess mission = new GotoProcess(taskId,
-                    parsed.goal(), 50, parsed.timeoutTicks());
+                GotoProcess mission = new GotoProcess(taskId, parsed.goal(), 50, parsed.timeoutTicks());
                 missions.put(taskId, mission);
                 arbiter.register(mission);
                 arbiter.requestControl(mission);
@@ -164,12 +158,15 @@ public final class GotoCommandHandler {
         }
         mission.abort();
         try {
-            events.push(new BotEvent(EventKind.TASK_CANCELLED,
-                daySupplier.getAsLong(), timeOfDaySupplier.getAsLong(),
-                false,
-                Map.of("task", mission.displayName(),
-                       "taskId", mission.taskId()),
-                mission.displayName() + ": cancelled by harness"));
+            events.push(new BotEvent(
+                    EventKind.TASK_CANCELLED,
+                    daySupplier.getAsLong(),
+                    timeOfDaySupplier.getAsLong(),
+                    false,
+                    Map.of(
+                            "task", mission.displayName(),
+                            "taskId", mission.taskId()),
+                    mission.displayName() + ": cancelled by harness"));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down with it.
         }
@@ -182,19 +179,14 @@ public final class GotoCommandHandler {
         int z = numeric(args, "z", null, Integer::parseInt);
         int tolerance = numeric(args, "tolerance", 0, Integer::parseInt);
         if (tolerance < 0) {
-            throw new IllegalArgumentException(
-                "tolerance must not be negative");
+            throw new IllegalArgumentException("tolerance must not be negative");
         }
-        long timeout = numeric(args, "timeoutTicks", DEFAULT_TIMEOUT_TICKS,
-            Long::parseLong);
+        long timeout = numeric(args, "timeoutTicks", DEFAULT_TIMEOUT_TICKS, Long::parseLong);
         if (timeout <= 0) {
-            throw new IllegalArgumentException(
-                "timeoutTicks must be positive");
+            throw new IllegalArgumentException("timeoutTicks must be positive");
         }
         CellPos target = new CellPos(x, y, z);
-        Goal goal = tolerance == 0
-            ? new GoalBlock(target)
-            : new GoalNear(target, tolerance);
+        Goal goal = tolerance == 0 ? new GoalBlock(target) : new GoalNear(target, tolerance);
         return new ParsedGoto(goal, timeout);
     }
 
@@ -214,8 +206,7 @@ public final class GotoCommandHandler {
      * @throws IllegalArgumentException when a required arg is missing
      *         or the raw value does not parse
      */
-    private <N> N numeric(Map<String, String> args, String key,
-                          N fallback, Function<String, N> parse) {
+    private <N> N numeric(Map<String, String> args, String key, N fallback, Function<String, N> parse) {
         String raw = args.get(key);
         if (raw == null) {
             if (fallback == null) {
@@ -226,11 +217,9 @@ public final class GotoCommandHandler {
         try {
             return parse.apply(raw.trim());
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(
-                "arg " + key + " is not an integer: " + raw);
+            throw new IllegalArgumentException("arg " + key + " is not an integer: " + raw);
         }
     }
 
-    private record ParsedGoto(Goal goal, long timeoutTicks) {
-    }
+    private record ParsedGoto(Goal goal, long timeoutTicks) {}
 }

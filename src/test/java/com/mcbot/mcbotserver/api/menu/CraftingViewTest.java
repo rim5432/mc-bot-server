@@ -1,16 +1,14 @@
 package com.mcbot.mcbotserver.api.menu;
 
-import com.mcbot.mcbotserver.api.inventory.ItemView;
-
-import org.junit.jupiter.api.Test;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.mcbot.mcbotserver.api.inventory.ItemView;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
 
 /**
  * Offline gates for {@link CraftingView}: the role-driven projection
@@ -35,9 +33,7 @@ class CraftingViewTest {
         // Row-major projection: grid position p maps to flat slot p+1
         // on the table layout.
         for (int p = 0; p < 9; p++) {
-            assertEquals(p + 1, view.flatGridIndex(p),
-                "grid position " + p + " must map to flat slot "
-                    + (p + 1));
+            assertEquals(p + 1, view.flatGridIndex(p), "grid position " + p + " must map to flat slot " + (p + 1));
         }
     }
 
@@ -76,8 +72,7 @@ class CraftingViewTest {
         }
         roles.put(27, SlotRole.HOTBAR);
         MenuView chest = snapshot("chest", 28, roles);
-        assertThrows(IllegalArgumentException.class,
-            () -> CraftingView.of(chest));
+        assertThrows(IllegalArgumentException.class, () -> CraftingView.of(chest));
     }
 
     @Test
@@ -90,45 +85,36 @@ class CraftingViewTest {
         }
         roles.put(8, SlotRole.HOTBAR);
         MenuView odd = snapshot("odd", 9, roles);
-        assertThrows(IllegalArgumentException.class,
-            () -> CraftingView.of(odd));
+        assertThrows(IllegalArgumentException.class, () -> CraftingView.of(odd));
     }
 
     @Test
     void canonicalConstructorRejectsForeignRoles() {
-        SlotView result = new SlotView(0, ItemView.EMPTY,
-            SlotRole.RESULT);
-        List<SlotView> badGrid = List.of(
-            new SlotView(1, ItemView.EMPTY, SlotRole.MAIN));
-        assertThrows(IllegalArgumentException.class,
-            () -> new CraftingView(tableSnapshot(3), badGrid, result));
+        SlotView result = new SlotView(0, ItemView.EMPTY, SlotRole.RESULT);
+        List<SlotView> badGrid = List.of(new SlotView(1, ItemView.EMPTY, SlotRole.MAIN));
+        assertThrows(IllegalArgumentException.class, () -> new CraftingView(tableSnapshot(3), badGrid, result));
 
-        SlotView notResult = new SlotView(20, ItemView.EMPTY,
-            SlotRole.MAIN);
+        SlotView notResult = new SlotView(20, ItemView.EMPTY, SlotRole.MAIN);
         List<SlotView> goodGrid = new java.util.ArrayList<>();
         for (int i = 1; i <= 9; i++) {
             goodGrid.add(new SlotView(i, ItemView.EMPTY, SlotRole.GRID));
         }
-        assertThrows(IllegalArgumentException.class,
-            () -> new CraftingView(tableSnapshot(3), goodGrid,
-                notResult));
+        assertThrows(IllegalArgumentException.class, () -> new CraftingView(tableSnapshot(3), goodGrid, notResult));
     }
 
     @Test
     void gridListIsImmutable() {
         CraftingView view = CraftingView.of(tableSnapshot(3));
-        assertThrows(UnsupportedOperationException.class,
-            () -> view.grid().add(new SlotView(99, ItemView.EMPTY,
-                SlotRole.GRID)));
+        assertThrows(
+                UnsupportedOperationException.class,
+                () -> view.grid().add(new SlotView(99, ItemView.EMPTY, SlotRole.GRID)));
     }
 
     @Test
     void flatGridIndexRejectsOutOfRangePositions() {
         CraftingView view = CraftingView.of(tableSnapshot(3));
-        assertThrows(IndexOutOfBoundsException.class,
-            () -> view.flatGridIndex(9));
-        assertThrows(IndexOutOfBoundsException.class,
-            () -> view.flatGridIndex(-1));
+        assertThrows(IndexOutOfBoundsException.class, () -> view.flatGridIndex(9));
+        assertThrows(IndexOutOfBoundsException.class, () -> view.flatGridIndex(-1));
         assertTrue(view.gridSide() == 2 || view.gridSide() == 3);
     }
 
@@ -148,12 +134,10 @@ class CraftingViewTest {
 
     /** Builds a snapshot where every unlisted slot is MAIN and every
      * item is empty. */
-    private static MenuView snapshot(String type, int size,
-                                     Map<Integer, SlotRole> special) {
+    private static MenuView snapshot(String type, int size, Map<Integer, SlotRole> special) {
         List<SlotView> slots = new java.util.ArrayList<>(size);
         for (int i = 0; i < size; i++) {
-            slots.add(new SlotView(i, ItemView.EMPTY,
-                special.getOrDefault(i, SlotRole.MAIN)));
+            slots.add(new SlotView(i, ItemView.EMPTY, special.getOrDefault(i, SlotRole.MAIN)));
         }
         return new MenuView(type, null, ItemView.EMPTY, size, slots);
     }

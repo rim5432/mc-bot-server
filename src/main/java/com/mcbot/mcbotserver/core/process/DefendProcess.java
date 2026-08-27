@@ -11,13 +11,12 @@ import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.EntitySnapshot;
 import com.mcbot.mcbotserver.api.world.ViewMode;
 import com.mcbot.mcbotserver.api.world.WorldView;
-
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
-import java.util.Map;
 
 /**
  * Light combat planner per boundaries.md decision 11: picks the
@@ -142,11 +141,13 @@ public final class DefendProcess implements BotProcess, TerminalMission {
      *                     may be empty (then the mission completes at
      *                     once)
      */
-    public DefendProcess(String taskId, int priority, long timeoutTicks,
-                         Supplier<CellPos> positionSource,
-                         Set<String> hostileTypes) {
-        this(taskId, priority, timeoutTicks, positionSource, hostileTypes,
-            Set.of());
+    public DefendProcess(
+            String taskId,
+            int priority,
+            long timeoutTicks,
+            Supplier<CellPos> positionSource,
+            Set<String> hostileTypes) {
+        this(taskId, priority, timeoutTicks, positionSource, hostileTypes, Set.of());
     }
 
     /**
@@ -161,26 +162,25 @@ public final class DefendProcess implements BotProcess, TerminalMission {
      *                     these are REFUSED at engage time instead of
      *                     chased; never null
      */
-    public DefendProcess(String taskId, int priority, long timeoutTicks,
-                         Supplier<CellPos> positionSource,
-                         Set<String> hostileTypes,
-                         Set<String> rangedTypes) {
+    public DefendProcess(
+            String taskId,
+            int priority,
+            long timeoutTicks,
+            Supplier<CellPos> positionSource,
+            Set<String> hostileTypes,
+            Set<String> rangedTypes) {
         if (taskId == null || taskId.isBlank()) {
             throw new IllegalArgumentException("taskId must not be blank");
         }
         if (timeoutTicks <= 0) {
-            throw new IllegalArgumentException(
-                "timeoutTicks must be positive");
+            throw new IllegalArgumentException("timeoutTicks must be positive");
         }
         this.taskId = taskId;
         this.priority = priority;
         this.timeoutTicks = timeoutTicks;
-        this.positionSource = Objects.requireNonNull(positionSource,
-            "positionSource");
-        this.hostileTypes = Set.copyOf(Objects.requireNonNull(
-            hostileTypes, "hostileTypes"));
-        this.rangedTypes = Set.copyOf(Objects.requireNonNull(
-            rangedTypes, "rangedTypes"));
+        this.positionSource = Objects.requireNonNull(positionSource, "positionSource");
+        this.hostileTypes = Set.copyOf(Objects.requireNonNull(hostileTypes, "hostileTypes"));
+        this.rangedTypes = Set.copyOf(Objects.requireNonNull(rangedTypes, "rangedTypes"));
     }
 
     @Override
@@ -366,9 +366,7 @@ public final class DefendProcess implements BotProcess, TerminalMission {
     }
 
     private Directive directiveFor(CellPos botCell) {
-        lastDirective = new Directive(
-            new GoalNear(targetCell, GOAL_RANGE),
-            new Overrides(new Attack(targetId)));
+        lastDirective = new Directive(new GoalNear(targetCell, GOAL_RANGE), new Overrides(new Attack(targetId)));
         return lastDirective;
     }
 
@@ -383,19 +381,15 @@ public final class DefendProcess implements BotProcess, TerminalMission {
      * @return hostile-typed entities within the active scan radius;
      *         never null, possibly empty
      */
-    private List<EntitySnapshot> scanHostiles(WorldView world,
-                                               CellPos center) {
+    private List<EntitySnapshot> scanHostiles(WorldView world, CellPos center) {
         // Engaged: tracking must see farther than engaging — an already-
         // locked target between ENGAGE and LEASH stays visible here, which
         // is what makes the leash break observable at all.
         // Non-engaged: use the full detection envelope (16) so a ranged
         // hostile kiting at 9–15 blocks is seen and REFUSED, not missed
         // and reported as SUCCESS ("area clear").
-        double scanRadius = engaged()
-            ? Math.max(ENGAGE_RADIUS, LEASH_RADIUS + 2)
-            : DETECTION_RADIUS;
-        List<EntitySnapshot> hits = world.getEntities(center, scanRadius,
-            ViewMode.LIVE);
+        double scanRadius = engaged() ? Math.max(ENGAGE_RADIUS, LEASH_RADIUS + 2) : DETECTION_RADIUS;
+        List<EntitySnapshot> hits = world.getEntities(center, scanRadius, ViewMode.LIVE);
         List<EntitySnapshot> out = new ArrayList<>();
         for (EntitySnapshot e : hits) {
             if (hostileTypes.contains(e.type())) {
@@ -405,8 +399,7 @@ public final class DefendProcess implements BotProcess, TerminalMission {
         return out;
     }
 
-    private EntitySnapshot nearestHostile(WorldView world,
-                                          CellPos center) {
+    private EntitySnapshot nearestHostile(WorldView world, CellPos center) {
         EntitySnapshot best = null;
         double bestDist = Double.MAX_VALUE;
         for (EntitySnapshot e : scanHostiles(world, center)) {
@@ -432,8 +425,7 @@ public final class DefendProcess implements BotProcess, TerminalMission {
      * @return the matching snapshot, or {@code null} if absent from
      *         the scan radius
      */
-    private EntitySnapshot findTarget(WorldView world, CellPos center,
-                                      String id) {
+    private EntitySnapshot findTarget(WorldView world, CellPos center, String id) {
         for (EntitySnapshot e : scanHostiles(world, center)) {
             if (id.equals(e.id())) {
                 return e;

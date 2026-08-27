@@ -5,7 +5,6 @@ import com.mcbot.mcbotserver.api.pathing.Heuristic;
 import com.mcbot.mcbotserver.api.pathing.Movement;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.WorldView;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -48,8 +47,7 @@ public final class AStarPathFinder {
      * Search outcome: full success (goal reached), best partial (budget
      * exhausted with a usable prefix toward the goal), or total failure.
      */
-    public record PathResult(List<CellPos> waypoints, int expandedNodes,
-                             boolean reachedGoal, double confidence) {
+    public record PathResult(List<CellPos> waypoints, int expandedNodes, boolean reachedGoal, double confidence) {
 
         /**
          * Creates a validated result.
@@ -61,14 +59,12 @@ public final class AStarPathFinder {
          *                      goal predicate
          * @param confidence    progress ratio in [0,1] - 1.0 for a
          *                      reached goal, 0.0 for failure; partial
-                      *                      outcomes sit in (0,1) by construction
+         *                      outcomes sit in (0,1) by construction
          */
         public PathResult {
             waypoints = List.copyOf(waypoints);
-            if (Double.isNaN(confidence) || confidence < 0.0
-                || confidence > 1.0) {
-                throw new IllegalArgumentException(
-                    "confidence must be in [0,1]: " + confidence);
+            if (Double.isNaN(confidence) || confidence < 0.0 || confidence > 1.0) {
+                throw new IllegalArgumentException("confidence must be in [0,1]: " + confidence);
             }
         }
 
@@ -119,13 +115,11 @@ public final class AStarPathFinder {
      * @param heuristic  cost-to-go estimator; never null
      * @param nodeBudget safety-net cap on expansions; positive
      */
-    public AStarPathFinder(MoveGraph graph, Heuristic heuristic,
-                           int nodeBudget) {
+    public AStarPathFinder(MoveGraph graph, Heuristic heuristic, int nodeBudget) {
         this.graph = Objects.requireNonNull(graph, "graph");
         this.heuristic = Objects.requireNonNull(heuristic, "heuristic");
         if (nodeBudget <= 0) {
-            throw new IllegalArgumentException(
-                "nodeBudget must be positive");
+            throw new IllegalArgumentException("nodeBudget must be positive");
         }
         this.wallClock = System::nanoTime;
         this.nodeBudget = nodeBudget;
@@ -143,17 +137,14 @@ public final class AStarPathFinder {
      * @param wallClock  monotonic nanotime supplier used to arm and
      *                   check the wall-clock deadline; never null
      */
-    public AStarPathFinder(MoveGraph graph, Heuristic heuristic,
-                           int nodeBudget,
-                           java.util.function.LongSupplier wallClock) {
+    public AStarPathFinder(
+            MoveGraph graph, Heuristic heuristic, int nodeBudget, java.util.function.LongSupplier wallClock) {
         this.graph = Objects.requireNonNull(graph, "graph");
         this.heuristic = Objects.requireNonNull(heuristic, "heuristic");
         if (nodeBudget <= 0) {
-            throw new IllegalArgumentException(
-                "nodeBudget must be positive");
+            throw new IllegalArgumentException("nodeBudget must be positive");
         }
-        this.wallClock = Objects.requireNonNull(wallClock,
-            "wallClock");
+        this.wallClock = Objects.requireNonNull(wallClock, "wallClock");
         this.nodeBudget = nodeBudget;
     }
 
@@ -171,8 +162,7 @@ public final class AStarPathFinder {
      *         toward the goal, possibly empty when nothing useful was
      *         ever expanded; never null
      */
-    public PathResult compute(WorldView world, CellPos start,
-                              Goal goal) {
+    public PathResult compute(WorldView world, CellPos start, Goal goal) {
         return compute(world, start, goal, heuristic);
     }
 
@@ -188,10 +178,8 @@ public final class AStarPathFinder {
      *                  for optimality; never null
      * @return see {@link #compute(WorldView, CellPos, Goal)}
      */
-    public PathResult compute(WorldView world, CellPos start,
-                              Goal goal, Heuristic heuristic) {
-        return compute(world, start, goal, heuristic,
-            NO_WALL_CLOCK_LIMIT);
+    public PathResult compute(WorldView world, CellPos start, Goal goal, Heuristic heuristic) {
+        return compute(world, start, goal, heuristic, NO_WALL_CLOCK_LIMIT);
     }
 
     /**
@@ -214,9 +202,7 @@ public final class AStarPathFinder {
      *                          {@link #NO_WALL_CLOCK_LIMIT} to disable
      * @return see {@link #compute(WorldView, CellPos, Goal)}
      */
-    public PathResult compute(WorldView world, CellPos start,
-                              Goal goal, Heuristic heuristic,
-                              long wallClockBudgetMs) {
+    public PathResult compute(WorldView world, CellPos start, Goal goal, Heuristic heuristic, long wallClockBudgetMs) {
         Objects.requireNonNull(world, "world");
         Objects.requireNonNull(start, "start");
         Objects.requireNonNull(goal, "goal");
@@ -231,9 +217,7 @@ public final class AStarPathFinder {
         open.add(new Node(start, heuristic.estimate(start)));
 
         boolean clockBounded = wallClockBudgetMs > 0;
-        long deadlineNanos = clockBounded
-            ? wallClock.getAsLong() + wallClockBudgetMs * 1_000_000L
-            : Long.MAX_VALUE;
+        long deadlineNanos = clockBounded ? wallClock.getAsLong() + wallClockBudgetMs * 1_000_000L : Long.MAX_VALUE;
 
         int expanded = 0;
         CellPos bestPartial = null;
@@ -241,8 +225,7 @@ public final class AStarPathFinder {
         boolean searchCut = false;
 
         while (!open.isEmpty() && expanded < nodeBudget) {
-            if (clockBounded && expanded % 64 == 0
-                && wallClock.getAsLong() > deadlineNanos) {
+            if (clockBounded && expanded % 64 == 0 && wallClock.getAsLong() > deadlineNanos) {
                 searchCut = true;
                 break;
             }
@@ -259,9 +242,7 @@ public final class AStarPathFinder {
             }
 
             if (goal.isInGoal(current.pos())) {
-                return new PathResult(
-                    reconstruct(cameFrom, current.pos()), expanded, true,
-                    1.0);
+                return new PathResult(reconstruct(cameFrom, current.pos()), expanded, true, 1.0);
             }
 
             double g = gScore.getOrDefault(current.pos(), Double.MAX_VALUE);
@@ -274,12 +255,10 @@ public final class AStarPathFinder {
                     continue;
                 }
                 double tentative = g + move.cost(world);
-                if (tentative < gScore.getOrDefault(next,
-                        Double.MAX_VALUE)) {
+                if (tentative < gScore.getOrDefault(next, Double.MAX_VALUE)) {
                     gScore.put(next, tentative);
                     cameFrom.put(next, current.pos());
-                    open.add(new Node(next,
-                        tentative + heuristic.estimate(next)));
+                    open.add(new Node(next, tentative + heuristic.estimate(next)));
                 }
             }
         }
@@ -299,23 +278,17 @@ public final class AStarPathFinder {
         // start vocabulary, and handing the follower a doomed
         // prefix would loop it through "walk a few cells, replan,
         // walk a few cells, replan" forever.
-        if (searchCut && bestPartial != null
-            && !bestPartial.equals(start)) {
+        if (searchCut && bestPartial != null && !bestPartial.equals(start)) {
             double startH = heuristic.estimate(start);
-            double confidence = (startH > 0.0)
-                ? Math.max(0.0, Math.min(1.0, 1.0 - bestH / startH))
-                : 0.0;
+            double confidence = (startH > 0.0) ? Math.max(0.0, Math.min(1.0, 1.0 - bestH / startH)) : 0.0;
             if (confidence >= MIN_PARTIAL_CONFIDENCE) {
-                return new PathResult(
-                    reconstruct(cameFrom, bestPartial), expanded, false,
-                    confidence);
+                return new PathResult(reconstruct(cameFrom, bestPartial), expanded, false, confidence);
             }
         }
         return PathResult.failed(expanded);
     }
 
-    private static List<CellPos> reconstruct(Map<CellPos, CellPos> links,
-                                             CellPos end) {
+    private static List<CellPos> reconstruct(Map<CellPos, CellPos> links, CellPos end) {
         List<CellPos> out = new ArrayList<>();
         CellPos cursor = end;
         out.add(cursor);
@@ -327,8 +300,7 @@ public final class AStarPathFinder {
         return out;
     }
 
-    private record Node(CellPos pos, double f)
-        implements Comparable<Node> {
+    private record Node(CellPos pos, double f) implements Comparable<Node> {
 
         @Override
         public int compareTo(Node other) {

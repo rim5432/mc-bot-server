@@ -6,8 +6,8 @@ import com.mcbot.mcbotserver.api.process.DigMission;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.BlockSnapshot;
-import com.mcbot.mcbotserver.api.world.WorldView;
 import com.mcbot.mcbotserver.api.world.ViewMode;
+import com.mcbot.mcbotserver.api.world.WorldView;
 
 /**
  * One-block dig mission (issue 0013 R1): a submit-and-wait task, not
@@ -29,8 +29,7 @@ import com.mcbot.mcbotserver.api.world.ViewMode;
  */
 // contract: see boundaries.md section B (process tier is
 //            side-effect-free) + issue 0013 R1 (dig is a task)
-public final class DigProcess implements BotProcess, TerminalMission,
-        DigMission {
+public final class DigProcess implements BotProcess, TerminalMission, DigMission {
 
     private final String taskId;
     private final CellPos target;
@@ -50,18 +49,15 @@ public final class DigProcess implements BotProcess, TerminalMission,
      * @param priority    arbiter seat priority (same scale as goto)
      * @param timeoutTicks mission budget; positive
      */
-    public DigProcess(String taskId, CellPos target, int priority,
-                      long timeoutTicks) {
+    public DigProcess(String taskId, CellPos target, int priority, long timeoutTicks) {
         if (taskId == null || taskId.isBlank()) {
-            throw new IllegalArgumentException(
-                "taskId must not be null or blank");
+            throw new IllegalArgumentException("taskId must not be null or blank");
         }
         if (target == null) {
             throw new IllegalArgumentException("target must not be null");
         }
         if (timeoutTicks <= 0) {
-            throw new IllegalArgumentException(
-                "timeoutTicks must be positive");
+            throw new IllegalArgumentException("timeoutTicks must be positive");
         }
         this.taskId = taskId;
         this.target = target;
@@ -118,8 +114,7 @@ public final class DigProcess implements BotProcess, TerminalMission,
                 return fail("chunk not loaded");
             }
             initialBlockId = snap.blockId();
-            if (BlockSnapshot.AIR.equals(initialBlockId)
-                || BlockSnapshot.UNKNOWN.equals(initialBlockId)) {
+            if (BlockSnapshot.AIR.equals(initialBlockId) || BlockSnapshot.UNKNOWN.equals(initialBlockId)) {
                 return fail("target is " + initialBlockId);
             }
         }
@@ -138,8 +133,7 @@ public final class DigProcess implements BotProcess, TerminalMission,
     }
 
     @Override
-    public void onExecutionReport(
-            com.mcbot.mcbotserver.api.behavior.ExecutionReport report) {
+    public void onExecutionReport(com.mcbot.mcbotserver.api.behavior.ExecutionReport report) {
         if (!active) {
             // Terminal state is sticky: a late report from the same
             // tick's pipeline must never flip a terminal state.
@@ -161,8 +155,7 @@ public final class DigProcess implements BotProcess, TerminalMission,
     }
 
     @Override
-    public void onLostControl(
-            com.mcbot.mcbotserver.api.interrupt.InterruptionContext ctx) {
+    public void onLostControl(com.mcbot.mcbotserver.api.interrupt.InterruptionContext ctx) {
         // Keep every logical field intact (boundary B resume
         // contract): the interruption is recorded by the reflex
         // paths; the mission revalidates nothing that a fresh tick
@@ -170,8 +163,7 @@ public final class DigProcess implements BotProcess, TerminalMission,
     }
 
     @Override
-    public boolean resume(
-            com.mcbot.mcbotserver.api.interrupt.InterruptionContext ctx) {
+    public boolean resume(com.mcbot.mcbotserver.api.interrupt.InterruptionContext ctx) {
         // A single-block dig has no perishable world assumptions
         // beyond the target cell; onTick re-reads it every tick and
         // fails honestly if it turned to air meanwhile. Break
@@ -211,8 +203,7 @@ public final class DigProcess implements BotProcess, TerminalMission,
         return Directive.of(new GoalNear(target, 2));
     }
 
-    private static String reasonOrUnknown(
-            com.mcbot.mcbotserver.api.behavior.ExecutionReport report) {
+    private static String reasonOrUnknown(com.mcbot.mcbotserver.api.behavior.ExecutionReport report) {
         return report.reason() != null ? report.reason() : "UNKNOWN";
     }
 }

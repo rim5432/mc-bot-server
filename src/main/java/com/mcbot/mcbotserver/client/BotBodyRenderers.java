@@ -2,7 +2,6 @@ package com.mcbot.mcbotserver.client;
 
 import com.mcbot.mcbotserver.McBotServer;
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
-
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
@@ -25,12 +24,10 @@ import net.minecraftforge.fml.common.Mod;
  * with the 0.6 x 1.8 carrier is what matters; swapping in dedicated
  * art later touches only the SKIN constant.
  */
-@Mod.EventBusSubscriber(modid = McBotServer.MODID,
-    bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+@Mod.EventBusSubscriber(modid = McBotServer.MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public final class BotBodyRenderers {
 
-    private BotBodyRenderers() {
-    }
+    private BotBodyRenderers() {}
 
     /**
      * Registers the body's renderer during client render setup.
@@ -38,23 +35,19 @@ public final class BotBodyRenderers {
      * @param event the forge registration event; never null
      */
     @SubscribeEvent
-    public static void onRegisterRenderers(
-        EntityRenderersEvent.RegisterRenderers event) {
-        event.registerEntityRenderer(McBotServer.BOT_BODY.get(),
-            BotBodyRenderer::new);
+    public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
+        event.registerEntityRenderer(McBotServer.BOT_BODY.get(), BotBodyRenderer::new);
     }
 
     /**
      * Renders the body as a humanoid using the vanilla zombie layer
      * and skin - matching proportions, zero new assets.
      */
-    public static class BotBodyRenderer
-        extends MobRenderer<BotBodyEntity, HumanoidModel<BotBodyEntity>> {
+    public static class BotBodyRenderer extends MobRenderer<BotBodyEntity, HumanoidModel<BotBodyEntity>> {
 
         /** Stand-in skin until dedicated art exists. */
         private static final ResourceLocation SKIN =
-            new ResourceLocation("minecraft",
-                "textures/entity/zombie/zombie.png");
+                new ResourceLocation("minecraft", "textures/entity/zombie/zombie.png");
 
         /**
          * Creates the renderer over a zombie-baked humanoid model.
@@ -62,10 +55,7 @@ public final class BotBodyRenderers {
          * @param context the client render context; never null
          */
         public BotBodyRenderer(EntityRendererProvider.Context context) {
-            super(context,
-                new HumanoidModel<>(
-                    context.bakeLayer(ModelLayers.ZOMBIE)),
-                0.5f);
+            super(context, new HumanoidModel<>(context.bakeLayer(ModelLayers.ZOMBIE)), 0.5f);
         }
 
         /**
@@ -75,8 +65,7 @@ public final class BotBodyRenderers {
          * @return the zombie texture location; never null
          */
         @Override
-        public ResourceLocation getTextureLocation(
-            BotBodyEntity entity) {
+        public ResourceLocation getTextureLocation(BotBodyEntity entity) {
             return SKIN;
         }
     }

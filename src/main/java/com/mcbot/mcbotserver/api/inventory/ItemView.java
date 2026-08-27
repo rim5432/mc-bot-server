@@ -36,8 +36,7 @@ public record ItemView(String itemId, int count, String nbtDigest) {
             throw new IllegalArgumentException("itemId must not be null");
         }
         if (count < 0) {
-            throw new IllegalArgumentException(
-                "count must not be negative: " + count);
+            throw new IllegalArgumentException("count must not be negative: " + count);
         }
         if (nbtDigest == null) {
             throw new IllegalArgumentException("nbtDigest must not be null");

@@ -2,7 +2,6 @@ package com.mcbot.mcbotserver.adapter;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-
 import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Direction;
@@ -57,11 +56,12 @@ public final class WorldCommands {
      *               mirror so place/drop and state disclosure agree;
      *               never null
      */
-    public record Live(WorldView view, Supplier<CellPos> botPos,
-                       Supplier<String> botId,
-                       InteractBlockExecutor interact,
-                       IntConsumer equip) {
-    }
+    public record Live(
+            WorldView view,
+            Supplier<CellPos> botPos,
+            Supplier<String> botId,
+            InteractBlockExecutor interact,
+            IntConsumer equip) {}
 
     /**
      * Register the block / blocks / entities subtrees.
@@ -70,48 +70,45 @@ public final class WorldCommands {
      * @param live       perception accessor returning null before the
      *                   first /botspawn; never null
      */
-    public static void register(CommandDispatcher<CommandSourceStack> dispatcher,
-                                Supplier<Live> live) {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, Supplier<Live> live) {
         var block = Commands.literal("block")
-            .requires(src -> src.hasPermission(2))
-            .then(Commands.argument("x", IntegerArgumentType.integer())
-                .then(Commands.argument("y", IntegerArgumentType.integer())
-                    .then(Commands.argument("z", IntegerArgumentType.integer())
-                        .executes(ctx -> runBlock(ctx, live)))));
+                .requires(src -> src.hasPermission(2))
+                .then(Commands.argument("x", IntegerArgumentType.integer())
+                        .then(Commands.argument("y", IntegerArgumentType.integer())
+                                .then(Commands.argument("z", IntegerArgumentType.integer())
+                                        .executes(ctx -> runBlock(ctx, live)))));
         var blocks = Commands.literal("blocks")
-            .requires(src -> src.hasPermission(2))
-            .then(Commands.argument("x", IntegerArgumentType.integer())
-                .then(Commands.argument("y", IntegerArgumentType.integer())
-                    .then(Commands.argument("z", IntegerArgumentType.integer())
-                        .then(volumeArg("dx", live,
-                            volumeArg("dy", live,
-                                volumeArg("dz", live, null)))))));
+                .requires(src -> src.hasPermission(2))
+                .then(Commands.argument("x", IntegerArgumentType.integer())
+                        .then(Commands.argument("y", IntegerArgumentType.integer())
+                                .then(Commands.argument("z", IntegerArgumentType.integer())
+                                        .then(volumeArg(
+                                                "dx", live, volumeArg("dy", live, volumeArg("dz", live, null)))))));
         var entities = Commands.literal("entities")
-            .requires(src -> src.hasPermission(2))
-            .executes(ctx -> runEntities(live, ctx.getSource(), 8, 32))
-            .then(Commands.argument("radius",
-                        IntegerArgumentType.integer(1, 64))
-                .executes(ctx -> runEntities(live, ctx.getSource(),
-                    IntegerArgumentType.getInteger(ctx, "radius"), 32))
-                .then(Commands.argument("limit",
-                            IntegerArgumentType.integer(1, 128))
-                    .executes(ctx -> runEntities(live, ctx.getSource(),
-                        IntegerArgumentType.getInteger(ctx, "radius"),
-                        IntegerArgumentType.getInteger(ctx, "limit")))));
+                .requires(src -> src.hasPermission(2))
+                .executes(ctx -> runEntities(live, ctx.getSource(), 8, 32))
+                .then(Commands.argument("radius", IntegerArgumentType.integer(1, 64))
+                        .executes(ctx ->
+                                runEntities(live, ctx.getSource(), IntegerArgumentType.getInteger(ctx, "radius"), 32))
+                        .then(Commands.argument("limit", IntegerArgumentType.integer(1, 128))
+                                .executes(ctx -> runEntities(
+                                        live,
+                                        ctx.getSource(),
+                                        IntegerArgumentType.getInteger(ctx, "radius"),
+                                        IntegerArgumentType.getInteger(ctx, "limit")))));
         var place = Commands.literal("place")
-            .requires(src -> src.hasPermission(2))
-            .then(Commands.argument("x", IntegerArgumentType.integer())
-                .then(Commands.argument("y", IntegerArgumentType.integer())
-                    .then(Commands.argument("z", IntegerArgumentType.integer())
-                        .then(Commands.argument("face",
-                                    com.mojang.brigadier.arguments
-                                        .StringArgumentType.word())
-                            .executes(ctx -> runPlace(ctx, live))))));
+                .requires(src -> src.hasPermission(2))
+                .then(Commands.argument("x", IntegerArgumentType.integer())
+                        .then(Commands.argument("y", IntegerArgumentType.integer())
+                                .then(Commands.argument("z", IntegerArgumentType.integer())
+                                        .then(Commands.argument(
+                                                        "face",
+                                                        com.mojang.brigadier.arguments.StringArgumentType.word())
+                                                .executes(ctx -> runPlace(ctx, live))))));
         var equip = Commands.literal("equip")
-            .requires(src -> src.hasPermission(2))
-            .then(Commands.argument("slot",
-                        IntegerArgumentType.integer(0, 8))
-                .executes(ctx -> runEquip(ctx, live)));
+                .requires(src -> src.hasPermission(2))
+                .then(Commands.argument("slot", IntegerArgumentType.integer(0, 8))
+                        .executes(ctx -> runEquip(ctx, live)));
         dispatcher.register(block);
         dispatcher.register(blocks);
         dispatcher.register(entities);
@@ -126,39 +123,35 @@ public final class WorldCommands {
      * silent-no-op gap with a post-state read - the reply says
      * placed or gives the distinguishable rejection reasons.
      */
-    private static int runPlace(CommandContext<CommandSourceStack> ctx,
-                                Supplier<Live> live) {
+    private static int runPlace(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
         Live l = live.get();
         if (l == null) {
             return answer(ctx.getSource(), err("no active bot"));
         }
-        String faceWord = com.mojang.brigadier.arguments.StringArgumentType
-            .getString(ctx, "face").toUpperCase(java.util.Locale.ROOT);
+        String faceWord = com.mojang.brigadier.arguments.StringArgumentType.getString(ctx, "face")
+                .toUpperCase(java.util.Locale.ROOT);
         Direction face;
         try {
             face = Direction.valueOf(faceWord);
         } catch (IllegalArgumentException e) {
-            return answer(ctx.getSource(),
-                err("unknown face: " + faceWord
-                    + " (up, down, north, south, east, west)"));
+            return answer(ctx.getSource(), err("unknown face: " + faceWord + " (up, down, north, south, east, west)"));
         }
         CellPos target = new CellPos(
-            IntegerArgumentType.getInteger(ctx, "x"),
-            IntegerArgumentType.getInteger(ctx, "y"),
-            IntegerArgumentType.getInteger(ctx, "z"));
+                IntegerArgumentType.getInteger(ctx, "x"),
+                IntegerArgumentType.getInteger(ctx, "y"),
+                IntegerArgumentType.getInteger(ctx, "z"));
         CellPos at = face.relative(target);
         BlockSnapshot before = l.view().getBlock(at, ViewMode.LIVE);
         if (before == null) {
             return answer(ctx.getSource(), err("chunk not loaded"));
         }
         if (!before.isAir()) {
-            return answer(ctx.getSource(),
-                err("cell not air: " + before.blockId()));
+            return answer(ctx.getSource(), err("cell not air: " + before.blockId()));
         }
         // hitPos is contractually non-null but unused by the executor.
-        l.interact().place(new Intent.InteractBlock(target, face,
-            new Vec3(target.x() + 0.5, target.y() + 0.5,
-                target.z() + 0.5)));
+        l.interact()
+                .place(new Intent.InteractBlock(
+                        target, face, new Vec3(target.x() + 0.5, target.y() + 0.5, target.z() + 0.5)));
         BlockSnapshot after = l.view().getBlock(at, ViewMode.LIVE);
         JsonObject root = ok();
         root.addProperty("placed", !after.isAir());
@@ -170,9 +163,8 @@ public final class WorldCommands {
         root.addProperty("block", after.blockId());
         if (after.isAir()) {
             root.addProperty("ok", false);
-            root.addProperty("reason",
-                "rejected (no block item in the selected slot,"
-                    + " cannot survive, or obstructed)");
+            root.addProperty(
+                    "reason", "rejected (no block item in the selected slot," + " cannot survive, or obstructed)");
             return answer(ctx.getSource(), root);
         }
         return answer(ctx.getSource(), root);
@@ -186,8 +178,7 @@ public final class WorldCommands {
      * reply carries the newly selected slot and the item now in hand so
      * the caller can confirm the equip landed on the intended item.
      */
-    private static int runEquip(CommandContext<CommandSourceStack> ctx,
-                                 Supplier<Live> live) {
+    private static int runEquip(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
         Live l = live.get();
         if (l == null) {
             return answer(ctx.getSource(), err("no active bot"));
@@ -210,7 +201,8 @@ public final class WorldCommands {
      * every argument by name.
      */
     private static com.mojang.brigadier.builder.RequiredArgumentBuilder<CommandSourceStack, Integer> volumeArg(
-            String name, Supplier<Live> live,
+            String name,
+            Supplier<Live> live,
             com.mojang.brigadier.builder.RequiredArgumentBuilder<CommandSourceStack, Integer> next) {
         var arg = Commands.argument(name, IntegerArgumentType.integer(1, 4));
         if (next == null) {
@@ -221,16 +213,15 @@ public final class WorldCommands {
         return arg;
     }
 
-    private static int runBlock(CommandContext<CommandSourceStack> ctx,
-                                Supplier<Live> live) {
+    private static int runBlock(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
         Live l = live.get();
         if (l == null) {
             return answer(ctx.getSource(), err("no active bot"));
         }
         CellPos pos = new CellPos(
-            IntegerArgumentType.getInteger(ctx, "x"),
-            IntegerArgumentType.getInteger(ctx, "y"),
-            IntegerArgumentType.getInteger(ctx, "z"));
+                IntegerArgumentType.getInteger(ctx, "x"),
+                IntegerArgumentType.getInteger(ctx, "y"),
+                IntegerArgumentType.getInteger(ctx, "z"));
         BlockSnapshot snap = l.view().getBlock(pos, ViewMode.LIVE);
         if (snap == null) {
             return answer(ctx.getSource(), err("chunk not loaded"));
@@ -245,8 +236,7 @@ public final class WorldCommands {
         return answer(ctx.getSource(), root);
     }
 
-    private static int runBlocks(CommandContext<CommandSourceStack> ctx,
-                                 Supplier<Live> live) {
+    private static int runBlocks(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
         Live l = live.get();
         if (l == null) {
             return answer(ctx.getSource(), err("no active bot"));
@@ -263,15 +253,12 @@ public final class WorldCommands {
             for (int iz = 0; iz < dz; iz++) {
                 for (int ix = 0; ix < dx; ix++) {
                     CellPos pos = new CellPos(x + ix, y + iy, z + iz);
-                    BlockSnapshot snap =
-                        l.view().getBlock(pos, ViewMode.LIVE);
-                    String id = snap == null ? BlockSnapshot.UNKNOWN
-                        : snap.blockId();
+                    BlockSnapshot snap = l.view().getBlock(pos, ViewMode.LIVE);
+                    String id = snap == null ? BlockSnapshot.UNKNOWN : snap.blockId();
                     if (BlockSnapshot.UNKNOWN.equals(id)) {
                         unknown++;
                     }
-                    cells.addProperty(
-                        pos.x() + "," + pos.y() + "," + pos.z(), id);
+                    cells.addProperty(pos.x() + "," + pos.y() + "," + pos.z(), id);
                 }
             }
         }
@@ -282,19 +269,15 @@ public final class WorldCommands {
         return answer(ctx.getSource(), root);
     }
 
-    private static int runEntities(Supplier<Live> live,
-                                   CommandSourceStack src, int radius,
-                                   int limit) {
+    private static int runEntities(Supplier<Live> live, CommandSourceStack src, int radius, int limit) {
         Live l = live.get();
         if (l == null) {
             return answer(src, err("no active bot"));
         }
         CellPos center = l.botPos().get();
         String selfId = l.botId().get();
-        List<EntitySnapshot> found = new ArrayList<>(
-            l.view().getEntities(center, radius, ViewMode.LIVE));
-        found.sort(Comparator.comparingDouble(
-            e -> dist(center, e)));
+        List<EntitySnapshot> found = new ArrayList<>(l.view().getEntities(center, radius, ViewMode.LIVE));
+        found.sort(Comparator.comparingDouble(e -> dist(center, e)));
         boolean truncated = found.size() > limit;
         JsonArray entities = new JsonArray();
         for (EntitySnapshot e : found) {
@@ -353,6 +336,5 @@ public final class WorldCommands {
         return 0;
     }
 
-    private WorldCommands() {
-    }
+    private WorldCommands() {}
 }

@@ -1,7 +1,6 @@
 package com.mcbot.mcbotserver.core.tick;
 
 import com.mcbot.mcbotserver.api.process.BotProcess;
-
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
 
 /**
@@ -67,8 +66,7 @@ final class ReflexEngageSeat implements ReflexSeat {
      *         has elapsed
      */
     public boolean maySubmit() {
-        return fight == null
-            && ticksSinceSubmit >= ENGAGE_RESUBMIT_COOLDOWN;
+        return fight == null && ticksSinceSubmit >= ENGAGE_RESUBMIT_COOLDOWN;
     }
 
     /**
@@ -86,8 +84,7 @@ final class ReflexEngageSeat implements ReflexSeat {
      *         slot (a survival reflex parked it mid-fight)
      */
     boolean fightIsParked() {
-        return fight != null && fight.isActive()
-            && arbiter.paused() == fight;
+        return fight != null && fight.isActive() && arbiter.paused() == fight;
     }
 
     /**
@@ -95,7 +92,6 @@ final class ReflexEngageSeat implements ReflexSeat {
      *         seated nor parked
      */
     boolean fightAwaitingSeat() {
-        return fight != null && fight.isActive()
-            && arbiter.paused() != fight;
+        return fight != null && fight.isActive() && arbiter.paused() != fight;
     }
 }

@@ -6,7 +6,6 @@ import com.mcbot.mcbotserver.api.menu.MenuView;
 import com.mcbot.mcbotserver.api.menu.RecipeView;
 import com.mcbot.mcbotserver.api.menu.SlotRole;
 import com.mcbot.mcbotserver.api.menu.SlotView;
-
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -45,11 +44,9 @@ public final class MenuPlanner {
 
     /** One click for the executor: pass the triple straight to
      * {@code menuClick}. */
-    public record Step(int slot, int button, MenuClick kind) {
-    }
+    public record Step(int slot, int button, MenuClick kind) {}
 
-    private MenuPlanner() {
-    }
+    private MenuPlanner() {}
 
     /**
      * Plan placing one item kind into the given grid cells. Sources are
@@ -74,28 +71,22 @@ public final class MenuPlanner {
      *                                 carries fewer than the demanded
      *                                 count of the item
      */
-    public static List<Step> planGridFill(CraftingView menu,
-                                          String itemId,
-                                          int... gridPos) {
+    public static List<Step> planGridFill(CraftingView menu, String itemId, int... gridPos) {
         if (itemId == null || itemId.isBlank()) {
-            throw new IllegalArgumentException(
-                "itemId must not be null or blank");
+            throw new IllegalArgumentException("itemId must not be null or blank");
         }
         if (gridPos == null || gridPos.length == 0) {
-            throw new IllegalArgumentException(
-                "at least one grid position is required");
+            throw new IllegalArgumentException("at least one grid position is required");
         }
 
         for (int p : gridPos) {
             if (p < 0 || p >= menu.grid().size()) {
-                throw new IllegalArgumentException(
-                    "grid position " + p + " out of range for a "
+                throw new IllegalArgumentException("grid position " + p + " out of range for a "
                         + menu.gridSide() + "x" + menu.gridSide()
                         + " grid");
             }
             if (!menu.grid().get(p).isEmpty()) {
-                throw new IllegalArgumentException(
-                    "target cell " + p + " already holds "
+                throw new IllegalArgumentException("target cell " + p + " already holds "
                         + menu.grid().get(p).item().itemId()
                         + " — refusing to overwrite");
             }
@@ -103,8 +94,7 @@ public final class MenuPlanner {
         for (int i = 0; i < gridPos.length; i++) {
             for (int j = i + 1; j < gridPos.length; j++) {
                 if (gridPos[i] == gridPos[j]) {
-                    throw new IllegalArgumentException(
-                        "duplicate grid position " + gridPos[i]);
+                    throw new IllegalArgumentException("duplicate grid position " + gridPos[i]);
                 }
             }
         }
@@ -116,8 +106,7 @@ public final class MenuPlanner {
         }
         if (available < gridPos.length) {
             throw new IllegalArgumentException(
-                "insufficient " + itemId + ": need " + gridPos.length
-                    + ", player region carries " + available);
+                    "insufficient " + itemId + ": need " + gridPos.length + ", player region carries " + available);
         }
 
         List<Step> steps = new ArrayList<>();
@@ -130,8 +119,7 @@ public final class MenuPlanner {
                 carried = src[1];
                 lastSource = src[0];
             }
-            steps.add(new Step(menu.flatGridIndex(p), 1,
-                MenuClick.PICKUP));
+            steps.add(new Step(menu.flatGridIndex(p), 1, MenuClick.PICKUP));
             carried--;
         }
         if (carried > 0) {
@@ -153,11 +141,9 @@ public final class MenuPlanner {
      */
     public static List<Step> planTakeResult(CraftingView menu) {
         if (menu.result().isEmpty()) {
-            throw new IllegalStateException(
-                "result slot is empty — nothing to take");
+            throw new IllegalStateException("result slot is empty — nothing to take");
         }
-        return List.of(new Step(menu.result().index(), 0,
-            MenuClick.QUICK_MOVE));
+        return List.of(new Step(menu.result().index(), 0, MenuClick.QUICK_MOVE));
     }
 
     /**
@@ -180,12 +166,10 @@ public final class MenuPlanner {
      *                                  cannot cover every cell from
      *                                  its accepted kinds
      */
-    public static List<Step> planRecipe(CraftingView menu,
-                                        RecipeView recipe) {
+    public static List<Step> planRecipe(CraftingView menu, RecipeView recipe) {
         if (!recipe.fitsInventoryGrid() && menu.gridSide() < 3) {
             throw new IllegalArgumentException(
-                recipe.recipeId() + " needs a crafting table; this"
-                    + " menu only offers a 2x2 grid");
+                    recipe.recipeId() + " needs a crafting table; this" + " menu only offers a 2x2 grid");
         }
 
         Map<String, Integer> supply = playerRegionTotals(menu.menu());
@@ -204,25 +188,23 @@ public final class MenuPlanner {
                 }
             }
             if (picked == null) {
-                throw new IllegalArgumentException(
-                    "cannot source cell " + pos + " of "
+                throw new IllegalArgumentException("cannot source cell " + pos + " of "
                         + recipe.recipeId() + ": none of "
                         + recipe.placements().get(pos)
                         + " remain in the player region");
             }
             int row = pos / recipe.patternWidth();
             int col = pos % recipe.patternWidth();
-            chosen.computeIfAbsent(picked, k -> new ArrayList<>())
-                .add(row * menu.gridSide() + col);
+            chosen.computeIfAbsent(picked, k -> new ArrayList<>()).add(row * menu.gridSide() + col);
         }
 
         List<Step> steps = new ArrayList<>();
-        for (Map.Entry<String, List<Integer>> group : chosen
-                .entrySet()) {
+        for (Map.Entry<String, List<Integer>> group : chosen.entrySet()) {
             List<Integer> cells = group.getValue();
-            steps.addAll(planGridFill(menu, group.getKey(),
-                cells.stream().mapToInt(Integer::intValue)
-                    .toArray()));
+            steps.addAll(planGridFill(
+                    menu,
+                    group.getKey(),
+                    cells.stream().mapToInt(Integer::intValue).toArray()));
         }
         return List.copyOf(steps);
     }
@@ -244,30 +226,26 @@ public final class MenuPlanner {
      *                                 or the container holds fewer
      *                                 than minCount of the item
      */
-    public static List<Step> planWithdraw(MenuView menu, String itemId,
-                                          int minCount) {
+    public static List<Step> planWithdraw(MenuView menu, String itemId, int minCount) {
         if (itemId == null || itemId.isBlank()) {
-            throw new IllegalArgumentException(
-                "itemId must not be null or blank");
+            throw new IllegalArgumentException("itemId must not be null or blank");
         }
         if (minCount <= 0) {
-            throw new IllegalArgumentException(
-                "minCount must be positive, got " + minCount);
+            throw new IllegalArgumentException("minCount must be positive, got " + minCount);
         }
         Deque<int[]> sources = new ArrayDeque<>();
         int available = 0;
         for (var slot : menu.slots()) {
-            if (slot.role() == SlotRole.CONTAINER && !slot.isEmpty()
-                && slot.item().itemId().equals(itemId)) {
-                sources.add(new int[] {slot.index(),
-                    slot.item().count()});
+            if (slot.role() == SlotRole.CONTAINER
+                    && !slot.isEmpty()
+                    && slot.item().itemId().equals(itemId)) {
+                sources.add(new int[] {slot.index(), slot.item().count()});
                 available += slot.item().count();
             }
         }
         if (available < minCount) {
             throw new IllegalArgumentException(
-                "insufficient " + itemId + " in container: need "
-                    + minCount + ", holds " + available);
+                    "insufficient " + itemId + " in container: need " + minCount + ", holds " + available);
         }
         List<Step> steps = new ArrayList<>();
         int collected = 0;
@@ -297,20 +275,16 @@ public final class MenuPlanner {
      */
     public static List<Step> planDeposit(MenuView menu, String itemId) {
         if (itemId == null || itemId.isBlank()) {
-            throw new IllegalArgumentException(
-                "itemId must not be null or blank");
+            throw new IllegalArgumentException("itemId must not be null or blank");
         }
         List<Step> steps = new ArrayList<>();
         for (var slot : playerSlots(menu)) {
             if (!slot.isEmpty() && slot.item().itemId().equals(itemId)) {
-                steps.add(new Step(slot.index(), 0,
-                    MenuClick.QUICK_MOVE));
+                steps.add(new Step(slot.index(), 0, MenuClick.QUICK_MOVE));
             }
         }
         if (steps.isEmpty()) {
-            throw new IllegalStateException(
-                "nothing to deposit: the player region holds no "
-                    + itemId);
+            throw new IllegalStateException("nothing to deposit: the player region holds no " + itemId);
         }
         return List.copyOf(steps);
     }
@@ -344,17 +318,12 @@ public final class MenuPlanner {
      *         the item, or the target role's free capacity cannot
      *         hold the deposit
      */
-    public static List<Step> planDepositCounted(MenuView menu,
-                                                SlotRole target,
-                                                String itemId,
-                                                int count) {
+    public static List<Step> planDepositCounted(MenuView menu, SlotRole target, String itemId, int count) {
         if (itemId == null || itemId.isBlank()) {
-            throw new IllegalArgumentException(
-                "itemId must not be null or blank");
+            throw new IllegalArgumentException("itemId must not be null or blank");
         }
         if (count <= 0) {
-            throw new IllegalArgumentException(
-                "count must be positive, got " + count);
+            throw new IllegalArgumentException("count must be positive, got " + count);
         }
         int supply = 0;
         for (var slot : playerSlots(menu)) {
@@ -363,22 +332,20 @@ public final class MenuPlanner {
             }
         }
         if (supply < count) {
-            throw new IllegalArgumentException(
-                "not enough: have " + supply + ", need " + count);
+            throw new IllegalArgumentException("not enough: have " + supply + ", need " + count);
         }
         // Target capacity: empty slots take up to 64, same-item slots
         // take their headroom. Deposits fill targets in snapshot
         // order.
-        record Target(int index, int room) { }
+        record Target(int index, int room) {}
         List<Target> targets = new ArrayList<>();
         for (var slot : menu.slots()) {
             if (slot.role() != target) {
                 continue;
             }
-            int room = slot.isEmpty() ? 64
-                : slot.item().itemId().equals(itemId)
-                    ? 64 - slot.item().count()
-                    : 0;
+            int room = slot.isEmpty()
+                    ? 64
+                    : slot.item().itemId().equals(itemId) ? 64 - slot.item().count() : 0;
             if (room > 0) {
                 targets.add(new Target(slot.index(), room));
             }
@@ -386,8 +353,7 @@ public final class MenuPlanner {
         int capacity = targets.stream().mapToInt(Target::room).sum();
         if (capacity < count) {
             throw new IllegalArgumentException(
-                "target " + target + " cannot hold " + count
-                    + " (room " + capacity + ")");
+                    "target " + target + " cannot hold " + count + " (room " + capacity + ")");
         }
         Deque<int[]> sources = sourceLedger(menu, itemId);
         List<Step> steps = new ArrayList<>();
@@ -404,8 +370,7 @@ public final class MenuPlanner {
                     targetIdx++;
                     targetRoom = targets.get(targetIdx).room();
                 }
-                steps.add(new Step(targets.get(targetIdx).index(), 1,
-                    MenuClick.PICKUP));
+                steps.add(new Step(targets.get(targetIdx).index(), 1, MenuClick.PICKUP));
                 targetRoom--;
             }
             // Return the remainder (a no-op click when the whole
@@ -438,14 +403,12 @@ public final class MenuPlanner {
      *         destination room in the player region (no empty slot
      *         and no same-item headroom)
      */
-    public static List<Step> planTakeRole(MenuView menu, SlotRole source,
-                                          int count) {
+    public static List<Step> planTakeRole(MenuView menu, SlotRole source, int count) {
         List<Step> steps = new ArrayList<>();
         if (count <= 0) {
             for (var slot : menu.slots()) {
                 if (slot.role() == source && !slot.isEmpty()) {
-                    steps.add(new Step(slot.index(), 0,
-                        MenuClick.QUICK_MOVE));
+                    steps.add(new Step(slot.index(), 0, MenuClick.QUICK_MOVE));
                 }
             }
             return List.copyOf(steps);
@@ -456,8 +419,7 @@ public final class MenuPlanner {
         int available = 0;
         for (var slot : menu.slots()) {
             if (slot.role() == source && !slot.isEmpty()) {
-                sourceStacks.add(
-                    new int[] {slot.index(), slot.item().count()});
+                sourceStacks.add(new int[] {slot.index(), slot.item().count()});
                 available += slot.item().count();
             }
         }
@@ -468,8 +430,7 @@ public final class MenuPlanner {
             if (!playerRegion(slot)) {
                 continue;
             }
-            int room = slot.isEmpty() ? 64
-                : 64 - slot.item().count();
+            int room = slot.isEmpty() ? 64 : 64 - slot.item().count();
             if (room > 0) {
                 destinations.add(new int[] {slot.index(), room});
                 destRoom += room;
@@ -477,8 +438,7 @@ public final class MenuPlanner {
         }
         if (destRoom < planned) {
             throw new IllegalArgumentException(
-                "player inventory cannot hold the take (room "
-                    + destRoom + ", need " + planned + ")");
+                    "player inventory cannot hold the take (room " + destRoom + ", need " + planned + ")");
         }
         int remaining = planned;
         int destIdx = 0;
@@ -495,8 +455,7 @@ public final class MenuPlanner {
                     destIdx++;
                     room = destinations.get(destIdx)[1];
                 }
-                steps.add(new Step(destinations.get(destIdx)[0], 1,
-                    MenuClick.PICKUP));
+                steps.add(new Step(destinations.get(destIdx)[0], 1, MenuClick.PICKUP));
                 room--;
             }
             steps.add(new Step(src, 0, MenuClick.PICKUP));
@@ -506,8 +465,7 @@ public final class MenuPlanner {
     }
 
     private static boolean playerRegion(SlotView slot) {
-        return slot.role() == SlotRole.MAIN
-            || slot.role() == SlotRole.HOTBAR;
+        return slot.role() == SlotRole.MAIN || slot.role() == SlotRole.HOTBAR;
     }
 
     /**
@@ -519,9 +477,7 @@ public final class MenuPlanner {
      * @return the matching slots in snapshot order; never null
      */
     private static List<SlotView> playerSlots(MenuView menu) {
-        return menu.slots().stream()
-            .filter(MenuPlanner::playerRegion)
-            .toList();
+        return menu.slots().stream().filter(MenuPlanner::playerRegion).toList();
     }
 
     /**
@@ -533,13 +489,11 @@ public final class MenuPlanner {
      * @return queue of {flat slot, count} pairs, front = first source;
      *         never null
      */
-    private static Deque<int[]> sourceLedger(
-            MenuView menu, String itemId) {
+    private static Deque<int[]> sourceLedger(MenuView menu, String itemId) {
         Deque<int[]> ledger = new ArrayDeque<>();
         for (var slot : playerSlots(menu)) {
             if (!slot.isEmpty() && slot.item().itemId().equals(itemId)) {
-                ledger.add(new int[] {slot.index(),
-                    slot.item().count()});
+                ledger.add(new int[] {slot.index(), slot.item().count()});
             }
         }
         return ledger;
@@ -552,13 +506,11 @@ public final class MenuPlanner {
      * @param menu the full snapshot; never null
      * @return item id → total count; never null, possibly empty
      */
-    private static Map<String, Integer> playerRegionTotals(
-            MenuView menu) {
+    private static Map<String, Integer> playerRegionTotals(MenuView menu) {
         Map<String, Integer> totals = new LinkedHashMap<>();
         for (var slot : playerSlots(menu)) {
             if (!slot.isEmpty()) {
-                totals.merge(slot.item().itemId(),
-                    slot.item().count(), Integer::sum);
+                totals.merge(slot.item().itemId(), slot.item().count(), Integer::sum);
             }
         }
         return totals;

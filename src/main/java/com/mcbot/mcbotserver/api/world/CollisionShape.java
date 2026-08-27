@@ -50,8 +50,7 @@ public record CollisionShape(Kind kind, Box box) {
      * @param maxY upper Y bound, {@code [minY,1]}
      * @param maxZ upper Z bound, {@code [minZ,1]}
      */
-    public record Box(double minX, double minY, double minZ,
-                      double maxX, double maxY, double maxZ) {
+    public record Box(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
 
         /**
          * Creates a validated cell-local box. Empty boxes (max equal
@@ -62,14 +61,11 @@ public record CollisionShape(Kind kind, Box box) {
          *                                  range or min exceeds max
          */
         public Box {
-            if (minX < 0 || minY < 0 || minZ < 0
-                || maxX > 1 || maxY > 1 || maxZ > 1) {
-                throw new IllegalArgumentException(
-                    "box bounds must be in [0,1]");
+            if (minX < 0 || minY < 0 || minZ < 0 || maxX > 1 || maxY > 1 || maxZ > 1) {
+                throw new IllegalArgumentException("box bounds must be in [0,1]");
             }
             if (minX > maxX || minY > maxY || minZ > maxZ) {
-                throw new IllegalArgumentException(
-                    "box min must be <= max on every axis");
+                throw new IllegalArgumentException("box min must be <= max on every axis");
             }
         }
 
@@ -175,10 +171,10 @@ public record CollisionShape(Kind kind, Box box) {
      */
     public boolean walkableTop() {
         return kind == Kind.FULL_CUBE
-            || (kind == Kind.PARTIAL
-                && box.maxY >= STANDABLE_THRESHOLD
-                && box.maxX - box.minX >= BODY_WIDTH
-                && box.maxZ - box.minZ >= BODY_WIDTH);
+                || (kind == Kind.PARTIAL
+                        && box.maxY >= STANDABLE_THRESHOLD
+                        && box.maxX - box.minX >= BODY_WIDTH
+                        && box.maxZ - box.minZ >= BODY_WIDTH);
     }
 
     /**

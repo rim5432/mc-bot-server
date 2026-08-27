@@ -1,9 +1,8 @@
 package com.mcbot.mcbotserver.core.command;
 
-import com.mcbot.mcbotserver.api.command.BotCommand;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-
+import com.mcbot.mcbotserver.api.command.BotCommand;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -20,8 +19,7 @@ import java.util.Map;
 // contract: see boundaries.md decision 18 (first boundary-D semantics)
 public final class GotoCommandJson {
 
-    private GotoCommandJson() {
-    }
+    private GotoCommandJson() {}
 
     /**
      * Parse one wire command.
@@ -33,8 +31,7 @@ public final class GotoCommandJson {
      *         not valid JSON or lacks the required shape
      */
     public static BotCommand fromJson(String json) {
-        JsonObject root = JsonParser.parseString(json)
-            .getAsJsonObject();
+        JsonObject root = JsonParser.parseString(json).getAsJsonObject();
         String verb = root.get("verb").getAsString();
         Map<String, String> args = new HashMap<>();
         if (root.has("args") && root.get("args").isJsonObject()) {

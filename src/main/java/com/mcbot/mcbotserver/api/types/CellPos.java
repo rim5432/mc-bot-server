@@ -24,8 +24,7 @@ public record CellPos(int x, int y, int z) {
         long dx = (long) x - other.x;
         long dy = (long) y - other.y;
         long dz = (long) z - other.z;
-        return Math.sqrt((double) dx * dx + (double) dy * dy
-            + (double) dz * dz);
+        return Math.sqrt((double) dx * dx + (double) dy * dy + (double) dz * dz);
     }
 
     /**
@@ -36,7 +35,6 @@ public record CellPos(int x, int y, int z) {
      * @return max of absolute axis deltas
      */
     public int chebyshevTo(CellPos other) {
-        return Math.max(Math.abs(x - other.x),
-            Math.max(Math.abs(y - other.y), Math.abs(z - other.z)));
+        return Math.max(Math.abs(x - other.x), Math.max(Math.abs(y - other.y), Math.abs(z - other.z)));
     }
 }

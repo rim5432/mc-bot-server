@@ -1,5 +1,10 @@
 package com.mcbot.mcbotserver.core.tick;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.mcbot.mcbotserver.api.actor.Actor;
 import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
@@ -7,30 +12,21 @@ import com.mcbot.mcbotserver.api.behavior.Behavior;
 import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
 import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
-import com.mcbot.mcbotserver.api.event.EventQueue;
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
-import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.BotProcess;
+import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.WorldView;
 import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.core.reflex.MinimalReflex;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
-import com.mcbot.mcbotserver.core.tick.BotController;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
-
-import org.junit.jupiter.api.Test;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 
 /**
  * Stage-0 exception gate: ADR-0005's full state machine — a
@@ -61,8 +57,7 @@ class ExceptionPolicyGateTest {
         private int executions;
 
         @Override
-        public ExecutionReport tick(WorldView world,
-                                    Directive directive, Actor actor) {
+        public ExecutionReport tick(WorldView world, Directive directive, Actor actor) {
             if (directive != null) {
                 executions++;
             }
@@ -99,8 +94,7 @@ class ExceptionPolicyGateTest {
         }
 
         @Override
-        public void onLostControl(InterruptionContext context) {
-        }
+        public void onLostControl(InterruptionContext context) {}
 
         @Override
         public boolean resume(InterruptionContext context) {
@@ -108,8 +102,7 @@ class ExceptionPolicyGateTest {
         }
 
         @Override
-        public void onContextInvalidated() {
-        }
+        public void onContextInvalidated() {}
 
         @Override
         public String displayName() {
@@ -120,8 +113,7 @@ class ExceptionPolicyGateTest {
     /** Everything the scenarios need, pre-wired. */
     private static final class Harness {
         final float[] health = {20f};
-        final InMemoryEventQueue events =
-            new InMemoryEventQueue(() -> 4L, () -> 7000L);
+        final InMemoryEventQueue events = new InMemoryEventQueue(() -> 4L, () -> 7000L);
         final List<InterruptionContext> fallbackCalls = new ArrayList<>();
         final ThrowingActor actor = new ThrowingActor();
         final TaskArbiter arbiter = new TaskArbiter();
@@ -131,35 +123,39 @@ class ExceptionPolicyGateTest {
 
         Harness(boolean throwingSensor) {
             SurvivalReflexLayer layer = new SurvivalReflexLayer(
-                throwingSensor
-                    ? (world, board) -> {
-                        throw new IllegalStateException("sensor boom");
-                    }
-                    : (world, board) -> board.botHealth = health[0]);
-            controller = new BotController(layer, arbiter,
-                List.of(behavior), actor, () -> new CellPos(0, 64, 0),
-                () -> health[0],
-                new BotController.GameClock() {
-                    @Override
-                    public long day() {
-                        return 4L;
-                    }
+                    throwingSensor
+                            ? (world, board) -> {
+                                throw new IllegalStateException("sensor boom");
+                            }
+                            : (world, board) -> board.botHealth = health[0]);
+            controller = new BotController(
+                    layer,
+                    arbiter,
+                    List.of(behavior),
+                    actor,
+                    () -> new CellPos(0, 64, 0),
+                    () -> health[0],
+                    new BotController.GameClock() {
+                        @Override
+                        public long day() {
+                            return 4L;
+                        }
 
-                    @Override
-                    public long timeOfDayTicks() {
-                        return 7000L;
-                    }
-                },
-                events,
-                fallbackCalls::add);
+                        @Override
+                        public long timeOfDayTicks() {
+                            return 7000L;
+                        }
+                    },
+                    events,
+                    fallbackCalls::add);
             arbiter.register(mission);
             arbiter.requestControl(mission);
         }
 
         List<BotEvent> crashEvents() {
             return events.statusSnapshot(0).events().stream()
-                .filter(e -> EventKind.BOT_CRASHED.equals(e.kind()))
-                .toList();
+                    .filter(e -> EventKind.BOT_CRASHED.equals(e.kind()))
+                    .toList();
         }
     }
 
@@ -179,17 +175,12 @@ class ExceptionPolicyGateTest {
         assertEquals(1, h.controller.crashCounter());
 
         List<BotEvent> crashes = h.crashEvents();
-        assertEquals(1, crashes.size(),
-            "primary channel must carry exactly one crash event");
-        assertTrue(crashes.get(0).urgent(),
-            "a crash is decision-critical freshness by definition");
-        assertEquals("IllegalStateException:boom",
-            crashes.get(0).attrs().get("cause"));
+        assertEquals(1, crashes.size(), "primary channel must carry exactly one crash event");
+        assertTrue(crashes.get(0).urgent(), "a crash is decision-critical freshness by definition");
+        assertEquals("IllegalStateException:boom", crashes.get(0).attrs().get("cause"));
 
-        assertEquals(1, h.fallbackCalls.size(),
-            "fallback channel must fire even when primary succeeded");
-        assertEquals("IllegalStateException:boom",
-            h.fallbackCalls.get(0).causeSummary());
+        assertEquals(1, h.fallbackCalls.size(), "fallback channel must fire even when primary succeeded");
+        assertEquals("IllegalStateException:boom", h.fallbackCalls.get(0).causeSummary());
     }
 
     /**
@@ -208,10 +199,8 @@ class ExceptionPolicyGateTest {
         h.controller.onTick(new MockWorldView());
         h.controller.onTick(new MockWorldView());
 
-        assertEquals(behaviorExecs, h.behavior.executions,
-            "behaviors are dead while latched");
-        assertEquals(missionTicks, h.mission.tickCalls,
-            "mission tier is dead while latched");
+        assertEquals(behaviorExecs, h.behavior.executions, "behaviors are dead while latched");
+        assertEquals(missionTicks, h.mission.tickCalls, "mission tier is dead while latched");
 
         Claim lastMove = null;
         for (Claim c : h.actor.submitted) {
@@ -235,18 +224,15 @@ class ExceptionPolicyGateTest {
 
         h.controller.onRespawned();
         assertFalse(h.controller.isCrashed(), "respawn clears the latch");
-        assertEquals(1, h.controller.crashCounter(),
-            "respawn must NOT clear the counter");
+        assertEquals(1, h.controller.crashCounter(), "respawn must NOT clear the counter");
 
         h.controller.onTick(new MockWorldView());
         assertTrue(h.controller.isCrashed());
-        assertEquals(2, h.controller.crashCounter(),
-            "second crash increments across respawns");
+        assertEquals(2, h.controller.crashCounter(), "second crash increments across respawns");
 
         h.controller.reset();
         assertFalse(h.controller.isCrashed());
-        assertEquals(0, h.controller.crashCounter(),
-            "harness reset is the full wipe");
+        assertEquals(0, h.controller.crashCounter(), "harness reset is the full wipe");
     }
 
     /** The catch frame covers stage 1 too — a poisoned sensor latches. */
@@ -260,9 +246,9 @@ class ExceptionPolicyGateTest {
         assertEquals(1, h.controller.crashCounter());
         assertEquals(1, h.crashEvents().size());
         assertEquals(1, h.fallbackCalls.size());
-        assertTrue(h.fallbackCalls.get(0).causeSummary()
-                .contains("sensor boom"),
-            "crash snapshot must name the original cause");
+        assertTrue(
+                h.fallbackCalls.get(0).causeSummary().contains("sensor boom"),
+                "crash snapshot must name the original cause");
     }
 
     /**
@@ -283,14 +269,10 @@ class ExceptionPolicyGateTest {
         h.actor.throwOnFlush = true;
         h.controller.onTick(new MockWorldView());
 
-        assertTrue(h.controller.isCrashed(),
-            "still latched; the floor is documentation");
-        assertEquals(2, h.controller.crashCounter(),
-            "the same D2 path fires again per ADR-0005 D3");
-        assertEquals(2, h.crashEvents().size(),
-            "primary channel re-reported");
-        assertEquals(2, h.fallbackCalls.size(),
-            "fallback channel re-reported");
+        assertTrue(h.controller.isCrashed(), "still latched; the floor is documentation");
+        assertEquals(2, h.controller.crashCounter(), "the same D2 path fires again per ADR-0005 D3");
+        assertEquals(2, h.crashEvents().size(), "primary channel re-reported");
+        assertEquals(2, h.fallbackCalls.size(), "fallback channel re-reported");
     }
 
     /**
@@ -303,37 +285,26 @@ class ExceptionPolicyGateTest {
     @Test
     void emergencyLatchFromOutsideMirrorsInPipelineCrash() {
         Harness h = new Harness(false);
-        assertFalse(h.controller.isCrashed(),
-            "clean controller starts un-latched");
+        assertFalse(h.controller.isCrashed(), "clean controller starts un-latched");
         assertEquals(0, h.controller.crashCounter());
 
-        h.controller.emergencyLatch(
-            new IllegalStateException("harness-outer-failure"));
+        h.controller.emergencyLatch(new IllegalStateException("harness-outer-failure"));
 
-        assertTrue(h.controller.isCrashed(),
-            "outside-the-pipeline latch still latches");
-        assertEquals(1, h.controller.crashCounter(),
-            "counter starts at 1 for the first outside failure");
-        assertEquals(1, h.crashEvents().size(),
-            "primary channel reports the outside failure");
-        assertEquals(1, h.fallbackCalls.size(),
-            "fallback channel reports the outside failure");
-        assertTrue(h.fallbackCalls.get(0).causeSummary()
-                .contains("harness-outer-failure"),
-            "snapshot must carry the original cause text");
+        assertTrue(h.controller.isCrashed(), "outside-the-pipeline latch still latches");
+        assertEquals(1, h.controller.crashCounter(), "counter starts at 1 for the first outside failure");
+        assertEquals(1, h.crashEvents().size(), "primary channel reports the outside failure");
+        assertEquals(1, h.fallbackCalls.size(), "fallback channel reports the outside failure");
+        assertTrue(
+                h.fallbackCalls.get(0).causeSummary().contains("harness-outer-failure"),
+                "snapshot must carry the original cause text");
 
         // Idempotency: latch stays set, counter still increments, both
         // channels re-report. A second outside failure is its own
         // report-worthy event so pathological rates stay visible.
-        h.controller.emergencyLatch(
-            new IllegalStateException("second-outer-failure"));
-        assertTrue(h.controller.isCrashed(),
-            "still latched after a second outside failure");
-        assertEquals(2, h.controller.crashCounter(),
-            "counter is monotonic across outside failures");
-        assertEquals(2, h.crashEvents().size(),
-            "primary re-reports so harness can see the rate");
-        assertEquals(2, h.fallbackCalls.size(),
-            "fallback re-reports so harness can see the rate");
+        h.controller.emergencyLatch(new IllegalStateException("second-outer-failure"));
+        assertTrue(h.controller.isCrashed(), "still latched after a second outside failure");
+        assertEquals(2, h.controller.crashCounter(), "counter is monotonic across outside failures");
+        assertEquals(2, h.crashEvents().size(), "primary re-reports so harness can see the rate");
+        assertEquals(2, h.fallbackCalls.size(), "fallback re-reports so harness can see the rate");
     }
 }

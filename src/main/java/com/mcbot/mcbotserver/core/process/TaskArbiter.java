@@ -5,7 +5,6 @@ import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.PriorityBands;
 import com.mcbot.mcbotserver.api.world.WorldView;
-
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;

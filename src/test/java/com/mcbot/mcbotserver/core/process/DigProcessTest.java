@@ -1,17 +1,16 @@
 package com.mcbot.mcbotserver.core.process;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.BlockSnapshot;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
-
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Offline gates for {@link DigProcess} (issue 0013 R1): completion is
@@ -24,8 +23,7 @@ class DigProcessTest {
 
     @Test
     void completesWhenTargetTurnsToAir() {
-        MockWorldView world = new MockWorldView()
-            .putBlock(new BlockSnapshot(TARGET, "minecraft:stone"));
+        MockWorldView world = new MockWorldView().putBlock(new BlockSnapshot(TARGET, "minecraft:stone"));
         DigProcess dig = new DigProcess("t1", TARGET, 50, 100);
         dig.onTick(world);
         assertEquals("minecraft:stone", dig.initialBlockId());
@@ -37,8 +35,7 @@ class DigProcessTest {
         assertNull(dig.failureReasonOrNull());
         // Terminal tick still answers a directive: onTick must never
         // return null while the process exists (BotProcess contract).
-        assertEquals(new com.mcbot.mcbotserver.api.goal.GoalNear(
-            TARGET, 2), directive.goal());
+        assertEquals(new com.mcbot.mcbotserver.api.goal.GoalNear(TARGET, 2), directive.goal());
     }
 
     @Test
@@ -53,8 +50,7 @@ class DigProcessTest {
 
     @Test
     void unloadedChunkFailsImmediately() {
-        MockWorldView world = new MockWorldView()
-            .markUnloaded(TARGET);
+        MockWorldView world = new MockWorldView().markUnloaded(TARGET);
         DigProcess dig = new DigProcess("t3", TARGET, 50, 100);
         dig.onTick(world);
         assertEquals("chunk not loaded", dig.failureReasonOrNull());
@@ -62,8 +58,7 @@ class DigProcessTest {
 
     @Test
     void budgetExpiryFailsWithTimeout() {
-        MockWorldView world = new MockWorldView()
-            .putBlock(new BlockSnapshot(TARGET, "minecraft:stone"));
+        MockWorldView world = new MockWorldView().putBlock(new BlockSnapshot(TARGET, "minecraft:stone"));
         DigProcess dig = new DigProcess("t4", TARGET, 50, 10);
         for (int i = 0; i < 10 && dig.isActive(); i++) {
             dig.onTick(world);
@@ -75,17 +70,14 @@ class DigProcessTest {
     @Test
     void malformedConstructionRejected() {
         org.junit.jupiter.api.Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> new DigProcess("", TARGET, 50, 100));
+                IllegalArgumentException.class, () -> new DigProcess("", TARGET, 50, 100));
         org.junit.jupiter.api.Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> new DigProcess("t5", TARGET, 50, 0));
+                IllegalArgumentException.class, () -> new DigProcess("t5", TARGET, 50, 0));
     }
 
     @Test
     void stuckReportFailsBeforeTimeout() {
-        MockWorldView world = new MockWorldView()
-            .putBlock(new BlockSnapshot(TARGET, "minecraft:stone"));
+        MockWorldView world = new MockWorldView().putBlock(new BlockSnapshot(TARGET, "minecraft:stone"));
         DigProcess dig = new DigProcess("t6", TARGET, 50, 100);
         dig.onTick(world);
         assertTrue(dig.isActive());
@@ -97,8 +89,7 @@ class DigProcessTest {
 
     @Test
     void failedReportFailsWithReason() {
-        MockWorldView world = new MockWorldView()
-            .putBlock(new BlockSnapshot(TARGET, "minecraft:stone"));
+        MockWorldView world = new MockWorldView().putBlock(new BlockSnapshot(TARGET, "minecraft:stone"));
         DigProcess dig = new DigProcess("t7", TARGET, 50, 100);
         dig.onTick(world);
         dig.onExecutionReport(ExecutionReport.failed("NO_PATH"));
@@ -111,8 +102,7 @@ class DigProcessTest {
         // PathingBehavior SUCCESS means "reached the stand-off range",
         // not "block broken". The dig must stay active until the world
         // read sees air.
-        MockWorldView world = new MockWorldView()
-            .putBlock(new BlockSnapshot(TARGET, "minecraft:stone"));
+        MockWorldView world = new MockWorldView().putBlock(new BlockSnapshot(TARGET, "minecraft:stone"));
         DigProcess dig = new DigProcess("t8", TARGET, 50, 100);
         dig.onTick(world);
         dig.onExecutionReport(ExecutionReport.success());
@@ -122,8 +112,7 @@ class DigProcessTest {
 
     @Test
     void runningReportIgnored() {
-        MockWorldView world = new MockWorldView()
-            .putBlock(new BlockSnapshot(TARGET, "minecraft:stone"));
+        MockWorldView world = new MockWorldView().putBlock(new BlockSnapshot(TARGET, "minecraft:stone"));
         DigProcess dig = new DigProcess("t9", TARGET, 50, 100);
         dig.onTick(world);
         dig.onExecutionReport(ExecutionReport.running());
@@ -134,8 +123,7 @@ class DigProcessTest {
     void terminalStateIgnoresLateReports() {
         // Once failed, a late SUCCESS from the same tick must not flip
         // the terminal state (sticky terminal contract).
-        MockWorldView world = new MockWorldView()
-            .putBlock(new BlockSnapshot(TARGET, "minecraft:stone"));
+        MockWorldView world = new MockWorldView().putBlock(new BlockSnapshot(TARGET, "minecraft:stone"));
         DigProcess dig = new DigProcess("t10", TARGET, 50, 100);
         dig.onTick(world);
         dig.onExecutionReport(ExecutionReport.stuck("no displacement"));

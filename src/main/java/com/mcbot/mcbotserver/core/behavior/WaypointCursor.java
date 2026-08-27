@@ -2,7 +2,6 @@ package com.mcbot.mcbotserver.core.behavior;
 
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
-
 import java.util.List;
 
 /**
@@ -77,8 +76,7 @@ final class WaypointCursor {
      * @return the cell to steer toward; never null
      */
     CellPos steerTarget() {
-        return waypoints.get(Math.min(waypointIndex,
-            waypoints.size() - 1));
+        return waypoints.get(Math.min(waypointIndex, waypoints.size() - 1));
     }
 
     /**
@@ -135,11 +133,8 @@ final class WaypointCursor {
     void advance(Vec3 position) {
         while (waypointIndex < waypoints.size()) {
             CellPos wp = waypoints.get(waypointIndex);
-            boolean sameCell =
-                PathingBehavior.floorOf(position).equals(wp);
-            double horizontal = Math.hypot(
-                position.x() - (wp.x() + 0.5),
-                position.z() - (wp.z() + 0.5));
+            boolean sameCell = PathingBehavior.floorOf(position).equals(wp);
+            double horizontal = Math.hypot(position.x() - (wp.x() + 0.5), position.z() - (wp.z() + 0.5));
             if (sameCell || horizontal <= PathingBehavior.WAYPOINT_REACH) {
                 waypointIndex++;
             } else {

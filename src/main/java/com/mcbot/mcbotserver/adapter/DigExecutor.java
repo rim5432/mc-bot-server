@@ -3,11 +3,11 @@ package com.mcbot.mcbotserver.adapter;
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.actor.DigPacing;
-
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
+
 /**
  * The dig half of the entity binding: converts a held INTERACT claim
  * (Intent.Dig) into vanilla destroy progress and, on completion, the
@@ -81,8 +81,7 @@ public final class DigExecutor {
      * @param claimed the claimed cell; never null
      */
     public void dig(CellPos claimed) {
-        BlockPos pos = new BlockPos(claimed.x(), claimed.y(),
-            claimed.z());
+        BlockPos pos = new BlockPos(claimed.x(), claimed.y(), claimed.z());
         if (!pos.equals(target)) {
             // New site (or first tick): reset any previous progress.
             // Vanilla's ABORT path broadcasts the clear; so does this.
@@ -109,19 +108,14 @@ public final class DigExecutor {
         // tool supplier). Recomputed every tick because the SLOT channel
         // may switch the held item mid-dig; vanilla's per-tick
         // incremental destroy progress does the same.
-        ItemStack held = body.getInventory().container()
-            .getItem(body.selectedSlot);
+        ItemStack held = body.getInventory().container().getItem(body.selectedSlot);
         float toolSpeed = held.getDestroySpeed(state);
-        boolean hasCorrectTool = !state.requiresCorrectToolForDrops()
-            || held.isCorrectToolForDrops(state);
+        boolean hasCorrectTool = !state.requiresCorrectToolForDrops() || held.isCorrectToolForDrops(state);
         heldTicks++;
         float progress = DigPacing.cumulativeProgress(
-            DigPacing.perTickProgress(
-                state.getDestroySpeed(body.level(), pos),
-                toolSpeed,
-                hasCorrectTool,
-                body.onGround()),
-            heldTicks);
+                DigPacing.perTickProgress(
+                        state.getDestroySpeed(body.level(), pos), toolSpeed, hasCorrectTool, body.onGround()),
+                heldTicks);
         if (progress >= 1.0f) {
             // Clear the crack broadcast first: destroyBlock emits the
             // 2001 break effect itself, and a stale stage would linger

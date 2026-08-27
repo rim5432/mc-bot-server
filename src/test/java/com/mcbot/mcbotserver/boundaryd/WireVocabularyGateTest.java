@@ -1,5 +1,16 @@
 package com.mcbot.mcbotserver.boundaryd;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import com.mcbot.mcbotserver.api.command.BotCommand;
+import com.mcbot.mcbotserver.api.command.SubmitResult;
+import com.mcbot.mcbotserver.api.event.BotEvent;
+import com.mcbot.mcbotserver.api.event.EventBatch;
+import com.mcbot.mcbotserver.api.event.EventKind;
+import com.mcbot.mcbotserver.api.state.BotState;
+import com.mcbot.mcbotserver.testsupport.RepoRoot;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,20 +21,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import com.mcbot.mcbotserver.api.command.BotCommand;
-import com.mcbot.mcbotserver.api.command.SubmitResult;
-import com.mcbot.mcbotserver.api.event.BotEvent;
-import com.mcbot.mcbotserver.api.event.EventBatch;
-import com.mcbot.mcbotserver.api.event.EventKind;
-import com.mcbot.mcbotserver.api.state.BotState;
-import com.mcbot.mcbotserver.testsupport.RepoRoot;
-
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Layer-1 gate over the boundary-D wire vocabulary: every
@@ -53,28 +51,30 @@ class WireVocabularyGateTest {
      * string values the wire carries (identical to the constant
      * names in {@link EventKind}).
      */
-    private static final Map<String, Set<String>> KIND_ATTRS =
-        Map.ofEntries(
+    private static final Map<String, Set<String>> KIND_ATTRS = Map.ofEntries(
             Map.entry("EVENT_DROPPED", Set.of("count")),
-            Map.entry("EVENT_GAP",
-                Set.of("count", "since", "oldest")),
-            Map.entry("STATE_PUSH", Set.of(
-                "posX", "posY", "posZ", "dimension", "task")),
+            Map.entry("EVENT_GAP", Set.of("count", "since", "oldest")),
+            Map.entry("STATE_PUSH", Set.of("posX", "posY", "posZ", "dimension", "task")),
             Map.entry("TASK_REJECTED", Set.of("taskId")),
             Map.entry("TASK_COMPLETED", Set.of("task", "taskId")),
-            Map.entry("TASK_FAILED",
-                Set.of("task", "taskId", "reason")),
+            Map.entry("TASK_FAILED", Set.of("task", "taskId", "reason")),
             Map.entry("TASK_PAUSED", Set.of("task", "taskId")),
             Map.entry("TASK_RESUMED", Set.of("task", "taskId")),
             Map.entry("TASK_DROPPED", Set.of("task", "taskId")),
             Map.entry("TASK_CANCELLED", Set.of("task", "taskId")),
             Map.entry("BOT_CRASHED", Set.of("cause")),
-            Map.entry("BLOCK_BROKEN", Set.of(
-                "taskId", "posX", "posY", "posZ", "blockId")),
-            Map.entry("KEEPALIVE", Set.of(
-                "pose", "waypointIndex", "waypointsTotal",
-                "ticksSincePlanProgress", "ticksSincePlan", "planAge",
-                "noPathWitnesses", "goalCell")));
+            Map.entry("BLOCK_BROKEN", Set.of("taskId", "posX", "posY", "posZ", "blockId")),
+            Map.entry(
+                    "KEEPALIVE",
+                    Set.of(
+                            "pose",
+                            "waypointIndex",
+                            "waypointsTotal",
+                            "ticksSincePlanProgress",
+                            "ticksSincePlan",
+                            "planAge",
+                            "noPathWitnesses",
+                            "goalCell")));
 
     /**
      * Every main-source file that constructs a {@link BotEvent} or
@@ -83,36 +83,34 @@ class WireVocabularyGateTest {
      * registration.
      */
     private static final List<String> PRODUCER_FILES = List.of(
-        "core/event/InMemoryEventQueue.java",
-        "core/command/CommandBus.java",
-        "core/command/GotoCommandHandler.java",
-        "core/command/DigCommandHandler.java",
-        "core/command/MineCommandHandler.java",
-        "core/state/ChangeDetectingStateChannel.java",
-        "core/tick/BotController.java",
-        "core/tick/MissionReporter.java",
-        "core/behavior/PathingBehavior.java");
+            "core/event/InMemoryEventQueue.java",
+            "core/command/CommandBus.java",
+            "core/command/GotoCommandHandler.java",
+            "core/command/DigCommandHandler.java",
+            "core/command/MineCommandHandler.java",
+            "core/state/ChangeDetectingStateChannel.java",
+            "core/tick/BotController.java",
+            "core/tick/MissionReporter.java",
+            "core/behavior/PathingBehavior.java");
 
     /** Attr-key literal shapes used at push sites. */
     private static final Pattern[] ATTR_LITERAL = {
-        Pattern.compile("\\.put\\(\"([^\"]+)\""),
-        Pattern.compile("Map\\.of\\(\"([^\"]+)\"")
+        Pattern.compile("\\.put\\(\"([^\"]+)\""), Pattern.compile("Map\\.of\\(\"([^\"]+)\"")
     };
 
     /** The constant declarations scanned out of EventKind.java - a
      *  source scan, not reflection, per H-R1 (the door rule). */
-    private static final Pattern STRING_CONSTANT = Pattern.compile(
-        "public\\s+static\\s+final\\s+String\\s+(\\w+)\\s*=\\s*\"([^\"]+)\"");
+    private static final Pattern STRING_CONSTANT =
+            Pattern.compile("public\\s+static\\s+final\\s+String\\s+(\\w+)\\s*=\\s*\"([^\"]+)\"");
 
     /** Fails when an EventKind constant lacks a registered shape
      *  or a registered shape lacks its kind. */
     @Test
     void kindInventoryMatchesEventKindConstants() {
-        Path source = RepoRoot.find().resolve(Path.of("src", "main",
-            "java", "com", "mcbot", "mcbotserver", "api", "event",
-            "EventKind.java"));
-        assertTrue(Files.isRegularFile(source),
-            () -> "EventKind source not found at " + source);
+        Path source = RepoRoot.find()
+                .resolve(Path.of(
+                        "src", "main", "java", "com", "mcbot", "mcbotserver", "api", "event", "EventKind.java"));
+        assertTrue(Files.isRegularFile(source), () -> "EventKind source not found at " + source);
         Set<String> constants = new TreeSet<>();
         try {
             Matcher m = STRING_CONSTANT.matcher(Files.readString(source));
@@ -130,11 +128,11 @@ class WireVocabularyGateTest {
         unknown.removeAll(constants);
         if (!unregistered.isEmpty() || !unknown.isEmpty()) {
             fail("event-kind inventory drifted. unregisteredKinds="
-                + unregistered + " unknownKinds=" + unknown
-                + ". A new EventKind constant must register its "
-                + "channel-owned attr keys in KIND_ATTRS (and update "
-                + "boundaries.md section D); a removed constant must "
-                + "retire its row here in the same change.");
+                    + unregistered + " unknownKinds=" + unknown
+                    + ". A new EventKind constant must register its "
+                    + "channel-owned attr keys in KIND_ATTRS (and update "
+                    + "boundaries.md section D); a removed constant must "
+                    + "retire its row here in the same change.");
         }
     }
 
@@ -145,17 +143,15 @@ class WireVocabularyGateTest {
     void producerAttrLiteralsStayInsideTheVocabulary() {
         Set<String> stamped = new TreeSet<>();
         for (String file : PRODUCER_FILES) {
-            Path path = RepoRoot.find().resolve(
-                "src/main/java/com/mcbot/mcbotserver/" + file);
-            assertTrue(Files.isRegularFile(path),
-                () -> "producer file listed in PRODUCER_FILES is "
-                    + "gone (renamed?): " + file);
+            Path path = RepoRoot.find().resolve("src/main/java/com/mcbot/mcbotserver/" + file);
+            assertTrue(
+                    Files.isRegularFile(path),
+                    () -> "producer file listed in PRODUCER_FILES is " + "gone (renamed?): " + file);
             String source;
             try {
                 source = Files.readString(path);
             } catch (IOException e) {
-                fail("cannot read producer file " + path + ": "
-                    + e.getMessage());
+                fail("cannot read producer file " + path + ": " + e.getMessage());
                 return;
             }
             for (Pattern p : ATTR_LITERAL) {
@@ -173,12 +169,12 @@ class WireVocabularyGateTest {
         stalePins.removeAll(stamped);
         if (!offVocabulary.isEmpty() || !stalePins.isEmpty()) {
             fail("wire attr-key vocabulary drifted. "
-                + "offVocabulary=" + offVocabulary
-                + " (a producer stamps a key nobody registered - "
-                + "register it in KIND_ATTRS or fix the typo) "
-                + "stalePins=" + stalePins
-                + " (registered keys no producer stamps - retire "
-                + "the pin or restore the producer).");
+                    + "offVocabulary=" + offVocabulary
+                    + " (a producer stamps a key nobody registered - "
+                    + "register it in KIND_ATTRS or fix the typo) "
+                    + "stalePins=" + stalePins
+                    + " (registered keys no producer stamps - retire "
+                    + "the pin or restore the producer).");
         }
     }
 
@@ -187,32 +183,38 @@ class WireVocabularyGateTest {
      *  contract, so it is pinned in declaration order. */
     @Test
     void wireRecordComponentsStayFrozen() {
-        assertComponents(BotEvent.class, "kind", "day", "t",
-            "urgent", "attrs", "text");
-        assertComponents(EventBatch.class, "events", "droppedCount",
-            "latestEventId", "resetAt");
-        assertComponents(SubmitResult.Ok.class, "taskId",
-            "idempotencyReplay");
+        assertComponents(BotEvent.class, "kind", "day", "t", "urgent", "attrs", "text");
+        assertComponents(EventBatch.class, "events", "droppedCount", "latestEventId", "resetAt");
+        assertComponents(SubmitResult.Ok.class, "taskId", "idempotencyReplay");
         assertComponents(SubmitResult.Rejected.class, "reason");
         assertComponents(BotCommand.class, "verb", "args");
-        assertComponents(BotState.class, "pos", "yaw", "pitch",
-            "dimension", "itemCounts", "selectedHotbarSlot",
-            "effectAmplifiers", "currentTaskSummary",
-            "healthHearts", "freeSlots");
+        assertComponents(
+                BotState.class,
+                "pos",
+                "yaw",
+                "pitch",
+                "dimension",
+                "itemCounts",
+                "selectedHotbarSlot",
+                "effectAmplifiers",
+                "currentTaskSummary",
+                "healthHearts",
+                "freeSlots");
     }
 
-    private static void assertComponents(Class<?> record,
-                                         String... expected) {
+    private static void assertComponents(Class<?> record, String... expected) {
         var components = record.getRecordComponents();
         Set<String> actual = new LinkedHashSet<>();
         for (var c : components) {
             actual.add(c.getName());
         }
-        assertEquals(List.of(expected), List.copyOf(actual),
-            () -> record.getSimpleName() + " wire components "
-                + "drifted (renamed or reordered). Every dump, debug "
-                + "and harness path prints these names; a rename is "
-                + "a boundary-D breaking change - update the pin, "
-                + "boundaries.md and every consumer in one change.");
+        assertEquals(
+                List.of(expected),
+                List.copyOf(actual),
+                () -> record.getSimpleName() + " wire components "
+                        + "drifted (renamed or reordered). Every dump, debug "
+                        + "and harness path prints these names; a rename is "
+                        + "a boundary-D breaking change - update the pin, "
+                        + "boundaries.md and every consumer in one change.");
     }
 }

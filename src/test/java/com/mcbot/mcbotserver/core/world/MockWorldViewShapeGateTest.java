@@ -1,20 +1,17 @@
 package com.mcbot.mcbotserver.core.world;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.BlockSnapshot;
 import com.mcbot.mcbotserver.api.world.BlockTraits;
 import com.mcbot.mcbotserver.api.world.CollisionShape;
 import com.mcbot.mcbotserver.api.world.CollisionShape.Box;
 import com.mcbot.mcbotserver.api.world.ViewMode;
-import com.mcbot.mcbotserver.core.world.MapBlockTraitsRegistry;
-import com.mcbot.mcbotserver.core.world.MockWorldView;
-
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Mock-side shape / traits injection gate: the offline mock can
@@ -35,8 +32,9 @@ class MockWorldViewShapeGateTest {
     @Test
     void airByDefaultHasEmptyShape() {
         MockWorldView w = new MockWorldView();
-        assertSame(CollisionShape.Kind.EMPTY,
-            w.getCollisionShape(POS, ViewMode.LIVE).kind());
+        assertSame(
+                CollisionShape.Kind.EMPTY,
+                w.getCollisionShape(POS, ViewMode.LIVE).kind());
         assertTrue(w.getCollisionShape(POS, ViewMode.LIVE).passable());
     }
 
@@ -44,8 +42,9 @@ class MockWorldViewShapeGateTest {
     void solidBlockByDefaultHasFullCubeShape() {
         MockWorldView w = new MockWorldView();
         w.putBlock(new BlockSnapshot(POS, "minecraft:stone"));
-        assertSame(CollisionShape.Kind.FULL_CUBE,
-            w.getCollisionShape(POS, ViewMode.LIVE).kind());
+        assertSame(
+                CollisionShape.Kind.FULL_CUBE,
+                w.getCollisionShape(POS, ViewMode.LIVE).kind());
         assertFalse(w.getCollisionShape(POS, ViewMode.LIVE).passable());
         assertTrue(w.getCollisionShape(POS, ViewMode.LIVE).walkableTop());
     }
@@ -56,10 +55,10 @@ class MockWorldViewShapeGateTest {
         w.putBlock(new BlockSnapshot(POS, "minecraft:stone"));
         // Even though the blockId says stone, the explicit partial
         // shape wins.
-        w.putShape(POS, CollisionShape.partial(
-            new Box(0, 0, 0, 1, 0.5, 1)));
-        assertSame(CollisionShape.Kind.PARTIAL,
-            w.getCollisionShape(POS, ViewMode.LIVE).kind());
+        w.putShape(POS, CollisionShape.partial(new Box(0, 0, 0, 1, 0.5, 1)));
+        assertSame(
+                CollisionShape.Kind.PARTIAL,
+                w.getCollisionShape(POS, ViewMode.LIVE).kind());
         assertTrue(w.getCollisionShape(POS, ViewMode.LIVE).passable());
     }
 
@@ -70,16 +69,16 @@ class MockWorldViewShapeGateTest {
         // Unloaded = "do not know"; the default answers
         // FULL_CUBE - blocking. The planner must not route through
         // unrendered terrain.
-        assertSame(CollisionShape.Kind.FULL_CUBE,
-            w.getCollisionShape(POS, ViewMode.LIVE).kind());
+        assertSame(
+                CollisionShape.Kind.FULL_CUBE,
+                w.getCollisionShape(POS, ViewMode.LIVE).kind());
     }
 
     @Test
     void traitsDefaultToSafeNone() {
         MockWorldView w = new MockWorldView();
         w.putBlock(new BlockSnapshot(POS, "minecraft:stone"));
-        assertSame(BlockTraits.NONE,
-            w.getBlockTraits(POS, ViewMode.LIVE));
+        assertSame(BlockTraits.NONE, w.getBlockTraits(POS, ViewMode.LIVE));
     }
 
     @Test
@@ -100,10 +99,8 @@ class MockWorldViewShapeGateTest {
         assertTrue(w.getBlockTraits(POS, ViewMode.LIVE).climbable());
         // A cell with a different id gets the registry's default
         // answer, which is the empty default.
-        w.putBlock(new BlockSnapshot(new CellPos(1, 64, 0),
-            "minecraft:stone"));
-        assertSame(BlockTraits.NONE,
-            w.getBlockTraits(new CellPos(1, 64, 0), ViewMode.LIVE));
+        w.putBlock(new BlockSnapshot(new CellPos(1, 64, 0), "minecraft:stone"));
+        assertSame(BlockTraits.NONE, w.getBlockTraits(new CellPos(1, 64, 0), ViewMode.LIVE));
     }
 
     @Test
@@ -123,15 +120,10 @@ class MockWorldViewShapeGateTest {
     @Test
     void nullArgumentsAreRejected() {
         MockWorldView w = new MockWorldView();
-        assertThrows(IllegalArgumentException.class,
-            () -> w.putShape(null, CollisionShape.empty()));
-        assertThrows(IllegalArgumentException.class,
-            () -> w.putShape(POS, null));
-        assertThrows(IllegalArgumentException.class,
-            () -> w.putTraits(null, BlockTraits.climbableOnly()));
-        assertThrows(IllegalArgumentException.class,
-            () -> w.putTraits(POS, null));
-        assertThrows(IllegalArgumentException.class,
-            () -> w.setTraitsRegistry(null));
+        assertThrows(IllegalArgumentException.class, () -> w.putShape(null, CollisionShape.empty()));
+        assertThrows(IllegalArgumentException.class, () -> w.putShape(POS, null));
+        assertThrows(IllegalArgumentException.class, () -> w.putTraits(null, BlockTraits.climbableOnly()));
+        assertThrows(IllegalArgumentException.class, () -> w.putTraits(POS, null));
+        assertThrows(IllegalArgumentException.class, () -> w.setTraitsRegistry(null));
     }
 }

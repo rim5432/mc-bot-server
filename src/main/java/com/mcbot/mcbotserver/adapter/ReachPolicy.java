@@ -34,8 +34,7 @@ public final class ReachPolicy {
     public static final double BLOCK_REACH_BLOCKS = 4.5;
 
     /** Squared reach, precomputed for per-tick distance comparisons. */
-    private static final double BLOCK_REACH_SQ =
-        BLOCK_REACH_BLOCKS * BLOCK_REACH_BLOCKS;
+    private static final double BLOCK_REACH_SQ = BLOCK_REACH_BLOCKS * BLOCK_REACH_BLOCKS;
 
     private ReachPolicy() {
         // utility class — no instances

@@ -17,8 +17,7 @@ import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
  * the gate test honest about mechanism, not configuration.
  */
 // contract: see boundaries.md decision 16 (minimal Phase-0 reflex)
-public final class FreezeOnLowHealthRule
-        implements ReflexRule, ReflexHysteresis {
+public final class FreezeOnLowHealthRule implements ReflexRule, ReflexHysteresis {
 
     /** Health at or below which the rule fires (default table). */
     public static final float FREEZE_THRESHOLD = 10f;
@@ -61,12 +60,10 @@ public final class FreezeOnLowHealthRule
      */
     public FreezeOnLowHealthRule(float threshold, int priority) {
         if (threshold <= 0f || threshold > 20f) {
-            throw new IllegalArgumentException(
-                "threshold must be in (0, 20]");
+            throw new IllegalArgumentException("threshold must be in (0, 20]");
         }
         if (priority <= 0) {
-            throw new IllegalArgumentException(
-                "priority must be positive");
+            throw new IllegalArgumentException("priority must be positive");
         }
         this.threshold = threshold;
         this.priority = priority;

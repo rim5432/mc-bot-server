@@ -18,12 +18,7 @@ import com.mcbot.mcbotserver.api.types.CellPos;
  * @param health    current health, 0 or greater
  * @param maxHealth maximum health, positive
  */
-public record EntitySnapshot(
-    String id,
-    String type,
-    CellPos pos,
-    float health,
-    float maxHealth) {
+public record EntitySnapshot(String id, String type, CellPos pos, float health, float maxHealth) {
 
     /**
      * Creates a validated snapshot.
@@ -45,12 +40,10 @@ public record EntitySnapshot(
             throw new IllegalArgumentException("pos must not be null");
         }
         if (health < 0f) {
-            throw new IllegalArgumentException(
-                "health must not be negative");
+            throw new IllegalArgumentException("health must not be negative");
         }
         if (maxHealth <= 0f) {
-            throw new IllegalArgumentException(
-                "maxHealth must be positive");
+            throw new IllegalArgumentException("maxHealth must be positive");
         }
     }
 }

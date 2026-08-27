@@ -1,22 +1,19 @@
 package com.mcbot.mcbotserver.core.process;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
 import com.mcbot.mcbotserver.api.process.Attack;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.PriorityBands;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.EntitySnapshot;
-import com.mcbot.mcbotserver.core.process.DefendProcess;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
-
-import org.junit.jupiter.api.Test;
-
 import java.util.Set;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 
 /**
  * DefendProcess target-locking contract: an engaged target is resolved
@@ -37,17 +34,14 @@ class DefendProcessTest {
     private static final String SKELETON = "minecraft:skeleton";
     private static final Set<String> HOSTILES = Set.of(ZOMBIE);
     private static final InterruptionContext CTX =
-        new InterruptionContext(1L, BOT, "defend:t1",
-            "reflex-preempt:test", "");
+            new InterruptionContext(1L, BOT, "defend:t1", "reflex-preempt:test", "");
 
     private DefendProcess mission() {
-        return new DefendProcess("t1", PriorityBands.DEFEND_PRIORITY,
-            1000L, () -> BOT, HOSTILES);
+        return new DefendProcess("t1", PriorityBands.DEFEND_PRIORITY, 1000L, () -> BOT, HOSTILES);
     }
 
     private EntitySnapshot zombie(String id, int x) {
-        return new EntitySnapshot(id, ZOMBIE,
-            new CellPos(x, 64, 0), 20f, 20f);
+        return new EntitySnapshot(id, ZOMBIE, new CellPos(x, 64, 0), 20f, 20f);
     }
 
     /**
@@ -72,15 +66,12 @@ class DefendProcessTest {
 
         for (int i = 0; i < 15; i++) {
             Directive d = m.onTick(world);
-            assertTrue(m.isActive(),
-                "tick " + i + ": A must stay engaged despite B at 7");
-            assertFalse(m.missionSucceeded(),
-                "tick " + i + ": must not report SUCCESS for live A");
+            assertTrue(m.isActive(), "tick " + i + ": A must stay engaged despite B at 7");
+            assertFalse(m.missionSucceeded(), "tick " + i + ": must not report SUCCESS for live A");
             // R1: the directive must target A, not B — goal switching
             // is observable through the Attack override's targetId.
             Attack attack = (Attack) d.overrides().combat();
-            assertEquals("A", attack.targetId(),
-                "tick " + i + ": directive must attack A, not B");
+            assertEquals("A", attack.targetId(), "tick " + i + ": directive must attack A, not B");
         }
     }
 
@@ -102,9 +93,7 @@ class DefendProcessTest {
 
         for (int i = 0; i < 10; i++) {
             m.onTick(world);
-            assertTrue(m.isActive(),
-                "grace tick " + i + " (ticksSinceSeen=" + (i + 1)
-                    + ") must still be active");
+            assertTrue(m.isActive(), "grace tick " + i + " (ticksSinceSeen=" + (i + 1) + ") must still be active");
         }
         m.onTick(world);
         assertFalse(m.isActive(), "11th tick must retire the mission");
@@ -134,13 +123,11 @@ class DefendProcessTest {
 
         // Replace with health=0 snapshot (death animation state)
         world.removeEntity("A");
-        world.addEntity(new EntitySnapshot("A", ZOMBIE,
-            new CellPos(6, 64, 0), 0f, 20f));
+        world.addEntity(new EntitySnapshot("A", ZOMBIE, new CellPos(6, 64, 0), 0f, 20f));
 
         for (int i = 0; i < 15; i++) {
             m.onTick(world);
-            assertTrue(m.isActive(),
-                "tick " + i + ": health=0 entity still matched by id");
+            assertTrue(m.isActive(), "tick " + i + ": health=0 entity still matched by id");
             assertFalse(m.missionSucceeded());
         }
 
@@ -197,8 +184,7 @@ class DefendProcessTest {
 
         // First post-resume tick: target present → reset → continue
         Directive d = m.onTick(world);
-        assertTrue(m.isActive(),
-            "first post-resume tick must keep fighting when A is present");
+        assertTrue(m.isActive(), "first post-resume tick must keep fighting when A is present");
         assertFalse(m.missionSucceeded());
         Attack attack = (Attack) d.overrides().combat();
         assertEquals("A", attack.targetId());
@@ -282,13 +268,10 @@ class DefendProcessTest {
         MockWorldView world = new MockWorldView();
         // 6-arg constructor: skeleton is in hostileTypes (visible to
         // scan) AND rangedTypes (refused rather than engaged).
-        DefendProcess m = new DefendProcess("t1",
-            PriorityBands.DEFEND_PRIORITY, 1000L, () -> BOT,
-            Set.of(ZOMBIE, SKELETON),
-            Set.of(SKELETON));
+        DefendProcess m = new DefendProcess(
+                "t1", PriorityBands.DEFEND_PRIORITY, 1000L, () -> BOT, Set.of(ZOMBIE, SKELETON), Set.of(SKELETON));
 
-        world.addEntity(new EntitySnapshot("S1", SKELETON,
-            new CellPos(6, 64, 0), 20f, 20f));
+        world.addEntity(new EntitySnapshot("S1", SKELETON, new CellPos(6, 64, 0), 20f, 20f));
 
         m.onTick(world);
         assertFalse(m.isActive());
@@ -307,14 +290,11 @@ class DefendProcessTest {
     @Test
     void rangedHostileBeyondEngageWithinDetectionIsRefused() {
         MockWorldView world = new MockWorldView();
-        DefendProcess m = new DefendProcess("t1",
-            PriorityBands.DEFEND_PRIORITY, 1000L, () -> BOT,
-            Set.of(ZOMBIE, SKELETON),
-            Set.of(SKELETON));
+        DefendProcess m = new DefendProcess(
+                "t1", PriorityBands.DEFEND_PRIORITY, 1000L, () -> BOT, Set.of(ZOMBIE, SKELETON), Set.of(SKELETON));
 
         // Skeleton at 10: beyond ENGAGE_RADIUS (8), inside DETECTION_RADIUS (16).
-        world.addEntity(new EntitySnapshot("S1", SKELETON,
-            new CellPos(10, 64, 0), 20f, 20f));
+        world.addEntity(new EntitySnapshot("S1", SKELETON, new CellPos(10, 64, 0), 20f, 20f));
 
         m.onTick(world);
         assertFalse(m.isActive());

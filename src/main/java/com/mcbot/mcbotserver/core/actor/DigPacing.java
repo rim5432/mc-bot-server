@@ -59,8 +59,7 @@ public final class DigPacing {
      */
     public static final int TOOL_REQUIRED_DIVISOR = 100;
 
-    private DigPacing() {
-    }
+    private DigPacing() {}
 
     /**
      * Destroy progress contributed by one held tick.
@@ -80,19 +79,12 @@ public final class DigPacing {
      *         for zero-hardness blocks (they pop on the first tick,
      *         exactly as vanilla's division produces)
      */
-    public static float perTickProgress(float destroySpeed,
-                                        float toolSpeed,
-                                        boolean hasCorrectTool,
-                                        boolean onGround) {
+    public static float perTickProgress(float destroySpeed, float toolSpeed, boolean hasCorrectTool, boolean onGround) {
         if (destroySpeed < 0f) {
             return 0f;
         }
-        float digSpeed = onGround
-            ? toolSpeed
-            : toolSpeed * AIRBORNE_DIG_MULTIPLIER;
-        return digSpeed / destroySpeed / (hasCorrectTool
-            ? HARVESTABLE_DIVISOR
-            : TOOL_REQUIRED_DIVISOR);
+        float digSpeed = onGround ? toolSpeed : toolSpeed * AIRBORNE_DIG_MULTIPLIER;
+        return digSpeed / destroySpeed / (hasCorrectTool ? HARVESTABLE_DIVISOR : TOOL_REQUIRED_DIVISOR);
     }
 
     /**
@@ -109,8 +101,7 @@ public final class DigPacing {
      * @return cumulative progress; {@code >= 1.0} means the break
      *         completes this tick
      */
-    public static float cumulativeProgress(float perTickProgress,
-                                           int heldTicks) {
+    public static float cumulativeProgress(float perTickProgress, int heldTicks) {
         return perTickProgress * heldTicks;
     }
 

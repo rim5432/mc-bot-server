@@ -26,8 +26,7 @@ public record Directive(Goal goal, Overrides overrides) {
             throw new IllegalArgumentException("goal must not be null");
         }
         if (overrides == null) {
-            throw new IllegalArgumentException(
-                "overrides must not be null");
+            throw new IllegalArgumentException("overrides must not be null");
         }
     }
 

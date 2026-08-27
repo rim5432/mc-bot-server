@@ -29,8 +29,7 @@ public sealed interface SubmitResult {
      * @param idempotencyReplay true when this Ok is a deduped replay of
      *                         a prior accepted submission
      */
-    record Ok(String taskId, boolean idempotencyReplay)
-            implements SubmitResult {
+    record Ok(String taskId, boolean idempotencyReplay) implements SubmitResult {
 
         /**
          * Canonical form for a fresh acceptance. Equivalent to
@@ -63,6 +62,5 @@ public sealed interface SubmitResult {
      *
      * @param reason why the command was refused; never null or blank
      */
-    record Rejected(String reason) implements SubmitResult {
-    }
+    record Rejected(String reason) implements SubmitResult {}
 }

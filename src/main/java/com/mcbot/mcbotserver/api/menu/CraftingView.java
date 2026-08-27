@@ -24,8 +24,7 @@ import java.util.List;
  *               entries); never null, immutable
  * @param result the crafting result slot; never null
  */
-public record CraftingView(MenuView menu, List<SlotView> grid,
-                           SlotView result) {
+public record CraftingView(MenuView menu, List<SlotView> grid, SlotView result) {
 
     /**
      * Projects a crafting lens out of a menu snapshot.
@@ -52,13 +51,11 @@ public record CraftingView(MenuView menu, List<SlotView> grid,
             }
         }
         if (result == null) {
-            throw new IllegalArgumentException(
-                "menu '" + menu.type() + "' has no RESULT slot");
+            throw new IllegalArgumentException("menu '" + menu.type() + "' has no RESULT slot");
         }
         if (grid.size() != 4 && grid.size() != 9) {
             throw new IllegalArgumentException(
-                "menu '" + menu.type() + "' grid must have 4 (2x2) or"
-                    + " 9 (3x3) slots, got " + grid.size());
+                    "menu '" + menu.type() + "' grid must have 4 (2x2) or" + " 9 (3x3) slots, got " + grid.size());
         }
         return new CraftingView(menu, grid, result);
     }
@@ -79,18 +76,14 @@ public record CraftingView(MenuView menu, List<SlotView> grid,
         }
         if (grid == null || (grid.size() != 4 && grid.size() != 9)) {
             throw new IllegalArgumentException(
-                "grid must have 4 (2x2) or 9 (3x3) slots, got "
-                    + (grid == null ? "null" : grid.size()));
+                    "grid must have 4 (2x2) or 9 (3x3) slots, got " + (grid == null ? "null" : grid.size()));
         }
         if (result == null || result.role() != SlotRole.RESULT) {
-            throw new IllegalArgumentException(
-                "result slot must carry the RESULT role");
+            throw new IllegalArgumentException("result slot must carry the RESULT role");
         }
         for (SlotView slot : grid) {
             if (slot.role() != SlotRole.GRID) {
-                throw new IllegalArgumentException(
-                    "grid slot " + slot.index()
-                        + " must carry the GRID role");
+                throw new IllegalArgumentException("grid slot " + slot.index() + " must carry the GRID role");
             }
         }
         grid = List.copyOf(grid);

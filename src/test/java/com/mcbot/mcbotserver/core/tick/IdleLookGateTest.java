@@ -1,15 +1,13 @@
 package com.mcbot.mcbotserver.core.tick;
 
-import com.mcbot.mcbotserver.api.types.Vec3;
-import com.mcbot.mcbotserver.core.behavior.IdleLook;
-
-import org.junit.jupiter.api.Test;
-
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.mcbot.mcbotserver.api.types.Vec3;
+import com.mcbot.mcbotserver.core.behavior.IdleLook;
+import java.util.List;
+import org.junit.jupiter.api.Test;
 
 /**
  * Idle head-tracking policy gate (issue 0005 P0): the constants and
@@ -32,34 +30,32 @@ class IdleLookGateTest {
         Vec3 near = new Vec3(3, 64, 0);
         Vec3 far = new Vec3(6, 64, 0);
 
-        IdleLook.Target t = IdleLook.nearestTarget(EYE,
-            List.of(far, near));
-        assertEquals(IdleLook.yawTo(EYE, near), t.yawDeg(), 1e-4,
-            "nearest candidate must win regardless of list order");
+        IdleLook.Target t = IdleLook.nearestTarget(EYE, List.of(far, near));
+        assertEquals(
+                IdleLook.yawTo(EYE, near), t.yawDeg(), 1e-4, "nearest candidate must win regardless of list order");
     }
 
     /** Nothing within the radius yields null. */
     @Test
     void emptyOrDistantCandidatesYieldNull() {
-        assertNull(IdleLook.nearestTarget(EYE, List.of()),
-            "no candidates must yield null");
-        assertNull(IdleLook.nearestTarget(EYE,
-                List.of(new Vec3(20, 64, 0), new Vec3(0, 80, 0))),
-            "candidates beyond the radius must be ignored");
+        assertNull(IdleLook.nearestTarget(EYE, List.of()), "no candidates must yield null");
+        assertNull(
+                IdleLook.nearestTarget(EYE, List.of(new Vec3(20, 64, 0), new Vec3(0, 80, 0))),
+                "candidates beyond the radius must be ignored");
     }
 
     /** Null entries are skipped without failing the scan. */
     @Test
     void nullCandidatesAreSkippedNotFatal() {
-        assertNull(IdleLook.nearestTarget(EYE,
-                java.util.Arrays.asList(null, new Vec3(50, 64, 0))),
-            "null entries are skipped; a solely-distant list stays"
-                + " null");
-        IdleLook.Target t = IdleLook.nearestTarget(EYE,
-            java.util.Arrays.asList(null, new Vec3(1, 64, 0)));
-        assertEquals(IdleLook.yawTo(EYE, new Vec3(1, 64, 0)),
-            t.yawDeg(), 1e-4,
-            "a valid candidate after a null must still win");
+        assertNull(
+                IdleLook.nearestTarget(EYE, java.util.Arrays.asList(null, new Vec3(50, 64, 0))),
+                "null entries are skipped; a solely-distant list stays" + " null");
+        IdleLook.Target t = IdleLook.nearestTarget(EYE, java.util.Arrays.asList(null, new Vec3(1, 64, 0)));
+        assertEquals(
+                IdleLook.yawTo(EYE, new Vec3(1, 64, 0)),
+                t.yawDeg(),
+                1e-4,
+                "a valid candidate after a null must still win");
     }
 
     /**
@@ -70,16 +66,19 @@ class IdleLookGateTest {
     @Test
     void pitchFollowsEngineSignAndClamps() {
         float up = IdleLook.pitchTo(EYE, new Vec3(1, 65.62, 0));
-        assertTrue(up < 0, "target above must read negative pitch, got "
-            + up);
+        assertTrue(up < 0, "target above must read negative pitch, got " + up);
         float down = IdleLook.pitchTo(EYE, new Vec3(1, 62.4, 0));
         assertTrue(down > 0, "target below must read positive pitch");
-        assertEquals(-IdleLook.PITCH_LIMIT_DEG,
-            IdleLook.pitchTo(EYE, new Vec3(0.1, 74, 0)), 0.01,
-            "near-zenith target clamps at the up limit");
-        assertEquals(IdleLook.PITCH_LIMIT_DEG,
-            IdleLook.pitchTo(EYE, new Vec3(0.1, 54, 0)), 0.01,
-            "near-nadir target clamps at the down limit");
+        assertEquals(
+                -IdleLook.PITCH_LIMIT_DEG,
+                IdleLook.pitchTo(EYE, new Vec3(0.1, 74, 0)),
+                0.01,
+                "near-zenith target clamps at the up limit");
+        assertEquals(
+                IdleLook.PITCH_LIMIT_DEG,
+                IdleLook.pitchTo(EYE, new Vec3(0.1, 54, 0)),
+                0.01,
+                "near-nadir target clamps at the down limit");
     }
 
     /**
@@ -88,10 +87,8 @@ class IdleLookGateTest {
      */
     @Test
     void yawMatchesSteeringConvention() {
-        assertEquals(-90f, IdleLook.yawTo(EYE, new Vec3(5, 64, 0)),
-            0.01, "east target must read yaw -90");
-        assertEquals(0f, IdleLook.yawTo(EYE, new Vec3(0, 64, 5)),
-            0.01, "south target must read yaw 0");
+        assertEquals(-90f, IdleLook.yawTo(EYE, new Vec3(5, 64, 0)), 0.01, "east target must read yaw -90");
+        assertEquals(0f, IdleLook.yawTo(EYE, new Vec3(0, 64, 5)), 0.01, "south target must read yaw 0");
     }
 
     /**
@@ -104,25 +101,26 @@ class IdleLookGateTest {
      */
     @Test
     void turnTowardYawCapsPerTickAndWraps() {
-        assertEquals(40f, IdleLook.turnTowardYaw(42f, 40f), 1e-4,
-            "a 2-degree correction completes in one tick");
-        assertEquals(15f, IdleLook.turnTowardYaw(0f, 90f), 1e-4,
-            "a 90-degree address advances exactly the cap");
-        assertEquals(-175f, IdleLook.turnTowardYaw(170f, -170f), 1e-4,
-            "20 degrees across the seam: +15 through 180, normalized");
-        assertEquals(-155f, IdleLook.turnTowardYaw(-170f, 10f), 1e-4,
-            "exact-180 tie takes the +cap; -170 + 15 = -155");
+        assertEquals(40f, IdleLook.turnTowardYaw(42f, 40f), 1e-4, "a 2-degree correction completes in one tick");
+        assertEquals(15f, IdleLook.turnTowardYaw(0f, 90f), 1e-4, "a 90-degree address advances exactly the cap");
+        assertEquals(
+                -175f,
+                IdleLook.turnTowardYaw(170f, -170f),
+                1e-4,
+                "20 degrees across the seam: +15 through 180, normalized");
+        assertEquals(-155f, IdleLook.turnTowardYaw(-170f, 10f), 1e-4, "exact-180 tie takes the +cap; -170 + 15 = -155");
     }
 
     /** Pitch turn cap mirrors yaw without wrap semantics. */
     @Test
     void turnTowardPitchCapsPerTick() {
-        assertEquals(15f, IdleLook.turnTowardPitch(0f, 40f), 1e-4,
-            "pitch advances at most the cap per tick");
-        assertEquals(5f, IdleLook.turnTowardPitch(0f, 5f), 1e-4,
-            "small pitch corrections complete in one tick");
-        assertEquals(-20f, IdleLook.turnTowardPitch(-5f, -30f), 1e-4,
-            "a 25-degree downward correction advances one cap of -15");
+        assertEquals(15f, IdleLook.turnTowardPitch(0f, 40f), 1e-4, "pitch advances at most the cap per tick");
+        assertEquals(5f, IdleLook.turnTowardPitch(0f, 5f), 1e-4, "small pitch corrections complete in one tick");
+        assertEquals(
+                -20f,
+                IdleLook.turnTowardPitch(-5f, -30f),
+                1e-4,
+                "a 25-degree downward correction advances one cap of -15");
     }
 
     /**
@@ -132,9 +130,7 @@ class IdleLookGateTest {
      */
     @Test
     void sweepDefaultsPinned() {
-        assertEquals(100, IdleLook.SWEEP_INTERVAL_TICKS,
-            "sweep direction flips every 100 idle ticks (~5 s)");
-        assertEquals(60f, IdleLook.SWEEP_AMPLITUDE_DEG, 1e-6,
-            "sweep glances reach 60 degrees off the idle base yaw");
+        assertEquals(100, IdleLook.SWEEP_INTERVAL_TICKS, "sweep direction flips every 100 idle ticks (~5 s)");
+        assertEquals(60f, IdleLook.SWEEP_AMPLITUDE_DEG, 1e-6, "sweep glances reach 60 degrees off the idle base yaw");
     }
 }

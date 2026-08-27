@@ -17,11 +17,8 @@ import com.mcbot.mcbotserver.core.pathing.AStarPathFinder;
 import com.mcbot.mcbotserver.core.pathing.MoveGraph;
 import com.mcbot.mcbotserver.core.pathing.PlanSmoother;
 import com.mcbot.mcbotserver.core.pathing.PlanWorker;
-
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 /**
  * Waypoint follower over the A* move graph: plans through the finder,
@@ -188,8 +185,7 @@ public final class PathingBehavior implements Behavior {
     private final WaypointCursor cursor = new WaypointCursor();
     private final PlanProgressFuse fuse = new PlanProgressFuse();
     private final ReplanGate gate = new ReplanGate();
-    private final NoPathEscalator noPath =
-        new NoPathEscalator(AStarPathFinder.DEFAULT_NODE_BUDGET);
+    private final NoPathEscalator noPath = new NoPathEscalator(AStarPathFinder.DEFAULT_NODE_BUDGET);
     private int ticksSinceAdoption;
     private Goal lastGoal;
     private int departHoldTicks;
@@ -226,8 +222,7 @@ public final class PathingBehavior implements Behavior {
      * @param positionSource body position accessor; never null
      * @param graph      edge supplier for planning; never null
      */
-    public PathingBehavior(String name, BodyPositionSource positionSource,
-                           MoveGraph graph) {
+    public PathingBehavior(String name, BodyPositionSource positionSource, MoveGraph graph) {
         this(name, positionSource, () -> true, graph, null);
     }
 
@@ -243,8 +238,7 @@ public final class PathingBehavior implements Behavior {
      * @param graph      edge supplier for planning; never null
      * @param worker     search executor; never null
      */
-    public PathingBehavior(String name, BodyPositionSource positionSource,
-                           MoveGraph graph, PlanWorker worker) {
+    public PathingBehavior(String name, BodyPositionSource positionSource, MoveGraph graph, PlanWorker worker) {
         this(name, positionSource, () -> true, graph, worker);
     }
 
@@ -260,9 +254,8 @@ public final class PathingBehavior implements Behavior {
      * @param onGroundSource  body contact-state accessor; never null
      * @param graph           edge supplier for planning; never null
      */
-    public PathingBehavior(String name, BodyPositionSource positionSource,
-                           OnGroundSource onGroundSource,
-                           MoveGraph graph) {
+    public PathingBehavior(
+            String name, BodyPositionSource positionSource, OnGroundSource onGroundSource, MoveGraph graph) {
         this(name, positionSource, onGroundSource, graph, null);
     }
 
@@ -280,9 +273,12 @@ public final class PathingBehavior implements Behavior {
      * @param graph           edge supplier for planning; never null
      * @param worker          search executor; never null
      */
-    public PathingBehavior(String name, BodyPositionSource positionSource,
-                           OnGroundSource onGroundSource,
-                           MoveGraph graph, PlanWorker worker) {
+    public PathingBehavior(
+            String name,
+            BodyPositionSource positionSource,
+            OnGroundSource onGroundSource,
+            MoveGraph graph,
+            PlanWorker worker) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("name must not be blank");
         }
@@ -301,8 +297,7 @@ public final class PathingBehavior implements Behavior {
     }
 
     @Override
-    public ExecutionReport tick(WorldView world, Directive directive,
-                                Actor actor) {
+    public ExecutionReport tick(WorldView world, Directive directive, Actor actor) {
         if (directive == null) {
             lastGoal = null;
             departHoldTicks = 0;
@@ -344,16 +339,14 @@ public final class PathingBehavior implements Behavior {
         // ground tick immediately has a usable plan), and the
         // freshness check is the cell-based guard regardless of
         // ground state.
-        applyAdoption(lifecycle.adoptIfReady(directive.goal(), cell),
-            world, directive.goal());
+        applyAdoption(lifecycle.adoptIfReady(directive.goal(), cell), world, directive.goal());
         if (noPath.tripped()) {
             resetPlan();
             return ExecutionReport.failed("NO_PATH");
         }
 
         if (evaluateTriggers) {
-            ExecutionReport verdict = triggerVerdict(world,
-                directive.goal(), position, cell, window);
+            ExecutionReport verdict = triggerVerdict(world, directive.goal(), position, cell, window);
             if (verdict != null) {
                 return verdict;
             }
@@ -400,9 +393,8 @@ public final class PathingBehavior implements Behavior {
      *         once between replan cooldowns); null when the tick
      *         should proceed to cursor advance
      */
-    private ExecutionReport triggerVerdict(WorldView world, Goal goal,
-                                           Vec3 position, CellPos cell,
-                                           ReplanGate.TickWindow window) {
+    private ExecutionReport triggerVerdict(
+            WorldView world, Goal goal, Vec3 position, CellPos cell, ReplanGate.TickWindow window) {
         // Plan-progress score (ledger 20, Path A).
         // Three OR criteria; any one counts as progress and
         // resets the accumulator. External replan (exhaustion,
@@ -421,8 +413,7 @@ public final class PathingBehavior implements Behavior {
 
         boolean fuseCondition = fuse.shouldFire();
         boolean offPath = !cursor.exhausted()
-            && distanceToSegment(position, cursor.previous(),
-                cursor.current()) > REPLAN_DISTANCE;
+                && distanceToSegment(position, cursor.previous(), cursor.current()) > REPLAN_DISTANCE;
         boolean exhausted = cursor.exhausted();
 
         // Replan cooldown bypassed on the landing edge: contact
@@ -430,11 +421,9 @@ public final class PathingBehavior implements Behavior {
         // pathing, and a stale plan from before take-off must
         // be replaced immediately rather than after the
         // cooldown elapses.
-        if ((fuseCondition || offPath || exhausted)
-            && gate.mayRequest(window)) {
+        if ((fuseCondition || offPath || exhausted) && gate.mayRequest(window)) {
             gate.onRequest();
-            applyAdoption(lifecycle.request(world, cell, goal,
-                noPath.nextNodeBudget()), world, goal);
+            applyAdoption(lifecycle.request(world, cell, goal, noPath.nextNodeBudget()), world, goal);
             if (noPath.tripped()) {
                 resetPlan();
                 return ExecutionReport.failed("NO_PATH");
@@ -466,8 +455,7 @@ public final class PathingBehavior implements Behavior {
             // claims flowing; movement or a later successful
             // plan clears the latch.
             fuse.latch();
-            return ExecutionReport.stuck(
-                "frozen between replan cooldowns");
+            return ExecutionReport.stuck("frozen between replan cooldowns");
         }
         return null;
     }
@@ -484,8 +472,7 @@ public final class PathingBehavior implements Behavior {
      * @param world    read-only perception for smoothing; never null
      * @param goal     the goal the adoption answers; never null
      */
-    private void applyAdoption(PlanLifecycle.Adoption adoption,
-                               WorldView world, Goal goal) {
+    private void applyAdoption(PlanLifecycle.Adoption adoption, WorldView world, Goal goal) {
         switch (adoption.outcome()) {
             case ADOPTED -> {
                 // Skip index 0: it is the cell we are standing in.
@@ -493,8 +480,7 @@ public final class PathingBehavior implements Behavior {
                 // adoption paths (sync and worker) get the simplified
                 // chain, and the corridor checks read the CURRENT
                 // world, not the search snapshot.
-                cursor.set(PlanSmoother.smooth(world,
-                    adoption.plan()));
+                cursor.set(PlanSmoother.smooth(world, adoption.plan()));
                 ticksSinceAdoption = 0;
                 fuse.onAdopted(cursor.index());
                 // Complete routes retire the unreachability ledger;
@@ -515,7 +501,7 @@ public final class PathingBehavior implements Behavior {
                 // asking would be a lie.
                 gate.primeLadder();
             }
-            case NOT_READY -> { }
+            case NOT_READY -> {}
         }
     }
 
@@ -547,10 +533,8 @@ public final class PathingBehavior implements Behavior {
      * @return a fresh {@code LinkedHashMap} of attribute strings;
      *         never null
      */
-    public Map<String, String> keepaliveAttrs(
-        Vec3 position, CellPos goalCell) {
-        Map<String, String> attrs =
-            new LinkedHashMap<>();
+    public Map<String, String> keepaliveAttrs(Vec3 position, CellPos goalCell) {
+        Map<String, String> attrs = new LinkedHashMap<>();
         attrs.put("pose", position.x() + "," + position.y() + "," + position.z());
         attrs.put("waypointIndex", String.valueOf(cursor.index()));
         attrs.put("waypointsTotal", String.valueOf(cursor.size()));
@@ -560,19 +544,16 @@ public final class PathingBehavior implements Behavior {
         // The key name change is intentional and the S-F
         // verifier-side impact is "ignore unknown attrs" (issue
         // 0001 §7 fix-2 contract).
-        attrs.put("ticksSincePlanProgress",
-            String.valueOf(fuse.ticksWithoutProgress()));
+        attrs.put("ticksSincePlanProgress", String.valueOf(fuse.ticksWithoutProgress()));
         attrs.put("ticksSincePlan", String.valueOf(gate.ticksSinceRequest()));
         attrs.put("planAge", String.valueOf(ticksSinceAdoption));
         // Unreachability evidence: how many consecutive partial
         // adoptions stopped approaching the goal (NoPathEscalator).
         // WITNESS_LIMIT of these precede a NO_PATH verdict - a
         // harness watching a crawl can see the verdict coming.
-        attrs.put("noPathWitnesses",
-            String.valueOf(noPath.witnesses()));
+        attrs.put("noPathWitnesses", String.valueOf(noPath.witnesses()));
         if (goalCell != null) {
-            attrs.put("goalCell",
-                goalCell.x() + "," + goalCell.y() + "," + goalCell.z());
+            attrs.put("goalCell", goalCell.x() + "," + goalCell.y() + "," + goalCell.z());
         }
         return attrs;
     }
@@ -591,19 +572,15 @@ public final class PathingBehavior implements Behavior {
      * @param to       the segment's far end; never null
      * @return non-negative distance in metres
      */
-    private static double distanceToSegment(Vec3 position, CellPos from,
-                                            CellPos to) {
+    private static double distanceToSegment(Vec3 position, CellPos from, CellPos to) {
         double ax = from.x() + 0.5;
         double az = from.z() + 0.5;
         double abx = to.x() + 0.5 - ax;
         double abz = to.z() + 0.5 - az;
         double lenSq = abx * abx + abz * abz;
-        double t = lenSq == 0 ? 0
-            : ((position.x() - ax) * abx + (position.z() - az) * abz)
-                / lenSq;
+        double t = lenSq == 0 ? 0 : ((position.x() - ax) * abx + (position.z() - az) * abz) / lenSq;
         t = Math.max(0, Math.min(1, t));
-        return Math.hypot(position.x() - (ax + abx * t),
-            position.z() - (az + abz * t));
+        return Math.hypot(position.x() - (ax + abx * t), position.z() - (az + abz * t));
     }
 
     private void steerTowardCurrentWaypoint(Vec3 position, Actor actor) {
@@ -623,14 +600,10 @@ public final class PathingBehavior implements Behavior {
         // terminal waypoint closes, floored at ARRIVE_MIN_DRIVE so
         // the body always creeps into the goal predicate.
         CellPos end = cursor.last();
-        double endDist = Math.hypot(end.x() + 0.5 - position.x(),
-            end.z() + 0.5 - position.z());
-        double forward = Math.min(1.0,
-            Math.max(ARRIVE_MIN_DRIVE, endDist / BRAKE_DISTANCE));
-        actor.submit(new Claim(Channel.MOVE, 10, name,
-            new Intent.Move(forward, 0, jumpForWaypoint, false)));
-        actor.submit(new Claim(Channel.ROT, 10, name,
-            new Intent.Look(yaw, steerPitch(position, wp))));
+        double endDist = Math.hypot(end.x() + 0.5 - position.x(), end.z() + 0.5 - position.z());
+        double forward = Math.min(1.0, Math.max(ARRIVE_MIN_DRIVE, endDist / BRAKE_DISTANCE));
+        actor.submit(new Claim(Channel.MOVE, 10, name, new Intent.Move(forward, 0, jumpForWaypoint, false)));
+        actor.submit(new Claim(Channel.ROT, 10, name, new Intent.Look(yaw, steerPitch(position, wp))));
     }
 
     /**
@@ -650,16 +623,14 @@ public final class PathingBehavior implements Behavior {
      */
     static float steerPitch(Vec3 position, CellPos wp) {
         double dy = wp.y() - position.y();
-        double horizontal = Math.hypot(wp.x() + 0.5 - position.x(),
-            wp.z() + 0.5 - position.z());
+        double horizontal = Math.hypot(wp.x() + 0.5 - position.x(), wp.z() + 0.5 - position.z());
         float pitch = (float) -Math.toDegrees(Math.atan2(dy, horizontal));
-        return Math.max(-STEER_PITCH_LIMIT_DEG,
-            Math.min(STEER_PITCH_LIMIT_DEG, pitch));
+        return Math.max(-STEER_PITCH_LIMIT_DEG, Math.min(STEER_PITCH_LIMIT_DEG, pitch));
     }
 
     static CellPos floorOf(Vec3 position) {
-        return new CellPos((int) Math.floor(position.x()),
-            (int) Math.floor(position.y()), (int) Math.floor(position.z()));
+        return new CellPos(
+                (int) Math.floor(position.x()), (int) Math.floor(position.y()), (int) Math.floor(position.z()));
     }
 
     /**
@@ -676,7 +647,6 @@ public final class PathingBehavior implements Behavior {
         if (goal instanceof GoalNear n) {
             return n.center();
         }
-        throw new IllegalStateException(
-            "unhandled goal variant: " + goal.getClass());
+        throw new IllegalStateException("unhandled goal variant: " + goal.getClass());
     }
 }

@@ -1,5 +1,9 @@
 package com.mcbot.mcbotserver.hygiene;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.mcbot.mcbotserver.testsupport.RepoRoot;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -8,13 +12,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Stream;
-
 import org.junit.jupiter.api.Test;
-
-import com.mcbot.mcbotserver.testsupport.RepoRoot;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Offline gate over the reflection one-door rule: scans the test
@@ -43,8 +41,8 @@ class ReflectionDoorCheck {
      * would self-match). Paths are package-relative under
      * src/test/java. */
     private static final Set<String> SKIPPED = Set.of(
-        "com/mcbot/mcbotserver/core/tick/PathingTestAccess.java",
-        "com/mcbot/mcbotserver/hygiene/ReflectionDoorCheck.java");
+            "com/mcbot/mcbotserver/core/tick/PathingTestAccess.java",
+            "com/mcbot/mcbotserver/hygiene/ReflectionDoorCheck.java");
 
     /** Each pattern marks a reflection entry point; any hit outside
      * {@link #SKIPPED} is a violation. */
@@ -57,36 +55,35 @@ class ReflectionDoorCheck {
      * the door uses reflection. */
     @Test
     void reflectionExistsOnlyBehindTheDoor() throws IOException {
-        Path testRoot = RepoRoot.find().resolve(
-            Path.of("src", "test", "java"));
+        Path testRoot = RepoRoot.find().resolve(Path.of("src", "test", "java"));
         List<String> violations = new ArrayList<>();
         Set<String> seen = new TreeSet<>();
         try (Stream<Path> paths = Files.walk(testRoot)) {
-            paths.filter(p -> p.toString().endsWith(".java"))
-                .forEach(p -> scanFile(p, testRoot, violations, seen));
+            paths.filter(p -> p.toString().endsWith(".java")).forEach(p -> scanFile(p, testRoot, violations, seen));
         }
         // Non-vacuity pin: the door itself must be among the
         // scanned files, or this gate is scanning the wrong tree
         // and its green means nothing.
-        assertTrue(seen.containsAll(SKIPPED),
-            "scan did not see the expected files under " + testRoot
-                + " - seen " + seen.size() + " files; is the walk "
-                + "pointed at the right tree?");
-        assertEquals(List.of(), violations,
-            "test-side reflection outside PathingTestAccess"
-                + " (code-health.md H-R1):\n"
-                + String.join("\n", violations)
-                + "\nCollaborator-level logic: move the test"
-                + " same-package (core.behavior) and call the"
-                + " package-private member directly - a moved class"
-                + " must be a compile error. Integration mid-drive"
-                + " state: route through PathingTestAccess.");
+        assertTrue(
+                seen.containsAll(SKIPPED),
+                "scan did not see the expected files under " + testRoot
+                        + " - seen " + seen.size() + " files; is the walk "
+                        + "pointed at the right tree?");
+        assertEquals(
+                List.of(),
+                violations,
+                "test-side reflection outside PathingTestAccess"
+                        + " (code-health.md H-R1):\n"
+                        + String.join("\n", violations)
+                        + "\nCollaborator-level logic: move the test"
+                        + " same-package (core.behavior) and call the"
+                        + " package-private member directly - a moved class"
+                        + " must be a compile error. Integration mid-drive"
+                        + " state: route through PathingTestAccess.");
     }
 
-    private void scanFile(Path file, Path testRoot,
-                          List<String> violations, Set<String> seen) {
-        String relative = testRoot.relativize(file).toString()
-            .replace('\\', '/');
+    private void scanFile(Path file, Path testRoot, List<String> violations, Set<String> seen) {
+        String relative = testRoot.relativize(file).toString().replace('\\', '/');
         seen.add(relative);
         if (SKIPPED.contains(relative)) {
             return;
@@ -101,8 +98,7 @@ class ReflectionDoorCheck {
         for (int i = 0; i < lines.size(); i++) {
             for (String pattern : PATTERNS) {
                 if (lines.get(i).contains(pattern)) {
-                    violations.add(relative + ":" + (i + 1) + ": "
-                        + pattern + " outside the door");
+                    violations.add(relative + ":" + (i + 1) + ": " + pattern + " outside the door");
                 }
             }
         }

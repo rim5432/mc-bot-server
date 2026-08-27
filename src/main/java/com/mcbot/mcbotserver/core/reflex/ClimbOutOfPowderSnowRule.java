@@ -66,12 +66,10 @@ public final class ClimbOutOfPowderSnowRule implements ReflexRule {
      */
     public ClimbOutOfPowderSnowRule(int trigger, int priority) {
         if (trigger < 1 || trigger >= 140) {
-            throw new IllegalArgumentException(
-                "trigger must be in [1, 139]");
+            throw new IllegalArgumentException("trigger must be in [1, 139]");
         }
         if (priority <= 0) {
-            throw new IllegalArgumentException(
-                "priority must be positive");
+            throw new IllegalArgumentException("priority must be positive");
         }
         this.trigger = trigger;
         this.priority = priority;

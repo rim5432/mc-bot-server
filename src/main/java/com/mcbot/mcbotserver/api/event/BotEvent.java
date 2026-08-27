@@ -21,13 +21,7 @@ import java.util.Map;
  * @param text   human-readable rendering for logging and fallback
  *               display; never null, possibly blank for pure-attr events
  */
-public record BotEvent(
-    String kind,
-    long day,
-    long t,
-    boolean urgent,
-    Map<String, String> attrs,
-    String text) {
+public record BotEvent(String kind, long day, long t, boolean urgent, Map<String, String> attrs, String text) {
 
     /**
      * Creates a validated event envelope.
@@ -44,12 +38,10 @@ public record BotEvent(
             throw new IllegalArgumentException("kind must not be blank");
         }
         if (day < 0) {
-            throw new IllegalArgumentException(
-                "day must not be negative");
+            throw new IllegalArgumentException("day must not be negative");
         }
         if (t < 0 || t > 23999) {
-            throw new IllegalArgumentException(
-                "t must be in 0..23999, got " + t);
+            throw new IllegalArgumentException("t must be in 0..23999, got " + t);
         }
         attrs = Map.copyOf(attrs);
         if (text == null) {

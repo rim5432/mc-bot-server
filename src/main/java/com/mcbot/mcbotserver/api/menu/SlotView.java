@@ -34,8 +34,7 @@ public record SlotView(int index, ItemView item, SlotRole role) {
      */
     public SlotView {
         if (index < 0) {
-            throw new IllegalArgumentException(
-                "slot index must not be negative, got " + index);
+            throw new IllegalArgumentException("slot index must not be negative, got " + index);
         }
         if (item == null) {
             throw new IllegalArgumentException("slot item must not be null");

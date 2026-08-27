@@ -3,7 +3,6 @@ package com.mcbot.mcbotserver.adapter;
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
 import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.types.Direction;
-
 import net.minecraft.core.BlockPos;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
@@ -77,20 +76,18 @@ public final class InteractBlockExecutor {
      * @param claim the winning InteractBlock claim; never null
      */
     public void place(Intent.InteractBlock claim) {
-        BlockPos target = new BlockPos(claim.target().x(),
-            claim.target().y(), claim.target().z());
+        BlockPos target = new BlockPos(
+                claim.target().x(), claim.target().y(), claim.target().z());
         if (!ReachPolicy.withinReach(body.getEyePosition(), target)) {
             return;
         }
-        ItemStack held = body.getInventory().container()
-            .getItem(body.selectedSlot);
+        ItemStack held = body.getInventory().container().getItem(body.selectedSlot);
         if (!(held.getItem() instanceof BlockItem blockItem)) {
             // Selected item is not a placeable block — silent no-op,
             // same as a player right-clicking air with a sword.
             return;
         }
-        BlockPos placePos = target.relative(
-            toMinecraft(claim.face()));
+        BlockPos placePos = target.relative(toMinecraft(claim.face()));
         BlockState existing = body.level().getBlockState(placePos);
         // Phase 1: only place into air. Replaceable blocks (water, tall
         // grass) need a PlaceContext for the canBeReplaced check; that
@@ -106,8 +103,7 @@ public final class InteractBlockExecutor {
         if (!state.canSurvive(body.level(), placePos)) {
             return;
         }
-        if (!body.level().isUnobstructed(state, placePos,
-                CollisionContext.empty())) {
+        if (!body.level().isUnobstructed(state, placePos, CollisionContext.empty())) {
             return;
         }
         // Flag 3 = UPDATE (1) | notify clients (2). Standard placement
@@ -130,10 +126,14 @@ public final class InteractBlockExecutor {
      */
     private void playPlaceSound(BlockPos pos, BlockState state) {
         SoundType sound = state.getSoundType();
-        body.level().playSound(null, pos, sound.getPlaceSound(),
-            SoundSource.BLOCKS,
-            (sound.getVolume() + 1.0f) / 2.0f,
-            sound.getPitch() * 0.8f);
+        body.level()
+                .playSound(
+                        null,
+                        pos,
+                        sound.getPlaceSound(),
+                        SoundSource.BLOCKS,
+                        (sound.getVolume() + 1.0f) / 2.0f,
+                        sound.getPitch() * 0.8f);
     }
 
     /**

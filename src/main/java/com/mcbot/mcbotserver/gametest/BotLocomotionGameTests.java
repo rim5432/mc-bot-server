@@ -1,19 +1,5 @@
 package com.mcbot.mcbotserver.gametest;
 
-import com.mcbot.mcbotserver.McBotServer;
-import com.mcbot.mcbotserver.api.event.EventKind;
-import com.mcbot.mcbotserver.api.types.CellPos;
-
-import net.minecraft.core.BlockPos;
-import net.minecraft.gametest.framework.GameTest;
-import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.effect.MobEffects;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.gametest.GameTestHolder;
-import net.minecraftforge.gametest.PrefixGameTestTemplate;
-
 import static com.mcbot.mcbotserver.gametest.GametestRig.assertEventSeen;
 import static com.mcbot.mcbotserver.gametest.GametestRig.check;
 import static com.mcbot.mcbotserver.gametest.GametestRig.checkEquals;
@@ -24,6 +10,19 @@ import static com.mcbot.mcbotserver.gametest.GametestRig.positionOf;
 import static com.mcbot.mcbotserver.gametest.GametestRig.reached;
 import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
 import static com.mcbot.mcbotserver.gametest.GametestRig.submitGoto;
+
+import com.mcbot.mcbotserver.McBotServer;
+import com.mcbot.mcbotserver.api.event.EventKind;
+import com.mcbot.mcbotserver.api.types.CellPos;
+import net.minecraft.core.BlockPos;
+import net.minecraft.gametest.framework.GameTest;
+import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.gametest.GameTestHolder;
+import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
 /**
  * Locomotion and goto-pipeline acceptance, in-engine: flat walks,
@@ -45,8 +44,7 @@ import static com.mcbot.mcbotserver.gametest.GametestRig.submitGoto;
 @PrefixGameTestTemplate(false)
 public final class BotLocomotionGameTests {
 
-    private BotLocomotionGameTests() {
-    }
+    private BotLocomotionGameTests() {}
 
     /**
      * Scenario 1: walks to a block on flat ground and reports success.
@@ -54,23 +52,19 @@ public final class BotLocomotionGameTests {
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void walksToBlock(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
-        CellPos goalCell = localToCell(helper,
-            new BlockPos(12, GametestRig.WALK_Y, 8));
+        CellPos goalCell = localToCell(helper, new BlockPos(12, GametestRig.WALK_Y, 8));
         var mission = submitGoto(rig, goalCell);
 
         helper.startSequence()
-            .thenWaitUntil(driveUntil(rig,
-                () -> check(reached(rig.body(), goalCell),
-                    "waiting for arrival")))
-            .thenExecuteFor(3, driveOnly(rig))
-            .thenExecuteAfter(0, () -> {
-                check(!mission.isActive(),
-                    "mission must retire after arrival");
-                check(mission.missionSucceeded(), "must be a success");
-                assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
-                rig.body().discard();
-            })
-            .thenSucceed();
+                .thenWaitUntil(driveUntil(rig, () -> check(reached(rig.body(), goalCell), "waiting for arrival")))
+                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    check(!mission.isActive(), "mission must retire after arrival");
+                    check(mission.missionSucceeded(), "must be a success");
+                    assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
+                    rig.body().discard();
+                })
+                .thenSucceed();
     }
 
     /**
@@ -102,28 +96,23 @@ public final class BotLocomotionGameTests {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
         for (int x = 6; x <= 8; x++) {
             for (int z = 0; z < 16; z++) {
-                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y, z),
-                    Blocks.WATER);
+                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y, z), Blocks.WATER);
             }
         }
-        CellPos goalCell = localToCell(helper,
-            new BlockPos(12, GametestRig.WALK_Y, 8));
+        CellPos goalCell = localToCell(helper, new BlockPos(12, GametestRig.WALK_Y, 8));
         var mission = submitGoto(rig, goalCell);
 
         helper.startSequence()
-            .thenWaitUntil(driveUntil(rig,
-                () -> check(reached(rig.body(), goalCell),
-                    "waiting for arrival across the trench")))
-            .thenExecuteFor(3, driveOnly(rig))
-            .thenExecuteAfter(0, () -> {
-                check(!mission.isActive(),
-                    "mission must retire after crossing");
-                check(mission.missionSucceeded(),
-                    "crossing must be a success");
-                assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
-                rig.body().discard();
-            })
-            .thenSucceed();
+                .thenWaitUntil(driveUntil(
+                        rig, () -> check(reached(rig.body(), goalCell), "waiting for arrival across the trench")))
+                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    check(!mission.isActive(), "mission must retire after crossing");
+                    check(mission.missionSucceeded(), "crossing must be a success");
+                    assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
+                    rig.body().discard();
+                })
+                .thenSucceed();
     }
 
     /**
@@ -147,38 +136,26 @@ public final class BotLocomotionGameTests {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
         for (int x = 6; x <= 8; x++) {
             for (int z = 0; z < 16; z++) {
-                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y, z),
-                    Blocks.WATER);
-                helper.setBlock(
-                    new BlockPos(x, GametestRig.FLOOR_Y - 1, z),
-                    Blocks.WATER);
-                helper.setBlock(
-                    new BlockPos(x, GametestRig.FLOOR_Y - 2, z),
-                    Blocks.WATER);
-                helper.setBlock(
-                    new BlockPos(x, GametestRig.FLOOR_Y - 3, z),
-                    Blocks.SMOOTH_STONE);
+                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y, z), Blocks.WATER);
+                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y - 1, z), Blocks.WATER);
+                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y - 2, z), Blocks.WATER);
+                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y - 3, z), Blocks.SMOOTH_STONE);
             }
         }
-        CellPos goalCell = localToCell(helper,
-            new BlockPos(12, GametestRig.WALK_Y, 8));
-        var mission = submitGoto(rig, goalCell,
-            GametestRig.MISSION_BUDGET + 150);
+        CellPos goalCell = localToCell(helper, new BlockPos(12, GametestRig.WALK_Y, 8));
+        var mission = submitGoto(rig, goalCell, GametestRig.MISSION_BUDGET + 150);
 
         helper.startSequence()
-            .thenWaitUntil(driveUntil(rig,
-                () -> check(reached(rig.body(), goalCell),
-                    "waiting for arrival across the deep pool")))
-            .thenExecuteFor(3, driveOnly(rig))
-            .thenExecuteAfter(0, () -> {
-                check(!mission.isActive(),
-                    "mission must retire after crossing");
-                check(mission.missionSucceeded(),
-                    "crossing must be a success");
-                assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
-                rig.body().discard();
-            })
-            .thenSucceed();
+                .thenWaitUntil(driveUntil(
+                        rig, () -> check(reached(rig.body(), goalCell), "waiting for arrival across the deep pool")))
+                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    check(!mission.isActive(), "mission must retire after crossing");
+                    check(mission.missionSucceeded(), "crossing must be a success");
+                    assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
+                    rig.body().discard();
+                })
+                .thenSucceed();
     }
 
     /**
@@ -193,8 +170,7 @@ public final class BotLocomotionGameTests {
     public static void recoversWhenShoved(GameTestHelper helper) {
         BlockPos start = new BlockPos(3, GametestRig.WALK_Y, 8);
         var rig = rig(helper, start);
-        CellPos goalCell = localToCell(helper,
-            new BlockPos(13, GametestRig.WALK_Y, 8));
+        CellPos goalCell = localToCell(helper, new BlockPos(13, GametestRig.WALK_Y, 8));
         var mission = submitGoto(rig, goalCell);
         int startAbsX = helper.absolutePos(start).getX();
 
@@ -206,57 +182,53 @@ public final class BotLocomotionGameTests {
         double[] zAtShove = {0.0};
 
         helper.startSequence()
-            .thenWaitUntil(driveUntil(rig,
-                () -> check(rig.body().getBlockX()
-                    - startAbsX >= 4,
-                    "waiting to pass mid-point")))
-            .thenExecute(() -> {
-                // Knock the body LATERALLY off the plan line. Since
-                // the ledger-20 follow-through (issue 0005 P1.2),
-                // drift is measured against the WALKED SEGMENT, not
-                // the current waypoint: an axial shove stays on the
-                // segment forever, so branch 1 now requires lateral
-                // departure. The stale drive from the last pipeline
-                // tick is neutralized first - the fields persist
-                // through the no-op window below, and a stale +X
-                // drive (sprint-amplified since P1.1) would fight
-                // the impulse and muddy the displacement reading.
-                zAtShove[0] = rig.body().getZ();
-                rig.body().setDrive(0f, 0f, false);
-                rig.body().setSprinting(false);
-                rig.body().setDeltaMovement(new Vec3(
-                    0.0, 0.0, -1.8));
-            })
-            .thenExecuteFor(5, () -> {
-                // 5 vanilla physics ticks without pipeline
-                // intervention - MC integrates the impulse.
-            })
-            .thenExecute(() -> {
-                // Sanity: lateral displacement must exceed the
-                // 3.5-cell floor (REPLAN_DISTANCE + friction margin)
-                // so the test stays in branch 1 (offPath fires on
-                // departure from the walked segment), not branch 2
-                // where offPath would NOT fire and the test silently
-                // regresses to limbo.
-                double dz = zAtShove[0] - rig.body().getZ();
-                check(dz > 3.5,
-                    "shove must displace the body > 3.5 cells in -Z "
-                    + "so the test stays in branch 1 (offPath fires), "
-                    + "not branch 2 (silent limbo). Got dz=" + dz
-                    + " - if friction or impulse changed, retune "
-                    + "the impulse or extend the vanilla-tick window; "
-                    + "do not relax the 3.5 margin silently.");
-            })
-            .thenWaitUntil(driveUntil(rig,
-                () -> check(reached(rig.body(), goalCell),
-                    "still re-walking after the shove")))
-            .thenExecuteFor(3, driveOnly(rig))
-            .thenExecuteAfter(0, () -> {
-                checkEquals(goalCell, positionOf(rig.body()),
-                    "must still arrive after the shove");
-                rig.body().discard();
-            })
-            .thenSucceed();
+                .thenWaitUntil(driveUntil(
+                        rig, () -> check(rig.body().getBlockX() - startAbsX >= 4, "waiting to pass mid-point")))
+                .thenExecute(() -> {
+                    // Knock the body LATERALLY off the plan line. Since
+                    // the ledger-20 follow-through (issue 0005 P1.2),
+                    // drift is measured against the WALKED SEGMENT, not
+                    // the current waypoint: an axial shove stays on the
+                    // segment forever, so branch 1 now requires lateral
+                    // departure. The stale drive from the last pipeline
+                    // tick is neutralized first - the fields persist
+                    // through the no-op window below, and a stale +X
+                    // drive (sprint-amplified since P1.1) would fight
+                    // the impulse and muddy the displacement reading.
+                    zAtShove[0] = rig.body().getZ();
+                    rig.body().setDrive(0f, 0f, false);
+                    rig.body().setSprinting(false);
+                    rig.body().setDeltaMovement(new Vec3(0.0, 0.0, -1.8));
+                })
+                .thenExecuteFor(5, () -> {
+                    // 5 vanilla physics ticks without pipeline
+                    // intervention - MC integrates the impulse.
+                })
+                .thenExecute(() -> {
+                    // Sanity: lateral displacement must exceed the
+                    // 3.5-cell floor (REPLAN_DISTANCE + friction margin)
+                    // so the test stays in branch 1 (offPath fires on
+                    // departure from the walked segment), not branch 2
+                    // where offPath would NOT fire and the test silently
+                    // regresses to limbo.
+                    double dz = zAtShove[0] - rig.body().getZ();
+                    check(
+                            dz > 3.5,
+                            "shove must displace the body > 3.5 cells in -Z "
+                                    + "so the test stays in branch 1 (offPath fires), "
+                                    + "not branch 2 (silent limbo). Got dz=" + dz
+                                    + " - if friction or impulse changed, retune "
+                                    + "the impulse or extend the vanilla-tick window; "
+                                    + "do not relax the 3.5 margin silently.");
+                })
+                .thenWaitUntil(driveUntil(
+                        rig, () -> check(reached(rig.body(), goalCell), "still re-walking after the shove")))
+                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    checkEquals(goalCell, positionOf(rig.body()), "must still arrive after the shove");
+                    rig.body().discard();
+                })
+                .thenSucceed();
     }
 
     /**
@@ -270,30 +242,32 @@ public final class BotLocomotionGameTests {
         // Floating goal five above the walk plane: no move in the
         // stage-2 vocabulary lands there (drops need support below,
         // climbs need a step chain), so the island drains to NO_PATH.
-        var mission = submitGoto(rig,
-            localToCell(helper, new BlockPos(13, GametestRig.WALK_Y + 5, 8)));
+        var mission = submitGoto(rig, localToCell(helper, new BlockPos(13, GametestRig.WALK_Y + 5, 8)));
 
         for (int x = 3; x <= 14; x++) {
             for (int y = 1; y <= 3; y++) {
-                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y + y, 7),
-                    net.minecraft.world.level.block.Blocks.SMOOTH_STONE);
-                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y + y, 9),
-                    net.minecraft.world.level.block.Blocks.SMOOTH_STONE);
+                helper.setBlock(
+                        new BlockPos(x, GametestRig.FLOOR_Y + y, 7),
+                        net.minecraft.world.level.block.Blocks.SMOOTH_STONE);
+                helper.setBlock(
+                        new BlockPos(x, GametestRig.FLOOR_Y + y, 9),
+                        net.minecraft.world.level.block.Blocks.SMOOTH_STONE);
             }
         }
 
         helper.startSequence()
-            .thenWaitUntil(driveUntil(rig, () ->
-                check(!mission.isActive(), "waiting for the failure")))
-            .thenExecuteFor(6, driveOnly(rig))
-            .thenExecute(() -> {
-                check(!mission.missionSucceeded(), "cannot succeed");
-                checkEquals("NO_PATH", mission.failureReasonOrNull(),
-                    "a walled-in goal must fail as NO_PATH at planning");
-                assertEventSeen(rig.events(), EventKind.TASK_FAILED);
-                rig.body().discard();
-            })
-            .thenSucceed();
+                .thenWaitUntil(driveUntil(rig, () -> check(!mission.isActive(), "waiting for the failure")))
+                .thenExecuteFor(6, driveOnly(rig))
+                .thenExecute(() -> {
+                    check(!mission.missionSucceeded(), "cannot succeed");
+                    checkEquals(
+                            "NO_PATH",
+                            mission.failureReasonOrNull(),
+                            "a walled-in goal must fail as NO_PATH at planning");
+                    assertEventSeen(rig.events(), EventKind.TASK_FAILED);
+                    rig.body().discard();
+                })
+                .thenSucceed();
     }
 
     /**
@@ -321,33 +295,26 @@ public final class BotLocomotionGameTests {
     @GameTest(template = "empty16x8x16", timeoutTicks = 600)
     public static void crossesLavaTrench(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
-        rig.body().addEffect(new MobEffectInstance(
-            MobEffects.FIRE_RESISTANCE, 1200, 0, false, false));
+        rig.body().addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 1200, 0, false, false));
         for (int x = 6; x <= 8; x++) {
             for (int z = 0; z < 16; z++) {
-                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y, z),
-                    Blocks.LAVA);
+                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y, z), Blocks.LAVA);
             }
         }
-        CellPos goalCell = localToCell(helper,
-            new BlockPos(12, GametestRig.WALK_Y, 8));
+        CellPos goalCell = localToCell(helper, new BlockPos(12, GametestRig.WALK_Y, 8));
         var mission = submitGoto(rig, goalCell, 500);
 
         helper.startSequence()
-            .thenWaitUntil(driveUntil(rig,
-                () -> check(reached(rig.body(), goalCell),
-                    "waiting for arrival across the lava trench")))
-            .thenExecuteFor(3, driveOnly(rig))
-            .thenExecuteAfter(0, () -> {
-                check(!mission.isActive(),
-                    "mission must retire after the lava crossing");
-                check(mission.missionSucceeded(),
-                    "crossing lava must be a success");
-                assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
-                checkEquals(20f, rig.body().getHealth(),
-                    "fire resistance must hold for the whole crossing");
-                rig.body().discard();
-            })
-            .thenSucceed();
+                .thenWaitUntil(driveUntil(
+                        rig, () -> check(reached(rig.body(), goalCell), "waiting for arrival across the lava trench")))
+                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    check(!mission.isActive(), "mission must retire after the lava crossing");
+                    check(mission.missionSucceeded(), "crossing lava must be a success");
+                    assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
+                    checkEquals(20f, rig.body().getHealth(), "fire resistance must hold for the whole crossing");
+                    rig.body().discard();
+                })
+                .thenSucceed();
     }
 }

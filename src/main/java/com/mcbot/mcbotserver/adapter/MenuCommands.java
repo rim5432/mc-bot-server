@@ -2,7 +2,6 @@ package com.mcbot.mcbotserver.adapter;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-
 import com.mcbot.mcbotserver.api.menu.CraftingView;
 import com.mcbot.mcbotserver.api.menu.MenuTransactions;
 import com.mcbot.mcbotserver.api.menu.MenuView;
@@ -62,9 +61,7 @@ public final class MenuCommands {
      * @param botPos  the bot body's block position (scan center);
      *                never null
      */
-    public record Live(MenuTransactions tx, RecipeCatalog catalog,
-                       ServerLevel level, Supplier<BlockPos> botPos) {
-    }
+    public record Live(MenuTransactions tx, RecipeCatalog catalog, ServerLevel level, Supplier<BlockPos> botPos) {}
 
     /**
      * Register the menu / scan / recipes subtrees on the dispatcher.
@@ -73,138 +70,114 @@ public final class MenuCommands {
      * @param live       menu surface accessor returning null before
      *                   the first /botspawn; never null
      */
-    public static void register(CommandDispatcher<CommandSourceStack> dispatcher,
-                                Supplier<Live> live) {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, Supplier<Live> live) {
         var menu = Commands.literal("menu")
-            .requires(src -> src.hasPermission(2))
-            .then(openBranch(live))
-            .then(Commands.literal("open-inventory")
-                .executes(ctx -> runOpenInventory(live,
-                    ctx.getSource())))
-            .then(Commands.literal("snapshot")
-                .executes(ctx -> runSnapshot(live,
-                    ctx.getSource())))
-            .then(Commands.literal("close")
-                .executes(ctx -> runClose(live,
-                    ctx.getSource())))
-            .then(depositBranch(live))
-            .then(takeBranch(live))
-            .then(craftBranch(live));
+                .requires(src -> src.hasPermission(2))
+                .then(openBranch(live))
+                .then(Commands.literal("open-inventory").executes(ctx -> runOpenInventory(live, ctx.getSource())))
+                .then(Commands.literal("snapshot").executes(ctx -> runSnapshot(live, ctx.getSource())))
+                .then(Commands.literal("close").executes(ctx -> runClose(live, ctx.getSource())))
+                .then(depositBranch(live))
+                .then(takeBranch(live))
+                .then(craftBranch(live));
         dispatcher.register(menu);
         dispatcher.register(scanBranch(live));
         dispatcher.register(Commands.literal("recipes")
-            .requires(src -> src.hasPermission(2))
-            .then(Commands.literal("list")
-                .executes(ctx -> runRecipeList(live, ctx.getSource(),
-                    0, 50))
-                .then(Commands.argument("offset",
-                            IntegerArgumentType.integer(0))
-                    .executes(ctx -> runRecipeList(live,
-                        ctx.getSource(),
-                        IntegerArgumentType.getInteger(ctx, "offset"),
-                        50))
-                    .then(Commands.argument("limit",
-                                IntegerArgumentType.integer(1, 200))
-                        .executes(ctx -> runRecipeList(live,
-                            ctx.getSource(),
-                            IntegerArgumentType.getInteger(ctx, "offset"),
-                            IntegerArgumentType.getInteger(ctx,
-                                "limit"))))))
-            .then(Commands.argument("itemId", StringArgumentType.string())
-                .executes(ctx -> runRecipes(live, ctx.getSource(),
-                    StringArgumentType.getString(ctx, "itemId")))));
+                .requires(src -> src.hasPermission(2))
+                .then(Commands.literal("list")
+                        .executes(ctx -> runRecipeList(live, ctx.getSource(), 0, 50))
+                        .then(Commands.argument("offset", IntegerArgumentType.integer(0))
+                                .executes(ctx -> runRecipeList(
+                                        live, ctx.getSource(), IntegerArgumentType.getInteger(ctx, "offset"), 50))
+                                .then(Commands.argument("limit", IntegerArgumentType.integer(1, 200))
+                                        .executes(ctx -> runRecipeList(
+                                                live,
+                                                ctx.getSource(),
+                                                IntegerArgumentType.getInteger(ctx, "offset"),
+                                                IntegerArgumentType.getInteger(ctx, "limit"))))))
+                .then(Commands.argument("itemId", StringArgumentType.string())
+                        .executes(ctx ->
+                                runRecipes(live, ctx.getSource(), StringArgumentType.getString(ctx, "itemId")))));
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> openBranch(
             Supplier<Live> live) {
         return Commands.literal("open")
-            .then(Commands.argument("x", IntegerArgumentType.integer())
-                .then(Commands.argument("y", IntegerArgumentType.integer())
-                    .then(Commands.argument("z",
-                                IntegerArgumentType.integer())
-                        .executes(ctx -> runOpen(ctx, live)))));
+                .then(Commands.argument("x", IntegerArgumentType.integer())
+                        .then(Commands.argument("y", IntegerArgumentType.integer())
+                                .then(Commands.argument("z", IntegerArgumentType.integer())
+                                        .executes(ctx -> runOpen(ctx, live)))));
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> depositBranch(
             Supplier<Live> live) {
         return Commands.literal("deposit")
-            .then(Commands.argument("slotRole", StringArgumentType.word())
-                .then(Commands.argument("item", StringArgumentType.string())
-                    .then(Commands.argument("count",
-                                IntegerArgumentType.integer(1))
-                        .executes(ctx -> runDeposit(ctx, live)))));
+                .then(Commands.argument("slotRole", StringArgumentType.word())
+                        .then(Commands.argument("item", StringArgumentType.string())
+                                .then(Commands.argument("count", IntegerArgumentType.integer(1))
+                                        .executes(ctx -> runDeposit(ctx, live)))));
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> takeBranch(
             Supplier<Live> live) {
-        var role = Commands.argument("slotRole", StringArgumentType.word())
-            .executes(ctx -> runTake(ctx, live, 0));
-        role = role.then(Commands.argument("count",
-                IntegerArgumentType.integer(1))
-            .executes(ctx -> runTake(ctx, live,
-                IntegerArgumentType.getInteger(ctx, "count"))));
+        var role = Commands.argument("slotRole", StringArgumentType.word()).executes(ctx -> runTake(ctx, live, 0));
+        role = role.then(Commands.argument("count", IntegerArgumentType.integer(1))
+                .executes(ctx -> runTake(ctx, live, IntegerArgumentType.getInteger(ctx, "count"))));
         return Commands.literal("take").then(role);
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> craftBranch(
             Supplier<Live> live) {
         return Commands.literal("craft")
-            .then(Commands.argument("recipeId",
-                        StringArgumentType.string())
-                .executes(ctx -> runCraft(ctx, live)));
+                .then(Commands.argument("recipeId", StringArgumentType.string()).executes(ctx -> runCraft(ctx, live)));
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> scanBranch(
             Supplier<Live> live) {
         var scan = Commands.literal("scan")
-            .requires(src -> src.hasPermission(2))
-            .executes(ctx -> runScan(live, ctx.getSource(), 8, 32));
-        var radius = Commands.argument("radius",
-                IntegerArgumentType.integer(0, 32))
-            .executes(ctx -> runScan(live, ctx.getSource(),
-                IntegerArgumentType.getInteger(ctx, "radius"), 32));
-        radius = radius.then(Commands.argument("limit",
-                IntegerArgumentType.integer(1, 128))
-            .executes(ctx -> runScan(live, ctx.getSource(),
-                IntegerArgumentType.getInteger(ctx, "radius"),
-                IntegerArgumentType.getInteger(ctx, "limit"))));
+                .requires(src -> src.hasPermission(2))
+                .executes(ctx -> runScan(live, ctx.getSource(), 8, 32));
+        var radius = Commands.argument("radius", IntegerArgumentType.integer(0, 32))
+                .executes(ctx -> runScan(live, ctx.getSource(), IntegerArgumentType.getInteger(ctx, "radius"), 32));
+        radius = radius.then(Commands.argument("limit", IntegerArgumentType.integer(1, 128))
+                .executes(ctx -> runScan(
+                        live,
+                        ctx.getSource(),
+                        IntegerArgumentType.getInteger(ctx, "radius"),
+                        IntegerArgumentType.getInteger(ctx, "limit"))));
         return scan.then(radius);
     }
 
-    private static int runOpen(CommandContext<CommandSourceStack> ctx,
-                               Supplier<Live> live) {
+    private static int runOpen(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
         Live l = live.get();
         if (l == null) {
             return answer(ctx.getSource(), err("no active bot"));
         }
         MenuView view = l.tx().openMenu(new CellPos(
-            IntegerArgumentType.getInteger(ctx, "x"),
-            IntegerArgumentType.getInteger(ctx, "y"),
-            IntegerArgumentType.getInteger(ctx, "z")));
+                IntegerArgumentType.getInteger(ctx, "x"),
+                IntegerArgumentType.getInteger(ctx, "y"),
+                IntegerArgumentType.getInteger(ctx, "z")));
         if (view == null) {
-            return answer(ctx.getSource(), err(
-                "open rejected: out of reach, unsupported kind, "
-                    + "missing container, or blocked"));
+            return answer(
+                    ctx.getSource(),
+                    err("open rejected: out of reach, unsupported kind, " + "missing container, or blocked"));
         }
         JsonObject root = ok();
         root.add("menu", MenuViewJson.toJsonObject(view));
         return answer(ctx.getSource(), root);
     }
 
-    private static int runOpenInventory(Supplier<Live> live,
-                                        CommandSourceStack src) {
+    private static int runOpenInventory(Supplier<Live> live, CommandSourceStack src) {
         Live l = live.get();
         if (l == null) {
             return answer(src, err("no active bot"));
         }
         JsonObject root = ok();
-        root.add("menu",
-            MenuViewJson.toJsonObject(l.tx().openInventoryMenu()));
+        root.add("menu", MenuViewJson.toJsonObject(l.tx().openInventoryMenu()));
         return answer(src, root);
     }
 
-    private static int runSnapshot(Supplier<Live> live,
-                                   CommandSourceStack src) {
+    private static int runSnapshot(Supplier<Live> live, CommandSourceStack src) {
         Live l = live.get();
         if (l == null) {
             return answer(src, err("no active bot"));
@@ -218,8 +191,7 @@ public final class MenuCommands {
         return answer(src, root);
     }
 
-    private static int runClose(Supplier<Live> live,
-                                CommandSourceStack src) {
+    private static int runClose(Supplier<Live> live, CommandSourceStack src) {
         Live l = live.get();
         if (l == null) {
             return answer(src, err("no active bot"));
@@ -230,8 +202,7 @@ public final class MenuCommands {
         return answer(src, ok());
     }
 
-    private static int runDeposit(CommandContext<CommandSourceStack> ctx,
-                                  Supplier<Live> live) {
+    private static int runDeposit(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
         Live l = live.get();
         if (l == null) {
             return answer(ctx.getSource(), err("no active bot"));
@@ -241,9 +212,7 @@ public final class MenuCommands {
         int count = IntegerArgumentType.getInteger(ctx, "count");
         SlotRole role = parseRole(roleWord);
         if (role == null) {
-            return answer(ctx.getSource(),
-                err("unknown role: " + roleWord
-                    + " (INPUT, FUEL, OUTPUT, CONTAINER)"));
+            return answer(ctx.getSource(), err("unknown role: " + roleWord + " (INPUT, FUEL, OUTPUT, CONTAINER)"));
         }
         MenuView before = l.tx().menuSnapshot();
         if (before == null) {
@@ -252,21 +221,18 @@ public final class MenuCommands {
         SlotRole resolved = resolveRole(before, role, true);
         List<MenuPlanner.Step> steps;
         try {
-            steps = MenuPlanner.planDepositCounted(before, resolved,
-                item, count);
+            steps = MenuPlanner.planDepositCounted(before, resolved, item, count);
         } catch (RuntimeException e) {
             return answer(ctx.getSource(), err(e.getMessage()));
         }
         MenuView after = executeSteps(l.tx(), steps, before);
         JsonObject root = ok();
-        root.addProperty("placed",
-            roleCount(after, resolved) - roleCount(before, resolved));
+        root.addProperty("placed", roleCount(after, resolved) - roleCount(before, resolved));
         root.add("menu", MenuViewJson.toJsonObject(after));
         return answer(ctx.getSource(), root);
     }
 
-    private static int runTake(CommandContext<CommandSourceStack> ctx,
-                               Supplier<Live> live, int count) {
+    private static int runTake(CommandContext<CommandSourceStack> ctx, Supplier<Live> live, int count) {
         Live l = live.get();
         if (l == null) {
             return answer(ctx.getSource(), err("no active bot"));
@@ -274,9 +240,7 @@ public final class MenuCommands {
         String roleWord = StringArgumentType.getString(ctx, "slotRole");
         SlotRole role = parseRole(roleWord);
         if (role == null) {
-            return answer(ctx.getSource(),
-                err("unknown role: " + roleWord
-                    + " (INPUT, FUEL, OUTPUT, CONTAINER)"));
+            return answer(ctx.getSource(), err("unknown role: " + roleWord + " (INPUT, FUEL, OUTPUT, CONTAINER)"));
         }
         MenuView before = l.tx().menuSnapshot();
         if (before == null) {
@@ -291,8 +255,7 @@ public final class MenuCommands {
         }
         MenuView after = executeSteps(l.tx(), steps, before);
         JsonObject root = ok();
-        root.addProperty("taken",
-            roleCount(before, resolved) - roleCount(after, resolved));
+        root.addProperty("taken", roleCount(before, resolved) - roleCount(after, resolved));
         root.add("menu", MenuViewJson.toJsonObject(after));
         return answer(ctx.getSource(), root);
     }
@@ -306,8 +269,7 @@ public final class MenuCommands {
      */
     private static SlotRole parseRole(String word) {
         return switch (word) {
-            case "INPUT", "FUEL", "OUTPUT", "CONTAINER"
-                -> SlotRole.valueOf(word);
+            case "INPUT", "FUEL", "OUTPUT", "CONTAINER" -> SlotRole.valueOf(word);
             default -> null;
         };
     }
@@ -325,11 +287,9 @@ public final class MenuCommands {
      *                take (OUTPUT resolves)
      * @return the concrete role to plan against; never null
      */
-    private static SlotRole resolveRole(MenuView view, SlotRole role,
-                                        boolean deposit) {
+    private static SlotRole resolveRole(MenuView view, SlotRole role, boolean deposit) {
         String type = view.type();
-        boolean furnaceFamily = type.equals("furnace")
-            || type.equals("blast_furnace") || type.equals("smoker");
+        boolean furnaceFamily = type.equals("furnace") || type.equals("blast_furnace") || type.equals("smoker");
         if (furnaceFamily) {
             return role;
         }
@@ -346,8 +306,7 @@ public final class MenuCommands {
         return total;
     }
 
-    private static int runCraft(CommandContext<CommandSourceStack> ctx,
-                                Supplier<Live> live) {
+    private static int runCraft(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
         Live l = live.get();
         if (l == null) {
             return answer(ctx.getSource(), err("no active bot"));
@@ -355,23 +314,18 @@ public final class MenuCommands {
         String recipeId = StringArgumentType.getString(ctx, "recipeId");
         var recipe = l.catalog().byId(recipeId);
         if (recipe.isEmpty()) {
-            return answer(ctx.getSource(),
-                err("no such recipe: " + recipeId));
+            return answer(ctx.getSource(), err("no such recipe: " + recipeId));
         }
         MenuView opened = l.tx().menuSnapshot();
         if (opened == null) {
-            return answer(ctx.getSource(),
-                err("no menu open - open a crafting surface first"));
+            return answer(ctx.getSource(), err("no menu open - open a crafting surface first"));
         }
         try {
             CraftingView lens = CraftingView.of(opened);
-            MenuView filled = executeSteps(l.tx(),
-                MenuPlanner.planRecipe(lens, recipe.get()), opened);
+            MenuView filled = executeSteps(l.tx(), MenuPlanner.planRecipe(lens, recipe.get()), opened);
             // The result slot resolves synchronously with the grid
             // change; the post-click snapshot already carries it.
-            MenuView done = executeSteps(l.tx(),
-                MenuPlanner.planTakeResult(CraftingView.of(filled)),
-                filled);
+            MenuView done = executeSteps(l.tx(), MenuPlanner.planTakeResult(CraftingView.of(filled)), filled);
             JsonObject root = ok();
             root.addProperty("result", recipe.get().resultItemId());
             root.addProperty("count", recipe.get().resultCount());
@@ -386,8 +340,7 @@ public final class MenuCommands {
         }
     }
 
-    private static int runScan(Supplier<Live> live, CommandSourceStack src,
-                               int radius, int limit) {
+    private static int runScan(Supplier<Live> live, CommandSourceStack src, int radius, int limit) {
         Live l = live.get();
         if (l == null) {
             return answer(src, err("no active bot"));
@@ -410,26 +363,21 @@ public final class MenuCommands {
                     if (!(be instanceof Container)) {
                         continue;
                     }
-                    double dist = Math.sqrt(
-                        be.getBlockPos().distSqr(center));
+                    double dist = Math.sqrt(be.getBlockPos().distSqr(center));
                     if (dist > radius) {
                         continue;
                     }
                     JsonObject node = new JsonObject();
-                    node.addProperty("type", String.valueOf(
-                        ForgeRegistries.BLOCK_ENTITY_TYPES
-                            .getKey(be.getType())));
+                    node.addProperty("type", String.valueOf(ForgeRegistries.BLOCK_ENTITY_TYPES.getKey(be.getType())));
                     node.addProperty("x", be.getBlockPos().getX());
                     node.addProperty("y", be.getBlockPos().getY());
                     node.addProperty("z", be.getBlockPos().getZ());
-                    node.addProperty("dist",
-                        Math.round(dist * 10) / 10.0);
+                    node.addProperty("dist", Math.round(dist * 10) / 10.0);
                     found.add(node);
                 }
             }
         }
-        found.sort(Comparator.comparingDouble(
-            n -> n.get("dist").getAsDouble()));
+        found.sort(Comparator.comparingDouble(n -> n.get("dist").getAsDouble()));
         boolean truncated = found.size() > limit;
         JsonArray containers = new JsonArray();
         found.stream().limit(limit).forEach(containers::add);
@@ -440,8 +388,7 @@ public final class MenuCommands {
         return answer(src, root);
     }
 
-    private static int runRecipes(Supplier<Live> live,
-                                  CommandSourceStack src, String itemId) {
+    private static int runRecipes(Supplier<Live> live, CommandSourceStack src, String itemId) {
         Live l = live.get();
         if (l == null) {
             return answer(src, err("no active bot"));
@@ -470,9 +417,7 @@ public final class MenuCommands {
      * @param limit  max recipes per page
      * @return command success code
      */
-    private static int runRecipeList(Supplier<Live> live,
-                                     CommandSourceStack src,
-                                     int offset, int limit) {
+    private static int runRecipeList(Supplier<Live> live, CommandSourceStack src, int offset, int limit) {
         Live l = live.get();
         if (l == null) {
             return answer(src, err("no active bot"));
@@ -487,8 +432,7 @@ public final class MenuCommands {
         root.addProperty("total", page.total());
         root.addProperty("offset", page.offset());
         root.addProperty("limit", page.limit());
-        root.addProperty("truncated",
-            page.offset() + page.limit() < page.total());
+        root.addProperty("truncated", page.offset() + page.limit() < page.total());
         return answer(src, root);
     }
 
@@ -501,9 +445,7 @@ public final class MenuCommands {
      * @param last  the snapshot the plan was computed from; never null
      * @return the post-execution snapshot; never null
      */
-    private static MenuView executeSteps(MenuTransactions tx,
-                                         List<MenuPlanner.Step> steps,
-                                         MenuView last) {
+    private static MenuView executeSteps(MenuTransactions tx, List<MenuPlanner.Step> steps, MenuView last) {
         MenuView view = last;
         for (MenuPlanner.Step step : steps) {
             view = tx.menuClick(step.slot(), step.button(), step.kind());
@@ -535,6 +477,5 @@ public final class MenuCommands {
         return 0;
     }
 
-    private MenuCommands() {
-    }
+    private MenuCommands() {}
 }

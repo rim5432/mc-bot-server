@@ -20,11 +20,7 @@ import com.mcbot.mcbotserver.api.types.CellPos;
  *                        string for clean reflex preemptions; never null
  */
 public record InterruptionContext(
-    long tick,
-    CellPos botPos,
-    String interruptedTask,
-    String causeSummary,
-    String stackTrace) {
+        long tick, CellPos botPos, String interruptedTask, String causeSummary, String stackTrace) {
 
     /**
      * Creates a validated context.
@@ -43,16 +39,13 @@ public record InterruptionContext(
             throw new IllegalArgumentException("botPos must not be null");
         }
         if (interruptedTask == null) {
-            throw new IllegalArgumentException(
-                "interruptedTask must not be null");
+            throw new IllegalArgumentException("interruptedTask must not be null");
         }
         if (causeSummary == null || causeSummary.isBlank()) {
-            throw new IllegalArgumentException(
-                "causeSummary must not be blank");
+            throw new IllegalArgumentException("causeSummary must not be blank");
         }
         if (stackTrace == null) {
-            throw new IllegalArgumentException(
-                "stackTrace must not be null");
+            throw new IllegalArgumentException("stackTrace must not be null");
         }
     }
 }

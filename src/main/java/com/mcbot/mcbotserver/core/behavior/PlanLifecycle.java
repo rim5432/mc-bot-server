@@ -8,7 +8,6 @@ import com.mcbot.mcbotserver.core.pathing.AStarPathFinder;
 import com.mcbot.mcbotserver.core.pathing.MoveGraph;
 import com.mcbot.mcbotserver.core.pathing.PlanWorker;
 import com.mcbot.mcbotserver.core.world.SnapshotWorldView;
-
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -57,8 +56,7 @@ final class PlanLifecycle {
      * @param plan    the adopted waypoint chain when
      *                {@code outcome == ADOPTED}; null otherwise
      */
-    record Adoption(Outcome outcome, List<CellPos> plan) {
-    }
+    record Adoption(Outcome outcome, List<CellPos> plan) {}
 
     private final MoveGraph graph;
     private final PlanWorker worker;
@@ -121,14 +119,11 @@ final class PlanLifecycle {
      * @param nodeBudget safety-net cap on expansions; positive
      * @return the verdict for THIS tick (never the pending search)
      */
-    Adoption request(WorldView world, CellPos start, Goal goal,
-                     int nodeBudget) {
+    Adoption request(WorldView world, CellPos start, Goal goal, int nodeBudget) {
         CellPos anchor = PathingBehavior.anchorCell(goal);
         if (worker == null) {
             var plan = computeSync(world, start, goal, nodeBudget);
-            return plan.isPresent()
-                ? new Adoption(Outcome.ADOPTED, plan.get())
-                : new Adoption(Outcome.NO_ROUTE, null);
+            return plan.isPresent() ? new Adoption(Outcome.ADOPTED, plan.get()) : new Adoption(Outcome.NO_ROUTE, null);
         }
         // One search in flight at a time; the cooldown gate above
         // spaces requests, this guard absorbs same-tick re-triggers.
@@ -138,10 +133,14 @@ final class PlanLifecycle {
         pendingGoal = goal;
         pendingStart = start;
         var snapshot = SnapshotWorldView.capture(world, start, anchor);
-        pendingPlan = worker.submit(snapshot, graph, start, goal,
-            Heuristic.euclideanTo(anchor),
-            nodeBudget,
-            PathingBehavior.PLAN_WALL_CLOCK_MS);
+        pendingPlan = worker.submit(
+                snapshot,
+                graph,
+                start,
+                goal,
+                Heuristic.euclideanTo(anchor),
+                nodeBudget,
+                PathingBehavior.PLAN_WALL_CLOCK_MS);
         return new Adoption(Outcome.NOT_READY, null);
     }
 
@@ -156,16 +155,10 @@ final class PlanLifecycle {
      * @param nodeBudget safety-net cap on expansions; positive
      * @return the waypoint chain, or empty for no route
      */
-    java.util.Optional<List<CellPos>> computeSync(WorldView world,
-                                                  CellPos start,
-                                                  Goal goal,
-                                                  int nodeBudget) {
+    java.util.Optional<List<CellPos>> computeSync(WorldView world, CellPos start, Goal goal, int nodeBudget) {
         CellPos anchor = PathingBehavior.anchorCell(goal);
-        var finder = new AStarPathFinder(graph,
-            Heuristic.euclideanTo(anchor),
-            nodeBudget);
-        var result = finder.compute(world, start, goal,
-            Heuristic.euclideanTo(anchor));
+        var finder = new AStarPathFinder(graph, Heuristic.euclideanTo(anchor), nodeBudget);
+        var result = finder.compute(world, start, goal, Heuristic.euclideanTo(anchor));
         if (!result.reachedGoal() && result.waypoints().isEmpty()) {
             return java.util.Optional.empty();
         }
@@ -206,8 +199,7 @@ final class PlanLifecycle {
         // future moves that span more cells per step must revisit
         // this constant in lockstep.
         boolean fresh = currentGoal.equals(pendingGoal)
-            && chebyshevDistance(cell, pendingStart)
-                <= PathingBehavior.FRESHNESS_CELLS;
+                && chebyshevDistance(cell, pendingStart) <= PathingBehavior.FRESHNESS_CELLS;
         pendingGoal = null;
         pendingStart = null;
         if (!fresh) {

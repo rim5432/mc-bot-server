@@ -2,7 +2,6 @@ package com.mcbot.mcbotserver.core.tick;
 
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
-
 import java.lang.reflect.Field;
 import java.util.List;
 
@@ -21,8 +20,7 @@ import java.util.List;
  */
 final class PathingTestAccess {
 
-    private PathingTestAccess() {
-    }
+    private PathingTestAccess() {}
 
     /** The active plan chain. */
     static List<CellPos> waypoints(PathingBehavior mover) {
@@ -37,8 +35,7 @@ final class PathingTestAccess {
     /** Force the cursor to a cell - JumpUp-waypoint steering tests. */
     static void writeWaypointIndex(PathingBehavior mover, int value) {
         try {
-            Field f = cursorOf(mover).getClass()
-                .getDeclaredField("waypointIndex");
+            Field f = cursorOf(mover).getClass().getDeclaredField("waypointIndex");
             f.setAccessible(true);
             f.set(cursorOf(mover), value);
         } catch (ReflectiveOperationException e) {
@@ -65,13 +62,10 @@ final class PathingTestAccess {
 
     /** Ticks since the last plan-progress criterion fired. */
     static int ticksSincePlanProgress(PathingBehavior mover) {
-        return (int) collaboratorField(mover, "fuse",
-            "ticksSincePlanProgress");
+        return (int) collaboratorField(mover, "fuse", "ticksSincePlanProgress");
     }
 
-    private static Object collaboratorField(PathingBehavior mover,
-                                            String holderField,
-                                            String name) {
+    private static Object collaboratorField(PathingBehavior mover, String holderField, String name) {
         try {
             Field hf = PathingBehavior.class.getDeclaredField(holderField);
             hf.setAccessible(true);
@@ -84,8 +78,7 @@ final class PathingTestAccess {
         }
     }
 
-    private static Object cursorField(PathingBehavior mover,
-                                      String name) {
+    private static Object cursorField(PathingBehavior mover, String name) {
         try {
             Field f = cursorOf(mover).getClass().getDeclaredField(name);
             f.setAccessible(true);

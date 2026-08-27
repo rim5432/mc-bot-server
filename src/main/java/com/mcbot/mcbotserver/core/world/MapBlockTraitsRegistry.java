@@ -2,7 +2,6 @@ package com.mcbot.mcbotserver.core.world;
 
 import com.mcbot.mcbotserver.api.world.BlockTraits;
 import com.mcbot.mcbotserver.api.world.BlockTraitsRegistry;
-
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -33,8 +32,7 @@ public final class MapBlockTraitsRegistry implements BlockTraitsRegistry {
     private boolean sealed;
 
     /** Builds an empty registry. */
-    public MapBlockTraitsRegistry() {
-    }
+    public MapBlockTraitsRegistry() {}
 
     /**
      * Builds a registry pre-populated from a map. The supplied map's
@@ -43,8 +41,7 @@ public final class MapBlockTraitsRegistry implements BlockTraitsRegistry {
      *
      * @param initial entries to copy in; must not be null
      */
-    public MapBlockTraitsRegistry(
-            Map<String, BlockTraits> initial) {
+    public MapBlockTraitsRegistry(Map<String, BlockTraits> initial) {
         if (initial == null) {
             throw new IllegalArgumentException("initial must not be null");
         }
@@ -54,8 +51,7 @@ public final class MapBlockTraitsRegistry implements BlockTraitsRegistry {
     @Override
     public BlockTraits traitsFor(String blockId) {
         if (blockId == null || blockId.isBlank()) {
-            throw new IllegalArgumentException(
-                "blockId must not be blank");
+            throw new IllegalArgumentException("blockId must not be blank");
         }
         // Exact match first: state-aware keys win.
         BlockTraits t = entries.get(blockId);
@@ -76,15 +72,12 @@ public final class MapBlockTraitsRegistry implements BlockTraitsRegistry {
     }
 
     @Override
-    public MapBlockTraitsRegistry register(String blockId,
-                                           BlockTraits traits) {
+    public MapBlockTraitsRegistry register(String blockId, BlockTraits traits) {
         if (sealed) {
-            throw new IllegalStateException(
-                "registry is sealed; build a new one");
+            throw new IllegalStateException("registry is sealed; build a new one");
         }
         if (blockId == null || blockId.isBlank()) {
-            throw new IllegalArgumentException(
-                "blockId must not be blank");
+            throw new IllegalArgumentException("blockId must not be blank");
         }
         if (traits == null) {
             throw new IllegalArgumentException("traits must not be null");

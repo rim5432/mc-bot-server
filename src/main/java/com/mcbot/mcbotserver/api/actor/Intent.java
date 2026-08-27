@@ -24,9 +24,7 @@ public sealed interface Intent {
      * @param jump    true to request a jump this tick
      * @param sneak   true to hold the sneak modifier
      */
-    record Move(double forward, double strafe,
-                boolean jump, boolean sneak) implements Intent {
-    }
+    record Move(double forward, double strafe, boolean jump, boolean sneak) implements Intent {}
 
     /**
      * Absolute rotation target, resolved on the ROT channel.
@@ -34,8 +32,7 @@ public sealed interface Intent {
      * @param yawDeg   target body yaw in degrees
      * @param pitchDeg target view pitch in degrees
      */
-    record Look(float yawDeg, float pitchDeg) implements Intent {
-    }
+    record Look(float yawDeg, float pitchDeg) implements Intent {}
 
     /**
      * Attack / interact press, resolved on the USE channel. Aiming is
@@ -43,8 +40,7 @@ public sealed interface Intent {
      *
      * @param pressing true to hold the action down this tick
      */
-    record Use(boolean pressing) implements Intent {
-    }
+    record Use(boolean pressing) implements Intent {}
 
     /**
      * Hotbar selection, resolved on the SLOT channel.
@@ -60,8 +56,7 @@ public sealed interface Intent {
          */
         public SelectSlot {
             if (slot < 0 || slot > 8) {
-                throw new IllegalArgumentException(
-                    "slot must be in 0..8, got " + slot);
+                throw new IllegalArgumentException("slot must be in 0..8, got " + slot);
             }
         }
     }
@@ -77,8 +72,7 @@ public sealed interface Intent {
      *
      * @param target the block cell being dug; never null
      */
-    record Dig(CellPos target)
-            implements Intent {
+    record Dig(CellPos target) implements Intent {
 
         /**
          * Creates a validated dig intent.
@@ -87,8 +81,7 @@ public sealed interface Intent {
          */
         public Dig {
             if (target == null) {
-                throw new IllegalArgumentException(
-                    "dig target must not be null");
+                throw new IllegalArgumentException("dig target must not be null");
             }
         }
     }
@@ -105,8 +98,7 @@ public sealed interface Intent {
      * @param fullStack true to drop the entire stack; false to drop a
      *                   single item (vanilla Q vs Ctrl-Q distinction)
      */
-    record DropSelected(boolean fullStack) implements Intent {
-    }
+    record DropSelected(boolean fullStack) implements Intent {}
 
     /**
      * Right-click a block: place a block from the selected hotbar slot
@@ -137,8 +129,7 @@ public sealed interface Intent {
      * @param hitPos absolute intersection point of the ray with the face;
      *               never null
      */
-    record InteractBlock(CellPos target, Direction face, Vec3 hitPos)
-            implements Intent {
+    record InteractBlock(CellPos target, Direction face, Vec3 hitPos) implements Intent {
 
         /**
          * Creates a validated interact-block intent.
@@ -149,16 +140,13 @@ public sealed interface Intent {
          */
         public InteractBlock {
             if (target == null) {
-                throw new IllegalArgumentException(
-                    "interact target must not be null");
+                throw new IllegalArgumentException("interact target must not be null");
             }
             if (face == null) {
-                throw new IllegalArgumentException(
-                    "interact face must not be null");
+                throw new IllegalArgumentException("interact face must not be null");
             }
             if (hitPos == null) {
-                throw new IllegalArgumentException(
-                    "interact hitPos must not be null");
+                throw new IllegalArgumentException("interact hitPos must not be null");
             }
         }
     }

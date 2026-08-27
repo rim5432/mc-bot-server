@@ -2,7 +2,6 @@ package com.mcbot.mcbotserver.api.menu;
 
 import com.mcbot.mcbotserver.api.inventory.ItemView;
 import com.mcbot.mcbotserver.api.types.CellPos;
-
 import java.util.List;
 
 /**
@@ -33,8 +32,7 @@ import java.util.List;
  * @param slots         flat slot list, index 0..containerSize-1;
  *                      never null, immutable after construction
  */
-public record MenuView(String type, CellPos sourcePos, ItemView carried,
-                       int containerSize, List<SlotView> slots) {
+public record MenuView(String type, CellPos sourcePos, ItemView carried, int containerSize, List<SlotView> slots) {
 
     /**
      * Creates a validated, immutable menu snapshot.
@@ -51,23 +49,20 @@ public record MenuView(String type, CellPos sourcePos, ItemView carried,
      */
     public MenuView {
         if (type == null || type.isBlank()) {
-            throw new IllegalArgumentException(
-                "menu type must not be null or blank");
+            throw new IllegalArgumentException("menu type must not be null or blank");
         }
         if (carried == null) {
             throw new IllegalArgumentException("carried must not be null");
         }
         if (containerSize <= 0) {
-            throw new IllegalArgumentException(
-                "containerSize must be positive, got " + containerSize);
+            throw new IllegalArgumentException("containerSize must be positive, got " + containerSize);
         }
         if (slots == null) {
             throw new IllegalArgumentException("slots must not be null");
         }
         if (slots.size() != containerSize) {
             throw new IllegalArgumentException(
-                "slots size " + slots.size()
-                    + " does not match containerSize " + containerSize);
+                    "slots size " + slots.size() + " does not match containerSize " + containerSize);
         }
         // Defensive copy: the caller's list may be mutable; the snapshot
         // must be immutable so the planner cannot reach back into the

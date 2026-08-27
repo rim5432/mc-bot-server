@@ -50,8 +50,7 @@ public final class GotoProcess implements BotProcess, TerminalMission {
      * @param priority     band-legal priority per PriorityBands
      * @param timeoutTicks tick budget; positive
      */
-    public GotoProcess(String taskId, Goal goal, int priority,
-                       long timeoutTicks) {
+    public GotoProcess(String taskId, Goal goal, int priority, long timeoutTicks) {
         if (taskId == null || taskId.isBlank()) {
             throw new IllegalArgumentException("taskId must not be blank");
         }
@@ -59,8 +58,7 @@ public final class GotoProcess implements BotProcess, TerminalMission {
             throw new IllegalArgumentException("goal must not be null");
         }
         if (timeoutTicks <= 0) {
-            throw new IllegalArgumentException(
-                "timeoutTicks must be positive");
+            throw new IllegalArgumentException("timeoutTicks must be positive");
         }
         this.taskId = taskId;
         this.goal = goal;

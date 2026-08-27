@@ -4,7 +4,6 @@ import com.mcbot.mcbotserver.api.goal.Goal;
 import com.mcbot.mcbotserver.api.pathing.Heuristic;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.WorldView;
-
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -59,19 +58,22 @@ public final class PlanWorker {
      */
     // runs on any thread; the returned future completes on mcbot-plan-worker
     public CompletableFuture<AStarPathFinder.PathResult> submit(
-        WorldView snapshot, MoveGraph graph, CellPos start, Goal goal,
-        Heuristic heuristic, int nodeBudget, long wallClockBudgetMs) {
+            WorldView snapshot,
+            MoveGraph graph,
+            CellPos start,
+            Goal goal,
+            Heuristic heuristic,
+            int nodeBudget,
+            long wallClockBudgetMs) {
         Objects.requireNonNull(snapshot, "snapshot");
         Objects.requireNonNull(graph, "graph");
         if (wallClockBudgetMs <= 0) {
-            throw new IllegalArgumentException(
-                "wallClockBudgetMs must be positive on the worker");
+            throw new IllegalArgumentException("wallClockBudgetMs must be positive on the worker");
         }
-        return CompletableFuture.supplyAsync(() ->
-                new AStarPathFinder(graph, heuristic, nodeBudget)
-                    .compute(snapshot, start, goal, heuristic,
-                        wallClockBudgetMs),
-            pool);
+        return CompletableFuture.supplyAsync(
+                () -> new AStarPathFinder(graph, heuristic, nodeBudget)
+                        .compute(snapshot, start, goal, heuristic, wallClockBudgetMs),
+                pool);
     }
 
     /**

@@ -6,7 +6,6 @@ import com.mcbot.mcbotserver.api.menu.MenuView;
 import com.mcbot.mcbotserver.api.menu.RecipeView;
 import com.mcbot.mcbotserver.api.menu.SlotRole;
 import com.mcbot.mcbotserver.api.menu.SlotView;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -27,10 +26,10 @@ final class MenuFixtures {
 
     /** Accept-kind pair shared by recipe and chest scenarios. */
     static final String OAK = "minecraft:oak_planks";
+
     static final String BIRCH = "minecraft:birch_planks";
 
-    private MenuFixtures() {
-    }
+    private MenuFixtures() {}
 
     /** Mutable placement fixture before freezing into a snapshot. */
     static final class Builder {
@@ -53,9 +52,8 @@ final class MenuFixtures {
      * or birch.
      */
     static RecipeView sticksRecipe() {
-        return new RecipeView("minecraft:stick", "minecraft:stick",
-            4, 1, Map.of(0, List.of(OAK, BIRCH),
-                1, List.of(OAK, BIRCH)));
+        return new RecipeView(
+                "minecraft:stick", "minecraft:stick", 4, 1, Map.of(0, List.of(OAK, BIRCH), 1, List.of(OAK, BIRCH)));
     }
 
     /** Crafting-table-shaped snapshot, mirror of the adapter roles. */
@@ -72,12 +70,9 @@ final class MenuFixtures {
         }
         List<SlotView> slots = new ArrayList<>(46);
         for (int i = 0; i < 46; i++) {
-            slots.add(new SlotView(i,
-                b.items.getOrDefault(i, ItemView.EMPTY),
-                b.roles.get(i)));
+            slots.add(new SlotView(i, b.items.getOrDefault(i, ItemView.EMPTY), b.roles.get(i)));
         }
-        MenuView view = new MenuView("crafting_table", null,
-            ItemView.EMPTY, 46, slots);
+        MenuView view = new MenuView("crafting_table", null, ItemView.EMPTY, 46, slots);
         return CraftingView.of(view);
     }
 
@@ -93,12 +88,9 @@ final class MenuFixtures {
         }
         List<SlotView> slots = new ArrayList<>(45);
         for (int i = 0; i < 45; i++) {
-            slots.add(new SlotView(i,
-                b.items.getOrDefault(i, ItemView.EMPTY),
-                b.roles.getOrDefault(i, SlotRole.MAIN)));
+            slots.add(new SlotView(i, b.items.getOrDefault(i, ItemView.EMPTY), b.roles.getOrDefault(i, SlotRole.MAIN)));
         }
-        return CraftingView.of(new MenuView("inventory", null,
-            ItemView.EMPTY, 45, slots));
+        return CraftingView.of(new MenuView("inventory", null, ItemView.EMPTY, 45, slots));
     }
 
     /** Chest-menu fake: CONTAINER 0..26, MAIN 27..53, HOTBAR 54..62. */
@@ -115,9 +107,7 @@ final class MenuFixtures {
         }
         List<SlotView> slots = new ArrayList<>(63);
         for (int i = 0; i < 63; i++) {
-            slots.add(new SlotView(i,
-                b.items.getOrDefault(i, ItemView.EMPTY),
-                b.roles.get(i)));
+            slots.add(new SlotView(i, b.items.getOrDefault(i, ItemView.EMPTY), b.roles.get(i)));
         }
         return new MenuView("chest", null, ItemView.EMPTY, 63, slots);
     }
@@ -136,11 +126,8 @@ final class MenuFixtures {
         }
         List<SlotView> slots = new ArrayList<>(39);
         for (int i = 0; i < 39; i++) {
-            slots.add(new SlotView(i,
-                b.items.getOrDefault(i, ItemView.EMPTY),
-                b.roles.get(i)));
+            slots.add(new SlotView(i, b.items.getOrDefault(i, ItemView.EMPTY), b.roles.get(i)));
         }
-        return new MenuView("furnace", null, ItemView.EMPTY, 39,
-            slots);
+        return new MenuView("furnace", null, ItemView.EMPTY, 39, slots);
     }
 }

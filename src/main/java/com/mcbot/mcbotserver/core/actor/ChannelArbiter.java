@@ -3,7 +3,6 @@ package com.mcbot.mcbotserver.core.actor;
 import com.mcbot.mcbotserver.api.actor.Actor;
 import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
-
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
@@ -42,8 +41,7 @@ public final class ChannelArbiter implements Actor {
     public Map<Channel, Claim> flush() {
         Map<Channel, Claim> winners = new EnumMap<>(buffer);
         buffer.clear();
-        winners.forEach((channel, claim) ->
-            incumbents.put(channel, claim.holder()));
+        winners.forEach((channel, claim) -> incumbents.put(channel, claim.holder()));
         return winners;
     }
 
@@ -70,10 +68,8 @@ public final class ChannelArbiter implements Actor {
             return challenger.priority() > current.priority();
         }
         String previousWinner = incumbents.get(challenger.channel());
-        boolean challengerIsIncumbent =
-            challenger.holder().equals(previousWinner);
-        boolean currentIsIncumbent =
-            current.holder().equals(previousWinner);
+        boolean challengerIsIncumbent = challenger.holder().equals(previousWinner);
+        boolean currentIsIncumbent = current.holder().equals(previousWinner);
         return challengerIsIncumbent && !currentIsIncumbent;
     }
 }

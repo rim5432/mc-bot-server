@@ -1,13 +1,14 @@
 package com.mcbot.mcbotserver.adapter;
 
-import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
 import com.mcbot.mcbotserver.api.inventory.ItemView;
 import com.mcbot.mcbotserver.api.menu.MenuClick;
 import com.mcbot.mcbotserver.api.menu.MenuView;
 import com.mcbot.mcbotserver.api.menu.SlotRole;
 import com.mcbot.mcbotserver.api.menu.SlotView;
 import com.mcbot.mcbotserver.api.types.CellPos;
-
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -20,10 +21,6 @@ import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
 
 /**
  * Adapter binding for an open {@link AbstractContainerMenu}: produces
@@ -97,8 +94,7 @@ public final class BindingMenu {
      * @param sourcePos the world block the menu is bound to; null for
      *                  the bot's own inventory menu
      */
-    public BindingMenu(AbstractContainerMenu menu, Player player,
-                       String type, CellPos sourcePos) {
+    public BindingMenu(AbstractContainerMenu menu, Player player, String type, CellPos sourcePos) {
         this.menu = Objects.requireNonNull(menu, "menu");
         this.player = Objects.requireNonNull(player, "player");
         this.type = Objects.requireNonNull(type, "type");
@@ -126,11 +122,9 @@ public final class BindingMenu {
         int size = menu.slots.size();
         List<SlotView> slots = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
-            slots.add(new SlotView(i,
-                toView(menu.slots.get(i).getItem()), roleOf(i, size)));
+            slots.add(new SlotView(i, toView(menu.slots.get(i).getItem()), roleOf(i, size)));
         }
-        return new MenuView(type, sourcePos, toView(menu.getCarried()),
-            size, slots);
+        return new MenuView(type, sourcePos, toView(menu.getCarried()), size, slots);
     }
 
     /**
@@ -290,12 +284,10 @@ public final class BindingMenu {
      * mid-close recipe recompute).
      */
     private void returnGridToInventory() {
-        int lastGridSlot = menu instanceof CraftingMenu ? 9
-            : menu instanceof InventoryMenu ? 4 : 0;
+        int lastGridSlot = menu instanceof CraftingMenu ? 9 : menu instanceof InventoryMenu ? 4 : 0;
         for (int i = 1; i <= lastGridSlot; i++) {
             Slot slot = menu.slots.get(i);
-            ItemStack removed =
-                slot.container.removeItemNoUpdate(slot.getContainerSlot());
+            ItemStack removed = slot.container.removeItemNoUpdate(slot.getContainerSlot());
             if (!removed.isEmpty()) {
                 player.getInventory().placeItemBackInInventory(removed);
             }
@@ -310,8 +302,7 @@ public final class BindingMenu {
      */
     private void ensureOpen() {
         if (closed) {
-            throw new IllegalStateException(
-                "menu is closed; open a new menu instead");
+            throw new IllegalStateException("menu is closed; open a new menu instead");
         }
     }
 
@@ -332,8 +323,7 @@ public final class BindingMenu {
             facade.syncPosition();
             if (!menu.stillValid(facade)) {
                 throw new IllegalStateException(
-                    "menu no longer valid (bot out of range or block "
-                        + "changed); close and reopen");
+                        "menu no longer valid (bot out of range or block " + "changed); close and reopen");
             }
         }
     }
@@ -367,8 +357,8 @@ public final class BindingMenu {
         ResourceLocation key = BuiltInRegistries.ITEM.getKey(stack.getItem());
         String id = key != null ? key.toString() : "unknown";
         String digest = stack.hasTag() && stack.getTag() != null
-            ? Integer.toHexString(stack.getTag().hashCode())
-            : "";
+                ? Integer.toHexString(stack.getTag().hashCode())
+                : "";
         return new ItemView(id, stack.getCount(), digest);
     }
 
@@ -378,32 +368,26 @@ public final class BindingMenu {
      * silently discarded. A null synchronizer would NPE inside
      * {@code AbstractContainerMenu}'s broadcast methods.
      */
-    private static final ContainerSynchronizer NO_OP_SYNCHRONIZER =
-        new ContainerSynchronizer() {
-            @Override
-            public void sendInitialData(AbstractContainerMenu menu,
-                                         NonNullList<ItemStack> slots,
-                                         ItemStack carried,
-                                         int[] dataValues) {
-                // no-op: no client to broadcast to
-            }
+    private static final ContainerSynchronizer NO_OP_SYNCHRONIZER = new ContainerSynchronizer() {
+        @Override
+        public void sendInitialData(
+                AbstractContainerMenu menu, NonNullList<ItemStack> slots, ItemStack carried, int[] dataValues) {
+            // no-op: no client to broadcast to
+        }
 
-            @Override
-            public void sendSlotChange(AbstractContainerMenu menu,
-                                        int slotId, ItemStack stack) {
-                // no-op
-            }
+        @Override
+        public void sendSlotChange(AbstractContainerMenu menu, int slotId, ItemStack stack) {
+            // no-op
+        }
 
-            @Override
-            public void sendCarriedChange(AbstractContainerMenu menu,
-                                           ItemStack stack) {
-                // no-op
-            }
+        @Override
+        public void sendCarriedChange(AbstractContainerMenu menu, ItemStack stack) {
+            // no-op
+        }
 
-            @Override
-            public void sendDataChange(AbstractContainerMenu menu,
-                                        int dataId, int value) {
-                // no-op
-            }
-        };
+        @Override
+        public void sendDataChange(AbstractContainerMenu menu, int dataId, int value) {
+            // no-op
+        }
+    };
 }

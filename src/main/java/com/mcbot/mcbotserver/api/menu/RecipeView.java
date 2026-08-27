@@ -35,9 +35,12 @@ import java.util.Map;
  * @param placements   pattern position → accepted item ids (non-empty,
  *                     in query order); never null, immutable
  */
-public record RecipeView(String recipeId, String resultItemId,
-                         int resultCount, int patternWidth,
-                         Map<Integer, List<String>> placements) {
+public record RecipeView(
+        String recipeId,
+        String resultItemId,
+        int resultCount,
+        int patternWidth,
+        Map<Integer, List<String>> placements) {
 
     /**
      * Creates a validated, immutable recipe description.
@@ -53,35 +56,27 @@ public record RecipeView(String recipeId, String resultItemId,
      */
     public RecipeView {
         if (recipeId == null || recipeId.isBlank()) {
-            throw new IllegalArgumentException(
-                "recipeId must not be null or blank");
+            throw new IllegalArgumentException("recipeId must not be null or blank");
         }
         if (resultItemId == null || resultItemId.isBlank()) {
-            throw new IllegalArgumentException(
-                "resultItemId must not be null or blank");
+            throw new IllegalArgumentException("resultItemId must not be null or blank");
         }
         if (resultCount <= 0) {
-            throw new IllegalArgumentException(
-                "resultCount must be positive, got " + resultCount);
+            throw new IllegalArgumentException("resultCount must be positive, got " + resultCount);
         }
         if (patternWidth < 1 || patternWidth > 3) {
-            throw new IllegalArgumentException(
-                "patternWidth must be 1..3, got " + patternWidth);
+            throw new IllegalArgumentException("patternWidth must be 1..3, got " + patternWidth);
         }
         if (placements == null || placements.isEmpty()) {
-            throw new IllegalArgumentException(
-                "placements must not be null or empty");
+            throw new IllegalArgumentException("placements must not be null or empty");
         }
         Map<Integer, List<String>> copied = new java.util.TreeMap<>();
         placements.forEach((pos, ids) -> {
             if (pos == null || pos < 0 || pos > 8) {
-                throw new IllegalArgumentException(
-                    "placement position out of range: " + pos);
+                throw new IllegalArgumentException("placement position out of range: " + pos);
             }
             if (ids == null || ids.isEmpty()) {
-                throw new IllegalArgumentException(
-                    "placement " + pos + " must accept at least one"
-                        + " item id");
+                throw new IllegalArgumentException("placement " + pos + " must accept at least one" + " item id");
             }
             copied.put(pos, List.copyOf(ids));
         });

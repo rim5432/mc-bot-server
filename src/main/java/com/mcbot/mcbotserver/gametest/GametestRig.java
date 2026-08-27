@@ -15,7 +15,8 @@ import com.mcbot.mcbotserver.core.process.GotoProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.core.state.ChangeDetectingStateChannel;
 import com.mcbot.mcbotserver.core.tick.BotController;
-
+import java.util.List;
+import java.util.Objects;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestAssertException;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -24,9 +25,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraftforge.registries.ForgeRegistries;
-
-import java.util.List;
-import java.util.Objects;
 
 /**
  * Shared in-engine harness for the gametest scenarios: one
@@ -66,18 +64,18 @@ final class GametestRig {
 
     private static final int DEFAULT_MISSION_BUDGET = 350;
 
-    private GametestRig() {
-    }
+    private GametestRig() {}
 
     /** Everything one scenario needs, wired by the shared factory. */
-    record Rig(BotBodyEntity body, BindingWorldView view,
-               BindingActor actor,
-               InMemoryEventQueue events,
-               TaskArbiter arbiter,
-               BotController controller,
-               GotoCommandHandler gotoHandler,
-               ChangeDetectingStateChannel state) {
-    }
+    record Rig(
+            BotBodyEntity body,
+            BindingWorldView view,
+            BindingActor actor,
+            InMemoryEventQueue events,
+            TaskArbiter arbiter,
+            BotController controller,
+            GotoCommandHandler gotoHandler,
+            ChangeDetectingStateChannel state) {}
 
     /**
      * Paves the 16x16 floor, spawns one body, wires the full
@@ -91,15 +89,12 @@ final class GametestRig {
         ServerLevel level = helper.getLevel();
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
-                helper.setBlock(new BlockPos(x, FLOOR_Y, z),
-                    Blocks.SMOOTH_STONE);
-                helper.setBlock(new BlockPos(x, FLOOR_Y + 1, z),
-                    Blocks.AIR);
+                helper.setBlock(new BlockPos(x, FLOOR_Y, z), Blocks.SMOOTH_STONE);
+                helper.setBlock(new BlockPos(x, FLOOR_Y + 1, z), Blocks.AIR);
             }
         }
 
-        var type = ForgeRegistries.ENTITY_TYPES.getValue(
-            new ResourceLocation(McBotServer.MODID, "bot_body"));
+        var type = ForgeRegistries.ENTITY_TYPES.getValue(new ResourceLocation(McBotServer.MODID, "bot_body"));
         if (type == null) {
             helper.fail("bot_body entity type not registered");
         }
@@ -108,13 +103,12 @@ final class GametestRig {
             helper.fail("bot_body creation failed");
         }
         var abs = helper.absolutePos(spawnLocal);
-        body.moveTo(abs.getX() + 0.5, abs.getY(), abs.getZ() + 0.5, 0f,
-            0f);
+        body.moveTo(abs.getX() + 0.5, abs.getY(), abs.getZ() + 0.5, 0f, 0f);
         level.addFreshEntity(body);
 
         BotAssembly.Assembled a = BotAssembly.assemble(level, body);
-        return new Rig(a.body(), a.view(), a.actor(), a.events(),
-            a.arbiter(), a.controller(), a.gotoHandler(), a.state());
+        return new Rig(
+                a.body(), a.view(), a.actor(), a.events(), a.arbiter(), a.controller(), a.gotoHandler(), a.state());
     }
 
     /**
@@ -182,10 +176,8 @@ final class GametestRig {
      * @return the active mission
      */
     static GotoProcess submitGoto(Rig rig, CellPos target, int budget) {
-        String taskId = "gt-" + Integer.toHexString(
-            System.identityHashCode(target));
-        GotoProcess mission = new GotoProcess(taskId,
-            new GoalBlock(target), 50, budget);
+        String taskId = "gt-" + Integer.toHexString(System.identityHashCode(target));
+        GotoProcess mission = new GotoProcess(taskId, new GoalBlock(target), 50, budget);
         rig.arbiter().register(mission);
         rig.arbiter().requestControl(mission);
         return mission;
@@ -197,17 +189,14 @@ final class GametestRig {
         }
     }
 
-    static void checkEquals(Object expected, Object actual,
-                            String message) {
+    static void checkEquals(Object expected, Object actual, String message) {
         if (!Objects.equals(expected, actual)) {
-            throw new GameTestAssertException(message + ": expected="
-                + expected + " actual=" + actual);
+            throw new GameTestAssertException(message + ": expected=" + expected + " actual=" + actual);
         }
     }
 
     static CellPos positionOf(BotBodyEntity body) {
-        return new CellPos(body.getBlockX(), body.getBlockY(),
-            body.getBlockZ());
+        return new CellPos(body.getBlockX(), body.getBlockY(), body.getBlockZ());
     }
 
     static Vec3 finePositionOf(BotBodyEntity body) {
@@ -222,8 +211,7 @@ final class GametestRig {
         return goal.equals(positionOf(body));
     }
 
-    static CellPos localToCell(GameTestHelper helper,
-                               BlockPos local) {
+    static CellPos localToCell(GameTestHelper helper, BlockPos local) {
         BlockPos abs = helper.absolutePos(local);
         return new CellPos(abs.getX(), abs.getY(), abs.getZ());
     }
@@ -245,9 +233,8 @@ final class GametestRig {
      */
     static BlockPos toLocal(GameTestHelper helper, BlockPos worldPos) {
         BlockPos origin = helper.absolutePos(BlockPos.ZERO);
-        return new BlockPos(worldPos.getX() - origin.getX(),
-            worldPos.getY() - origin.getY(),
-            worldPos.getZ() - origin.getZ());
+        return new BlockPos(
+                worldPos.getX() - origin.getX(), worldPos.getY() - origin.getY(), worldPos.getZ() - origin.getZ());
     }
 
     /**
@@ -258,8 +245,7 @@ final class GametestRig {
      * @param item the kind to sum; never null
      * @return total stack-count across every container slot
      */
-    static int countItems(Rig rig,
-                          net.minecraft.world.item.Item item) {
+    static int countItems(Rig rig, net.minecraft.world.item.Item item) {
         var container = rig.body().getInventory().container();
         int total = 0;
         for (int i = 0; i < container.getContainerSize(); i++) {
@@ -279,9 +265,8 @@ final class GametestRig {
      * @param kind   registered event-kind string; never null
      */
     static void assertEventSeen(InMemoryEventQueue events, String kind) {
-        List<String> kinds = events.statusSnapshot(0).events().stream()
-            .map(BotEvent::kind).toList();
-        check(kinds.contains(kind),
-            "expected " + kind + " in stream, got " + kinds);
+        List<String> kinds =
+                events.statusSnapshot(0).events().stream().map(BotEvent::kind).toList();
+        check(kinds.contains(kind), "expected " + kind + " in stream, got " + kinds);
     }
 }

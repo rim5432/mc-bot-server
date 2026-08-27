@@ -7,7 +7,6 @@ import com.mcbot.mcbotserver.api.world.CollisionShape;
 import com.mcbot.mcbotserver.api.world.EntitySnapshot;
 import com.mcbot.mcbotserver.api.world.ViewMode;
 import com.mcbot.mcbotserver.api.world.WorldView;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,9 +45,8 @@ public final class SnapshotWorldView implements WorldView {
     private final Map<CellPos, CollisionShape> shapes;
     private final Map<CellPos, BlockTraits> traits;
 
-    private SnapshotWorldView(Map<CellPos, BlockSnapshot> cells,
-                              Map<CellPos, CollisionShape> shapes,
-                              Map<CellPos, BlockTraits> traits) {
+    private SnapshotWorldView(
+            Map<CellPos, BlockSnapshot> cells, Map<CellPos, CollisionShape> shapes, Map<CellPos, BlockTraits> traits) {
         this.cells = cells;
         this.shapes = shapes;
         this.traits = traits;
@@ -70,8 +68,7 @@ public final class SnapshotWorldView implements WorldView {
      * @return an immutable snapshot; never null
      */
     // runs on server tick thread; reads live world state
-    public static SnapshotWorldView capture(WorldView live, CellPos a,
-                                            CellPos b) {
+    public static SnapshotWorldView capture(WorldView live, CellPos a, CellPos b) {
         Objects.requireNonNull(live, "live");
         int minX = Math.min(a.x(), b.x()) - XZ_MARGIN;
         int maxX = Math.max(a.x(), b.x()) + XZ_MARGIN;
@@ -87,20 +84,16 @@ public final class SnapshotWorldView implements WorldView {
             for (int y = minY; y <= maxY; y++) {
                 for (int z = minZ; z <= maxZ; z++) {
                     var pos = new CellPos(x, y, z);
-                    BlockSnapshot snap = live.getBlock(pos,
-                        ViewMode.LIVE);
+                    BlockSnapshot snap = live.getBlock(pos, ViewMode.LIVE);
                     if (snap != null) {
                         copied.put(pos, snap);
                     }
-                    shapes.put(pos,
-                        live.getCollisionShape(pos, ViewMode.LIVE));
-                    traits.put(pos,
-                        live.getBlockTraits(pos, ViewMode.LIVE));
+                    shapes.put(pos, live.getCollisionShape(pos, ViewMode.LIVE));
+                    traits.put(pos, live.getBlockTraits(pos, ViewMode.LIVE));
                 }
             }
         }
-        return new SnapshotWorldView(Map.copyOf(copied),
-            Map.copyOf(shapes), Map.copyOf(traits));
+        return new SnapshotWorldView(Map.copyOf(copied), Map.copyOf(shapes), Map.copyOf(traits));
     }
 
     /**
@@ -126,10 +119,8 @@ public final class SnapshotWorldView implements WorldView {
      * @return the captured shape; never null
      */
     @Override
-    public CollisionShape getCollisionShape(CellPos pos,
-                                            ViewMode mode) {
-        CollisionShape shape = shapes.get(
-            Objects.requireNonNull(pos, "pos"));
+    public CollisionShape getCollisionShape(CellPos pos, ViewMode mode) {
+        CollisionShape shape = shapes.get(Objects.requireNonNull(pos, "pos"));
         return shape != null ? shape : CollisionShape.fullCube();
     }
 
@@ -143,8 +134,7 @@ public final class SnapshotWorldView implements WorldView {
      */
     @Override
     public BlockTraits getBlockTraits(CellPos pos, ViewMode mode) {
-        BlockTraits t = traits.get(
-            Objects.requireNonNull(pos, "pos"));
+        BlockTraits t = traits.get(Objects.requireNonNull(pos, "pos"));
         return t != null ? t : BlockTraits.defaults();
     }
 
@@ -157,9 +147,7 @@ public final class SnapshotWorldView implements WorldView {
      * @return an empty list; never null
      */
     @Override
-    public List<EntitySnapshot> getEntities(CellPos center,
-                                            double radius,
-                                            ViewMode mode) {
+    public List<EntitySnapshot> getEntities(CellPos center, double radius, ViewMode mode) {
         return List.of();
     }
 

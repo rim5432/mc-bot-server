@@ -2,7 +2,6 @@ package com.mcbot.mcbotserver.core.pathing;
 
 import com.mcbot.mcbotserver.api.pathing.Movement;
 import com.mcbot.mcbotserver.api.types.CellPos;
-
 import java.util.List;
 
 /**

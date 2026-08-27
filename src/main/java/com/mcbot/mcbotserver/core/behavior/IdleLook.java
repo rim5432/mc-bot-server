@@ -1,7 +1,6 @@
 package com.mcbot.mcbotserver.core.behavior;
 
 import com.mcbot.mcbotserver.api.types.Vec3;
-
 import java.util.List;
 
 /**
@@ -59,11 +58,9 @@ public final class IdleLook {
     public static final float SWEEP_AMPLITUDE_DEG = 60f;
 
     /** Look angles toward one candidate; engine conventions. */
-    public record Target(float yawDeg, float pitchDeg) {
-    }
+    public record Target(float yawDeg, float pitchDeg) {}
 
-    private IdleLook() {
-    }
+    private IdleLook() {}
 
     /**
      * Pick the track target: the nearest candidate within
@@ -77,8 +74,7 @@ public final class IdleLook {
      * @return angles toward the nearest candidate, or {@code null}
      *         when none is within the radius
      */
-    public static Target nearestTarget(Vec3 eye,
-                                       List<Vec3> candidateEyes) {
+    public static Target nearestTarget(Vec3 eye, List<Vec3> candidateEyes) {
         Vec3 best = null;
         double bestDist = Double.MAX_VALUE;
         for (Vec3 candidate : candidateEyes) {
@@ -107,8 +103,7 @@ public final class IdleLook {
      * @return yaw in degrees, -180..180
      */
     public static float yawTo(Vec3 from, Vec3 to) {
-        return (float) Math.toDegrees(
-            Math.atan2(-(to.x() - from.x()), to.z() - from.z()));
+        return (float) Math.toDegrees(Math.atan2(-(to.x() - from.x()), to.z() - from.z()));
     }
 
     /**
@@ -122,12 +117,9 @@ public final class IdleLook {
      */
     public static float pitchTo(Vec3 from, Vec3 to) {
         double dy = to.y() - from.y();
-        double horizontal = Math.hypot(to.x() - from.x(),
-            to.z() - from.z());
-        float pitch = (float) -Math.toDegrees(
-            Math.atan2(dy, horizontal));
-        return Math.max(-PITCH_LIMIT_DEG,
-            Math.min(PITCH_LIMIT_DEG, pitch));
+        double horizontal = Math.hypot(to.x() - from.x(), to.z() - from.z());
+        float pitch = (float) -Math.toDegrees(Math.atan2(dy, horizontal));
+        return Math.max(-PITCH_LIMIT_DEG, Math.min(PITCH_LIMIT_DEG, pitch));
     }
 
     /**
@@ -140,12 +132,9 @@ public final class IdleLook {
      * @param targetYaw  desired yaw in degrees
      * @return the next yaw, normalized to -180..180
      */
-    public static float turnTowardYaw(float currentYaw,
-                                      float targetYaw) {
-        double delta = Math.IEEEremainder(
-            targetYaw - currentYaw, 360.0);
-        double step = Math.min(TURN_PER_TICK_DEG,
-            Math.max(-TURN_PER_TICK_DEG, delta));
+    public static float turnTowardYaw(float currentYaw, float targetYaw) {
+        double delta = Math.IEEEremainder(targetYaw - currentYaw, 360.0);
+        double step = Math.min(TURN_PER_TICK_DEG, Math.max(-TURN_PER_TICK_DEG, delta));
         return (float) Math.IEEEremainder(currentYaw + step, 360.0);
     }
 
@@ -158,11 +147,9 @@ public final class IdleLook {
      * @param targetPitch  desired pitch in degrees
      * @return the next pitch
      */
-    public static float turnTowardPitch(float currentPitch,
-                                        float targetPitch) {
+    public static float turnTowardPitch(float currentPitch, float targetPitch) {
         double delta = targetPitch - currentPitch;
-        double step = Math.min(TURN_PER_TICK_DEG,
-            Math.max(-TURN_PER_TICK_DEG, delta));
+        double step = Math.min(TURN_PER_TICK_DEG, Math.max(-TURN_PER_TICK_DEG, delta));
         return (float) (currentPitch + step);
     }
 }

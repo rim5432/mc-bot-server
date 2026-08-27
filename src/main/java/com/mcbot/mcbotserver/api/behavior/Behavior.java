@@ -26,8 +26,7 @@ public interface Behavior {
      * @param actor     the claim surface; never null
      * @return this tick's verdict; never null
      */
-    ExecutionReport tick(WorldView world, Directive directive,
-                         Actor actor);
+    ExecutionReport tick(WorldView world, Directive directive, Actor actor);
 
     /**
      * Stable identity for diagnostics and claim holder names.

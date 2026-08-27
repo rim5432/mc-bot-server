@@ -1,5 +1,9 @@
 package com.mcbot.mcbotserver.architecture;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import com.mcbot.mcbotserver.testsupport.RepoRoot;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -7,13 +11,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Stream;
-
 import org.junit.jupiter.api.Test;
-
-import com.mcbot.mcbotserver.testsupport.RepoRoot;
-
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Layer-1 gate over the package structure (AGENTS.md 1.1 as the tree
@@ -34,8 +32,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 class PackageStructureGateTest {
 
     /** Legal first segments under com.mcbot.mcbotserver in src/main. */
-    private static final Set<String> MODULES = Set.of(
-        "api", "core", "adapter", "mixin", "gametest", "client");
+    private static final Set<String> MODULES = Set.of("api", "core", "adapter", "mixin", "gametest", "client");
 
     /**
      * Test packages that test the repository rather than one main
@@ -43,36 +40,33 @@ class PackageStructureGateTest {
      * boundaryd = boundary D), the hygiene/architecture gates, and
      * testsupport (shared test infrastructure - RepoRoot et al).
      */
-    private static final Set<String> TEST_METAS = Set.of(
-        "architecture", "boundarya", "boundaryd", "hygiene",
-        "testsupport");
+    private static final Set<String> TEST_METAS =
+            Set.of("architecture", "boundarya", "boundaryd", "hygiene", "testsupport");
 
     /** Anchors proving the main scan actually saw the tree. */
-    private static final List<String> MAIN_ANCHORS = List.of(
-        "api/actor", "core/tick", "adapter", "gametest");
+    private static final List<String> MAIN_ANCHORS = List.of("api/actor", "core/tick", "adapter", "gametest");
 
     /** Anchors proving the test scan actually saw the tree. */
-    private static final List<String> TEST_ANCHORS = List.of(
-        "core/tick", "boundarya", "boundaryd", "hygiene");
+    private static final List<String> TEST_ANCHORS = List.of("core/tick", "boundarya", "boundaryd", "hygiene");
 
     /** Fails when a main package breaks the module grammar. */
     @Test
     void mainPackagesStaySingleLevelAndCrossHalfFree() {
-        Set<String> packages = scanPackages(RepoRoot.find().resolve(
-            Path.of("src", "main", "java", "com", "mcbot", "mcbotserver")));
-        List<String> violations = packages.stream()
-            .filter(p -> !isLegalMainPackage(p))
-            .toList();
-        assertTrue(violations.isEmpty(),
-            () -> "main packages break the module grammar: "
-                + violations + ". Legal shapes: the root, <module>, "
-                + "or <module>.<subject> with module in " + MODULES
-                + " and subject never a module name; deeper nesting "
-                + "is a namespace defect (AGENTS.md 1.1).");
+        Set<String> packages =
+                scanPackages(RepoRoot.find().resolve(Path.of("src", "main", "java", "com", "mcbot", "mcbotserver")));
+        List<String> violations =
+                packages.stream().filter(p -> !isLegalMainPackage(p)).toList();
+        assertTrue(
+                violations.isEmpty(),
+                () -> "main packages break the module grammar: "
+                        + violations + ". Legal shapes: the root, <module>, "
+                        + "or <module>.<subject> with module in " + MODULES
+                        + " and subject never a module name; deeper nesting "
+                        + "is a namespace defect (AGENTS.md 1.1).");
         for (String anchor : MAIN_ANCHORS) {
-            assertTrue(packages.contains(anchor),
-                () -> "main package anchor missing: " + anchor
-                    + " - the scan came back incomplete.");
+            assertTrue(
+                    packages.contains(anchor),
+                    () -> "main package anchor missing: " + anchor + " - the scan came back incomplete.");
         }
     }
 
@@ -80,23 +74,24 @@ class PackageStructureGateTest {
      *  belongs to the sanctioned meta set. */
     @Test
     void testPackagesMirrorMainOrAreSanctionedMetas() {
-        Set<String> main = scanPackages(RepoRoot.find().resolve(
-            Path.of("src", "main", "java", "com", "mcbot", "mcbotserver")));
-        Set<String> test = scanPackages(RepoRoot.find().resolve(
-            Path.of("src", "test", "java", "com", "mcbot", "mcbotserver")));
+        Set<String> main =
+                scanPackages(RepoRoot.find().resolve(Path.of("src", "main", "java", "com", "mcbot", "mcbotserver")));
+        Set<String> test =
+                scanPackages(RepoRoot.find().resolve(Path.of("src", "test", "java", "com", "mcbot", "mcbotserver")));
         Set<String> violations = new TreeSet<>(test);
         violations.removeAll(main);
         violations.removeAll(TEST_METAS);
-        assertTrue(violations.isEmpty(),
-            () -> "test packages with no main counterpart and no meta "
-                + "sanction: " + violations + ". Either mirror the "
-                + "package under test or add the package to TEST_METAS "
-                + "as a deliberate, reviewed decision (a theme name is "
-                + "not a mirror).");
+        assertTrue(
+                violations.isEmpty(),
+                () -> "test packages with no main counterpart and no meta "
+                        + "sanction: " + violations + ". Either mirror the "
+                        + "package under test or add the package to TEST_METAS "
+                        + "as a deliberate, reviewed decision (a theme name is "
+                        + "not a mirror).");
         for (String anchor : TEST_ANCHORS) {
-            assertTrue(test.contains(anchor),
-                () -> "test package anchor missing: " + anchor
-                    + " - the scan came back incomplete.");
+            assertTrue(
+                    test.contains(anchor),
+                    () -> "test package anchor missing: " + anchor + " - the scan came back incomplete.");
         }
     }
 
@@ -124,20 +119,17 @@ class PackageStructureGateTest {
         Set<String> packages = new TreeSet<>();
         try (Stream<Path> walk = Files.walk(root)) {
             walk.filter(Files::isDirectory)
-                .filter(PackageStructureGateTest::holdsJavaFile)
-                .forEach(dir -> packages.add(root.relativize(dir)
-                    .toString().replace('\\', '/')));
+                    .filter(PackageStructureGateTest::holdsJavaFile)
+                    .forEach(dir -> packages.add(root.relativize(dir).toString().replace('\\', '/')));
         } catch (IOException e) {
-            fail("cannot scan package tree under " + root + ": "
-                + e.getMessage());
+            fail("cannot scan package tree under " + root + ": " + e.getMessage());
         }
         return packages;
     }
 
     private static boolean holdsJavaFile(Path dir) {
         try (Stream<Path> list = Files.list(dir)) {
-            return list.anyMatch(p -> p.getFileName().toString()
-                .endsWith(".java"));
+            return list.anyMatch(p -> p.getFileName().toString().endsWith(".java"));
         } catch (IOException e) {
             return false;
         }

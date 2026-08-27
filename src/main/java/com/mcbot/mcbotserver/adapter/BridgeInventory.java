@@ -1,7 +1,6 @@
 package com.mcbot.mcbotserver.adapter;
 
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
-
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -167,8 +166,7 @@ public final class BridgeInventory extends Inventory {
      */
     @Override
     public ItemStack removeItem(int slot, int amount) {
-        return body.getInventory().container()
-            .removeItem(toBindingSlot(slot), amount);
+        return body.getInventory().container().removeItem(toBindingSlot(slot), amount);
     }
 
     /**
@@ -181,8 +179,7 @@ public final class BridgeInventory extends Inventory {
      */
     @Override
     public ItemStack removeItemNoUpdate(int slot) {
-        return body.getInventory().container()
-            .removeItemNoUpdate(toBindingSlot(slot));
+        return body.getInventory().container().removeItemNoUpdate(toBindingSlot(slot));
     }
 
     /**
@@ -238,17 +235,14 @@ public final class BridgeInventory extends Inventory {
     public int getSlotWithRemainingSpace(ItemStack stack) {
         SimpleContainer container = body.getInventory().container();
         int selected = body.selectedSlot;
-        if (hasRemainingSpace(container.getItem(selected), stack,
-                container)) {
+        if (hasRemainingSpace(container.getItem(selected), stack, container)) {
             return selected;
         }
-        if (hasRemainingSpace(container.getItem(OFFHAND_SLOT), stack,
-                container)) {
+        if (hasRemainingSpace(container.getItem(OFFHAND_SLOT), stack, container)) {
             return OFFHAND_SLOT;
         }
         for (int i = 0; i < MAIN_SLOTS; i++) {
-            if (hasRemainingSpace(container.getItem(i), stack,
-                    container)) {
+            if (hasRemainingSpace(container.getItem(i), stack, container)) {
                 return i;
             }
         }
@@ -266,14 +260,12 @@ public final class BridgeInventory extends Inventory {
      *                  max stack size
      * @return true when the candidate slot can absorb from the stack
      */
-    private static boolean hasRemainingSpace(ItemStack slot,
-                                             ItemStack stack,
-                                             SimpleContainer container) {
+    private static boolean hasRemainingSpace(ItemStack slot, ItemStack stack, SimpleContainer container) {
         return !slot.isEmpty()
-            && ItemStack.isSameItemSameTags(slot, stack)
-            && slot.isStackable()
-            && slot.getCount() < slot.getMaxStackSize()
-            && slot.getCount() < container.getMaxStackSize();
+                && ItemStack.isSameItemSameTags(slot, stack)
+                && slot.isStackable()
+                && slot.getCount() < slot.getMaxStackSize()
+                && slot.getCount() < container.getMaxStackSize();
     }
 
     /**

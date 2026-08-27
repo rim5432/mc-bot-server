@@ -2,7 +2,6 @@ package com.mcbot.mcbotserver.core.pathing;
 
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.WorldView;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -53,8 +52,7 @@ public final class PlanSmoother {
      */
     public static final double SAMPLE_STEP = 0.5;
 
-    private PlanSmoother() {
-    }
+    private PlanSmoother() {}
 
     /**
      * Simplify an adopted waypoint chain. The first and last cells
@@ -89,8 +87,7 @@ public final class PlanSmoother {
             while (j + 1 < plan.size()) {
                 CellPos cur = plan.get(j);
                 CellPos next = plan.get(j + 1);
-                if (next.x() - cur.x() != dx || next.y() - cur.y() != dy
-                    || next.z() - cur.z() != dz) {
+                if (next.x() - cur.x() != dx || next.y() - cur.y() != dy || next.z() - cur.z() != dz) {
                     break;
                 }
                 j++;
@@ -101,15 +98,14 @@ public final class PlanSmoother {
         return out;
     }
 
-    private static List<CellPos> mergeVisible(WorldView world,
-                                              List<CellPos> runs) {
+    private static List<CellPos> mergeVisible(WorldView world, List<CellPos> runs) {
         List<CellPos> out = new ArrayList<>();
         out.add(runs.get(0));
         int i = 0;
         while (i < runs.size() - 1) {
             int j = runs.size() - 1;
-            while (j > i + 1 && (runs.get(i).y() != runs.get(j).y()
-                || !corridorStandable(world, runs.get(i), runs.get(j)))) {
+            while (j > i + 1
+                    && (runs.get(i).y() != runs.get(j).y() || !corridorStandable(world, runs.get(i), runs.get(j)))) {
                 j--;
             }
             out.add(runs.get(j));
@@ -134,8 +130,7 @@ public final class PlanSmoother {
      * @return true when every sample stands on a walkable floor with
      *         headroom
      */
-    static boolean corridorStandable(WorldView world, CellPos from,
-                                     CellPos to) {
+    static boolean corridorStandable(WorldView world, CellPos from, CellPos to) {
         double x0 = from.x() + 0.5;
         double z0 = from.z() + 0.5;
         double x1 = to.x() + 0.5;
@@ -144,10 +139,8 @@ public final class PlanSmoother {
         int steps = Math.max(1, (int) Math.ceil(dist / SAMPLE_STEP));
         for (int k = 1; k < steps; k++) {
             double t = (double) k / steps;
-            CellPos sample = new CellPos(
-                (int) Math.floor(x0 + (x1 - x0) * t),
-                from.y(),
-                (int) Math.floor(z0 + (z1 - z0) * t));
+            CellPos sample =
+                    new CellPos((int) Math.floor(x0 + (x1 - x0) * t), from.y(), (int) Math.floor(z0 + (z1 - z0) * t));
             if (!BasicMoves.standable(world, sample)) {
                 return false;
             }

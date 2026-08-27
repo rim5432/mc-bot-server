@@ -45,8 +45,7 @@ public final class BotInventoryMenu extends InventoryMenu {
      *                  the facade is always server-side
      * @param owner     the owning facade; never null
      */
-    public BotInventoryMenu(Inventory inventory, boolean active,
-                            Player owner) {
+    public BotInventoryMenu(Inventory inventory, boolean active, Player owner) {
         super(inventory, active, owner);
         this.player = inventory.player;
     }

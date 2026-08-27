@@ -2,7 +2,6 @@ package com.mcbot.mcbotserver.core.tick;
 
 import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
-
 import java.util.Map;
 
 /**

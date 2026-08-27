@@ -1,14 +1,13 @@
 package com.mcbot.mcbotserver.api.actor;
 
-import com.mcbot.mcbotserver.api.types.CellPos;
-import com.mcbot.mcbotserver.api.types.Direction;
-import com.mcbot.mcbotserver.api.types.Vec3;
-
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.api.types.Direction;
+import com.mcbot.mcbotserver.api.types.Vec3;
+import org.junit.jupiter.api.Test;
 
 /**
  * Offline gates for the Phase 1 InteractBlock intent and the api-layer
@@ -86,58 +85,54 @@ class InteractBlockIntentTest {
 
     @Test
     void interactBlockRejectsNullTarget() {
-        assertThrows(IllegalArgumentException.class,
-            () -> new Intent.InteractBlock(null, Direction.UP, HIT));
+        assertThrows(IllegalArgumentException.class, () -> new Intent.InteractBlock(null, Direction.UP, HIT));
     }
 
     @Test
     void interactBlockRejectsNullFace() {
-        assertThrows(IllegalArgumentException.class,
-            () -> new Intent.InteractBlock(TARGET, null, HIT));
+        assertThrows(IllegalArgumentException.class, () -> new Intent.InteractBlock(TARGET, null, HIT));
     }
 
     @Test
     void interactBlockRejectsNullHitPos() {
-        assertThrows(IllegalArgumentException.class,
-            () -> new Intent.InteractBlock(TARGET, Direction.UP, null));
+        assertThrows(IllegalArgumentException.class, () -> new Intent.InteractBlock(TARGET, Direction.UP, null));
     }
 
     // ---- Claim channel validation ----
 
     @Test
     void interactBlockIsValidOnInteractChannel() {
-        var claim = new Claim(Channel.INTERACT, 100, "test",
-            new Intent.InteractBlock(TARGET, Direction.UP, HIT));
+        var claim = new Claim(Channel.INTERACT, 100, "test", new Intent.InteractBlock(TARGET, Direction.UP, HIT));
         assertEquals(Channel.INTERACT, claim.channel());
         assertTrue(claim.intent() instanceof Intent.InteractBlock);
     }
 
     @Test
     void interactBlockRejectedOnMoveChannel() {
-        assertThrows(IllegalArgumentException.class,
-            () -> new Claim(Channel.MOVE, 100, "test",
-                new Intent.InteractBlock(TARGET, Direction.UP, HIT)));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new Claim(Channel.MOVE, 100, "test", new Intent.InteractBlock(TARGET, Direction.UP, HIT)));
     }
 
     @Test
     void interactBlockRejectedOnRotChannel() {
-        assertThrows(IllegalArgumentException.class,
-            () -> new Claim(Channel.ROT, 100, "test",
-                new Intent.InteractBlock(TARGET, Direction.UP, HIT)));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new Claim(Channel.ROT, 100, "test", new Intent.InteractBlock(TARGET, Direction.UP, HIT)));
     }
 
     @Test
     void interactBlockRejectedOnUseChannel() {
-        assertThrows(IllegalArgumentException.class,
-            () -> new Claim(Channel.USE, 100, "test",
-                new Intent.InteractBlock(TARGET, Direction.UP, HIT)));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new Claim(Channel.USE, 100, "test", new Intent.InteractBlock(TARGET, Direction.UP, HIT)));
     }
 
     @Test
     void interactBlockRejectedOnSlotChannel() {
-        assertThrows(IllegalArgumentException.class,
-            () -> new Claim(Channel.SLOT, 100, "test",
-                new Intent.InteractBlock(TARGET, Direction.UP, HIT)));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new Claim(Channel.SLOT, 100, "test", new Intent.InteractBlock(TARGET, Direction.UP, HIT)));
     }
 
     // ---- INTERACT channel coexistence ----
@@ -148,11 +143,8 @@ class InteractBlockIntentTest {
         // per-tick arbiter picks one winner per tick. This gate only
         // proves the claim-construction gate accepts all three; the
         // arbitration itself is ChannelArbiter's job.
-        new Claim(Channel.INTERACT, 100, "dig",
-            new Intent.Dig(TARGET));
-        new Claim(Channel.INTERACT, 100, "drop",
-            new Intent.DropSelected(true));
-        new Claim(Channel.INTERACT, 100, "place",
-            new Intent.InteractBlock(TARGET, Direction.UP, HIT));
+        new Claim(Channel.INTERACT, 100, "dig", new Intent.Dig(TARGET));
+        new Claim(Channel.INTERACT, 100, "drop", new Intent.DropSelected(true));
+        new Claim(Channel.INTERACT, 100, "place", new Intent.InteractBlock(TARGET, Direction.UP, HIT));
     }
 }

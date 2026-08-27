@@ -1,15 +1,14 @@
 package com.mcbot.mcbotserver.core.behavior;
 
-import com.mcbot.mcbotserver.api.goal.GoalBlock;
-import com.mcbot.mcbotserver.api.goal.GoalNear;
-import com.mcbot.mcbotserver.api.types.CellPos;
-
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.mcbot.mcbotserver.api.goal.GoalBlock;
+import com.mcbot.mcbotserver.api.goal.GoalNear;
+import com.mcbot.mcbotserver.api.types.CellPos;
+import org.junit.jupiter.api.Test;
 
 /**
  * State-machine gates for the unreachable-goal escalation: witness
@@ -22,8 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class NoPathEscalatorTest {
 
-    private static final GoalBlock GOAL =
-        new GoalBlock(new CellPos(0, 64, 0));
+    private static final GoalBlock GOAL = new GoalBlock(new CellPos(0, 64, 0));
 
     private static CellPos at(int x, int y, int z) {
         return new CellPos(x, y, z);
@@ -181,8 +179,7 @@ class NoPathEscalatorTest {
         for (int i = 0; i < 10; i++) {
             e.onAdopted(GOAL, at(20, 64, 0));
         }
-        assertEquals(NoPathEscalator.MAX_NODE_BUDGET,
-            e.nextNodeBudget());
+        assertEquals(NoPathEscalator.MAX_NODE_BUDGET, e.nextNodeBudget());
     }
 
     /** Improvement after witnesses keeps the budget ladder honest. */
@@ -199,7 +196,6 @@ class NoPathEscalatorTest {
     /** Construction rejects a non-positive budget loudly. */
     @Test
     void nonPositiveBaseBudgetRejected() {
-        assertThrows(IllegalArgumentException.class,
-            () -> new NoPathEscalator(0));
+        assertThrows(IllegalArgumentException.class, () -> new NoPathEscalator(0));
     }
 }

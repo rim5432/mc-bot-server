@@ -36,8 +36,7 @@ public record Vec3(double x, double y, double z) {
      * @param targetZ target z
      * @return straight-line distance
      */
-    public double distanceTo(double targetX, double targetY,
-                             double targetZ) {
+    public double distanceTo(double targetX, double targetY, double targetZ) {
         double dx = x - targetX;
         double dy = y - targetY;
         double dz = z - targetZ;

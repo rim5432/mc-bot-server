@@ -2,15 +2,12 @@ package com.mcbot.mcbotserver.adapter;
 
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
 import com.mojang.authlib.GameProfile;
-
-import net.minecraft.core.BlockPos;
+import java.util.UUID;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-
-import java.util.UUID;
 
 /**
  * Minimal Player facade for menu and crafting operations (issue 0007
@@ -77,8 +74,7 @@ public final class BotPlayerFacade extends Player {
      * @param body the physical carrier; never null
      */
     public BotPlayerFacade(BotBodyEntity body) {
-        super(body.level(), body.blockPosition(), body.getYRot(),
-            createProfile(body));
+        super(body.level(), body.blockPosition(), body.getYRot(), createProfile(body));
         this.body = body;
         // NOTE: Entity.eyeHeight is private and getEyeHeight() is final,
         // so this facade retains the Player default eyeHeight (1.62) even
@@ -93,8 +89,7 @@ public final class BotPlayerFacade extends Player {
         // !level.isClientSide flag in the Player constructor).
         // BotInventoryMenu bypasses the vanilla slotsChanged
         // ServerPlayer cast — see its class Javadoc.
-        this.facadeInventoryMenu = new BotInventoryMenu(
-            bridgeInventory, true, this);
+        this.facadeInventoryMenu = new BotInventoryMenu(bridgeInventory, true, this);
         this.containerMenu = facadeInventoryMenu;
     }
 
@@ -196,8 +191,7 @@ public final class BotPlayerFacade extends Player {
      * @return the spawned item entity, or null if the stack was empty
      */
     @Override
-    public net.minecraft.world.entity.item.ItemEntity drop(
-            ItemStack stack, boolean throwRandomly) {
+    public net.minecraft.world.entity.item.ItemEntity drop(ItemStack stack, boolean throwRandomly) {
         if (stack.isEmpty()) {
             return null;
         }
@@ -255,8 +249,7 @@ public final class BotPlayerFacade extends Player {
      * No-op overload for integer-stat awards.
      */
     @Override
-    public void awardStat(net.minecraft.resources.ResourceLocation stat,
-                           int amount) {
+    public void awardStat(net.minecraft.resources.ResourceLocation stat, int amount) {
         // no-op
     }
 

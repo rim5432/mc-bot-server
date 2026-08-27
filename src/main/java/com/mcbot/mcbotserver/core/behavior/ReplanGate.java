@@ -36,8 +36,7 @@ final class ReplanGate {
      * @param landingEdge      whether this tick IS the landing edge,
      *                         which bypasses the cooldown
      */
-    record TickWindow(boolean evaluateTriggers, boolean landingEdge) {
-    }
+    record TickWindow(boolean evaluateTriggers, boolean landingEdge) {}
 
     /**
      * Open the tick's window: advance the cooldown counter and sample
@@ -61,9 +60,7 @@ final class ReplanGate {
      * @return true iff a request would be honoured
      */
     boolean mayRequest(TickWindow window) {
-        return window.landingEdge()
-            || neverPlanned
-            || ticksSincePlan >= PathingBehavior.REPLAN_COOLDOWN;
+        return window.landingEdge() || neverPlanned || ticksSincePlan >= PathingBehavior.REPLAN_COOLDOWN;
     }
 
     /** Record that a request fired; re-arm the full cooldown. */

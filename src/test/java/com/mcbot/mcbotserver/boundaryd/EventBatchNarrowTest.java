@@ -1,17 +1,15 @@
 package com.mcbot.mcbotserver.boundaryd;
 
-import com.mcbot.mcbotserver.api.event.BotEvent;
-import com.mcbot.mcbotserver.api.event.EventBatch;
-import com.mcbot.mcbotserver.api.event.EventKind;
-
-import org.junit.jupiter.api.Test;
-
-import java.util.List;
-import java.util.Map;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.mcbot.mcbotserver.api.event.BotEvent;
+import com.mcbot.mcbotserver.api.event.EventBatch;
+import com.mcbot.mcbotserver.api.event.EventKind;
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
 
 /**
  * Kind-prefix narrowing gates (issue 0011 D3): the events-poll verb
@@ -26,8 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class EventBatchNarrowTest {
 
     private static BotEvent event(String kind) {
-        return new BotEvent(kind, 0L, 0L, false, Map.of(),
-            kind + " probe");
+        return new BotEvent(kind, 0L, 0L, false, Map.of(), kind + " probe");
     }
 
     private static EventBatch batch(BotEvent... events) {
@@ -40,13 +37,14 @@ class EventBatchNarrowTest {
     @Test
     void prefixKeepsMatchesAndDropsTheRest() {
         EventBatch narrowed = batch(
-            event(EventKind.STATE_PUSH),
-            event(EventKind.TASK_COMPLETED),
-            event(EventKind.KEEPALIVE),
-            event(EventKind.TASK_FAILED))
-            .narrowedToKindPrefix("TASK_");
-        assertEquals(List.of("TASK_COMPLETED", "TASK_FAILED"),
-            narrowed.events().stream().map(BotEvent::kind).toList());
+                        event(EventKind.STATE_PUSH),
+                        event(EventKind.TASK_COMPLETED),
+                        event(EventKind.KEEPALIVE),
+                        event(EventKind.TASK_FAILED))
+                .narrowedToKindPrefix("TASK_");
+        assertEquals(
+                List.of("TASK_COMPLETED", "TASK_FAILED"),
+                narrowed.events().stream().map(BotEvent::kind).toList());
     }
 
     /**
@@ -57,27 +55,25 @@ class EventBatchNarrowTest {
     @Test
     void cursorIntegrityKindsSurviveEveryFilter() {
         EventBatch narrowed = batch(
-            event(EventKind.TASK_COMPLETED),
-            event(EventKind.EVENT_GAP),
-            event(EventKind.STATE_PUSH),
-            event(EventKind.EVENT_DROPPED))
-            .narrowedToKindPrefix("TASK_");
+                        event(EventKind.TASK_COMPLETED),
+                        event(EventKind.EVENT_GAP),
+                        event(EventKind.STATE_PUSH),
+                        event(EventKind.EVENT_DROPPED))
+                .narrowedToKindPrefix("TASK_");
         assertEquals(
-            List.of("TASK_COMPLETED", "EVENT_GAP", "EVENT_DROPPED"),
-            narrowed.events().stream().map(BotEvent::kind).toList());
+                List.of("TASK_COMPLETED", "EVENT_GAP", "EVENT_DROPPED"),
+                narrowed.events().stream().map(BotEvent::kind).toList());
     }
 
     @Test
     void cursorFieldsStayTheTrueStreamValues() {
-        EventBatch original = batch(
-            event(EventKind.STATE_PUSH),
-            event(EventKind.STATE_PUSH));
+        EventBatch original = batch(event(EventKind.STATE_PUSH), event(EventKind.STATE_PUSH));
         EventBatch narrowed = original.narrowedToKindPrefix("TASK_");
-        assertTrue(narrowed.events().isEmpty(),
-            "nothing matches the prefix");
-        assertEquals(original.latestEventId(), narrowed.latestEventId(),
-            "the cursor must advance by what existed, not what was "
-                + "shown");
+        assertTrue(narrowed.events().isEmpty(), "nothing matches the prefix");
+        assertEquals(
+                original.latestEventId(),
+                narrowed.latestEventId(),
+                "the cursor must advance by what existed, not what was " + "shown");
         assertEquals(original.droppedCount(), narrowed.droppedCount());
         assertEquals(original.resetAt(), narrowed.resetAt());
     }

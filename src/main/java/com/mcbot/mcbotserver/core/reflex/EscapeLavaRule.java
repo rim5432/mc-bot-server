@@ -34,8 +34,7 @@ import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
  * replaces.
  */
 // contract: see ADR-0003 section 2 (rules are data rows over the board)
-public final class EscapeLavaRule
-        implements ReflexRule, ReflexHysteresis {
+public final class EscapeLavaRule implements ReflexRule, ReflexHysteresis {
 
     /** Flat firing priority; above every other reflex — lava is the
      * fastest killer in the catalog (4 HP/tick). */
@@ -72,8 +71,7 @@ public final class EscapeLavaRule
      */
     public EscapeLavaRule(int priority) {
         if (priority <= 0) {
-            throw new IllegalArgumentException(
-                "priority must be positive");
+            throw new IllegalArgumentException("priority must be positive");
         }
         this.priority = priority;
     }

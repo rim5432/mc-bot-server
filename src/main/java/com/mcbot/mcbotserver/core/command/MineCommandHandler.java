@@ -7,9 +7,7 @@ import com.mcbot.mcbotserver.api.event.EventQueue;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.process.MineProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
-
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
@@ -50,14 +48,18 @@ public final class MineCommandHandler {
      *                          every mission as the search center;
      *                          never null
      */
-    public MineCommandHandler(TaskArbiter arbiter, EventQueue events,
-                              LongSupplier daySupplier,
-                              LongSupplier timeOfDaySupplier,
-                              Supplier<CellPos> botPosition) {
-        if (arbiter == null || events == null || daySupplier == null
-                || timeOfDaySupplier == null || botPosition == null) {
-            throw new IllegalArgumentException(
-                "arguments must not be null");
+    public MineCommandHandler(
+            TaskArbiter arbiter,
+            EventQueue events,
+            LongSupplier daySupplier,
+            LongSupplier timeOfDaySupplier,
+            Supplier<CellPos> botPosition) {
+        if (arbiter == null
+                || events == null
+                || daySupplier == null
+                || timeOfDaySupplier == null
+                || botPosition == null) {
+            throw new IllegalArgumentException("arguments must not be null");
         }
         this.arbiter = arbiter;
         this.events = events;
@@ -79,8 +81,7 @@ public final class MineCommandHandler {
         bus.register("mine", new CommandBus.Handler() {
             @Override
             public String validate(BotCommand command) {
-                return validateArgs(command) ? null
-                    : "mine wants blockType count [timeoutTicks]";
+                return validateArgs(command) ? null : "mine wants blockType count [timeoutTicks]";
             }
 
             @Override
@@ -89,11 +90,9 @@ public final class MineCommandHandler {
                 String blockType = args.get("blockType");
                 int count = Integer.parseInt(args.get("count"));
                 long timeout = args.containsKey("timeoutTicks")
-                    ? Long.parseLong(args.get("timeoutTicks"))
-                    : DEFAULT_TIMEOUT_TICKS;
-                MineProcess mission = new MineProcess(
-                    taskId, blockType, count, 50, timeout,
-                    botPosition);
+                        ? Long.parseLong(args.get("timeoutTicks"))
+                        : DEFAULT_TIMEOUT_TICKS;
+                MineProcess mission = new MineProcess(taskId, blockType, count, 50, timeout, botPosition);
                 missions.put(taskId, mission);
                 arbiter.register(mission);
                 arbiter.requestControl(mission);
@@ -125,8 +124,7 @@ public final class MineCommandHandler {
         });
     }
 
-    private void pushBlockBroken(String taskId,
-                                 MineProcess.BlockBreak pending) {
+    private void pushBlockBroken(String taskId, MineProcess.BlockBreak pending) {
         try {
             var attrs = new HashMap<String, String>();
             attrs.put("taskId", taskId);
@@ -134,11 +132,13 @@ public final class MineCommandHandler {
             attrs.put("posY", String.valueOf(pending.pos().y()));
             attrs.put("posZ", String.valueOf(pending.pos().z()));
             attrs.put("blockId", pending.blockId());
-            events.push(new BotEvent(EventKind.BLOCK_BROKEN,
-                daySupplier.getAsLong(),
-                timeOfDaySupplier.getAsLong(), false,
-                Map.copyOf(attrs),
-                taskId + ": broke " + pending.blockId()));
+            events.push(new BotEvent(
+                    EventKind.BLOCK_BROKEN,
+                    daySupplier.getAsLong(),
+                    timeOfDaySupplier.getAsLong(),
+                    false,
+                    Map.copyOf(attrs),
+                    taskId + ": broke " + pending.blockId()));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down with it.
         }
@@ -156,11 +156,13 @@ public final class MineCommandHandler {
         }
         mission.abort();
         try {
-            events.push(new BotEvent(EventKind.TASK_CANCELLED,
-                daySupplier.getAsLong(),
-                timeOfDaySupplier.getAsLong(), false,
-                Map.of("task", "mine:" + taskId, "taskId", taskId),
-                "mine:" + taskId + ": cancelled by harness"));
+            events.push(new BotEvent(
+                    EventKind.TASK_CANCELLED,
+                    daySupplier.getAsLong(),
+                    timeOfDaySupplier.getAsLong(),
+                    false,
+                    Map.of("task", "mine:" + taskId, "taskId", taskId),
+                    "mine:" + taskId + ": cancelled by harness"));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down with it.
         }
@@ -177,8 +179,7 @@ public final class MineCommandHandler {
             if (count <= 0) {
                 return false;
             }
-            if (args.containsKey("timeoutTicks")
-                    && Long.parseLong(args.get("timeoutTicks")) <= 0) {
+            if (args.containsKey("timeoutTicks") && Long.parseLong(args.get("timeoutTicks")) <= 0) {
                 return false;
             }
             return true;

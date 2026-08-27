@@ -2,15 +2,13 @@ package com.mcbot.mcbotserver.adapter;
 
 import com.mcbot.mcbotserver.api.inventory.InventoryView;
 import com.mcbot.mcbotserver.api.inventory.ItemView;
-
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.item.ItemStack;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
 
 /**
  * Adapter-side inventory binding: a {@link SimpleContainer} of 41 slots
@@ -47,8 +45,7 @@ import java.util.Objects;
 public final class BindingInventory {
 
     /** Total slots: 36 main + 4 armor + 1 offhand. */
-    public static final int CONTAINER_SIZE =
-        InventoryView.MAIN_SIZE + InventoryView.ARMOR_SIZE + 1;
+    public static final int CONTAINER_SIZE = InventoryView.MAIN_SIZE + InventoryView.ARMOR_SIZE + 1;
 
     /** Slot index of the first armor slot (head). */
     public static final int ARMOR_START = InventoryView.MAIN_SIZE;
@@ -98,8 +95,7 @@ public final class BindingInventory {
     public void setSelectedSlot(int slot) {
         if (slot < 0 || slot >= InventoryView.HOTBAR_SIZE) {
             throw new IllegalArgumentException(
-                "selectedSlot must be 0.." + (InventoryView.HOTBAR_SIZE - 1)
-                    + ", was " + slot);
+                    "selectedSlot must be 0.." + (InventoryView.HOTBAR_SIZE - 1) + ", was " + slot);
         }
         this.selectedSlot = slot;
     }
@@ -121,8 +117,7 @@ public final class BindingInventory {
             armorSlots.add(toView(container.getItem(ARMOR_START + i)));
         }
         ItemView offhand = toView(container.getItem(OFFHAND_SLOT));
-        return new InventoryView(mainSlots, selectedSlot, armorSlots,
-            offhand);
+        return new InventoryView(mainSlots, selectedSlot, armorSlots, offhand);
     }
 
     /**
@@ -141,8 +136,8 @@ public final class BindingInventory {
         ResourceLocation key = BuiltInRegistries.ITEM.getKey(stack.getItem());
         String id = key != null ? key.toString() : "unknown";
         String digest = stack.hasTag() && stack.getTag() != null
-            ? Integer.toHexString(stack.getTag().hashCode())
-            : "";
+                ? Integer.toHexString(stack.getTag().hashCode())
+                : "";
         return new ItemView(id, stack.getCount(), digest);
     }
 }

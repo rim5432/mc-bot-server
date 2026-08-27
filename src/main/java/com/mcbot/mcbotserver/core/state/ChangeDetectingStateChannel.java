@@ -5,7 +5,6 @@ import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.event.EventQueue;
 import com.mcbot.mcbotserver.api.state.BotState;
 import com.mcbot.mcbotserver.api.state.StateChannel;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -57,17 +56,14 @@ public final class ChangeDetectingStateChannel implements StateChannel {
      * @param daySupplier       game-day stamp accessor; never null
      * @param timeOfDaySupplier time-of-day stamp accessor; never null
      */
-    public ChangeDetectingStateChannel(SnapshotSource source,
-                                       EventQueue events,
-                                       LongSupplier daySupplier,
-                                       LongSupplier timeOfDaySupplier) {
+    public ChangeDetectingStateChannel(
+            SnapshotSource source, EventQueue events, LongSupplier daySupplier, LongSupplier timeOfDaySupplier) {
         if (source == null) {
             throw new IllegalArgumentException("source must not be null");
         }
         this.events = Objects.requireNonNull(events, "events");
         this.daySupplier = Objects.requireNonNull(daySupplier, "day");
-        this.timeOfDaySupplier =
-            Objects.requireNonNull(timeOfDaySupplier, "timeOfDay");
+        this.timeOfDaySupplier = Objects.requireNonNull(timeOfDaySupplier, "timeOfDay");
         this.source = source;
     }
 
@@ -90,10 +86,13 @@ public final class ChangeDetectingStateChannel implements StateChannel {
             attrs.put("posZ", String.valueOf(state.pos().z()));
             attrs.put("dimension", state.dimension());
             attrs.put("task", state.currentTaskSummary());
-            events.push(new BotEvent(EventKind.STATE_PUSH,
-                daySupplier.getAsLong(), timeOfDaySupplier.getAsLong(),
-                false, attrs,
-                first ? "initial state" : "state changed"));
+            events.push(new BotEvent(
+                    EventKind.STATE_PUSH,
+                    daySupplier.getAsLong(),
+                    timeOfDaySupplier.getAsLong(),
+                    false,
+                    attrs,
+                    first ? "initial state" : "state changed"));
         } catch (RuntimeException ignored) {
             // A failed state push must not break the caller's tick.
         }

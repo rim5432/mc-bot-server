@@ -1,9 +1,10 @@
 package com.mcbot.mcbotserver.core.tick;
 
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+
 import com.mcbot.mcbotserver.api.actor.Actor;
 import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
-import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
@@ -13,16 +14,9 @@ import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 import com.mcbot.mcbotserver.core.pathing.BasicMoves;
 import com.mcbot.mcbotserver.core.pathing.PlanWorker;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
-
+import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Freshness-tolerance gate (issue 0001 fix 5 / Ruling (c)):
@@ -52,9 +46,16 @@ class AdoptFreshnessGateTest {
     }
 
     private static final class NullActor implements Actor {
-        @Override public void submit(Claim claim) {}
-        @Override public Map<Channel, Claim> flush() { return Map.of(); }
-        @Override public void clearAllIntents() {}
+        @Override
+        public void submit(Claim claim) {}
+
+        @Override
+        public Map<Channel, Claim> flush() {
+            return Map.of();
+        }
+
+        @Override
+        public void clearAllIntents() {}
     }
 
     /**
@@ -65,12 +66,10 @@ class AdoptFreshnessGateTest {
      */
     @Test
     void oneCellDriftDuringSearchIsAdopted() throws Exception {
-        Vec3[] position = { new Vec3(0.5, 64, 0.5) };
-        PathingBehavior mover = new PathingBehavior("mover",
-            () -> position[0], BasicMoves::from, worker);
+        Vec3[] position = {new Vec3(0.5, 64, 0.5)};
+        PathingBehavior mover = new PathingBehavior("mover", () -> position[0], BasicMoves::from, worker);
         WorldView world = MockWorldView.pavedFloor(60);
-        Directive directive = Directive.of(
-            new GoalBlock(new CellPos(40, 64, 0)));
+        Directive directive = Directive.of(new GoalBlock(new CellPos(40, 64, 0)));
 
         // Tick 1: bot at cell (0, 64, 0). No plan yet; replan
         // requests a search with pendingStart = (0, 64, 0).
@@ -94,9 +93,11 @@ class AdoptFreshnessGateTest {
                 break;
             }
         }
-        assertNotEquals(0, PathingTestAccess.waypoints(mover).size(),
-            "after 1-cell drift during search, the plan must still "
-            + "be adopted (Chebyshev-1 freshness, not cell-equality)");
+        assertNotEquals(
+                0,
+                PathingTestAccess.waypoints(mover).size(),
+                "after 1-cell drift during search, the plan must still "
+                        + "be adopted (Chebyshev-1 freshness, not cell-equality)");
     }
 
     /**
@@ -114,12 +115,10 @@ class AdoptFreshnessGateTest {
      */
     @Test
     void oneCellVerticalDriftDuringSearchIsAdopted() throws Exception {
-        Vec3[] position = { new Vec3(0.5, 64, 0.5) };
-        PathingBehavior mover = new PathingBehavior("mover",
-            () -> position[0], BasicMoves::from, worker);
+        Vec3[] position = {new Vec3(0.5, 64, 0.5)};
+        PathingBehavior mover = new PathingBehavior("mover", () -> position[0], BasicMoves::from, worker);
         WorldView world = MockWorldView.pavedFloor(60);
-        Directive directive = Directive.of(
-            new GoalBlock(new CellPos(40, 64, 0)));
+        Directive directive = Directive.of(new GoalBlock(new CellPos(40, 64, 0)));
 
         // Tick 1: request plan with pendingStart = (0, 64, 0).
         mover.tick(world, directive, new NullActor());
@@ -135,11 +134,12 @@ class AdoptFreshnessGateTest {
                 break;
             }
         }
-        assertNotEquals(0, PathingTestAccess.waypoints(mover).size(),
-            "Chebyshev-1 must accept 1-cell drift on ANY axis, "
-            + "including Y (JumpUp / Drop in the move vocabulary "
-            + "are max-Chebyshev 1, so this is the tightest "
-            + "tolerance that does not over-reject)");
+        assertNotEquals(
+                0,
+                PathingTestAccess.waypoints(mover).size(),
+                "Chebyshev-1 must accept 1-cell drift on ANY axis, "
+                        + "including Y (JumpUp / Drop in the move vocabulary "
+                        + "are max-Chebyshev 1, so this is the tightest "
+                        + "tolerance that does not over-reject)");
     }
-
 }

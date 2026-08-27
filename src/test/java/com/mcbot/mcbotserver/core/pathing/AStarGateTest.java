@@ -1,17 +1,14 @@
 package com.mcbot.mcbotserver.core.pathing;
 
-import com.mcbot.mcbotserver.api.goal.GoalBlock;
-import com.mcbot.mcbotserver.api.pathing.Heuristic;
-import com.mcbot.mcbotserver.api.types.CellPos;
-import com.mcbot.mcbotserver.core.pathing.AStarPathFinder;
-import com.mcbot.mcbotserver.core.pathing.BasicMoves;
-import com.mcbot.mcbotserver.core.world.MockWorldView;
-
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.mcbot.mcbotserver.api.goal.GoalBlock;
+import com.mcbot.mcbotserver.api.pathing.Heuristic;
+import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.core.world.MockWorldView;
+import org.junit.jupiter.api.Test;
 
 /**
  * Stage-2 A* gate: the engine finds paths over the basic move set on
@@ -27,17 +24,15 @@ class AStarGateTest {
         MockWorldView world = new MockWorldView();
         for (int x = 0; x <= xLen; x++) {
             for (int z = -zWide; z <= zWide; z++) {
-                world.putBlock(new com.mcbot.mcbotserver.api.world
-                    .BlockSnapshot(new CellPos(x, 64, z),
-                        "minecraft:smooth_stone"));
+                world.putBlock(new com.mcbot.mcbotserver.api.world.BlockSnapshot(
+                        new CellPos(x, 64, z), "minecraft:smooth_stone"));
             }
         }
         return world;
     }
 
     private static AStarPathFinder finder() {
-        return new AStarPathFinder(BasicMoves::from,
-            Heuristic.euclideanTo(null));
+        return new AStarPathFinder(BasicMoves::from, Heuristic.euclideanTo(null));
     }
 
     /**
@@ -50,14 +45,12 @@ class AStarGateTest {
         CellPos start = new CellPos(0, 65, 0);
         CellPos goal = new CellPos(8, 65, 0);
 
-        var result = new AStarPathFinder(BasicMoves::from,
-            Heuristic.euclideanTo(goal)).compute(world, start,
-            new GoalBlock(goal));
+        var result = new AStarPathFinder(BasicMoves::from, Heuristic.euclideanTo(goal))
+                .compute(world, start, new GoalBlock(goal));
 
         assertTrue(result.reachedGoal());
         assertEquals(start, result.waypoints().get(0));
-        assertEquals(goal, result.waypoints()
-            .get(result.waypoints().size() - 1));
+        assertEquals(goal, result.waypoints().get(result.waypoints().size() - 1));
         for (CellPos c : result.waypoints()) {
             assertEquals(65, c.y(), "path left the walk plane at " + c);
         }
@@ -68,20 +61,16 @@ class AStarGateTest {
     void wallForcesDetourAroundBlockedColumn() {
         MockWorldView world = flatGround(12, 3);
         CellPos blocked = new CellPos(4, 65, 0);
-        world.putBlock(new com.mcbot.mcbotserver.api.world.BlockSnapshot(
-            blocked, "minecraft:stone"));
+        world.putBlock(new com.mcbot.mcbotserver.api.world.BlockSnapshot(blocked, "minecraft:stone"));
         CellPos start = new CellPos(0, 65, 0);
         CellPos goal = new CellPos(8, 65, 0);
 
-        var result = new AStarPathFinder(BasicMoves::from,
-            Heuristic.euclideanTo(goal)).compute(world, start,
-            new GoalBlock(goal));
+        var result = new AStarPathFinder(BasicMoves::from, Heuristic.euclideanTo(goal))
+                .compute(world, start, new GoalBlock(goal));
 
         assertTrue(result.reachedGoal());
-        assertFalse(result.waypoints().contains(blocked),
-            "path must not traverse the wall cell");
-        assertTrue(result.waypoints().size() >= 8,
-            "path must still span the corridor");
+        assertFalse(result.waypoints().contains(blocked), "path must not traverse the wall cell");
+        assertTrue(result.waypoints().size() >= 8, "path must still span the corridor");
     }
 
     /** No support chain to the goal: clean NO_PATH, empty waypoints. */
@@ -91,13 +80,11 @@ class AStarGateTest {
         CellPos start = new CellPos(0, 65, 0);
         CellPos floatingGoal = new CellPos(20, 80, 0);
 
-        var result = new AStarPathFinder(BasicMoves::from,
-            Heuristic.euclideanTo(floatingGoal)).compute(world, start,
-            new GoalBlock(floatingGoal));
+        var result = new AStarPathFinder(BasicMoves::from, Heuristic.euclideanTo(floatingGoal))
+                .compute(world, start, new GoalBlock(floatingGoal));
 
         assertFalse(result.reachedGoal());
-        assertTrue(result.waypoints().isEmpty(),
-            "no usable partial exists toward a floating goal");
+        assertTrue(result.waypoints().isEmpty(), "no usable partial exists toward a floating goal");
     }
 
     /**
@@ -113,17 +100,14 @@ class AStarGateTest {
         CellPos start = new CellPos(0, 65, 0);
         CellPos farGoal = new CellPos(55, 65, 25);
 
-        var finder = new AStarPathFinder(BasicMoves::from,
-            Heuristic.euclideanTo(farGoal), 50);
+        var finder = new AStarPathFinder(BasicMoves::from, Heuristic.euclideanTo(farGoal), 50);
         var result = finder.compute(world, start, new GoalBlock(farGoal));
 
-        assertFalse(result.reachedGoal(),
-            "50 nodes cannot reach 40+ blocks away");
-        assertTrue(result.expandedNodes() <= 50,
-            "budget must cap expansions");
-        assertTrue(result.waypoints().size() > 1,
-            "a 50-node search against a 60-cell goal makes "
-                + "enough progress to clear MIN_PARTIAL_CONFIDENCE");
+        assertFalse(result.reachedGoal(), "50 nodes cannot reach 40+ blocks away");
+        assertTrue(result.expandedNodes() <= 50, "budget must cap expansions");
+        assertTrue(
+                result.waypoints().size() > 1,
+                "a 50-node search against a 60-cell goal makes " + "enough progress to clear MIN_PARTIAL_CONFIDENCE");
     }
 
     /**
@@ -140,17 +124,14 @@ class AStarGateTest {
         CellPos start = new CellPos(0, 65, 0);
         CellPos farGoal = new CellPos(25, 65, 15);
 
-        var finder = new AStarPathFinder(BasicMoves::from,
-            Heuristic.euclideanTo(farGoal), 2);
+        var finder = new AStarPathFinder(BasicMoves::from, Heuristic.euclideanTo(farGoal), 2);
         var result = finder.compute(world, start, new GoalBlock(farGoal));
 
-        assertFalse(result.reachedGoal(),
-            "2 nodes cannot reach a 29-cell goal");
-        assertTrue(result.waypoints().isEmpty(),
-            "low-confidence PARTIAL must downgrade to FAILED, "
-                + "not surface a doomed prefix");
-        assertEquals(0.0, result.confidence(),
-            "FAILED carries zero confidence by definition");
+        assertFalse(result.reachedGoal(), "2 nodes cannot reach a 29-cell goal");
+        assertTrue(
+                result.waypoints().isEmpty(),
+                "low-confidence PARTIAL must downgrade to FAILED, " + "not surface a doomed prefix");
+        assertEquals(0.0, result.confidence(), "FAILED carries zero confidence by definition");
     }
 
     /**
@@ -161,18 +142,14 @@ class AStarGateTest {
     @Test
     void pathResultConfidenceIsValidated() {
         try {
-            new AStarPathFinder.PathResult(java.util.List.of(), 0,
-                true, 1.5);
-            org.junit.jupiter.api.Assertions.fail(
-                "confidence > 1.0 must be rejected");
+            new AStarPathFinder.PathResult(java.util.List.of(), 0, true, 1.5);
+            org.junit.jupiter.api.Assertions.fail("confidence > 1.0 must be rejected");
         } catch (IllegalArgumentException expected) {
             assertTrue(expected.getMessage().contains("confidence"));
         }
         try {
-            new AStarPathFinder.PathResult(java.util.List.of(), 0,
-                true, Double.NaN);
-            org.junit.jupiter.api.Assertions.fail(
-                "NaN confidence must be rejected");
+            new AStarPathFinder.PathResult(java.util.List.of(), 0, true, Double.NaN);
+            org.junit.jupiter.api.Assertions.fail("NaN confidence must be rejected");
         } catch (IllegalArgumentException expected) {
             assertTrue(expected.getMessage().contains("confidence"));
         }

@@ -4,7 +4,6 @@ import com.mcbot.mcbotserver.api.actor.Actor;
 import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.core.actor.ChannelArbiter;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +21,7 @@ public class RecordingActor implements Actor {
 
     /** Claims accepted this tick-since-clear, in arrival order. */
     public final List<Claim> submitted = new ArrayList<>();
+
     private final ChannelArbiter delegate = new ChannelArbiter();
 
     @Override

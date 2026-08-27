@@ -13,7 +13,6 @@ import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.api.world.WorldView;
-
 import java.util.Objects;
 
 /**
@@ -80,8 +79,7 @@ public final class CombatBehavior implements Behavior {
             throw new IllegalArgumentException("name must not be blank");
         }
         this.name = name;
-        this.positionSource = Objects.requireNonNull(positionSource,
-            "positionSource");
+        this.positionSource = Objects.requireNonNull(positionSource, "positionSource");
     }
 
     @Override
@@ -90,10 +88,8 @@ public final class CombatBehavior implements Behavior {
     }
 
     @Override
-    public ExecutionReport tick(WorldView world, Directive directive,
-                                Actor actor) {
-        if (directive == null
-            || directive.overrides().combat() == null) {
+    public ExecutionReport tick(WorldView world, Directive directive, Actor actor) {
+        if (directive == null || directive.overrides().combat() == null) {
             return ExecutionReport.running();
         }
 
@@ -116,10 +112,8 @@ public final class CombatBehavior implements Behavior {
             yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
             lastYaw = yaw;
         }
-        float pitch = (float) -Math.toDegrees(
-            Math.atan2(dy, Math.max(horizontal, 0.001)));
-        actor.submit(new Claim(Channel.ROT, 20, name,
-            new Intent.Look(yaw, pitch)));
+        float pitch = (float) -Math.toDegrees(Math.atan2(dy, Math.max(horizontal, 0.001)));
+        actor.submit(new Claim(Channel.ROT, 20, name, new Intent.Look(yaw, pitch)));
 
         // Swing pacing: hold the release until cooldown expires so the
         // adapter sees exactly one rising edge per attack window. The
@@ -133,17 +127,13 @@ public final class CombatBehavior implements Behavior {
         } else {
             ticksSinceInReach++;
         }
-        boolean inReachMemory = reach <= ATTACK_REACH
-            || ticksSinceInReach <= AIM_HOLD_TICKS;
-        if (released && ticksSinceSwing >= ATTACK_COOLDOWN_TICKS
-            && inReachMemory) {
-            actor.submit(new Claim(Channel.USE, 20, name,
-                new Intent.Use(true)));
+        boolean inReachMemory = reach <= ATTACK_REACH || ticksSinceInReach <= AIM_HOLD_TICKS;
+        if (released && ticksSinceSwing >= ATTACK_COOLDOWN_TICKS && inReachMemory) {
+            actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(true)));
             pressLatched = true;
             ticksSinceSwing = 0;
         } else if (pressLatched) {
-            actor.submit(new Claim(Channel.USE, 20, name,
-                new Intent.Use(false)));
+            actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(false)));
             pressLatched = false;
         }
         return ExecutionReport.running();
@@ -163,7 +153,6 @@ public final class CombatBehavior implements Behavior {
         if (goal instanceof GoalNear n) {
             return n.center();
         }
-        throw new IllegalStateException(
-            "unhandled goal variant: " + goal.getClass());
+        throw new IllegalStateException("unhandled goal variant: " + goal.getClass());
     }
 }

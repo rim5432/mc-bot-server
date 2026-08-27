@@ -1,19 +1,17 @@
 package com.mcbot.mcbotserver.boundaryd;
 
-import com.mcbot.mcbotserver.api.event.BotEvent;
-import com.mcbot.mcbotserver.api.event.EventBatch;
-import com.mcbot.mcbotserver.api.event.EventKind;
-import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
-
-import org.junit.jupiter.api.Test;
-
-import java.util.List;
-import java.util.Map;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.mcbot.mcbotserver.api.event.BotEvent;
+import com.mcbot.mcbotserver.api.event.EventBatch;
+import com.mcbot.mcbotserver.api.event.EventKind;
+import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
 
 /**
  * Behind-consumer recovery gate: the queue detects a stale
@@ -42,8 +40,7 @@ class GapEventGateTest {
      */
     @Test
     void staleCursorPrependsGapEvent() {
-        InMemoryEventQueue q = new InMemoryEventQueue(
-            () -> 1L, () -> 0L);
+        InMemoryEventQueue q = new InMemoryEventQueue(() -> 1L, () -> 0L);
         // Overflow by 5 to evict the first 5 entries. After this
         // loop, entries hold id 6..205, lastEventId=205.
         for (int i = 0; i < InMemoryEventQueue.DEFAULT_CAP + 5; i++) {
@@ -55,10 +52,8 @@ class GapEventGateTest {
         List<BotEvent> page = batch.events();
         BotEvent gap = page.get(0);
         assertEquals(EventKind.EVENT_GAP, gap.kind());
-        assertSame(true, gap.urgent(),
-            "gap must be urgent - harness mental model is wrong");
-        assertEquals("4", gap.attrs().get("count"),
-            "4 events between since=1 and oldest=6");
+        assertSame(true, gap.urgent(), "gap must be urgent - harness mental model is wrong");
+        assertEquals("4", gap.attrs().get("count"), "4 events between since=1 and oldest=6");
         assertEquals("1", gap.attrs().get("since"));
         assertEquals("6", gap.attrs().get("oldest"));
         // Real page starts at id 6, which carries text "ev-5" (the
@@ -68,8 +63,9 @@ class GapEventGateTest {
         // EVENT_DROPPED notice - that one is appended at the tail
         // because the same 205-push loop that evicted the 5 oldest
         // also set droppedSinceLastPoll=5.
-        assertEquals("ev-" + (InMemoryEventQueue.DEFAULT_CAP + 4),
-            page.get(page.size() - 2).text());
+        assertEquals(
+                "ev-" + (InMemoryEventQueue.DEFAULT_CAP + 4),
+                page.get(page.size() - 2).text());
     }
 
     /**
@@ -79,8 +75,7 @@ class GapEventGateTest {
      */
     @Test
     void cursorAtOldestMinusOneHasNoGap() {
-        InMemoryEventQueue q = new InMemoryEventQueue(
-            () -> 1L, () -> 0L);
+        InMemoryEventQueue q = new InMemoryEventQueue(() -> 1L, () -> 0L);
         q.push(stamped("a"));
         q.push(stamped("b"));
         // lastEventId=2. Ask since 1 - that's "everything past id 1"
@@ -89,8 +84,7 @@ class GapEventGateTest {
         assertEquals(1, batch.events().size());
         assertEquals("b", batch.events().get(0).text());
         for (BotEvent e : batch.events()) {
-            assertFalse(EventKind.EVENT_GAP.equals(e.kind()),
-                "no gap when zero events were lost");
+            assertFalse(EventKind.EVENT_GAP.equals(e.kind()), "no gap when zero events were lost");
         }
     }
 
@@ -101,15 +95,13 @@ class GapEventGateTest {
      */
     @Test
     void firstPollWithCursorZeroHasNoGap() {
-        InMemoryEventQueue q = new InMemoryEventQueue(
-            () -> 1L, () -> 0L);
+        InMemoryEventQueue q = new InMemoryEventQueue(() -> 1L, () -> 0L);
         q.push(stamped("a"));
         q.push(stamped("b"));
         EventBatch batch = q.statusSnapshot(0L);
         assertEquals(2, batch.events().size());
         for (BotEvent e : batch.events()) {
-            assertFalse(EventKind.EVENT_GAP.equals(e.kind()),
-                "first poll with cursor 0 has no gap");
+            assertFalse(EventKind.EVENT_GAP.equals(e.kind()), "first poll with cursor 0 has no gap");
         }
     }
 
@@ -120,8 +112,7 @@ class GapEventGateTest {
      */
     @Test
     void gapAndOverflowCoexist() {
-        InMemoryEventQueue q = new InMemoryEventQueue(
-            () -> 1L, () -> 0L);
+        InMemoryEventQueue q = new InMemoryEventQueue(() -> 1L, () -> 0L);
         for (int i = 0; i < InMemoryEventQueue.DEFAULT_CAP + 5; i++) {
             q.push(stamped("ev-" + i));
         }
@@ -129,8 +120,7 @@ class GapEventGateTest {
         // first 5 evicted). Caller thinks last seen was 1 - events
         // 2..5 lost (count=4), oldest on the page = 6.
         EventBatch batch = q.statusSnapshot(1L);
-        assertTrue(batch.droppedCount() > 0,
-            "overflow must still be reported via droppedCount");
+        assertTrue(batch.droppedCount() > 0, "overflow must still be reported via droppedCount");
         BotEvent first = batch.events().get(0);
         assertEquals(EventKind.EVENT_GAP, first.kind());
         assertEquals("4", first.attrs().get("count"));
@@ -154,8 +144,7 @@ class GapEventGateTest {
      */
     @Test
     void allOriginalEntriesEvictedAndStaleCursorEmitsGap() {
-        InMemoryEventQueue q = new InMemoryEventQueue(
-            () -> 1L, () -> 0L);
+        InMemoryEventQueue q = new InMemoryEventQueue(() -> 1L, () -> 0L);
         q.push(stamped("a"));
         q.push(stamped("b"));
         // Push DEFAULT_CAP + 5 more events. After this loop:
@@ -181,8 +170,7 @@ class GapEventGateTest {
      */
     @Test
     void cursorAtLastEventIdEmitsNoGapAndEmptyPage() {
-        InMemoryEventQueue q = new InMemoryEventQueue(
-            () -> 1L, () -> 0L);
+        InMemoryEventQueue q = new InMemoryEventQueue(() -> 1L, () -> 0L);
         q.push(stamped("a"));
         // lastEventId=1. Ask since 1: nothing new, zero lost.
         EventBatch batch = q.statusSnapshot(1L);

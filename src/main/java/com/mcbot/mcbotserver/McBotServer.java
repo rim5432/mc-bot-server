@@ -9,7 +9,7 @@ import com.mcbot.mcbotserver.core.command.GotoCommandHandler;
 import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.state.ChangeDetectingStateChannel;
 import com.mcbot.mcbotserver.core.tick.BotController;
-
+import com.mojang.logging.LogUtils;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EntityType;
@@ -29,9 +29,7 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
-
 import org.slf4j.Logger;
-import com.mojang.logging.LogUtils;
 
 /**
  * Mod entry: the only MC-aware wiring point. Owns entity
@@ -49,37 +47,33 @@ public class McBotServer {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     private static final DeferredRegister<EntityType<?>> ENTITIES =
-        DeferredRegister.create(ForgeRegistries.ENTITY_TYPES, MODID);
+            DeferredRegister.create(ForgeRegistries.ENTITY_TYPES, MODID);
 
     /** Registry handle for the physical carrier; read by the client
      *  renderer wiring. */
-    public static final RegistryObject<EntityType<BotBodyEntity>>
-        BOT_BODY = ENTITIES.register("bot_body",
-            () -> EntityType.Builder.of(BotBodyEntity::new,
-                    MobCategory.CREATURE)
-                .sized(0.6f, 1.8f)
-                .build("bot_body"));
+    public static final RegistryObject<EntityType<BotBodyEntity>> BOT_BODY = ENTITIES.register(
+            "bot_body",
+            () -> EntityType.Builder.of(BotBodyEntity::new, MobCategory.CREATURE)
+                    .sized(0.6f, 1.8f)
+                    .build("bot_body"));
 
     private BotController activeController;
     private BindingWorldView activeView;
     private BotBodyEntity activeBody;
     private GotoCommandHandler activeGotoHandler;
-    private com.mcbot.mcbotserver.core.command.DigCommandHandler
-        activeDigHandler;
-    private com.mcbot.mcbotserver.core.command.MineCommandHandler
-        activeMineHandler;
+    private com.mcbot.mcbotserver.core.command.DigCommandHandler activeDigHandler;
+    private com.mcbot.mcbotserver.core.command.MineCommandHandler activeMineHandler;
     private InMemoryEventQueue activeEvents;
     private CommandBus activeBus;
     private ChangeDetectingStateChannel activeState;
     private com.mcbot.mcbotserver.adapter.BindingActor activeActor;
     private com.mcbot.mcbotserver.adapter.RecipeCatalog activeCatalog;
 
-    private final com.mcbot.mcbotserver.adapter.ReflexRuleReloader
-        ruleReloader = new com.mcbot.mcbotserver.adapter.ReflexRuleReloader();
+    private final com.mcbot.mcbotserver.adapter.ReflexRuleReloader ruleReloader =
+            new com.mcbot.mcbotserver.adapter.ReflexRuleReloader();
 
     public McBotServer() {
-        IEventBus modBus =
-            FMLJavaModLoadingContext.get().getModEventBus();
+        IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
         ENTITIES.register(modBus);
         // EntityAttributeCreationEvent is a MOD-bus event; without this
         // listener the body spawns with no attributes and vanilla
@@ -92,8 +86,7 @@ public class McBotServer {
 
     /** Datapack reloads rewrite the reflex rule table in place. */
     @SubscribeEvent
-    public void onAddReloadListeners(
-            net.minecraftforge.event.AddReloadListenerEvent event) {
+    public void onAddReloadListeners(net.minecraftforge.event.AddReloadListenerEvent event) {
         ruleReloader.bind(null);
         event.addListener(ruleReloader);
     }
@@ -104,10 +97,11 @@ public class McBotServer {
         // createMobAttributes does NOT include MOVEMENT_SPEED - each
         // mob type adds its own. Without it the binding's zza=1 drives
         // a speed-0 body: gravity works, walking never starts.
-        event.put(BOT_BODY.get(), Mob.createMobAttributes()
-            .add(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED,
-                0.25)
-            .build());
+        event.put(
+                BOT_BODY.get(),
+                Mob.createMobAttributes()
+                        .add(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED, 0.25)
+                        .build());
     }
 
     @SubscribeEvent
@@ -160,8 +154,7 @@ public class McBotServer {
         if (event.phase != TickEvent.Phase.END) {
             return;
         }
-        if (activeController == null || activeView == null
-                || activeBody == null) {
+        if (activeController == null || activeView == null || activeBody == null) {
             return;
         }
         try {
@@ -190,8 +183,7 @@ public class McBotServer {
             activeController.setAirSupply(activeBody.getAirSupply());
             activeController.onTick(activeView);
         } catch (RuntimeException e) {
-            LOGGER.error("mcbotserver tick harness failed; "
-                + "emergency latching", e);
+            LOGGER.error("mcbotserver tick harness failed; " + "emergency latching", e);
             activeController.emergencyLatch(e);
         }
     }
@@ -203,86 +195,78 @@ public class McBotServer {
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
         BotCommands.register(event.getDispatcher(), this::channels);
-        com.mcbot.mcbotserver.adapter.MenuCommands.register(
-            event.getDispatcher(), this::menuLive);
-        com.mcbot.mcbotserver.adapter.WorldCommands.register(
-            event.getDispatcher(), this::worldLive);
-        event.getDispatcher().register(Commands.literal("botspawn")
-            .requires(src -> src.hasPermission(2))
-            .executes(ctx -> {
-                var level = ctx.getSource().getLevel();
-                var pos = ctx.getSource().getPosition();
-                // Replace semantics (class doc): at most one wired
-                // body. The old ENTITY must leave the world too, not
-                // just the wiring - leaving it turned every extra
-                // /botspawn into an orphaned zombie standing around.
-                if (activeBody != null && activeBody.isAlive()) {
-                    activeBody.discard();
-                }
-                BotBodyEntity body = BOT_BODY.get().create(level);
-                if (body == null) {
-                    ctx.getSource().sendFailure(Component.literal(
-                        "body creation failed"));
-                    return 0;
-                }
-                body.moveTo(pos.x, pos.y, pos.z, 0f, 0f);
-                level.addFreshEntity(body);
+        com.mcbot.mcbotserver.adapter.MenuCommands.register(event.getDispatcher(), this::menuLive);
+        com.mcbot.mcbotserver.adapter.WorldCommands.register(event.getDispatcher(), this::worldLive);
+        event.getDispatcher()
+                .register(Commands.literal("botspawn")
+                        .requires(src -> src.hasPermission(2))
+                        .executes(ctx -> {
+                            var level = ctx.getSource().getLevel();
+                            var pos = ctx.getSource().getPosition();
+                            // Replace semantics (class doc): at most one wired
+                            // body. The old ENTITY must leave the world too, not
+                            // just the wiring - leaving it turned every extra
+                            // /botspawn into an orphaned zombie standing around.
+                            if (activeBody != null && activeBody.isAlive()) {
+                                activeBody.discard();
+                            }
+                            BotBodyEntity body = BOT_BODY.get().create(level);
+                            if (body == null) {
+                                ctx.getSource().sendFailure(Component.literal("body creation failed"));
+                                return 0;
+                            }
+                            body.moveTo(pos.x, pos.y, pos.z, 0f, 0f);
+                            level.addFreshEntity(body);
 
-                // Single assembly source: the gametest rig builds the
-                // identical pipeline through the same factory, so
-                // wiring drift between production and in-engine tests
-                // is impossible by construction.
-                var a = com.mcbot.mcbotserver.adapter.BotAssembly
-                    .assemble(level, body);
-                // Future /reload swaps follow the datapack table; the
-                // reloader is mod-instance state, not pipeline state.
-                ruleReloader.bind(a.reflex());
+                            // Single assembly source: the gametest rig builds the
+                            // identical pipeline through the same factory, so
+                            // wiring drift between production and in-engine tests
+                            // is impossible by construction.
+                            var a = com.mcbot.mcbotserver.adapter.BotAssembly.assemble(level, body);
+                            // Future /reload swaps follow the datapack table; the
+                            // reloader is mod-instance state, not pipeline state.
+                            ruleReloader.bind(a.reflex());
 
-                this.activeEvents = a.events();
-                this.activeBus = a.bus();
-                this.activeState = a.state();
-                this.activeController = a.controller();
-                this.activeView = a.view();
-                this.activeBody = body;
-                this.activeGotoHandler = a.gotoHandler();
-                this.activeDigHandler = a.digHandler();
-                this.activeMineHandler = a.mineHandler();
-                this.activeActor = a.actor();
-                this.activeCatalog =
-                    new com.mcbot.mcbotserver.adapter.RecipeCatalog(
-                        level);
+                            this.activeEvents = a.events();
+                            this.activeBus = a.bus();
+                            this.activeState = a.state();
+                            this.activeController = a.controller();
+                            this.activeView = a.view();
+                            this.activeBody = body;
+                            this.activeGotoHandler = a.gotoHandler();
+                            this.activeDigHandler = a.digHandler();
+                            this.activeMineHandler = a.mineHandler();
+                            this.activeActor = a.actor();
+                            this.activeCatalog = new com.mcbot.mcbotserver.adapter.RecipeCatalog(level);
 
-                String spawned = "bot spawned at " + body.blockPosition()
-                    + "; drive with /bot goto x y z tolerance timeoutTicks";
-                ctx.getSource().sendSuccess(
-                    () -> Component.literal(spawned), true);
-                return 1;
-            }));
-        event.getDispatcher().register(Commands.literal("botdespawn")
-            .requires(src -> src.hasPermission(2))
-            .executes(ctx -> {
-                var level = ctx.getSource().getLevel();
-                var bodies = level.getEntities(BOT_BODY.get(),
-                    b -> true);
-                bodies.forEach(BotBodyEntity::discard);
-                this.activeEvents = null;
-                this.activeBus = null;
-                this.activeState = null;
-                this.activeController = null;
-                this.activeView = null;
-                this.activeBody = null;
-                this.activeGotoHandler = null;
-                this.activeDigHandler = null;
-                this.activeMineHandler = null;
-                this.activeActor = null;
-                this.activeCatalog = null;
-                int n = bodies.size();
-                String msg = "removed " + n
-                    + (n == 1 ? " bot body" : " bot bodies");
-                ctx.getSource().sendSuccess(
-                    () -> Component.literal(msg), true);
-                return n;
-            }));
+                            String spawned = "bot spawned at " + body.blockPosition()
+                                    + "; drive with /bot goto x y z tolerance timeoutTicks";
+                            ctx.getSource().sendSuccess(() -> Component.literal(spawned), true);
+                            return 1;
+                        }));
+        event.getDispatcher()
+                .register(Commands.literal("botdespawn")
+                        .requires(src -> src.hasPermission(2))
+                        .executes(ctx -> {
+                            var level = ctx.getSource().getLevel();
+                            var bodies = level.getEntities(BOT_BODY.get(), b -> true);
+                            bodies.forEach(BotBodyEntity::discard);
+                            this.activeEvents = null;
+                            this.activeBus = null;
+                            this.activeState = null;
+                            this.activeController = null;
+                            this.activeView = null;
+                            this.activeBody = null;
+                            this.activeGotoHandler = null;
+                            this.activeDigHandler = null;
+                            this.activeMineHandler = null;
+                            this.activeActor = null;
+                            this.activeCatalog = null;
+                            int n = bodies.size();
+                            String msg = "removed " + n + (n == 1 ? " bot body" : " bot bodies");
+                            ctx.getSource().sendSuccess(() -> Component.literal(msg), true);
+                            return n;
+                        }));
     }
 
     /**
@@ -292,25 +276,24 @@ public class McBotServer {
      *         /botspawn
      */
     private BotCommands.Channels channels() {
-        if (activeEvents == null || activeBus == null
-                || activeState == null) {
+        if (activeEvents == null || activeBus == null || activeState == null) {
             return null;
         }
-        return new BotCommands.Channels(activeEvents, activeBus,
-            activeState,
-            () -> activeGotoHandler != null
-                ? activeGotoHandler.stopAll() : 0,
-            () -> {
-                // ADR-0005 5a through the console verb: report whether
-                // a latch was actually cleared so a harness resetting
-                // a healthy bot learns it did nothing.
-                boolean wasCrashed = activeController != null
-                    && activeController.isCrashed();
-                if (activeController != null) {
-                    activeController.reset();
-                }
-                return wasCrashed;
-            });
+        return new BotCommands.Channels(
+                activeEvents,
+                activeBus,
+                activeState,
+                () -> activeGotoHandler != null ? activeGotoHandler.stopAll() : 0,
+                () -> {
+                    // ADR-0005 5a through the console verb: report whether
+                    // a latch was actually cleared so a harness resetting
+                    // a healthy bot learns it did nothing.
+                    boolean wasCrashed = activeController != null && activeController.isCrashed();
+                    if (activeController != null) {
+                        activeController.reset();
+                    }
+                    return wasCrashed;
+                });
     }
 
     /**
@@ -326,32 +309,29 @@ public class McBotServer {
      * @return the perception surface, or null before /botspawn
      */
     private com.mcbot.mcbotserver.adapter.WorldCommands.Live worldLive() {
-        if (activeView == null || activeBody == null
-                || activeActor == null || !activeBody.isAlive()) {
+        if (activeView == null || activeBody == null || activeActor == null || !activeBody.isAlive()) {
             return null;
         }
         return new com.mcbot.mcbotserver.adapter.WorldCommands.Live(
-            activeView,
-            () -> new com.mcbot.mcbotserver.api.types.CellPos(
-                activeBody.getBlockX(), activeBody.getBlockY(),
-                activeBody.getBlockZ()),
-            () -> String.valueOf(activeBody.getUUID()),
-            activeActor == null ? null : activeActor.interactExecutor(),
-            slot -> {
-                activeBody.selectedSlot = slot;
-                activeBody.getInventory().setSelectedSlot(slot);
-            });
+                activeView,
+                () -> new com.mcbot.mcbotserver.api.types.CellPos(
+                        activeBody.getBlockX(), activeBody.getBlockY(), activeBody.getBlockZ()),
+                () -> String.valueOf(activeBody.getUUID()),
+                activeActor == null ? null : activeActor.interactExecutor(),
+                slot -> {
+                    activeBody.selectedSlot = slot;
+                    activeBody.getInventory().setSelectedSlot(slot);
+                });
     }
 
     private com.mcbot.mcbotserver.adapter.MenuCommands.Live menuLive() {
-        if (activeActor == null || activeCatalog == null
-                || activeBody == null || !activeBody.isAlive()) {
+        if (activeActor == null || activeCatalog == null || activeBody == null || !activeBody.isAlive()) {
             return null;
         }
         return new com.mcbot.mcbotserver.adapter.MenuCommands.Live(
-            activeActor, activeCatalog,
-            (net.minecraft.server.level.ServerLevel)
-                activeBody.level(),
-            activeBody::blockPosition);
+                activeActor,
+                activeCatalog,
+                (net.minecraft.server.level.ServerLevel) activeBody.level(),
+                activeBody::blockPosition);
     }
 }

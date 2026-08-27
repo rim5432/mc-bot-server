@@ -1,18 +1,16 @@
 package com.mcbot.mcbotserver.core.process;
 
-import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
-import com.mcbot.mcbotserver.api.goal.GoalBlock;
-import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
-import com.mcbot.mcbotserver.api.types.CellPos;
-import com.mcbot.mcbotserver.core.process.GotoProcess;
-import com.mcbot.mcbotserver.core.world.MockWorldView;
-
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
+import com.mcbot.mcbotserver.api.goal.GoalBlock;
+import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
+import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.core.world.MockWorldView;
+import org.junit.jupiter.api.Test;
 
 /**
  * Stage-1 GotoProcess state machine: SUCCESS / STUCK / TIMEOUT
@@ -23,12 +21,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class GotoProcessTest {
 
     private static final MockWorldView WORLD = new MockWorldView();
-    private static final InterruptionContext CTX = new InterruptionContext(
-        1L, new CellPos(0, 64, 0), "goto:t1", "reflex-preempt:X", "");
+    private static final InterruptionContext CTX =
+            new InterruptionContext(1L, new CellPos(0, 64, 0), "goto:t1", "reflex-preempt:X", "");
 
     private GotoProcess mission(long timeout) {
-        return new GotoProcess("t1",
-            new GoalBlock(new CellPos(10, 64, 10)), 50, timeout);
+        return new GotoProcess("t1", new GoalBlock(new CellPos(10, 64, 10)), 50, timeout);
     }
 
     /** SUCCESS report retires the mission as a clean success. */
@@ -40,16 +37,14 @@ class GotoProcessTest {
         assertFalse(m.isActive());
         assertTrue(m.missionSucceeded());
         assertNull(m.failureReasonOrNull());
-        assertFalse(m.resume(CTX),
-            "a finished mission must not resume");
+        assertFalse(m.resume(CTX), "a finished mission must not resume");
     }
 
     /** STUCK report fails the mission with reason STUCK. */
     @Test
     void stuckReportFailsMission() {
         GotoProcess m = mission(100);
-        m.onExecutionReport(
-            ExecutionReport.stuck("no displacement in window"));
+        m.onExecutionReport(ExecutionReport.stuck("no displacement in window"));
         assertFalse(m.isActive());
         assertFalse(m.missionSucceeded());
         assertEquals("STUCK", m.failureReasonOrNull());
@@ -74,8 +69,7 @@ class GotoProcessTest {
         GotoProcess m = mission(100);
         m.onExecutionReport(ExecutionReport.stuck("x"));
         m.onExecutionReport(ExecutionReport.success());
-        assertFalse(m.missionSucceeded(),
-            "a failed mission must not become successful");
+        assertFalse(m.missionSucceeded(), "a failed mission must not become successful");
         assertEquals("STUCK", m.failureReasonOrNull());
     }
 
@@ -95,7 +89,6 @@ class GotoProcessTest {
         GotoProcess m = mission(100);
         assertTrue(m.resume(CTX));
         m.onExecutionReport(ExecutionReport.stuck("x"));
-        assertFalse(m.resume(CTX),
-            "a failed mission must not resume");
+        assertFalse(m.resume(CTX), "a failed mission must not resume");
     }
 }

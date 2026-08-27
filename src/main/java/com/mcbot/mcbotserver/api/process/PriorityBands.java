@@ -32,8 +32,7 @@ public final class PriorityBands {
     /** DefendProcess's parking spot inside the tactical band. */
     public static final int DEFEND_PRIORITY = 150;
 
-    private PriorityBands() {
-    }
+    private PriorityBands() {}
 
     /**
      * Validate that a priority falls inside a defined band.
@@ -45,14 +44,10 @@ public final class PriorityBands {
      *         is a programming error, not a runtime condition
      */
     public static int requireLegal(int priority) {
-        boolean routine = priority >= ROUTINE_MIN
-            && priority <= ROUTINE_MAX;
-        boolean tactical = priority >= TACTICAL_MIN
-            && priority <= TACTICAL_MAX;
+        boolean routine = priority >= ROUTINE_MIN && priority <= ROUTINE_MAX;
+        boolean tactical = priority >= TACTICAL_MIN && priority <= TACTICAL_MAX;
         if (!routine && !tactical) {
-            throw new IllegalArgumentException(
-                "priority " + priority
-                    + " outside bands [0..99] and [100..199]");
+            throw new IllegalArgumentException("priority " + priority + " outside bands [0..99] and [100..199]");
         }
         return priority;
     }

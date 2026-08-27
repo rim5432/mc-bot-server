@@ -1,22 +1,20 @@
 package com.mcbot.mcbotserver.adapter;
 
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
-
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.Container;
+import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.ContainerLevelAccess;
-import net.minecraft.world.MenuProvider;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.CraftingTableBlock;
 import net.minecraft.world.level.block.state.BlockState;
-
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Opens vanilla menus against the bot's {@link BotPlayerFacade} and
@@ -120,15 +118,12 @@ public final class MenuOpener {
         MenuProvider provider = state.getMenuProvider(level, pos);
         if (provider != null) {
             facade.syncPosition();
-            var menu = provider.createMenu(NEXT_ID.getAndIncrement(),
-                facade.getInventory(), facade);
+            var menu = provider.createMenu(NEXT_ID.getAndIncrement(), facade.getInventory(), facade);
             if (menu != null) {
                 facade.containerMenu = menu;
-                String type = String.valueOf(
-                    BuiltInRegistries.BLOCK.getKey(block));
-                return Optional.of(new BindingMenu(menu, facade,
-                    type.substring(type.indexOf(':') + 1),
-                    toCellPos(pos)));
+                String type = String.valueOf(BuiltInRegistries.BLOCK.getKey(block));
+                return Optional.of(
+                        new BindingMenu(menu, facade, type.substring(type.indexOf(':') + 1), toCellPos(pos)));
             }
         }
         return Optional.empty();
@@ -178,27 +173,21 @@ public final class MenuOpener {
 
     private BindingMenu openCraftingTable(BlockPos pos) {
         facade.syncPosition();
-        ContainerLevelAccess access = ContainerLevelAccess.create(
-            facade.body().level(), pos);
+        ContainerLevelAccess access = ContainerLevelAccess.create(facade.body().level(), pos);
         Inventory inv = facade.getInventory();
-        BotCraftingMenu menu = new BotCraftingMenu(
-            NEXT_ID.getAndIncrement(), inv, access);
+        BotCraftingMenu menu = new BotCraftingMenu(NEXT_ID.getAndIncrement(), inv, access);
         facade.containerMenu = menu;
-        return new BindingMenu(menu, facade, "crafting_table",
-            toCellPos(pos));
+        return new BindingMenu(menu, facade, "crafting_table", toCellPos(pos));
     }
 
-    private Optional<BindingMenu> openChest(ChestBlock block,
-                                            BlockState state,
-                                            BlockPos pos) {
+    private Optional<BindingMenu> openChest(ChestBlock block, BlockState state, BlockPos pos) {
         Level level = facade.body().level();
         // Vanilla's own merge (the same helper ChestBlock.use routes
         // through): CompoundContainer for a double pair, the single
         // block entity otherwise, null when blocked (solid block or
         // cat above a half). validate=false keeps the blocked check
         // ACTIVE, matching the vanilla open path.
-        Container chest = ChestBlock.getContainer(
-            block, state, level, pos, false);
+        Container chest = ChestBlock.getContainer(block, state, level, pos, false);
         if (chest == null) {
             return Optional.empty();
         }
@@ -208,21 +197,18 @@ public final class MenuOpener {
         // chest opens the six-row GUI). Only 27/54 exist today; other
         // widths mean a different menu kind entirely.
         ChestMenu menu = chest.getContainerSize() == 54
-            ? ChestMenu.sixRows(NEXT_ID.getAndIncrement(), inv, chest)
-            : ChestMenu.threeRows(NEXT_ID.getAndIncrement(), inv, chest);
+                ? ChestMenu.sixRows(NEXT_ID.getAndIncrement(), inv, chest)
+                : ChestMenu.threeRows(NEXT_ID.getAndIncrement(), inv, chest);
         facade.containerMenu = menu;
-        return Optional.of(new BindingMenu(menu, facade, "chest",
-            toCellPos(pos)));
+        return Optional.of(new BindingMenu(menu, facade, "chest", toCellPos(pos)));
     }
 
     /**
      * Convert an engine block position to the api position type for
      * snapshots (the api never sees engine types).
      */
-    private static com.mcbot.mcbotserver.api.types.CellPos toCellPos(
-            BlockPos pos) {
-        return new com.mcbot.mcbotserver.api.types.CellPos(
-            pos.getX(), pos.getY(), pos.getZ());
+    private static com.mcbot.mcbotserver.api.types.CellPos toCellPos(BlockPos pos) {
+        return new com.mcbot.mcbotserver.api.types.CellPos(pos.getX(), pos.getY(), pos.getZ());
     }
 
     /**

@@ -86,8 +86,7 @@ public interface BotProcess {
      * @param report the behavior's verdict for the latest tick; never
      *               null
      */
-    default void onExecutionReport(ExecutionReport report) {
-    }
+    default void onExecutionReport(ExecutionReport report) {}
 
     /**
      * Stable identity for diagnostics, snapshots and interruption

@@ -38,8 +38,7 @@ import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
  * finding water must outrank stopping.
  */
 // contract: see ADR-0003 section 2 (rules are data rows over the board)
-public final class ExtinguishFireRule
-        implements ReflexRule, ReflexHysteresis {
+public final class ExtinguishFireRule implements ReflexRule, ReflexHysteresis {
 
     /**
      * Flat firing priority; between SURFACE (110) and FREEZE (100).
@@ -88,8 +87,7 @@ public final class ExtinguishFireRule
      */
     public ExtinguishFireRule(int priority) {
         if (priority <= 0) {
-            throw new IllegalArgumentException(
-                "priority must be positive");
+            throw new IllegalArgumentException("priority must be positive");
         }
         this.priority = priority;
     }

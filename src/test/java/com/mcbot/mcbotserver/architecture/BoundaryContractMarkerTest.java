@@ -1,5 +1,9 @@
 package com.mcbot.mcbotserver.architecture;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import com.mcbot.mcbotserver.testsupport.RepoRoot;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -8,13 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
-
 import org.junit.jupiter.api.Test;
-
-import com.mcbot.mcbotserver.testsupport.RepoRoot;
-
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Layer-1 gate for the contract-marker convention (AGENTS.md
@@ -40,22 +38,21 @@ class BoundaryContractMarkerTest {
      * marker, keyed by simple name. Simple names are unambiguous
      * here: no non-api type in the tree shares them.
      */
-    private static final List<String> BOUNDARY_INTERFACES = List.of(
-        "Actor", "Behavior", "BotProcess", "WorldView", "EventQueue",
-        "CommandChannel", "MenuTransactions");
+    private static final List<String> BOUNDARY_INTERFACES =
+            List.of("Actor", "Behavior", "BotProcess", "WorldView", "EventQueue", "CommandChannel", "MenuTransactions");
 
     /**
      * One known implementer per interface - proves the scan sees
      * the tree; a silent empty scan must not pass.
      */
     private static final Map<String, String> ANCHORS = Map.of(
-        "Actor", "core/actor/ChannelArbiter.java",
-        "Behavior", "core/behavior/PathingBehavior.java",
-        "BotProcess", "core/process/GotoProcess.java",
-        "WorldView", "core/world/SnapshotWorldView.java",
-        "EventQueue", "core/event/InMemoryEventQueue.java",
-        "CommandChannel", "core/command/CommandBus.java",
-        "MenuTransactions", "adapter/BindingActor.java");
+            "Actor", "core/actor/ChannelArbiter.java",
+            "Behavior", "core/behavior/PathingBehavior.java",
+            "BotProcess", "core/process/GotoProcess.java",
+            "WorldView", "core/world/SnapshotWorldView.java",
+            "EventQueue", "core/event/InMemoryEventQueue.java",
+            "CommandChannel", "core/command/CommandBus.java",
+            "MenuTransactions", "adapter/BindingActor.java");
 
     /**
      * Marker shapes: the inline form and the Javadoc form. The
@@ -64,8 +61,7 @@ class BoundaryContractMarkerTest {
      * the doc governance tree; what the rule freezes is the
      * pointer's presence, not its spelling.
      */
-    private static final Pattern MARKER = Pattern.compile(
-        "(?i)contract: see \\w");
+    private static final Pattern MARKER = Pattern.compile("(?i)contract: see \\w");
 
     /** Fails when any src/main boundary implementer lacks its
      *  contract marker. */
@@ -73,34 +69,33 @@ class BoundaryContractMarkerTest {
     void boundaryImplementersCarryContractMarkers() {
         List<String> violations = new ArrayList<>();
         List<String> seenAnchors = new ArrayList<>();
-        try (Stream<Path> files = Files.walk(RepoRoot.find().resolve(
-                Path.of("src", "main", "java")))) {
+        try (Stream<Path> files = Files.walk(RepoRoot.find().resolve(Path.of("src", "main", "java")))) {
             files.filter(p -> p.toString().endsWith(".java"))
-                .filter(p -> !p.toString().replace('\\', '/')
-                    .contains("/com/mcbot/mcbotserver/api/"))
-                .forEach(p -> scanFile(p, violations, seenAnchors));
+                    .filter(p -> !p.toString().replace('\\', '/').contains("/com/mcbot/mcbotserver/api/"))
+                    .forEach(p -> scanFile(p, violations, seenAnchors));
         } catch (IOException e) {
             fail("cannot scan main sources: " + e.getMessage());
             return;
         }
         for (var entry : ANCHORS.entrySet()) {
-            assertTrue(seenAnchors.contains(entry.getKey()),
-                () -> "no implementer of " + entry.getKey()
-                    + " found - expected at least "
-                    + entry.getValue()
-                    + "; the scan came back incomplete.");
+            assertTrue(
+                    seenAnchors.contains(entry.getKey()),
+                    () -> "no implementer of " + entry.getKey()
+                            + " found - expected at least "
+                            + entry.getValue()
+                            + "; the scan came back incomplete.");
         }
-        assertTrue(violations.isEmpty(),
-            () -> "boundary-interface implementers without a "
-                + "contract marker (AGENTS.md 1.4.3.1):\n"
-                + String.join("\n", violations)
-                + "\nAdd '// contract: see ADR-NNNN' (or a "
-                + "'Contract: see boundaries.md section X' Javadoc "
-                + "line) at the class level.");
+        assertTrue(
+                violations.isEmpty(),
+                () -> "boundary-interface implementers without a "
+                        + "contract marker (AGENTS.md 1.4.3.1):\n"
+                        + String.join("\n", violations)
+                        + "\nAdd '// contract: see ADR-NNNN' (or a "
+                        + "'Contract: see boundaries.md section X' Javadoc "
+                        + "line) at the class level.");
     }
 
-    private static void scanFile(Path file, List<String> violations,
-                                 List<String> anchorsSeen) {
+    private static void scanFile(Path file, List<String> violations, List<String> anchorsSeen) {
         String source;
         try {
             source = Files.readString(file);
@@ -111,9 +106,9 @@ class BoundaryContractMarkerTest {
         String path = file.toString().replace('\\', '/');
         boolean implementsBoundary = false;
         for (String iface : BOUNDARY_INTERFACES) {
-            if (Pattern.compile(
-                    "(implements|extends)[^;{()]*\\b" + iface + "\\b")
-                    .matcher(source).find()) {
+            if (Pattern.compile("(implements|extends)[^;{()]*\\b" + iface + "\\b")
+                    .matcher(source)
+                    .find()) {
                 implementsBoundary = true;
                 if (path.endsWith(ANCHORS.getOrDefault(iface, ""))) {
                     anchorsSeen.add(iface);

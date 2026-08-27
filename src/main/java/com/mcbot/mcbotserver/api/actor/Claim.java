@@ -20,8 +20,7 @@ package com.mcbot.mcbotserver.api.actor;
  * @param intent   the payload to apply when this claim wins; must be
  *                 the sealed variant matching the channel
  */
-public record Claim(Channel channel, int priority, String holder,
-                    Intent intent) {
+public record Claim(Channel channel, int priority, String holder, Intent intent) {
 
     /**
      * Creates a validated claim. The intent variant must match the
@@ -47,8 +46,7 @@ public record Claim(Channel channel, int priority, String holder,
         }
         if (!matchesChannel(channel, intent)) {
             throw new IllegalArgumentException(
-                "intent " + intent.getClass().getSimpleName()
-                    + " does not match channel " + channel);
+                    "intent " + intent.getClass().getSimpleName() + " does not match channel " + channel);
         }
     }
 
@@ -66,9 +64,10 @@ public record Claim(Channel channel, int priority, String holder,
             case ROT -> intent instanceof Intent.Look;
             case USE -> intent instanceof Intent.Use;
             case SLOT -> intent instanceof Intent.SelectSlot;
-            case INTERACT -> intent instanceof Intent.Dig
-                || intent instanceof Intent.DropSelected
-                || intent instanceof Intent.InteractBlock;
+            case INTERACT ->
+                intent instanceof Intent.Dig
+                        || intent instanceof Intent.DropSelected
+                        || intent instanceof Intent.InteractBlock;
         };
     }
 }

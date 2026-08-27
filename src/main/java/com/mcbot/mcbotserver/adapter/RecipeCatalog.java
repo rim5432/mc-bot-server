@@ -1,7 +1,10 @@
 package com.mcbot.mcbotserver.adapter;
 
 import com.mcbot.mcbotserver.api.menu.RecipeView;
-
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.TreeMap;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -11,11 +14,6 @@ import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.item.crafting.ShapedRecipe;
 import net.minecraft.world.level.Level;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.TreeMap;
 
 /**
  * Queries the server {@code RecipeManager} and translates shaped
@@ -71,8 +69,7 @@ public final class RecipeCatalog {
         if (key == null) {
             return Optional.empty();
         }
-        return recipes.byKey(key).flatMap(recipe -> translate(key,
-            recipe));
+        return recipes.byKey(key).flatMap(recipe -> translate(key, recipe));
     }
 
     /**
@@ -87,13 +84,11 @@ public final class RecipeCatalog {
         List<RecipeView> matches = new ArrayList<>();
         for (ResourceLocation key : recipes.getRecipeIds().toList()) {
             recipes.byKey(key)
-                .flatMap(recipe -> translate(key, recipe))
-                .filter(view -> view.resultItemId()
-                    .equals(resultItemId))
-                .ifPresent(matches::add);
+                    .flatMap(recipe -> translate(key, recipe))
+                    .filter(view -> view.resultItemId().equals(resultItemId))
+                    .ifPresent(matches::add);
         }
-        matches.sort((a, b) -> a.recipeId()
-            .compareTo(b.recipeId()));
+        matches.sort((a, b) -> a.recipeId().compareTo(b.recipeId()));
         return List.copyOf(matches);
     }
 
@@ -115,17 +110,14 @@ public final class RecipeCatalog {
     public RecipePage list(int offset, int limit) {
         List<RecipeView> all = new ArrayList<>();
         for (ResourceLocation key : recipes.getRecipeIds().toList()) {
-            recipes.byKey(key)
-                .flatMap(recipe -> translate(key, recipe))
-                .ifPresent(all::add);
+            recipes.byKey(key).flatMap(recipe -> translate(key, recipe)).ifPresent(all::add);
         }
         all.sort((a, b) -> a.recipeId().compareTo(b.recipeId()));
         int total = all.size();
         int from = Math.max(0, Math.min(offset, total));
         int safeLimit = Math.max(1, Math.min(limit, 200));
         int to = Math.min(from + safeLimit, total);
-        return new RecipePage(
-            List.copyOf(all.subList(from, to)), total, from, to - from);
+        return new RecipePage(List.copyOf(all.subList(from, to)), total, from, to - from);
     }
 
     /**
@@ -136,9 +128,7 @@ public final class RecipeCatalog {
      * @param offset  effective zero-based start of this page
      * @param limit   effective number of recipes in this page
      */
-    public record RecipePage(List<RecipeView> recipes, int total,
-                             int offset, int limit) {
-    }
+    public record RecipePage(List<RecipeView> recipes, int total, int offset, int limit) {}
 
     /**
      * Translate one engine recipe into the pure description.
@@ -148,13 +138,11 @@ public final class RecipeCatalog {
      * @return the description, or empty when it is not a representable
      *         shaped recipe (shapeless, or an empty/degenerate result)
      */
-    private Optional<RecipeView> translate(ResourceLocation key,
-                                           Recipe<?> recipe) {
+    private Optional<RecipeView> translate(ResourceLocation key, Recipe<?> recipe) {
         if (!(recipe instanceof ShapedRecipe shaped)) {
             return Optional.empty();
         }
-        ItemStack result =
-            shaped.getResultItem(level.registryAccess());
+        ItemStack result = shaped.getResultItem(level.registryAccess());
         if (result == null || result.isEmpty()) {
             return Optional.empty();
         }
@@ -167,8 +155,7 @@ public final class RecipeCatalog {
             }
             List<String> ids = new ArrayList<>(options.length);
             for (ItemStack option : options) {
-                ResourceLocation itemId =
-                    BuiltInRegistries.ITEM.getKey(option.getItem());
+                ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(option.getItem());
                 ids.add(itemId != null ? itemId.toString() : "unknown");
             }
             placements.put(i, List.copyOf(ids));
@@ -176,8 +163,11 @@ public final class RecipeCatalog {
         if (placements.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(new RecipeView(key.toString(),
-            BuiltInRegistries.ITEM.getKey(result.getItem()).toString(),
-            result.getCount(), shaped.getWidth(), placements));
+        return Optional.of(new RecipeView(
+                key.toString(),
+                BuiltInRegistries.ITEM.getKey(result.getItem()).toString(),
+                result.getCount(),
+                shaped.getWidth(),
+                placements));
     }
 }

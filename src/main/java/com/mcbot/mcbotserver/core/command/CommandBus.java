@@ -4,9 +4,7 @@ import com.mcbot.mcbotserver.api.command.BotCommand;
 import com.mcbot.mcbotserver.api.command.CommandChannel;
 import com.mcbot.mcbotserver.api.command.SubmitResult;
 import com.mcbot.mcbotserver.api.event.BotEvent;
-import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.event.EventQueue;
-
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -123,8 +121,7 @@ public final class CommandBus implements CommandChannel {
      */
     public void setCancelListener(CancelListener listener) {
         if (listener == null) {
-            throw new IllegalArgumentException(
-                "listener must not be null");
+            throw new IllegalArgumentException("listener must not be null");
         }
         this.cancelListener = listener;
     }
@@ -136,8 +133,7 @@ public final class CommandBus implements CommandChannel {
         }
         Handler handler = handlers.get(command.verb());
         if (handler == null) {
-            return new SubmitResult.Rejected(
-                "unknown verb: " + command.verb());
+            return new SubmitResult.Rejected("unknown verb: " + command.verb());
         }
         String reason = handler.validate(command);
         if (reason != null) {
@@ -149,8 +145,8 @@ public final class CommandBus implements CommandChannel {
         // a bot restart wipes it alongside the event queue (the
         // resetAt contract covers both).
         String effectiveKey = idempotencyKey != null
-            ? idempotencyKey
-            : "auto:" + command.verb() + ":" + canonicalArgs(command.args());
+                ? idempotencyKey
+                : "auto:" + command.verb() + ":" + canonicalArgs(command.args());
         String cachedTaskId = idempotencyCache.get(effectiveKey);
         if (cachedTaskId != null) {
             return SubmitResult.Ok.replay(cachedTaskId);
@@ -231,8 +227,7 @@ public final class CommandBus implements CommandChannel {
      * @param t      time-of-day stamp; non-negative
      * @param text   short human-readable outcome; never null
      */
-    public void finishTask(String taskId, String kind, long day, long t,
-                           String text) {
+    public void finishTask(String taskId, String kind, long day, long t, String text) {
         activeTasks.remove(taskId);
         // Terminal state closes the dedupe window the same way cancel
         // does. A retry that arrives after the task finished must see
@@ -241,8 +236,7 @@ public final class CommandBus implements CommandChannel {
         if (idemKey != null) {
             idempotencyCache.remove(idemKey, taskId);
         }
-        events.push(new BotEvent(kind, day, t, true,
-            Map.of("taskId", taskId), text));
+        events.push(new BotEvent(kind, day, t, true, Map.of("taskId", taskId), text));
     }
 
     private String nextTaskId() {

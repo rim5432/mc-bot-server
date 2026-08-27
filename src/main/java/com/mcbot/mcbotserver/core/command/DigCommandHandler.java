@@ -7,7 +7,6 @@ import com.mcbot.mcbotserver.api.event.EventQueue;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.process.DigProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,13 +47,10 @@ public final class DigCommandHandler {
      * @param daySupplier       game-day stamp accessor; never null
      * @param timeOfDaySupplier time-of-day stamp accessor; never null
      */
-    public DigCommandHandler(TaskArbiter arbiter, EventQueue events,
-                             LongSupplier daySupplier,
-                             LongSupplier timeOfDaySupplier) {
-        if (arbiter == null || events == null || daySupplier == null
-                || timeOfDaySupplier == null) {
-            throw new IllegalArgumentException(
-                "arguments must not be null");
+    public DigCommandHandler(
+            TaskArbiter arbiter, EventQueue events, LongSupplier daySupplier, LongSupplier timeOfDaySupplier) {
+        if (arbiter == null || events == null || daySupplier == null || timeOfDaySupplier == null) {
+            throw new IllegalArgumentException("arguments must not be null");
         }
         this.arbiter = arbiter;
         this.events = events;
@@ -79,21 +75,23 @@ public final class DigCommandHandler {
         bus.register("dig", new CommandBus.Handler() {
             @Override
             public String validate(BotCommand command) {
-                return validateArgs(command) ? null
-                    : "dig wants integer args x y z [timeoutTicks]";
+                return validateArgs(command) ? null : "dig wants integer args x y z [timeoutTicks]";
             }
 
             @Override
             public void execute(BotCommand command, String taskId) {
                 Map<String, String> args = command.args();
                 long timeout = args.containsKey("timeoutTicks")
-                    ? Long.parseLong(args.get("timeoutTicks"))
-                    : DEFAULT_TIMEOUT_TICKS;
-                DigProcess mission = new DigProcess(taskId,
-                    new CellPos(Integer.parseInt(args.get("x")),
-                        Integer.parseInt(args.get("y")),
-                        Integer.parseInt(args.get("z"))),
-                    50, timeout);
+                        ? Long.parseLong(args.get("timeoutTicks"))
+                        : DEFAULT_TIMEOUT_TICKS;
+                DigProcess mission = new DigProcess(
+                        taskId,
+                        new CellPos(
+                                Integer.parseInt(args.get("x")),
+                                Integer.parseInt(args.get("y")),
+                                Integer.parseInt(args.get("z"))),
+                        50,
+                        timeout);
                 missions.put(taskId, mission);
                 arbiter.register(mission);
                 arbiter.requestControl(mission);
@@ -128,14 +126,14 @@ public final class DigCommandHandler {
             attrs.put("posX", String.valueOf(mission.target().x()));
             attrs.put("posY", String.valueOf(mission.target().y()));
             attrs.put("posZ", String.valueOf(mission.target().z()));
-            attrs.put("blockId", String.valueOf(
-                mission.initialBlockId()));
-            events.push(new BotEvent(EventKind.BLOCK_BROKEN,
-                daySupplier.getAsLong(),
-                timeOfDaySupplier.getAsLong(), false,
-                Map.copyOf(attrs),
-                mission.missionTaskId() + ": broke "
-                    + mission.initialBlockId()));
+            attrs.put("blockId", String.valueOf(mission.initialBlockId()));
+            events.push(new BotEvent(
+                    EventKind.BLOCK_BROKEN,
+                    daySupplier.getAsLong(),
+                    timeOfDaySupplier.getAsLong(),
+                    false,
+                    Map.copyOf(attrs),
+                    mission.missionTaskId() + ": broke " + mission.initialBlockId()));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down with it.
         }
@@ -153,11 +151,13 @@ public final class DigCommandHandler {
         }
         mission.abort();
         try {
-            events.push(new BotEvent(EventKind.TASK_CANCELLED,
-                daySupplier.getAsLong(),
-                timeOfDaySupplier.getAsLong(), false,
-                Map.of("task", "dig:" + taskId, "taskId", taskId),
-                "dig:" + taskId + ": cancelled by harness"));
+            events.push(new BotEvent(
+                    EventKind.TASK_CANCELLED,
+                    daySupplier.getAsLong(),
+                    timeOfDaySupplier.getAsLong(),
+                    false,
+                    Map.of("task", "dig:" + taskId, "taskId", taskId),
+                    "dig:" + taskId + ": cancelled by harness"));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down with it.
         }
@@ -169,8 +169,7 @@ public final class DigCommandHandler {
             for (String key : List.of("x", "y", "z")) {
                 Integer.parseInt(args.get(key));
             }
-            if (args.containsKey("timeoutTicks")
-                    && Long.parseLong(args.get("timeoutTicks")) <= 0) {
+            if (args.containsKey("timeoutTicks") && Long.parseLong(args.get("timeoutTicks")) <= 0) {
                 return false;
             }
             return true;
@@ -178,5 +177,4 @@ public final class DigCommandHandler {
             return false;
         }
     }
-
 }

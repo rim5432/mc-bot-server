@@ -1,22 +1,16 @@
 package com.mcbot.mcbotserver.core.reflex;
 
-import com.mcbot.mcbotserver.api.reflex.ReflexAction;
-import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
-import com.mcbot.mcbotserver.api.types.CellPos;
-import com.mcbot.mcbotserver.api.world.WorldView;
-import com.mcbot.mcbotserver.core.reflex.EscapeLavaRule;
-import com.mcbot.mcbotserver.core.reflex.ExtinguishFireRule;
-import com.mcbot.mcbotserver.core.reflex.FreezeOnLowHealthRule;
-import com.mcbot.mcbotserver.core.reflex.SurfaceOnLowAirRule;
-import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
-import com.mcbot.mcbotserver.core.world.MockWorldView;
-
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import com.mcbot.mcbotserver.api.reflex.ReflexAction;
+import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
+import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.api.world.WorldView;
+import com.mcbot.mcbotserver.core.world.MockWorldView;
+import org.junit.jupiter.api.Test;
 
 /**
  * Lava-escape and fire-extinguish reflex gates: the inLethalFluid
@@ -46,8 +40,7 @@ class EscapeLavaRuleTest {
         return board;
     }
 
-    private static ThreatBlackboard boardAtFire(int fireTicks,
-                                                float health) {
+    private static ThreatBlackboard boardAtFire(int fireTicks, float health) {
         var board = new ThreatBlackboard();
         board.beginTick(0L, 0L, 0L, POS, health);
         board.fireTicks = fireTicks;
@@ -59,33 +52,27 @@ class EscapeLavaRuleTest {
     @Test
     void firesInLavaAndSilentOnDryLand() {
         EscapeLavaRule rule = new EscapeLavaRule();
-        assertEquals(EscapeLavaRule.LAVA_ESCAPE_PRIORITY,
-            rule.computePriority(boardAt(true)), "in lava fires");
-        assertEquals(-1, rule.computePriority(boardAt(false)),
-            "dry land stays silent");
+        assertEquals(EscapeLavaRule.LAVA_ESCAPE_PRIORITY, rule.computePriority(boardAt(true)), "in lava fires");
+        assertEquals(-1, rule.computePriority(boardAt(false)), "dry land stays silent");
     }
 
     @Test
     void actionIsEscapeNotAscend() {
-        assertEquals(ReflexAction.ESCAPE,
-            new EscapeLavaRule().action());
+        assertEquals(ReflexAction.ESCAPE, new EscapeLavaRule().action());
     }
 
     @Test
     void unSensedLavaDefaultsToFalseAndNeverFires() {
         ThreatBlackboard board = new ThreatBlackboard();
         board.beginTick(0L, 0L, 0L, POS, 20f);
-        assertEquals(false, board.inLethalFluid,
-            "beginTick resets inLethalFluid to false");
-        assertEquals(-1, new EscapeLavaRule()
-                .computePriority(board),
-            "a rig whose sensor never stamps lava must not flap");
+        assertEquals(false, board.inLethalFluid, "beginTick resets inLethalFluid to false");
+        assertEquals(
+                -1, new EscapeLavaRule().computePriority(board), "a rig whose sensor never stamps lava must not flap");
     }
 
     @Test
     void badPriorityIsRejected() {
-        assertThrows(IllegalArgumentException.class,
-            () -> new EscapeLavaRule(0));
+        assertThrows(IllegalArgumentException.class, () -> new EscapeLavaRule(0));
     }
 
     /**
@@ -96,11 +83,10 @@ class EscapeLavaRuleTest {
      */
     @Test
     void lavaOutranksSurfaceAndFreezeWhenAllFire() {
-        SurvivalReflexLayer layer = new SurvivalReflexLayer(
-            (world, board) -> {
-                board.inLethalFluid = true;
-                board.airSupply = 50;
-            });
+        SurvivalReflexLayer layer = new SurvivalReflexLayer((world, board) -> {
+            board.inLethalFluid = true;
+            board.airSupply = 50;
+        });
         layer.addRule(new FreezeOnLowHealthRule());
         layer.addRule(new SurfaceOnLowAirRule());
         layer.addRule(new EscapeLavaRule());
@@ -113,21 +99,17 @@ class EscapeLavaRuleTest {
     @Test
     void holdSurvivesLavaExitThenReleases() {
         boolean[] inLava = {true};
-        SurvivalReflexLayer layer = new SurvivalReflexLayer(
-            (world, board) -> board.inLethalFluid = inLava[0]);
+        SurvivalReflexLayer layer = new SurvivalReflexLayer((world, board) -> board.inLethalFluid = inLava[0]);
         layer.addRule(new EscapeLavaRule());
-        assertNotNull(layer.tick(WORLD, 1L, 0L, 0L, POS, 20f),
-            "in lava fires");
+        assertNotNull(layer.tick(WORLD, 1L, 0L, 0L, POS, 20f), "in lava fires");
         inLava[0] = false;
-        for (int i = 0;
-             i < EscapeLavaRule.LAVA_ESCAPE_HOLD_TICKS; i++) {
-            assertNotNull(layer.tick(WORLD, 2L + i, 0L, 0L, POS, 20f),
-                "hold tick " + i + " keeps escape to clear edge");
+        for (int i = 0; i < EscapeLavaRule.LAVA_ESCAPE_HOLD_TICKS; i++) {
+            assertNotNull(
+                    layer.tick(WORLD, 2L + i, 0L, 0L, POS, 20f), "hold tick " + i + " keeps escape to clear edge");
         }
-        assertNull(layer.tick(WORLD,
-            2L + EscapeLavaRule.LAVA_ESCAPE_HOLD_TICKS,
-            0L, 0L, POS, 20f),
-            "hold expired + stable dry land releases");
+        assertNull(
+                layer.tick(WORLD, 2L + EscapeLavaRule.LAVA_ESCAPE_HOLD_TICKS, 0L, 0L, POS, 20f),
+                "hold expired + stable dry land releases");
     }
 
     // ---- ExtinguishFireRule ----
@@ -136,47 +118,44 @@ class EscapeLavaRuleTest {
     void firesWhenRemainingDamageExceedsHealth() {
         ExtinguishFireRule rule = new ExtinguishFireRule();
         // fireTicks=400 -> 20 damage remaining, health=10 -> lethal
-        assertEquals(ExtinguishFireRule.FIRE_EXTINGUISH_PRIORITY,
-            rule.computePriority(boardAtFire(400, 10f)),
-            "20 remaining damage vs 10 health fires");
+        assertEquals(
+                ExtinguishFireRule.FIRE_EXTINGUISH_PRIORITY,
+                rule.computePriority(boardAtFire(400, 10f)),
+                "20 remaining damage vs 10 health fires");
         // fireTicks=20 -> 1 damage remaining, health=10 -> safe
-        assertEquals(-1, rule.computePriority(boardAtFire(20, 10f)),
-            "1 remaining damage vs 10 health stays silent");
+        assertEquals(-1, rule.computePriority(boardAtFire(20, 10f)), "1 remaining damage vs 10 health stays silent");
     }
 
     @Test
     void zeroFireTicksNeverFires() {
-        assertEquals(-1, new ExtinguishFireRule()
-                .computePriority(boardAtFire(0, 1f)),
-            "not burning stays silent even at 1 health");
+        assertEquals(
+                -1,
+                new ExtinguishFireRule().computePriority(boardAtFire(0, 1f)),
+                "not burning stays silent even at 1 health");
     }
 
     @Test
     void actionIsEscape() {
-        assertEquals(ReflexAction.ESCAPE,
-            new ExtinguishFireRule().action());
+        assertEquals(ReflexAction.ESCAPE, new ExtinguishFireRule().action());
     }
 
     @Test
     void fireEscapeOutranksFreezeButNotSurface() {
         // fireTicks=400 (20 dmg), health=10 -> lethal fire
-        SurvivalReflexLayer layer = new SurvivalReflexLayer(
-            (world, board) -> {
-                board.fireTicks = 400;
-                board.airSupply = 300; // not drowning
-            });
+        SurvivalReflexLayer layer = new SurvivalReflexLayer((world, board) -> {
+            board.fireTicks = 400;
+            board.airSupply = 300; // not drowning
+        });
         layer.addRule(new FreezeOnLowHealthRule()); // 100
         layer.addRule(new SurfaceOnLowAirRule()); // 110, won't fire
         layer.addRule(new ExtinguishFireRule()); // 105
         var decision = layer.tick(WORLD, 1L, 0L, 0L, POS, 10f);
         assertNotNull(decision);
-        assertEquals("EXTINGUISH_FIRE", decision.ruleName(),
-            "fire escape (105) outranks freeze (100)");
+        assertEquals("EXTINGUISH_FIRE", decision.ruleName(), "fire escape (105) outranks freeze (100)");
     }
 
     @Test
     void badFirePriorityIsRejected() {
-        assertThrows(IllegalArgumentException.class,
-            () -> new ExtinguishFireRule(0));
+        assertThrows(IllegalArgumentException.class, () -> new ExtinguishFireRule(0));
     }
 }

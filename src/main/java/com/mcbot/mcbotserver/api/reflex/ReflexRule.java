@@ -60,8 +60,7 @@ public interface ReflexRule {
      * @return the action target cell, or null when the action needs
      *         none or the board carries no position
      */
-    default com.mcbot.mcbotserver.api.types.CellPos actionTarget(
-            ThreatBlackboard board) {
+    default com.mcbot.mcbotserver.api.types.CellPos actionTarget(ThreatBlackboard board) {
         return null;
     }
 }

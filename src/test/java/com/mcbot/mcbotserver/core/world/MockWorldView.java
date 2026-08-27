@@ -9,7 +9,6 @@ import com.mcbot.mcbotserver.api.world.CollisionShape;
 import com.mcbot.mcbotserver.api.world.EntitySnapshot;
 import com.mcbot.mcbotserver.api.world.ViewMode;
 import com.mcbot.mcbotserver.api.world.WorldView;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -61,8 +60,7 @@ public final class MockWorldView implements WorldView {
         MockWorldView world = new MockWorldView();
         for (int x = 0; x <= xLen; x++) {
             for (int z = -2; z <= 2; z++) {
-                world.putBlock(new BlockSnapshot(
-                    new CellPos(x, 63, z), "minecraft:smooth_stone"));
+                world.putBlock(new BlockSnapshot(new CellPos(x, 63, z), "minecraft:smooth_stone"));
             }
         }
         return world;
@@ -210,8 +208,7 @@ public final class MockWorldView implements WorldView {
             return null;
         }
         BlockSnapshot snapshot = blocks.get(pos);
-        return snapshot != null ? snapshot
-            : new BlockSnapshot(pos, BlockSnapshot.AIR);
+        return snapshot != null ? snapshot : new BlockSnapshot(pos, BlockSnapshot.AIR);
     }
 
     @Override
@@ -230,8 +227,7 @@ public final class MockWorldView implements WorldView {
             return shape;
         }
         BlockSnapshot snapshot = blocks.get(pos);
-        boolean isAir = snapshot == null
-            || BlockSnapshot.AIR.equals(snapshot.blockId());
+        boolean isAir = snapshot == null || BlockSnapshot.AIR.equals(snapshot.blockId());
         return isAir ? CollisionShape.empty() : CollisionShape.fullCube();
     }
 
@@ -245,14 +241,12 @@ public final class MockWorldView implements WorldView {
             return override;
         }
         BlockSnapshot snapshot = blocks.get(pos);
-        String id = snapshot == null ? BlockSnapshot.AIR
-            : snapshot.blockId();
+        String id = snapshot == null ? BlockSnapshot.AIR : snapshot.blockId();
         return traitsRegistry.traitsFor(id);
     }
 
     @Override
-    public List<EntitySnapshot> getEntities(CellPos center, double radius,
-                                            ViewMode mode) {
+    public List<EntitySnapshot> getEntities(CellPos center, double radius, ViewMode mode) {
         if (center == null) {
             throw new IllegalArgumentException("center must not be null");
         }

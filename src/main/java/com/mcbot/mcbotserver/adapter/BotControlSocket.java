@@ -1,11 +1,5 @@
 package com.mcbot.mcbotserver.adapter;
 
-import net.minecraft.network.chat.Component;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.dedicated.DedicatedServer;
-import net.minecraft.server.rcon.RconConsoleSource;
-
-import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -20,6 +14,9 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.dedicated.DedicatedServer;
+import net.minecraft.server.rcon.RconConsoleSource;
 
 /**
  * RCON-shaped control socket for servers the vanilla thread does not
@@ -51,8 +48,7 @@ public final class BotControlSocket {
     private static volatile ServerSocket listener;
     private static Thread acceptThread;
 
-    private BotControlSocket() {
-    }
+    private BotControlSocket() {}
 
     /**
      * Opens the bridge when this server has no vanilla RCON of its
@@ -66,24 +62,20 @@ public final class BotControlSocket {
             return;
         }
         Properties props = readServerProperties();
-        if (!"true".equalsIgnoreCase(
-                props.getProperty("enable-rcon", "false"))) {
+        if (!"true".equalsIgnoreCase(props.getProperty("enable-rcon", "false"))) {
             return;
         }
         String password = props.getProperty("rcon.password", "");
         if (password.isBlank()) {
             return;
         }
-        int port = Integer.parseInt(props.getProperty("rcon.port",
-            "25575"));
+        int port = Integer.parseInt(props.getProperty("rcon.port", "25575"));
         try {
-            listener = new ServerSocket(port, 8,
-                InetAddress.getByName("127.0.0.1"));
+            listener = new ServerSocket(port, 8, InetAddress.getByName("127.0.0.1"));
         } catch (IOException e) {
             return;
         }
-        acceptThread = new Thread(() -> acceptLoop(server, password),
-            "mcbotserver-control-socket");
+        acceptThread = new Thread(() -> acceptLoop(server, password), "mcbotserver-control-socket");
         acceptThread.setDaemon(true);
         acceptThread.start();
     }
@@ -104,14 +96,11 @@ public final class BotControlSocket {
         }
     }
 
-    private static void acceptLoop(MinecraftServer server,
-                                   String password) {
+    private static void acceptLoop(MinecraftServer server, String password) {
         while (listener != null) {
             try {
                 Socket client = listener.accept();
-                Thread t = new Thread(
-                    () -> serve(server, password, client),
-                    "mcbotserver-control-client");
+                Thread t = new Thread(() -> serve(server, password, client), "mcbotserver-control-client");
                 t.setDaemon(true);
                 t.start();
             } catch (IOException e) {
@@ -120,8 +109,7 @@ public final class BotControlSocket {
         }
     }
 
-    private static void serve(MinecraftServer server, String password,
-                              Socket client) {
+    private static void serve(MinecraftServer server, String password, Socket client) {
         try (client) {
             client.setSoTimeout(30_000);
             InputStream in = client.getInputStream();
@@ -133,22 +121,18 @@ public final class BotControlSocket {
                 // exactly length - 10 bytes.
                 int length = readLittleEndianInt(in);
                 if (length < 10 || length > 8192) {
-                    throw new IOException(
-                        "unreasonable packet length: " + length);
+                    throw new IOException("unreasonable packet length: " + length);
                 }
                 int id = readLittleEndianInt(in);
                 int type = readLittleEndianInt(in);
-                String payload =
-                    readPayload(in, length - 10);
+                String payload = readPayload(in, length - 10);
                 if (type == 3) {
                     authed = constantTimeEquals(payload, password);
                     writePacket(out, authed ? id : -1, type, "");
                     continue;
                 }
                 if (type == 2) {
-                    String response = authed
-                        ? execute(server, payload)
-                        : "";
+                    String response = authed ? execute(server, payload) : "";
                     writePacket(out, authed ? id : -1, type, response);
                     continue;
                 }
@@ -163,16 +147,13 @@ public final class BotControlSocket {
      * Runs one command on the tick thread and returns its chat-text
      * answer. Mirrors DedicatedServer's RCON execution shape.
      */
-    private static String execute(MinecraftServer server,
-                                  String command)
-            throws InterruptedException {
+    private static String execute(MinecraftServer server, String command) throws InterruptedException {
         RconConsoleSource out = new RconConsoleSource(server);
         CountDownLatch done = new CountDownLatch(1);
         server.execute(() -> {
             try {
                 out.prepareForCommand();
-                server.getCommands().performPrefixedCommand(
-                    out.createCommandSourceStack(), command);
+                server.getCommands().performPrefixedCommand(out.createCommandSourceStack(), command);
             } finally {
                 done.countDown();
             }
@@ -190,8 +171,7 @@ public final class BotControlSocket {
      */
     private static Properties readServerProperties() {
         Properties props = new Properties();
-        for (Path candidate : List.of(Path.of("server.properties"),
-                Path.of("run", "server.properties"))) {
+        for (Path candidate : List.of(Path.of("server.properties"), Path.of("run", "server.properties"))) {
             if (Files.isReadable(candidate)) {
                 try (InputStream in = Files.newInputStream(candidate)) {
                     props.load(in);
@@ -214,8 +194,7 @@ public final class BotControlSocket {
         return diff == 0;
     }
 
-    private static int readLittleEndianInt(InputStream in)
-            throws IOException {
+    private static int readLittleEndianInt(InputStream in) throws IOException {
         int b0 = in.read();
         int b1 = in.read();
         int b2 = in.read();
@@ -235,8 +214,7 @@ public final class BotControlSocket {
      * @return decoded payload text; empty string when absent
      * @throws IOException when the stream breaks mid-packet
      */
-    private static String readPayload(InputStream in, int textLength)
-            throws IOException {
+    private static String readPayload(InputStream in, int textLength) throws IOException {
         byte[] body = new byte[textLength];
         int off = 0;
         while (off < textLength) {
@@ -253,8 +231,7 @@ public final class BotControlSocket {
         return new String(body, 0, end, StandardCharsets.UTF_8);
     }
 
-    private static void writePacket(OutputStream out, int id, int type,
-                                    String payload) throws IOException {
+    private static void writePacket(OutputStream out, int id, int type, String payload) throws IOException {
         byte[] text = payload.getBytes(StandardCharsets.UTF_8);
         int size = 4 + 4 + text.length + 2;
         writeLittleEndianInt(out, size);
@@ -266,8 +243,7 @@ public final class BotControlSocket {
         out.flush();
     }
 
-    private static void writeLittleEndianInt(OutputStream out, int v)
-            throws IOException {
+    private static void writeLittleEndianInt(OutputStream out, int v) throws IOException {
         out.write(v & 0xFF);
         out.write((v >> 8) & 0xFF);
         out.write((v >> 16) & 0xFF);

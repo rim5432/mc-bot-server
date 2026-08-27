@@ -9,18 +9,16 @@ import com.mcbot.mcbotserver.api.world.CollisionShape;
 import com.mcbot.mcbotserver.api.world.EntitySnapshot;
 import com.mcbot.mcbotserver.api.world.ViewMode;
 import com.mcbot.mcbotserver.api.world.WorldView;
-
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.Supplier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.AABB;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.function.Supplier;
 
 /**
  * Read half of the entity binding: pure reads over one ServerLevel.
@@ -61,8 +59,7 @@ public final class BindingWorldView implements WorldView {
      * @param level  the world to read; never null
      * @param traits sealed trait registry; never null
      */
-    public BindingWorldView(ServerLevel level,
-                            BlockTraitsRegistry traits) {
+    public BindingWorldView(ServerLevel level, BlockTraitsRegistry traits) {
         this(level, traits, InventoryView::empty);
     }
 
@@ -78,13 +75,10 @@ public final class BindingWorldView implements WorldView {
      * @param inventorySupplier produces the current inventory snapshot;
      *                          never null
      */
-    public BindingWorldView(ServerLevel level,
-                            BlockTraitsRegistry traits,
-                            Supplier<InventoryView> inventorySupplier) {
+    public BindingWorldView(ServerLevel level, BlockTraitsRegistry traits, Supplier<InventoryView> inventorySupplier) {
         this.level = Objects.requireNonNull(level, "level");
         this.traits = Objects.requireNonNull(traits, "traits");
-        this.inventorySupplier = Objects.requireNonNull(inventorySupplier,
-            "inventorySupplier");
+        this.inventorySupplier = Objects.requireNonNull(inventorySupplier, "inventorySupplier");
     }
 
     @Override
@@ -100,10 +94,8 @@ public final class BindingWorldView implements WorldView {
         if (state.isAir()) {
             return new BlockSnapshot(pos, BlockSnapshot.AIR);
         }
-        ResourceLocation key = BuiltInRegistries.BLOCK.getKey(
-            state.getBlock());
-        return new BlockSnapshot(pos,
-            key != null ? key.toString() : BlockSnapshot.UNKNOWN);
+        ResourceLocation key = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+        return new BlockSnapshot(pos, key != null ? key.toString() : BlockSnapshot.UNKNOWN);
     }
 
     /**
@@ -117,8 +109,7 @@ public final class BindingWorldView implements WorldView {
      * @return the cell-local shape; never null
      */
     @Override
-    public CollisionShape getCollisionShape(CellPos pos,
-                                            ViewMode mode) {
+    public CollisionShape getCollisionShape(CellPos pos, ViewMode mode) {
         BlockPos mc = toMc(pos);
         if (!level.hasChunkAt(mc)) {
             return CollisionShape.fullCube();
@@ -137,40 +128,40 @@ public final class BindingWorldView implements WorldView {
         double maxX = voxels.max(net.minecraft.core.Direction.Axis.X);
         double maxY = voxels.max(net.minecraft.core.Direction.Axis.Y);
         double maxZ = voxels.max(net.minecraft.core.Direction.Axis.Z);
-        boolean full = minX <= 0 && minY <= 0 && minZ <= 0
-            && maxX >= 1 && maxY >= 1 && maxZ >= 1;
-        return full ? CollisionShape.fullCube()
-            : CollisionShape.partial(new CollisionShape.Box(
-                Math.max(0, Math.min(1, minX)),
-                Math.max(0, Math.min(1, minY)),
-                Math.max(0, Math.min(1, minZ)),
-                Math.max(0, Math.min(1, maxX)),
-                Math.max(0, Math.min(1, maxY)),
-                Math.max(0, Math.min(1, maxZ))));
+        boolean full = minX <= 0 && minY <= 0 && minZ <= 0 && maxX >= 1 && maxY >= 1 && maxZ >= 1;
+        return full
+                ? CollisionShape.fullCube()
+                : CollisionShape.partial(new CollisionShape.Box(
+                        Math.max(0, Math.min(1, minX)),
+                        Math.max(0, Math.min(1, minY)),
+                        Math.max(0, Math.min(1, minZ)),
+                        Math.max(0, Math.min(1, maxX)),
+                        Math.max(0, Math.min(1, maxY)),
+                        Math.max(0, Math.min(1, maxZ))));
     }
 
     @Override
-    public List<EntitySnapshot> getEntities(CellPos center,
-                                            double radius, ViewMode mode) {
+    public List<EntitySnapshot> getEntities(CellPos center, double radius, ViewMode mode) {
         AABB box = new AABB(
-            center.x() + 0.5 - radius, center.y() + 0.5 - radius,
-            center.z() + 0.5 - radius,
-            center.x() + 0.5 + radius, center.y() + 0.5 + radius,
-            center.z() + 0.5 + radius);
+                center.x() + 0.5 - radius,
+                center.y() + 0.5 - radius,
+                center.z() + 0.5 - radius,
+                center.x() + 0.5 + radius,
+                center.y() + 0.5 + radius,
+                center.z() + 0.5 + radius);
         List<EntitySnapshot> out = new ArrayList<>();
-        for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class,
-            box)) {
+        for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, box)) {
             double dist = e.blockPosition().distSqr(toMc(center));
             if (dist > radius * radius) {
                 continue;
             }
-            ResourceLocation key = BuiltInRegistries.ENTITY_TYPE.getKey(
-                e.getType());
+            ResourceLocation key = BuiltInRegistries.ENTITY_TYPE.getKey(e.getType());
             out.add(new EntitySnapshot(
-                e.getStringUUID(),
-                key != null ? key.toString() : "unknown",
-                new CellPos(e.getBlockX(), e.getBlockY(), e.getBlockZ()),
-                e.getHealth(), e.getMaxHealth()));
+                    e.getStringUUID(),
+                    key != null ? key.toString() : "unknown",
+                    new CellPos(e.getBlockX(), e.getBlockY(), e.getBlockZ()),
+                    e.getHealth(),
+                    e.getMaxHealth()));
         }
         return out;
     }
@@ -192,10 +183,8 @@ public final class BindingWorldView implements WorldView {
             return BlockTraits.defaults();
         }
         var state = level.getBlockState(mc);
-        ResourceLocation key = BuiltInRegistries.BLOCK.getKey(
-            state.getBlock());
-        return traits.traitsFor(key != null ? key.toString()
-            : BlockSnapshot.UNKNOWN);
+        ResourceLocation key = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+        return traits.traitsFor(key != null ? key.toString() : BlockSnapshot.UNKNOWN);
     }
 
     @Override

@@ -2,21 +2,17 @@ package com.mcbot.mcbotserver.adapter;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
-import com.mojang.logging.LogUtils;
 import com.mcbot.mcbotserver.core.reflex.ReflexRuleJson;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
-
-import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.server.packs.resources.SimpleJsonResourceReloadListener;
-import net.minecraft.util.profiling.ProfilerFiller;
-
-import net.minecraftforge.event.AddReloadListenerEvent;
-
-import org.slf4j.Logger;
-
+import com.mojang.logging.LogUtils;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.server.packs.resources.SimpleJsonResourceReloadListener;
+import net.minecraft.util.profiling.ProfilerFiller;
+import net.minecraftforge.event.AddReloadListenerEvent;
+import org.slf4j.Logger;
 
 /**
  * Datapack-driven reflex rule table: reads {@code
@@ -33,8 +29,7 @@ import java.util.Objects;
  * never disables the bot - it keeps the last good table, because an
  * empty safety reflex is worse than a stale one.
  */
-public final class ReflexRuleReloader
-    extends SimpleJsonResourceReloadListener {
+public final class ReflexRuleReloader extends SimpleJsonResourceReloadListener {
 
     /** Datapack directory SimpleJsonResourceReloadListener scans. */
     public static final String DIRECTORY = "reflex_rules";
@@ -64,27 +59,24 @@ public final class ReflexRuleReloader
     }
 
     @Override
-    protected void apply(Map<net.minecraft.resources.ResourceLocation,
-            com.google.gson.JsonElement> files,
-                         ResourceManager resourceManager,
-                         ProfilerFiller profiler) {
-        com.google.gson.JsonElement doc = files.get(
-            new net.minecraft.resources.ResourceLocation("mcbotserver",
-                DIRECTORY));
+    protected void apply(
+            Map<net.minecraft.resources.ResourceLocation, com.google.gson.JsonElement> files,
+            ResourceManager resourceManager,
+            ProfilerFiller profiler) {
+        com.google.gson.JsonElement doc =
+                files.get(new net.minecraft.resources.ResourceLocation("mcbotserver", DIRECTORY));
         if (!(doc instanceof JsonObject table)) {
             return;
         }
         try {
-            List<com.mcbot.mcbotserver.api.reflex.ReflexRule> rules =
-                ReflexRuleJson.parse(table.toString());
+            List<com.mcbot.mcbotserver.api.reflex.ReflexRule> rules = ReflexRuleJson.parse(table.toString());
             if (target != null && !rules.isEmpty()) {
                 target.replaceRules(rules);
             }
         } catch (IllegalArgumentException badTable) {
             // Keep the last good table; a broken datapack must not
             // silently strip the bot's survival reflexes.
-            LOGGER.error("mcbotserver reflex_rules.json rejected: {}",
-                badTable.getMessage());
+            LOGGER.error("mcbotserver reflex_rules.json rejected: {}", badTable.getMessage());
         }
     }
 

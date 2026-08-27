@@ -10,14 +10,12 @@ import com.mcbot.mcbotserver.api.menu.MenuTransactions;
 import com.mcbot.mcbotserver.api.menu.MenuView;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.actor.ChannelArbiter;
-
+import java.util.Map;
+import java.util.Objects;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-
-import java.util.Map;
-import java.util.Objects;
 
 /**
  * Write half of the entity binding: resolves per-tick claims and
@@ -63,6 +61,7 @@ public final class BindingActor implements Actor, MenuTransactions {
     }
     /** Menu transactions: one facade+opener pair per body (0007 A1). */
     private final MenuOpener menus;
+
     private boolean lastUsePressing;
     private boolean lastDropClaimed;
     private boolean lastInteractClaimed;
@@ -92,8 +91,7 @@ public final class BindingActor implements Actor, MenuTransactions {
 
         Claim move = winners.get(Channel.MOVE);
         if (move != null && move.intent() instanceof Intent.Move m) {
-            body.setDrive((float) clamp(m.forward()),
-                (float) clamp(m.strafe()), m.jump());
+            body.setDrive((float) clamp(m.forward()), (float) clamp(m.strafe()), m.jump());
             // Sprint gait (issue 0005 P1.1, issue 0004 F6(3) ruling
             // D4): adapter-local policy, no Intent field. Forward
             // stride plus straight clearance ahead. Suppress in fluid
@@ -133,8 +131,7 @@ public final class BindingActor implements Actor, MenuTransactions {
         }
 
         Claim slot = winners.get(Channel.SLOT);
-        if (slot != null
-                && slot.intent() instanceof Intent.SelectSlot s) {
+        if (slot != null && slot.intent() instanceof Intent.SelectSlot s) {
             body.selectedSlot = s.slot();
             // Mirror to the inventory binding so perception snapshots
             // read the correct held slot (issue 0007 Phase 1). The body
@@ -144,13 +141,11 @@ public final class BindingActor implements Actor, MenuTransactions {
         }
 
         Claim interact = winners.get(Channel.INTERACT);
-        if (interact != null
-                && interact.intent() instanceof Intent.Dig d) {
+        if (interact != null && interact.intent() instanceof Intent.Dig d) {
             dig.dig(d.target());
             lastDropClaimed = false;
             lastInteractClaimed = false;
-        } else if (interact != null
-                && interact.intent() instanceof Intent.DropSelected ds) {
+        } else if (interact != null && interact.intent() instanceof Intent.DropSelected ds) {
             // Drop is one-shot: fire on the rising edge only. A held
             // DropSelected claim across ticks must not drop twice — the
             // same rising-edge gate USE uses for melee swings. Any stale
@@ -163,8 +158,7 @@ public final class BindingActor implements Actor, MenuTransactions {
             }
             lastDropClaimed = true;
             lastInteractClaimed = false;
-        } else if (interact != null
-                && interact.intent() instanceof Intent.InteractBlock ib) {
+        } else if (interact != null && interact.intent() instanceof Intent.InteractBlock ib) {
             // Place is one-shot: fire on the rising edge only. A held
             // InteractBlock claim across ticks must not place repeatedly
             // — same rising-edge gate as DropSelected and USE melee.
@@ -209,8 +203,8 @@ public final class BindingActor implements Actor, MenuTransactions {
     @Override
     public MenuView openMenu(CellPos target) {
         return menus.open(new BlockPos(target.x(), target.y(), target.z()))
-            .map(BindingMenu::snapshot)
-            .orElse(null);
+                .map(BindingMenu::snapshot)
+                .orElse(null);
     }
 
     @Override
@@ -266,16 +260,19 @@ public final class BindingActor implements Actor, MenuTransactions {
     // contract: see issues/0005-player-feel-motion-layer.md P1 +
     // issue 0004 D4 (sprint is an adapter policy, no Intent field)
     private boolean sprintClearAhead(Intent.Move m) {
-        if (m.forward() < SPRINT_FORWARD_MIN
-            || body.isInWater() || body.isInLava()) {
+        if (m.forward() < SPRINT_FORWARD_MIN || body.isInWater() || body.isInLava()) {
             return false;
         }
         var view = body.getViewVector(1.0F);
         var dir = new Vec3(view.x, 0, view.z).normalize();
         var eye = body.getEyePosition();
-        var clip = body.level().clip(new ClipContext(eye,
-            eye.add(dir.scale(SPRINT_CLEARANCE_BLOCKS)),
-            ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, body));
+        var clip = body.level()
+                .clip(new ClipContext(
+                        eye,
+                        eye.add(dir.scale(SPRINT_CLEARANCE_BLOCKS)),
+                        ClipContext.Block.COLLIDER,
+                        ClipContext.Fluid.NONE,
+                        body));
         return clip.getType() == HitResult.Type.MISS;
     }
 

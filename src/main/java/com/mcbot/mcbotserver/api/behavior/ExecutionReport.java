@@ -38,15 +38,12 @@ public record ExecutionReport(Status status, String reason) {
         if (status == null) {
             throw new IllegalArgumentException("status must not be null");
         }
-        boolean needsReason = status == Status.FAILED
-            || status == Status.STUCK;
+        boolean needsReason = status == Status.FAILED || status == Status.STUCK;
         if (needsReason && (reason == null || reason.isBlank())) {
-            throw new IllegalArgumentException(
-                status + " requires a reason");
+            throw new IllegalArgumentException(status + " requires a reason");
         }
         if (!needsReason && reason != null) {
-            throw new IllegalArgumentException(
-                status + " must not carry a reason");
+            throw new IllegalArgumentException(status + " must not carry a reason");
         }
     }
 

@@ -1,8 +1,8 @@
 package com.mcbot.mcbotserver.core.event;
 
+import com.google.gson.JsonObject;
 import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventBatch;
-import com.google.gson.JsonObject;
 
 /**
  * Serializes an {@link EventBatch} into the single-line JSON dialect
@@ -20,8 +20,7 @@ import com.google.gson.JsonObject;
 // contract: see boundaries.md Boundary D protocol (event stream shape)
 public final class EventBatchJson {
 
-    private EventBatchJson() {
-    }
+    private EventBatchJson() {}
 
     /**
      * Render the batch as one compact JSON line.

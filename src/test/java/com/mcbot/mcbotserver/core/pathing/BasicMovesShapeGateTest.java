@@ -1,16 +1,14 @@
 package com.mcbot.mcbotserver.core.pathing;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.BlockSnapshot;
 import com.mcbot.mcbotserver.api.world.CollisionShape;
 import com.mcbot.mcbotserver.api.world.CollisionShape.Box;
-import com.mcbot.mcbotserver.core.pathing.BasicMoves;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
-
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Shape-driven viability gate: the move predicates answer from the
@@ -38,9 +36,7 @@ class BasicMovesShapeGateTest {
         MockWorldView w = new MockWorldView();
         for (int x = -2; x <= 3; x++) {
             for (int z = -2; z <= 3; z++) {
-                w.putBlock(new BlockSnapshot(
-                    new CellPos(x, FLOOR_Y, z),
-                    "minecraft:stone"));
+                w.putBlock(new BlockSnapshot(new CellPos(x, FLOOR_Y, z), "minecraft:stone"));
             }
         }
         return w;
@@ -54,13 +50,10 @@ class BasicMovesShapeGateTest {
         // across.
         for (int x = -2; x <= 3; x++) {
             for (int z = -2; z <= 3; z++) {
-                w.putShape(new CellPos(x, FLOOR_Y, z),
-                    CollisionShape.partial(
-                        new Box(0, 0, 0, 1, 0.5, 1)));
+                w.putShape(new CellPos(x, FLOOR_Y, z), CollisionShape.partial(new Box(0, 0, 0, 1, 0.5, 1)));
             }
         }
-        assertTrue(new BasicMoves.Walk(SRC, DST).isViable(w),
-            "lower slab is standable: walk must be viable");
+        assertTrue(new BasicMoves.Walk(SRC, DST).isViable(w), "lower slab is standable: walk must be viable");
     }
 
     @Test
@@ -72,13 +65,10 @@ class BasicMovesShapeGateTest {
         // is a wall, and its top is never a routing surface.)
         for (int x = -2; x <= 3; x++) {
             for (int z = -2; z <= 3; z++) {
-                w.putShape(new CellPos(x, FLOOR_Y, z),
-                    CollisionShape.partial(
-                        new Box(0.4, 0, 0.4, 0.6, 1, 0.6)));
+                w.putShape(new CellPos(x, FLOOR_Y, z), CollisionShape.partial(new Box(0.4, 0, 0.4, 0.6, 1, 0.6)));
             }
         }
-        assertFalse(new BasicMoves.Walk(SRC, DST).isViable(w),
-            "fence post top is too thin to stand on");
+        assertFalse(new BasicMoves.Walk(SRC, DST).isViable(w), "fence post top is too thin to stand on");
     }
 
     @Test
@@ -86,13 +76,10 @@ class BasicMovesShapeGateTest {
         MockWorldView w = floor();
         for (int x = -2; x <= 3; x++) {
             for (int z = -2; z <= 3; z++) {
-                w.putShape(new CellPos(x, FLOOR_Y, z),
-                    CollisionShape.partial(
-                        new Box(0, 0, 0, 1, 0.1, 1)));
+                w.putShape(new CellPos(x, FLOOR_Y, z), CollisionShape.partial(new Box(0, 0, 0, 1, 0.1, 1)));
             }
         }
-        assertFalse(new BasicMoves.Walk(SRC, DST).isViable(w),
-            "plate thinner than step height is not walkable");
+        assertFalse(new BasicMoves.Walk(SRC, DST).isViable(w), "plate thinner than step height is not walkable");
     }
 
     @Test
@@ -100,13 +87,10 @@ class BasicMovesShapeGateTest {
         MockWorldView w = floor();
         for (int x = -2; x <= 3; x++) {
             for (int z = -2; z <= 3; z++) {
-                w.putShape(new CellPos(x, FLOOR_Y, z),
-                    CollisionShape.partial(
-                        new Box(0, 0.5, 0, 1, 1, 1)));
+                w.putShape(new CellPos(x, FLOOR_Y, z), CollisionShape.partial(new Box(0, 0.5, 0, 1, 1, 1)));
             }
         }
-        assertTrue(new BasicMoves.Walk(SRC, DST).isViable(w),
-            "upper slab top is at y=1, body can stand on it");
+        assertTrue(new BasicMoves.Walk(SRC, DST).isViable(w), "upper slab top is at y=1, body can stand on it");
     }
 
     @Test
@@ -117,12 +101,10 @@ class BasicMovesShapeGateTest {
         // body-clear - the head cell above it is empty, and the
         // cell below the foot carries the platform's walkable top.
         MockWorldView w = floor();
-        w.putShape(new CellPos(1, BODY_Y, 0),
-            CollisionShape.partial(
-                new Box(0, 0.5, 0, 1, 1, 1)));
-        assertTrue(new BasicMoves.JumpUp(SRC,
-            new CellPos(1, BODY_Y + 1, 0)).isViable(w),
-            "jump onto an upper-slab platform must be viable");
+        w.putShape(new CellPos(1, BODY_Y, 0), CollisionShape.partial(new Box(0, 0.5, 0, 1, 1, 1)));
+        assertTrue(
+                new BasicMoves.JumpUp(SRC, new CellPos(1, BODY_Y + 1, 0)).isViable(w),
+                "jump onto an upper-slab platform must be viable");
     }
 
     @Test
@@ -131,19 +113,14 @@ class BasicMovesShapeGateTest {
         // the same answer. The test that a future regression
         // special-casing "minecraft:stone" or any other id is
         // caught here, not inside the planner.
-        for (String id : new String[] {
-            "minecraft:stone",
-            "minecraft:dirt",
-            "totally:not-a-real-block"}) {
+        for (String id : new String[] {"minecraft:stone", "minecraft:dirt", "totally:not-a-real-block"}) {
             MockWorldView w = new MockWorldView();
             for (int x = -2; x <= 3; x++) {
                 for (int z = -2; z <= 3; z++) {
-                    w.putBlock(new BlockSnapshot(
-                        new CellPos(x, FLOOR_Y, z), id));
+                    w.putBlock(new BlockSnapshot(new CellPos(x, FLOOR_Y, z), id));
                 }
             }
-            assertTrue(new BasicMoves.Walk(SRC, DST).isViable(w),
-                "id " + id + ": same geometry, same answer");
+            assertTrue(new BasicMoves.Walk(SRC, DST).isViable(w), "id " + id + ": same geometry, same answer");
         }
     }
 }

@@ -6,13 +6,11 @@ import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.core.behavior.IdleLook;
-
-import net.minecraft.world.InteractionHand;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import net.minecraft.world.InteractionHand;
 
 /**
  * Cosmetic body expression for the entity binding (issue 0005):
@@ -64,12 +62,9 @@ final class PresenceLayer {
                 continue;
             }
             var playerEye = player.getEyePosition();
-            candidates.add(new Vec3(playerEye.x, playerEye.y,
-                playerEye.z));
+            candidates.add(new Vec3(playerEye.x, playerEye.y, playerEye.z));
         }
-        IdleLook.Target target =
-            IdleLook.nearestTarget(new Vec3(eye.x, eye.y, eye.z),
-                candidates);
+        IdleLook.Target target = IdleLook.nearestTarget(new Vec3(eye.x, eye.y, eye.z), candidates);
         if (target == null) {
             // Nobody near: periodic sweep instead (issue 0005 P2.3).
             applyIdleSweep();
@@ -77,8 +72,8 @@ final class PresenceLayer {
         }
         idleTicks = 0;
         body.setTargetRotation(
-            IdleLook.turnTowardYaw(body.getYRot(), target.yawDeg()),
-            IdleLook.turnTowardPitch(body.getXRot(), target.pitchDeg()));
+                IdleLook.turnTowardYaw(body.getYRot(), target.yawDeg()),
+                IdleLook.turnTowardPitch(body.getXRot(), target.pitchDeg()));
     }
 
     /**
@@ -105,12 +100,9 @@ final class PresenceLayer {
         if (idleTicks % IdleLook.SWEEP_INTERVAL_TICKS == 0) {
             sweepRight = !sweepRight;
         }
-        float sweepYaw = idleBaseYaw + (sweepRight
-            ? IdleLook.SWEEP_AMPLITUDE_DEG
-            : -IdleLook.SWEEP_AMPLITUDE_DEG);
+        float sweepYaw = idleBaseYaw + (sweepRight ? IdleLook.SWEEP_AMPLITUDE_DEG : -IdleLook.SWEEP_AMPLITUDE_DEG);
         body.setTargetRotation(
-            IdleLook.turnTowardYaw(body.getYRot(), sweepYaw),
-            IdleLook.turnTowardPitch(body.getXRot(), 0f));
+                IdleLook.turnTowardYaw(body.getYRot(), sweepYaw), IdleLook.turnTowardPitch(body.getXRot(), 0f));
     }
 
     /** Fixed seed for the fidget interval sequence (design rule 3). */
@@ -134,8 +126,8 @@ final class PresenceLayer {
     public static final int COMBAT_PRIORITY_BAND = 20;
 
     private int nextFidgetInterval() {
-        return FIDGET_MIN_INTERVAL_TICKS + fidgetRandom.nextInt(
-            FIDGET_MAX_INTERVAL_TICKS - FIDGET_MIN_INTERVAL_TICKS + 1);
+        return FIDGET_MIN_INTERVAL_TICKS
+                + fidgetRandom.nextInt(FIDGET_MAX_INTERVAL_TICKS - FIDGET_MIN_INTERVAL_TICKS + 1);
     }
 
     /**
@@ -155,13 +147,10 @@ final class PresenceLayer {
      */
     // contract: see issues/0005-player-feel-motion-layer.md P3 (the
     // marker that prevents promotion into Intent.Use)
-    void tickWalkFidget(Map<Channel, Claim> winners, Claim move,
-                        Claim rot) {
-        boolean walking = move != null
-            && move.intent() instanceof Intent.Move m
-            && m.forward() >= 0.5;
-        boolean combatOwnsArbiter = winners.get(Channel.USE) != null
-            || (rot != null && rot.priority() >= COMBAT_PRIORITY_BAND);
+    void tickWalkFidget(Map<Channel, Claim> winners, Claim move, Claim rot) {
+        boolean walking = move != null && move.intent() instanceof Intent.Move m && m.forward() >= 0.5;
+        boolean combatOwnsArbiter =
+                winners.get(Channel.USE) != null || (rot != null && rot.priority() >= COMBAT_PRIORITY_BAND);
         if (!walking || combatOwnsArbiter) {
             return;
         }

@@ -9,7 +9,6 @@ import com.mcbot.mcbotserver.api.world.BlockTraits;
 import com.mcbot.mcbotserver.api.world.ViewMode;
 import com.mcbot.mcbotserver.api.world.WorldView;
 import com.mcbot.mcbotserver.core.process.GotoProcess;
-
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
@@ -93,8 +92,7 @@ public final class RescueMissionFactory implements Supplier<BotProcess> {
      */
     @Override
     public BotProcess get() {
-        CellPos origin = new CellPos(body.getBlockX(),
-            body.getBlockY(), body.getBlockZ());
+        CellPos origin = new CellPos(body.getBlockX(), body.getBlockY(), body.getBlockZ());
         CellPos target;
         if (body.isInLava()) {
             target = findNearestShore(origin);
@@ -106,11 +104,9 @@ public final class RescueMissionFactory implements Supplier<BotProcess> {
         if (target == null) {
             return null;
         }
-        String taskId = "reflex-rescue-"
-            + counter.incrementAndGet();
-        return new GotoProcess(taskId, new GoalBlock(target),
-            PriorityBands.requireLegal(RESCUE_PRIORITY),
-            RESCUE_TIMEOUT_TICKS);
+        String taskId = "reflex-rescue-" + counter.incrementAndGet();
+        return new GotoProcess(
+                taskId, new GoalBlock(target), PriorityBands.requireLegal(RESCUE_PRIORITY), RESCUE_TIMEOUT_TICKS);
     }
 
     private CellPos findNearestShore(CellPos origin) {
@@ -120,14 +116,11 @@ public final class RescueMissionFactory implements Supplier<BotProcess> {
         for (int dx = -SCAN_RADIUS; dx <= SCAN_RADIUS; dx++) {
             for (int dy = -SCAN_RADIUS; dy <= SCAN_RADIUS; dy++) {
                 for (int dz = -SCAN_RADIUS; dz <= SCAN_RADIUS; dz++) {
-                    CellPos candidate = new CellPos(
-                        origin.x() + dx, origin.y() + dy,
-                        origin.z() + dz);
+                    CellPos candidate = new CellPos(origin.x() + dx, origin.y() + dy, origin.z() + dz);
                     if (!isShore(candidate)) {
                         continue;
                     }
-                    double score = directionAwareScore(
-                        origin, candidate, fwd);
+                    double score = directionAwareScore(origin, candidate, fwd);
                     if (score < bestScore) {
                         bestScore = score;
                         best = candidate;
@@ -152,14 +145,11 @@ public final class RescueMissionFactory implements Supplier<BotProcess> {
         for (int dx = -SCAN_RADIUS; dx <= SCAN_RADIUS; dx++) {
             for (int dy = -SCAN_RADIUS; dy <= SCAN_RADIUS; dy++) {
                 for (int dz = -SCAN_RADIUS; dz <= SCAN_RADIUS; dz++) {
-                    CellPos candidate = new CellPos(
-                        origin.x() + dx, origin.y() + dy,
-                        origin.z() + dz);
+                    CellPos candidate = new CellPos(origin.x() + dx, origin.y() + dy, origin.z() + dz);
                     if (!isWaterCell(candidate)) {
                         continue;
                     }
-                    double score = directionAwareScore(
-                        origin, candidate, fwd);
+                    double score = directionAwareScore(origin, candidate, fwd);
                     if (score < bestScore) {
                         bestScore = score;
                         best = candidate;
@@ -176,8 +166,7 @@ public final class RescueMissionFactory implements Supplier<BotProcess> {
      * score; one behind gets a higher (worse) score. The bias is
      * bounded so a genuinely near shore always beats a far one.
      */
-    private double directionAwareScore(CellPos origin, CellPos candidate,
-                                       double[] fwd) {
+    private double directionAwareScore(CellPos origin, CellPos candidate, double[] fwd) {
         double dx = candidate.x() - origin.x();
         double dz = candidate.z() - origin.z();
         double dist = candidate.distanceTo(origin);
@@ -194,7 +183,7 @@ public final class RescueMissionFactory implements Supplier<BotProcess> {
      */
     private double[] forwardVector() {
         double yawRad = Math.toRadians(body.getYRot());
-        return new double[]{-Math.sin(yawRad), Math.cos(yawRad)};
+        return new double[] {-Math.sin(yawRad), Math.cos(yawRad)};
     }
 
     /**
@@ -217,8 +206,7 @@ public final class RescueMissionFactory implements Supplier<BotProcess> {
         if (!view.isLoaded(below)) {
             return false;
         }
-        return view.getCollisionShape(below, ViewMode.LIVE)
-            .walkableTop();
+        return view.getCollisionShape(below, ViewMode.LIVE).walkableTop();
     }
 
     /**
@@ -239,7 +227,6 @@ public final class RescueMissionFactory implements Supplier<BotProcess> {
         if (!view.isLoaded(below)) {
             return false;
         }
-        return view.getCollisionShape(below, ViewMode.LIVE)
-            .walkableTop();
+        return view.getCollisionShape(below, ViewMode.LIVE).walkableTop();
     }
 }

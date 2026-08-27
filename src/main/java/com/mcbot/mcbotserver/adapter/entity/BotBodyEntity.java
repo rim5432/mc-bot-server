@@ -1,7 +1,6 @@
 package com.mcbot.mcbotserver.adapter.entity;
 
 import com.mcbot.mcbotserver.adapter.BindingInventory;
-
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.control.MoveControl;
@@ -152,8 +151,7 @@ public final class BotBodyEntity extends PathfinderMob {
         }
         // 0.5f y-offset: spawns at about hand height, matching the
         // vanilla player drop visual.
-        ItemStack toDrop = fullStack ? held.copy()
-            : held.copyWithCount(1);
+        ItemStack toDrop = fullStack ? held.copy() : held.copyWithCount(1);
         ItemEntity dropped = spawnAtLocation(toDrop, 0.5f);
         if (dropped != null) {
             // Vanilla player-thrown drops wait 40 ticks before pickup;
@@ -174,8 +172,7 @@ public final class BotBodyEntity extends PathfinderMob {
      * @param type  the registered type; never null
      * @param level the server level; never null
      */
-    public BotBodyEntity(EntityType<? extends PathfinderMob> type,
-                         Level level) {
+    public BotBodyEntity(EntityType<? extends PathfinderMob> type, Level level) {
         super(type, level);
         // Neutralize all three vanilla controls: the binding is the sole
         // writer of locomotion, look, and jump state. Each control runs
@@ -196,15 +193,13 @@ public final class BotBodyEntity extends PathfinderMob {
                 // binding owns locomotion inputs; nothing to do
             }
         };
-        this.lookControl = new net.minecraft.world.entity.ai.control
-            .LookControl(this) {
+        this.lookControl = new net.minecraft.world.entity.ai.control.LookControl(this) {
             @Override
             public void tick() {
                 // binding owns rotation via setRot/setYHeadRot; nothing to do
             }
         };
-        this.jumpControl = new net.minecraft.world.entity.ai.control
-            .JumpControl(this) {
+        this.jumpControl = new net.minecraft.world.entity.ai.control.JumpControl(this) {
             @Override
             public void tick() {
                 // binding owns jump via jumpFromGround/jumpInFluid; nothing to do
@@ -256,8 +251,7 @@ public final class BotBodyEntity extends PathfinderMob {
         // on tickCount alignment so it fires exactly once per interval,
         // not once per method entry (customServerAiStep is called once
         // per tick by Mob.aiStep, but the gate is defensive).
-        if (tickCount % REGEN_INTERVAL_TICKS == 0
-                && getHealth() < getMaxHealth()) {
+        if (tickCount % REGEN_INTERVAL_TICKS == 0 && getHealth() < getMaxHealth()) {
             heal(REGEN_AMOUNT);
         }
 
@@ -271,8 +265,7 @@ public final class BotBodyEntity extends PathfinderMob {
         // before setSpeed, the speed write clobbers the binding's drive
         // every tick (zza=0.25 instead of 0), so an idle body walks
         // forward forever. setSpeed first, then re-apply drive values.
-        setSpeed((float) getAttributeValue(
-            net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED));
+        setSpeed((float) getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED));
         setXxa(driveStrafe);
         setZza(driveForward);
         if (driveJump && isInLava() && !onGround()) {
@@ -295,8 +288,7 @@ public final class BotBodyEntity extends PathfinderMob {
             // branch makes; invoking it here is the same class of
             // deviation as jumpFromGround. +0.3/tick while held,
             // matching a player holding space to surface.
-            jumpInFluid(net.minecraftforge.common.ForgeMod.WATER_TYPE
-                .get());
+            jumpInFluid(net.minecraftforge.common.ForgeMod.WATER_TYPE.get());
         } else if (driveJump && onGround()) {
             // Grounded (dry OR wading): fire jumpFromGround directly.
             // Two deliberate deviations live in this branch. First,
@@ -343,15 +335,11 @@ public final class BotBodyEntity extends PathfinderMob {
             return;
         }
         presenceCooldown = PRESENCE_SCAN_INTERVAL_TICKS;
-        for (net.minecraft.world.entity.monster.Monster monster
-                : level().getEntitiesOfClass(
-                    net.minecraft.world.entity.monster.Monster.class,
-                    getBoundingBox().inflate(PRESENCE_SCAN_HALF_WIDTH),
-                    m -> m.isAlive() && !m.isNoAi()
-                        && m.getTarget() == null)) {
-            double follow = monster.getAttributeValue(
-                net.minecraft.world.entity.ai.attributes.Attributes
-                    .FOLLOW_RANGE);
+        for (net.minecraft.world.entity.monster.Monster monster : level().getEntitiesOfClass(
+                        net.minecraft.world.entity.monster.Monster.class,
+                        getBoundingBox().inflate(PRESENCE_SCAN_HALF_WIDTH),
+                        m -> m.isAlive() && !m.isNoAi() && m.getTarget() == null)) {
+            double follow = monster.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.FOLLOW_RANGE);
             if (monster.distanceToSqr(this) > follow * follow) {
                 continue;
             }

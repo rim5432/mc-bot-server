@@ -1,11 +1,10 @@
 package com.mcbot.mcbotserver.core.behavior;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
-
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Steer-pitch clamp math at the extremes, called directly: this
@@ -24,17 +23,20 @@ class SteerPitchClampTest {
     @Test
     void steepWaypointsClampToLimit() {
         Vec3 position = new Vec3(0.5, 64, 0.5);
-        assertEquals(-PathingBehavior.STEER_PITCH_LIMIT_DEG,
-            PathingBehavior.steerPitch(position,
-                new CellPos(1, 67, 0)), 0.01,
-            "near-vertical ascent clamps at the up limit");
-        assertEquals(PathingBehavior.STEER_PITCH_LIMIT_DEG,
-            PathingBehavior.steerPitch(position,
-                new CellPos(1, 61, 0)), 0.01,
-            "near-vertical descent clamps at the down limit");
-        assertEquals(0f,
-            PathingBehavior.steerPitch(position,
-                new CellPos(1, 64, 0)), 1e-6,
-            "level waypoint reads exactly 0");
+        assertEquals(
+                -PathingBehavior.STEER_PITCH_LIMIT_DEG,
+                PathingBehavior.steerPitch(position, new CellPos(1, 67, 0)),
+                0.01,
+                "near-vertical ascent clamps at the up limit");
+        assertEquals(
+                PathingBehavior.STEER_PITCH_LIMIT_DEG,
+                PathingBehavior.steerPitch(position, new CellPos(1, 61, 0)),
+                0.01,
+                "near-vertical descent clamps at the down limit");
+        assertEquals(
+                0f,
+                PathingBehavior.steerPitch(position, new CellPos(1, 64, 0)),
+                1e-6,
+                "level waypoint reads exactly 0");
     }
 }

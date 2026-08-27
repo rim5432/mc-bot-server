@@ -23,13 +23,11 @@ import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.api.world.WorldView;
 import com.mcbot.mcbotserver.core.behavior.IdleLook;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
-import com.mcbot.mcbotserver.core.process.DigProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.core.process.TerminalMission;
 import com.mcbot.mcbotserver.core.reflex.MinimalReflex;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer.ReflexDecision;
-
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.List;
@@ -115,8 +113,7 @@ public final class BotController {
      * decisions to the freeze hold (rigs without combat wiring park
      * the mission instead of fighting blind).
      */
-    private final Supplier<BotProcess>
-        engageMissionFactory;
+    private final Supplier<BotProcess> engageMissionFactory;
     /** Mission TASK_* emission and hand-off edge detection. */
     private final MissionReporter missions;
     /** Reflex-owned ENGAGE fight seat bookkeeping. */
@@ -126,8 +123,7 @@ public final class BotController {
      * decisions to the freeze hold (rigs without rescue wiring park
      * the mission instead of routing to safety).
      */
-    private final Supplier<BotProcess>
-        rescueMissionFactory;
+    private final Supplier<BotProcess> rescueMissionFactory;
     /** Reflex-owned ESCAPE rescue seat bookkeeping. */
     private final ReflexRescueSeat rescueSeat;
 
@@ -163,13 +159,17 @@ public final class BotController {
      *                      never null
      * @param crashReporter fallback reporter; never null
      */
-    public BotController(SurvivalReflexLayer reflex, TaskArbiter arbiter,
-                         List<Behavior> behaviors, Actor actor,
-                         CellPositionSource positionSource, HealthSource healthSource,
-                         GameClock clock, EventQueue events,
-                         CrashReporter crashReporter) {
-        this(reflex, arbiter, behaviors, actor, positionSource,
-            healthSource, clock, events, crashReporter, null, null);
+    public BotController(
+            SurvivalReflexLayer reflex,
+            TaskArbiter arbiter,
+            List<Behavior> behaviors,
+            Actor actor,
+            CellPositionSource positionSource,
+            HealthSource healthSource,
+            GameClock clock,
+            EventQueue events,
+            CrashReporter crashReporter) {
+        this(reflex, arbiter, behaviors, actor, positionSource, healthSource, clock, events, crashReporter, null, null);
     }
 
     /**
@@ -192,16 +192,29 @@ public final class BotController {
      *                      may be null - ENGAGE then degrades to the
      *                      freeze hold
      */
-    public BotController(SurvivalReflexLayer reflex, TaskArbiter arbiter,
-                         List<Behavior> behaviors, Actor actor,
-                         CellPositionSource positionSource, HealthSource healthSource,
-                         GameClock clock, EventQueue events,
-                         CrashReporter crashReporter,
-                         Supplier<BotProcess>
-                             engageMissionFactory) {
-        this(reflex, arbiter, behaviors, actor, positionSource,
-            healthSource, clock, events, crashReporter,
-            engageMissionFactory, null);
+    public BotController(
+            SurvivalReflexLayer reflex,
+            TaskArbiter arbiter,
+            List<Behavior> behaviors,
+            Actor actor,
+            CellPositionSource positionSource,
+            HealthSource healthSource,
+            GameClock clock,
+            EventQueue events,
+            CrashReporter crashReporter,
+            Supplier<BotProcess> engageMissionFactory) {
+        this(
+                reflex,
+                arbiter,
+                behaviors,
+                actor,
+                positionSource,
+                healthSource,
+                clock,
+                events,
+                crashReporter,
+                engageMissionFactory,
+                null);
     }
 
     /**
@@ -229,24 +242,27 @@ public final class BotController {
      *                      may be null - ESCAPE then degrades to the
      *                      freeze hold
      */
-    public BotController(SurvivalReflexLayer reflex, TaskArbiter arbiter,
-                         List<Behavior> behaviors, Actor actor,
-                         CellPositionSource positionSource, HealthSource healthSource,
-                         GameClock clock, EventQueue events,
-                         CrashReporter crashReporter,
-                         Supplier<BotProcess> engageMissionFactory,
-                         Supplier<BotProcess> rescueMissionFactory) {
+    public BotController(
+            SurvivalReflexLayer reflex,
+            TaskArbiter arbiter,
+            List<Behavior> behaviors,
+            Actor actor,
+            CellPositionSource positionSource,
+            HealthSource healthSource,
+            GameClock clock,
+            EventQueue events,
+            CrashReporter crashReporter,
+            Supplier<BotProcess> engageMissionFactory,
+            Supplier<BotProcess> rescueMissionFactory) {
         this.reflex = Objects.requireNonNull(reflex, "reflex");
         this.arbiter = Objects.requireNonNull(arbiter, "arbiter");
         this.behaviors = List.copyOf(behaviors);
         this.actor = Objects.requireNonNull(actor, "actor");
         this.positionSource = Objects.requireNonNull(positionSource, "positionSource");
-        this.healthSource =
-            Objects.requireNonNull(healthSource, "healthSource");
+        this.healthSource = Objects.requireNonNull(healthSource, "healthSource");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.events = Objects.requireNonNull(events, "events");
-        this.crashReporter =
-            Objects.requireNonNull(crashReporter, "crashReporter");
+        this.crashReporter = Objects.requireNonNull(crashReporter, "crashReporter");
         this.engageMissionFactory = engageMissionFactory;
         this.rescueMissionFactory = rescueMissionFactory;
         this.missions = new MissionReporter(arbiter, events);
@@ -397,16 +413,13 @@ public final class BotController {
      *         live reflex mission keeps running - preempting it every
      *         tick would starve the very mission the reflex submitted
      */
-    private boolean handoffToSeat(ReflexSeat seat,
-                                  Supplier<BotProcess> factory,
-                                  ReflexDecision decision,
-                                  long day, long tod) {
+    private boolean handoffToSeat(
+            ReflexSeat seat, Supplier<BotProcess> factory, ReflexDecision decision, long day, long tod) {
         seat.retireFinished();
         if (!seat.maySubmit()) {
             return false;
         }
-        preemptAndHold(decision, new Intent.Move(0, 0, false, false),
-            day, tod);
+        preemptAndHold(decision, new Intent.Move(0, 0, false, false), day, tod);
         BotProcess mission = factory.get();
         if (mission != null) {
             arbiter.register(mission);
@@ -460,22 +473,18 @@ public final class BotController {
         // preemption and then runs the fight through the mission stage
         // (a fight is multi-tick state; a held-body reflex cannot carry
         // target tracking, leash and grace - ReflexAction#ENGAGE).
-        var decision = reflex.tick(world, tickCounter, day, tod,
-            position, health);
+        var decision = reflex.tick(world, tickCounter, day, tod, position, health);
         if (decision != null) {
-            boolean engageDecision =
-                decision.action() == ReflexAction.ENGAGE;
+            boolean engageDecision = decision.action() == ReflexAction.ENGAGE;
             if (engageDecision && engageMissionFactory != null) {
-                if (handoffToSeat(engageSeat, engageMissionFactory,
-                        decision, day, tod)) {
+                if (handoffToSeat(engageSeat, engageMissionFactory, decision, day, tod)) {
                     return;
                 }
                 // Live reflex-owned mission (or the resubmit cooldown):
                 // fall through to the mission stage so the fight keeps
                 // running - preempting it every tick would starve the
                 // very mission this reflex submitted.
-            } else if (decision.action() == ReflexAction.ESCAPE
-                    && rescueMissionFactory != null) {
+            } else if (decision.action() == ReflexAction.ESCAPE && rescueMissionFactory != null) {
                 // ESCAPE: same handoff shape as ENGAGE but the mission
                 // is a pathing goal (lava shore, water source) rather
                 // than a fight. The factory reads body state to decide
@@ -483,8 +492,7 @@ public final class BotController {
                 // reachable target returns null and the preemption
                 // degrades to the freeze hold (park and escalate) -
                 // no escape route means the harness must decide.
-                if (handoffToSeat(rescueSeat, rescueMissionFactory,
-                        decision, day, tod)) {
+                if (handoffToSeat(rescueSeat, rescueMissionFactory, decision, day, tod)) {
                     return;
                 }
                 // Live reflex-owned rescue mission (or cooldown): fall
@@ -499,8 +507,8 @@ public final class BotController {
                 // ENGAGE decision without a factory degrades to this
                 // hold: no combat wiring means park, never fight blind.
                 Intent.Move hold = decision.action() == ReflexAction.ASCEND
-                    ? new Intent.Move(0, 0, true, false)
-                    : new Intent.Move(0, 0, false, false);
+                        ? new Intent.Move(0, 0, true, false)
+                        : new Intent.Move(0, 0, false, false);
                 preemptAndHold(decision, hold, day, tod);
                 return;
             }
@@ -522,19 +530,16 @@ public final class BotController {
         boolean fightAwaitingSeat = engageSeat.fightAwaitingSeat();
         boolean rescueIsParked = rescueSeat.rescueIsParked();
         boolean rescueAwaitingSeat = rescueSeat.rescueAwaitingSeat();
-        if (arbiter.paused() != null && arbiter.current() == null
+        if (arbiter.paused() != null
+                && arbiter.current() == null
                 && (fightIsParked
-                    || rescueIsParked
-                    || (decision == null
-                        && !fightAwaitingSeat
-                        && !rescueAwaitingSeat))) {
+                        || rescueIsParked
+                        || (decision == null && !fightAwaitingSeat && !rescueAwaitingSeat))) {
             BotProcess resuming = arbiter.paused();
             String resumingTask = resuming.displayName();
-            String resumingId = (resuming instanceof TerminalMission tm)
-                ? tm.missionTaskId() : null;
+            String resumingId = (resuming instanceof TerminalMission tm) ? tm.missionTaskId() : null;
             boolean resumed = arbiter.tryResume();
-            missions.resumeVerdict(resumed, resumingTask, resumingId,
-                day, tod);
+            missions.resumeVerdict(resumed, resumingTask, resumingId, day, tod);
         }
 
         // Stage 2: arbiter picks or keeps the winner.
@@ -547,10 +552,8 @@ public final class BotController {
         // submitAimAndDig for why silence resets progress). Reflex
         // preemption still wins because the reflex layer runs first
         // and parks missions.
-        if (arbiter.current() instanceof DigMission dm
-                && dm.isDigging()) {
-            submitAimAndDig(dm.priority(),
-                "mission:dig:" + dm.missionTaskId(), dm.digTarget());
+        if (arbiter.current() instanceof DigMission dm && dm.isDigging()) {
+            submitAimAndDig(dm.priority(), "mission:dig:" + dm.missionTaskId(), dm.digTarget());
         }
 
         // Stage 3: behaviors claim channels per directive; reports flow
@@ -593,9 +596,7 @@ public final class BotController {
      * @param day      game day for event stamping
      * @param tod      time-of-day ticks for event stamping
      */
-    private void preemptAndHold(
-            SurvivalReflexLayer.ReflexDecision decision, Intent.Move hold,
-            long day, long tod) {
+    private void preemptAndHold(SurvivalReflexLayer.ReflexDecision decision, Intent.Move hold, long day, long tod) {
         // Single-slot eviction with an honest event: when this park
         // will occupy the paused slot over an existing occupant (the
         // reflex-chain shape: original parked by an engage submission,
@@ -604,41 +605,34 @@ public final class BotController {
         // revalidation reaches the harness as TASK_DROPPED - the
         // arbiter's internal eviction is the safety net, not the
         // reporter.
-        if (arbiter.paused() != null && arbiter.current() != null
+        if (arbiter.paused() != null
+                && arbiter.current() != null
                 && arbiter.current().isActive()
                 && arbiter.paused() != arbiter.current()) {
             BotProcess evicted = arbiter.paused();
             String evictedName = evicted.displayName();
-            String evictedId = (evicted instanceof TerminalMission tm)
-                ? tm.missionTaskId() : null;
-            if (arbiter.requeuePausedOrDrop()
-                    == TaskArbiter.PausedEviction.DROPPED) {
-                missions.dropped(evictedName, evictedId, day, tod,
-                    "context invalidated by reflex chain requeue");
+            String evictedId = (evicted instanceof TerminalMission tm) ? tm.missionTaskId() : null;
+            if (arbiter.requeuePausedOrDrop() == TaskArbiter.PausedEviction.DROPPED) {
+                missions.dropped(evictedName, evictedId, day, tod, "context invalidated by reflex chain requeue");
             }
         }
-        InterruptionContext ctx = new InterruptionContext(tickCounter,
-            positionSource.get(), activeName(),
-            "reflex-preempt:" + decision.ruleName(), "");
+        InterruptionContext ctx = new InterruptionContext(
+                tickCounter, positionSource.get(), activeName(), "reflex-preempt:" + decision.ruleName(), "");
         BotProcess current = arbiter.current();
         String pausedTask = current != null ? current.displayName() : "";
-        String pausedId = (current instanceof TerminalMission tm)
-            ? tm.missionTaskId() : null;
+        String pausedId = (current instanceof TerminalMission tm) ? tm.missionTaskId() : null;
         boolean announceVerdict = false;
         switch (arbiter.forcePauseAll(ctx)) {
             case PARKED -> {
-                missions.paused(pausedTask, pausedId, day, tod,
-                    "paused by reflex " + decision.ruleName());
+                missions.paused(pausedTask, pausedId, day, tod, "paused by reflex " + decision.ruleName());
                 // No current while parked: the transition detector
                 // must not fire on stale state.
                 missions.forgetCurrent();
             }
             case RETIRED_TERMINAL -> announceVerdict = true;
-            case NO_CURRENT -> {
-            }
+            case NO_CURRENT -> {}
         }
-        actor.submit(new Claim(Channel.MOVE, decision.priority(),
-            "reflex:" + decision.ruleName(), hold));
+        actor.submit(new Claim(Channel.MOVE, decision.priority(), "reflex:" + decision.ruleName(), hold));
         preemptDigClaims(decision);
         actor.flush();
         if (announceVerdict) {
@@ -661,14 +655,11 @@ public final class BotController {
      *
      * @param decision the winning reflex decision; never null
      */
-    private void preemptDigClaims(
-            SurvivalReflexLayer.ReflexDecision decision) {
-        if (decision.action() != ReflexAction.DIG
-                || decision.target() == null) {
+    private void preemptDigClaims(SurvivalReflexLayer.ReflexDecision decision) {
+        if (decision.action() != ReflexAction.DIG || decision.target() == null) {
             return;
         }
-        submitAimAndDig(decision.priority(),
-            "reflex:" + decision.ruleName(), decision.target());
+        submitAimAndDig(decision.priority(), "reflex:" + decision.ruleName(), decision.target());
     }
 
     /**
@@ -689,15 +680,12 @@ public final class BotController {
      *                 {@code "reflex:<rule>"}
      * @param target   the block cell to dig; must not be null
      */
-    private void submitAimAndDig(int priority, String holder,
-                                 CellPos target) {
+    private void submitAimAndDig(int priority, String holder, CellPos target) {
         Vec3 from = cellCenter(positionSource.get());
         Vec3 to = cellCenter(target);
-        actor.submit(new Claim(Channel.ROT, priority, holder,
-            new Intent.Look(IdleLook.yawTo(from, to),
-                IdleLook.pitchTo(from, to))));
-        actor.submit(new Claim(Channel.INTERACT, priority, holder,
-            new Intent.Dig(target)));
+        actor.submit(new Claim(
+                Channel.ROT, priority, holder, new Intent.Look(IdleLook.yawTo(from, to), IdleLook.pitchTo(from, to))));
+        actor.submit(new Claim(Channel.INTERACT, priority, holder, new Intent.Dig(target)));
     }
 
     /**
@@ -706,18 +694,20 @@ public final class BotController {
      * (v1 has at most one; if more plan reporters are added later,
      * extract a small interface and merge their snapshots here).
      */
-    private void emitKeepalive(CellPos position, Directive directive,
-                               long day, long tod) {
+    private void emitKeepalive(CellPos position, Directive directive, long day, long tod) {
         CellPos goalCell = goalCellOf(directive);
         Vec3 poseD = new Vec3(position.x(), position.y(), position.z());
         for (Behavior b : behaviors) {
             if (b instanceof PathingBehavior pb) {
-                Map<String, String> attrs = pb.keepaliveAttrs(
-                    poseD, goalCell);
+                Map<String, String> attrs = pb.keepaliveAttrs(poseD, goalCell);
                 try {
-                    events.push(new BotEvent(EventKind.KEEPALIVE,
-                        day, tod, false, Map.copyOf(attrs),
-                        "keepalive at tick " + tickCounter));
+                    events.push(new BotEvent(
+                            EventKind.KEEPALIVE,
+                            day,
+                            tod,
+                            false,
+                            Map.copyOf(attrs),
+                            "keepalive at tick " + tickCounter));
                 } catch (RuntimeException ignored) {
                     // Reporting must never take the pipeline down.
                 }
@@ -768,10 +758,12 @@ public final class BotController {
         }
         StringWriter stack = new StringWriter();
         e.printStackTrace(new PrintWriter(stack));
-        InterruptionContext ctx = new InterruptionContext(tickCounter,
-            position, activeName(),
-            e.getClass().getSimpleName() + ":" + e.getMessage(),
-            stack.toString());
+        InterruptionContext ctx = new InterruptionContext(
+                tickCounter,
+                position,
+                activeName(),
+                e.getClass().getSimpleName() + ":" + e.getMessage(),
+                stack.toString());
 
         // Clear BEFORE reporting so even a poisoned outbox cannot leave
         // stale intents on the body (ADR-0005 D2 step 3).
@@ -786,10 +778,13 @@ public final class BotController {
 
     private void reportPrimary(InterruptionContext ctx) {
         try {
-            events.push(new BotEvent(EventKind.BOT_CRASHED,
-                clock.day(), clock.timeOfDayTicks(), true,
-                Map.of("cause", ctx.causeSummary()),
-                "bot crashed: " + ctx.causeSummary()));
+            events.push(new BotEvent(
+                    EventKind.BOT_CRASHED,
+                    clock.day(),
+                    clock.timeOfDayTicks(),
+                    true,
+                    Map.of("cause", ctx.causeSummary()),
+                    "bot crashed: " + ctx.causeSummary()));
         } catch (RuntimeException ignored) {
             // Best-effort; the fallback channel still fires below.
         }
@@ -805,8 +800,8 @@ public final class BotController {
 
     private String activeName() {
         var current = arbiter.current();
-        return current != null ? current.displayName()
-            : (arbiter.paused() != null
-                ? arbiter.paused().displayName() : "");
+        return current != null
+                ? current.displayName()
+                : (arbiter.paused() != null ? arbiter.paused().displayName() : "");
     }
 }

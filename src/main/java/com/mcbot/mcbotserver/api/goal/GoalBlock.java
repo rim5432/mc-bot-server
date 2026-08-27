@@ -30,7 +30,6 @@ public record GoalBlock(CellPos target) implements Goal {
 
     @Override
     public String describe() {
-        return "GoalBlock(" + target.x() + "," + target.y() + ","
-            + target.z() + ")";
+        return "GoalBlock(" + target.x() + "," + target.y() + "," + target.z() + ")";
     }
 }

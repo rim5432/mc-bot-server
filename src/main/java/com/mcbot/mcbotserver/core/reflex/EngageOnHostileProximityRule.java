@@ -31,8 +31,7 @@ import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
  * health points the right reflex is to stop, not to start a fight.
  */
 // contract: see ADR-0003 section 2 (rules are data rows over the board)
-public final class EngageOnHostileProximityRule
-        implements ReflexRule, ReflexHysteresis {
+public final class EngageOnHostileProximityRule implements ReflexRule, ReflexHysteresis {
 
     /** Threat distance at or below which the rule fires. */
     public static final double TRIGGER_DISTANCE = 6.0;
@@ -68,19 +67,15 @@ public final class EngageOnHostileProximityRule
      *                 releases; strictly above trigger
      * @param priority flat firing priority; positive
      */
-    public EngageOnHostileProximityRule(double trigger, double release,
-                                        int priority) {
+    public EngageOnHostileProximityRule(double trigger, double release, int priority) {
         if (trigger <= 0f) {
-            throw new IllegalArgumentException(
-                "trigger must be positive");
+            throw new IllegalArgumentException("trigger must be positive");
         }
         if (release <= trigger) {
-            throw new IllegalArgumentException(
-                "release must be strictly above trigger");
+            throw new IllegalArgumentException("release must be strictly above trigger");
         }
         if (priority <= 0) {
-            throw new IllegalArgumentException(
-                "priority must be positive");
+            throw new IllegalArgumentException("priority must be positive");
         }
         this.trigger = trigger;
         this.release = release;
@@ -89,9 +84,7 @@ public final class EngageOnHostileProximityRule
 
     @Override
     public int computePriority(ThreatBlackboard board) {
-        return board.nearestThreat != null
-            && board.nearestThreatDistance <= trigger
-                ? priority : -1;
+        return board.nearestThreat != null && board.nearestThreatDistance <= trigger ? priority : -1;
     }
 
     /** The configured firing distance. */

@@ -28,12 +28,7 @@ import java.util.List;
  *                     null, never null elements, size exactly 4
  * @param offhand      the offhand slot; never null
  */
-public record InventoryView(
-    List<ItemView> main,
-    int selectedSlot,
-    List<ItemView> armor,
-    ItemView offhand
-) {
+public record InventoryView(List<ItemView> main, int selectedSlot, List<ItemView> armor, ItemView offhand) {
 
     /** Number of main inventory slots (9 hotbar + 27 backpack). */
     public static final int MAIN_SIZE = 36;
@@ -59,21 +54,17 @@ public record InventoryView(
             throw new IllegalArgumentException("main must not be null");
         }
         if (main.size() != MAIN_SIZE) {
-            throw new IllegalArgumentException(
-                "main size must be " + MAIN_SIZE + ", was " + main.size());
+            throw new IllegalArgumentException("main size must be " + MAIN_SIZE + ", was " + main.size());
         }
         if (selectedSlot < 0 || selectedSlot >= HOTBAR_SIZE) {
             throw new IllegalArgumentException(
-                "selectedSlot must be 0.." + (HOTBAR_SIZE - 1)
-                    + ", was " + selectedSlot);
+                    "selectedSlot must be 0.." + (HOTBAR_SIZE - 1) + ", was " + selectedSlot);
         }
         if (armor == null) {
             throw new IllegalArgumentException("armor must not be null");
         }
         if (armor.size() != ARMOR_SIZE) {
-            throw new IllegalArgumentException(
-                "armor size must be " + ARMOR_SIZE + ", was "
-                    + armor.size());
+            throw new IllegalArgumentException("armor size must be " + ARMOR_SIZE + ", was " + armor.size());
         }
         if (offhand == null) {
             throw new IllegalArgumentException("offhand must not be null");
@@ -124,7 +115,6 @@ public record InventoryView(
      * @return unmodifiable list of the 27 backpack slots; never null
      */
     public List<ItemView> backpack() {
-        return Collections.unmodifiableList(
-            main.subList(HOTBAR_SIZE, MAIN_SIZE));
+        return Collections.unmodifiableList(main.subList(HOTBAR_SIZE, MAIN_SIZE));
     }
 }

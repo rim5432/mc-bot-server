@@ -58,11 +58,8 @@ final class PlanProgressFuse {
      * @param goalAnchor the goal's anchor cell; never null
      * @return true iff at least one criterion fired
      */
-    boolean evaluate(WaypointCursor cursor, Vec3 position,
-                     CellPos goalAnchor) {
-        double goalDist = position.distanceTo(
-            goalAnchor.x() + 0.5, goalAnchor.y() + 0.5,
-            goalAnchor.z() + 0.5);
+    boolean evaluate(WaypointCursor cursor, Vec3 position, CellPos goalAnchor) {
+        double goalDist = position.distanceTo(goalAnchor.x() + 0.5, goalAnchor.y() + 0.5, goalAnchor.z() + 0.5);
 
         boolean p1 = cursor.index() > lastWaypointIndex;
         if (p1) {
@@ -88,8 +85,7 @@ final class PlanProgressFuse {
             // (JumpUp, Drop) are real progress the latched min must
             // capture (ledger 20).
             CellPos wp = cursor.current();
-            double wpDist = position.distanceTo(wp.x() + 0.5,
-                wp.y() + 0.5, wp.z() + 0.5);
+            double wpDist = position.distanceTo(wp.x() + 0.5, wp.y() + 0.5, wp.z() + 0.5);
             p3 = wpDist < lastWaypoint3DDistance - PathingBehavior.STUCK_EPSILON;
             if (p3) {
                 lastWaypoint3DDistance = wpDist;
@@ -117,8 +113,7 @@ final class PlanProgressFuse {
      * @return true iff a STUCK verdict is due
      */
     boolean shouldFire() {
-        return !stuckLatched
-            && ticksSincePlanProgress >= PathingBehavior.STUCK_WINDOW;
+        return !stuckLatched && ticksSincePlanProgress >= PathingBehavior.STUCK_WINDOW;
     }
 
     /**

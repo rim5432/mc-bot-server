@@ -31,8 +31,7 @@ import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
  * converts one lethal condition into two.
  */
 // contract: see ADR-0003 section 2 (rules are data rows over the board)
-public final class SurfaceOnLowAirRule
-        implements ReflexRule, ReflexHysteresis {
+public final class SurfaceOnLowAirRule implements ReflexRule, ReflexHysteresis {
 
     /** Air at or below which the rule fires (default table). */
     public static final int TRIGGER_AIR = 80;
@@ -77,17 +76,13 @@ public final class SurfaceOnLowAirRule
      */
     public SurfaceOnLowAirRule(int trigger, int release, int priority) {
         if (trigger < 1 || trigger >= ThreatBlackboard.MAX_AIR_SUPPLY) {
-            throw new IllegalArgumentException(
-                "trigger must be in [1, 299]");
+            throw new IllegalArgumentException("trigger must be in [1, 299]");
         }
-        if (release <= trigger
-                || release > ThreatBlackboard.MAX_AIR_SUPPLY) {
-            throw new IllegalArgumentException(
-                "release must be in (trigger, 300]");
+        if (release <= trigger || release > ThreatBlackboard.MAX_AIR_SUPPLY) {
+            throw new IllegalArgumentException("release must be in (trigger, 300]");
         }
         if (priority <= 0) {
-            throw new IllegalArgumentException(
-                "priority must be positive");
+            throw new IllegalArgumentException("priority must be positive");
         }
         this.trigger = trigger;
         this.release = release;

@@ -30,13 +30,11 @@ import com.mcbot.mcbotserver.core.state.ChangeDetectingStateChannel;
 import com.mcbot.mcbotserver.core.tick.BotController;
 import com.mcbot.mcbotserver.core.tick.CrashReporter;
 import com.mcbot.mcbotserver.core.world.MapBlockTraitsRegistry;
-
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
-
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -80,23 +78,22 @@ public final class BotAssembly {
      */
     public static final long ENGAGE_MISSION_TIMEOUT_TICKS = 600L;
 
-    private BotAssembly() {
-    }
+    private BotAssembly() {}
 
     /** Everything assembled around one body, ready to tick. */
-    public record Assembled(BotBodyEntity body,
-                            BindingWorldView view,
-                            BindingActor actor,
-                            InMemoryEventQueue events,
-                            TaskArbiter arbiter,
-                            SurvivalReflexLayer reflex,
-                            BotController controller,
-                            CommandBus bus,
-                            GotoCommandHandler gotoHandler,
-                            DigCommandHandler digHandler,
-                            MineCommandHandler mineHandler,
-                            ChangeDetectingStateChannel state) {
-    }
+    public record Assembled(
+            BotBodyEntity body,
+            BindingWorldView view,
+            BindingActor actor,
+            InMemoryEventQueue events,
+            TaskArbiter arbiter,
+            SurvivalReflexLayer reflex,
+            BotController controller,
+            CommandBus bus,
+            GotoCommandHandler gotoHandler,
+            DigCommandHandler digHandler,
+            MineCommandHandler mineHandler,
+            ChangeDetectingStateChannel state) {}
 
     /**
      * Wires the full production pipeline around one spawned body.
@@ -106,30 +103,29 @@ public final class BotAssembly {
      * @return the assembled pipeline; never null
      */
     public static Assembled assemble(ServerLevel level, BotBodyEntity body) {
-        InMemoryEventQueue events = new InMemoryEventQueue(
-            () -> level.getDayTime() / 24000L,
-            () -> level.getDayTime() % 24000L);
+        InMemoryEventQueue events =
+                new InMemoryEventQueue(() -> level.getDayTime() / 24000L, () -> level.getDayTime() % 24000L);
         TaskArbiter arbiter = new TaskArbiter();
         // Baseline trait annotations the swim vocabulary cannot work
         // without. Code-level floor for now; the datapack JSON pipeline
         // (decision 10) supersedes this when block traits get their
         // reload listener - tracked as a workplan follow-up.
-        BlockTraitsRegistry traits =
-            new MapBlockTraitsRegistry()
-                .register("minecraft:water",
-                    BlockTraits.liquidOnly())
-                .register("minecraft:lava",
-                    BlockTraits.dangerousLiquid())
+        BlockTraitsRegistry traits = new MapBlockTraitsRegistry()
+                .register("minecraft:water", BlockTraits.liquidOnly())
+                .register("minecraft:lava", BlockTraits.dangerousLiquid())
                 .seal();
-        BindingWorldView view = new BindingWorldView(level, traits,
-            () -> body.getInventory().snapshot());
+        BindingWorldView view =
+                new BindingWorldView(level, traits, () -> body.getInventory().snapshot());
         BindingActor actor = new BindingActor(body);
 
-        SurvivalReflexLayer reflex = new SurvivalReflexLayer(
-            new LevelThreatSensor(view,
-                () -> poseOf(body), body::getAirSupply,
-                body::isInLava, body::getRemainingFireTicks,
-                body::getTicksFrozen, body::isInWall,
+        SurvivalReflexLayer reflex = new SurvivalReflexLayer(new LevelThreatSensor(
+                view,
+                () -> poseOf(body),
+                body::getAirSupply,
+                body::isInLava,
+                body::getRemainingFireTicks,
+                body::getTicksFrozen,
+                body::isInWall,
                 () -> suffocationBlockOf(body)));
         reflex.addRule(new FreezeOnLowHealthRule());
         // Air reflex outranks the freeze rule by default (SURFACE
@@ -176,23 +172,22 @@ public final class BotAssembly {
         // points the right reflex is to stop, not to start a fight.
         reflex.addRule(new EngageOnHostileProximityRule());
 
-        Behavior mover = new PathingBehavior("mover",
-            () -> finePoseOf(body),
-            () -> body.onGround(),
-            com.mcbot.mcbotserver.core.pathing.BasicMoves::from,
-            new com.mcbot.mcbotserver.core.pathing.PlanWorker());
+        Behavior mover = new PathingBehavior(
+                "mover",
+                () -> finePoseOf(body),
+                () -> body.onGround(),
+                com.mcbot.mcbotserver.core.pathing.BasicMoves::from,
+                new com.mcbot.mcbotserver.core.pathing.PlanWorker());
         // CombatBehavior must be seated here too: without it the
         // engage reflex submits defend missions whose Attack overrides
         // nobody executes - the production gap behind the idle
         // night-cave death.
-        Behavior combat = new CombatBehavior("combat",
-            () -> finePoseOf(body));
+        Behavior combat = new CombatBehavior("combat", () -> finePoseOf(body));
 
         // One fresh reflex-owned defend per engage submission; the
         // assembly owns identity, budget and type sets.
         var engageCounter = new AtomicInteger();
-        Supplier<com.mcbot.mcbotserver.api.process.BotProcess>
-            engageFactory = () -> new DefendProcess(
+        Supplier<com.mcbot.mcbotserver.api.process.BotProcess> engageFactory = () -> new DefendProcess(
                 "reflex-engage-" + engageCounter.incrementAndGet(),
                 PriorityBands.DEFEND_PRIORITY,
                 ENGAGE_MISSION_TIMEOUT_TICKS,
@@ -205,31 +200,33 @@ public final class BotAssembly {
         // nearest shore / water-adjacent cell. Returns null when no
         // target is in range; the controller then degrades ESCAPE to
         // the FREEZE hold (park and escalate).
-        Supplier<com.mcbot.mcbotserver.api.process.BotProcess>
-            rescueFactory = new RescueMissionFactory(view, body);
+        Supplier<com.mcbot.mcbotserver.api.process.BotProcess> rescueFactory = new RescueMissionFactory(view, body);
 
-        BotController controller = new BotController(reflex, arbiter,
-            List.of(mover, combat), actor,
-            () -> poseOf(body), body::getHealth,
-            clockOf(level), events,
-            CrashReporter.consoleFallback(), engageFactory,
-            rescueFactory);
+        BotController controller = new BotController(
+                reflex,
+                arbiter,
+                List.of(mover, combat),
+                actor,
+                () -> poseOf(body),
+                body::getHealth,
+                clockOf(level),
+                events,
+                CrashReporter.consoleFallback(),
+                engageFactory,
+                rescueFactory);
         CommandBus bus = new CommandBus(events);
         GotoCommandHandler gotoHandler = new GotoCommandHandler(
-            arbiter, events,
-            () -> level.getDayTime() / 24000L,
-            () -> level.getDayTime() % 24000L);
+                arbiter, events, () -> level.getDayTime() / 24000L, () -> level.getDayTime() % 24000L);
         gotoHandler.attach(bus);
         DigCommandHandler digHandler = new DigCommandHandler(
-            arbiter, events,
-            () -> level.getDayTime() / 24000L,
-            () -> level.getDayTime() % 24000L);
+                arbiter, events, () -> level.getDayTime() / 24000L, () -> level.getDayTime() % 24000L);
         digHandler.attach(bus);
         MineCommandHandler mineHandler = new MineCommandHandler(
-            arbiter, events,
-            () -> level.getDayTime() / 24000L,
-            () -> level.getDayTime() % 24000L,
-            () -> poseOf(body));
+                arbiter,
+                events,
+                () -> level.getDayTime() / 24000L,
+                () -> level.getDayTime() % 24000L,
+                () -> poseOf(body));
         mineHandler.attach(bus);
         // The bus has ONE cancel-listener slot: route to every verb
         // handler's public cancel method (each self-guards by its
@@ -240,15 +237,25 @@ public final class BotAssembly {
             mineHandler.onCancel(taskId, verb);
         });
 
-        ChangeDetectingStateChannel state =
-            new ChangeDetectingStateChannel(
+        ChangeDetectingStateChannel state = new ChangeDetectingStateChannel(
                 () -> snapshotOf(body, gotoHandler, level),
                 events,
                 () -> level.getDayTime() / 24000L,
                 () -> level.getDayTime() % 24000L);
 
-        return new Assembled(body, view, actor, events, arbiter, reflex,
-            controller, bus, gotoHandler, digHandler, mineHandler, state);
+        return new Assembled(
+                body,
+                view,
+                actor,
+                events,
+                arbiter,
+                reflex,
+                controller,
+                bus,
+                gotoHandler,
+                digHandler,
+                mineHandler,
+                state);
     }
 
     /**
@@ -260,9 +267,7 @@ public final class BotAssembly {
      * @param level       the body's level; never null
      * @return fresh snapshot; never null
      */
-    private static BotState snapshotOf(BotBodyEntity body,
-                                       GotoCommandHandler gotoHandler,
-                                       ServerLevel level) {
+    private static BotState snapshotOf(BotBodyEntity body, GotoCommandHandler gotoHandler, ServerLevel level) {
         // Item summary from the live inventory binding (issue 0007 Phase
         // 1): aggregate main-slot counts by item id. Armor and offhand
         // are excluded from the summary map — they are equipment, not
@@ -279,22 +284,26 @@ public final class BotAssembly {
         }
         Map<String, Integer> effects = new LinkedHashMap<>();
         for (MobEffectInstance instance : body.getActiveEffects()) {
-            effects.put(BuiltInRegistries.MOB_EFFECT
-                    .getKey(instance.getEffect()).toString(),
-                instance.getAmplifier());
+            effects.put(
+                    BuiltInRegistries.MOB_EFFECT.getKey(instance.getEffect()).toString(), instance.getAmplifier());
         }
         // Health bucketed to whole hearts: 1 heart = 2 half-heart
         // units, rounding half up so a fresh bot reads 20.
-        return new BotState(poseOf(body), body.getYRot(),
-            body.getXRot(), level.dimension().location().getPath(),
-            items, inv.selectedSlot(), effects,
-            gotoHandler.activeTaskSummary(),
-            Math.round(body.getHealth() / 2.0f), freeSlots);
+        return new BotState(
+                poseOf(body),
+                body.getYRot(),
+                body.getXRot(),
+                level.dimension().location().getPath(),
+                items,
+                inv.selectedSlot(),
+                effects,
+                gotoHandler.activeTaskSummary(),
+                Math.round(body.getHealth() / 2.0f),
+                freeSlots);
     }
 
     private static CellPos poseOf(BotBodyEntity body) {
-        return new CellPos(body.getBlockX(), body.getBlockY(),
-            body.getBlockZ());
+        return new CellPos(body.getBlockX(), body.getBlockY(), body.getBlockZ());
     }
 
     /**
@@ -311,16 +320,12 @@ public final class BotAssembly {
         if (!body.isInWall()) {
             return null;
         }
-        var eyeCell = net.minecraft.core.BlockPos.containing(
-            body.getEyePosition());
-        return new CellPos(eyeCell.getX(), eyeCell.getY(),
-            eyeCell.getZ());
+        var eyeCell = net.minecraft.core.BlockPos.containing(body.getEyePosition());
+        return new CellPos(eyeCell.getX(), eyeCell.getY(), eyeCell.getZ());
     }
 
-    private static com.mcbot.mcbotserver.api.types.Vec3 finePoseOf(
-            BotBodyEntity body) {
-        return new com.mcbot.mcbotserver.api.types.Vec3(body.getX(),
-            body.getY(), body.getZ());
+    private static com.mcbot.mcbotserver.api.types.Vec3 finePoseOf(BotBodyEntity body) {
+        return new com.mcbot.mcbotserver.api.types.Vec3(body.getX(), body.getY(), body.getZ());
     }
 
     private static BotController.GameClock clockOf(ServerLevel level) {

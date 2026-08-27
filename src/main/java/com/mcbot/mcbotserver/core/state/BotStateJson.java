@@ -1,7 +1,7 @@
 package com.mcbot.mcbotserver.core.state;
 
-import com.mcbot.mcbotserver.api.state.BotState;
 import com.google.gson.JsonObject;
+import com.mcbot.mcbotserver.api.state.BotState;
 
 /**
  * Serializes a {@link BotState} snapshot into the single-line JSON
@@ -15,8 +15,7 @@ import com.google.gson.JsonObject;
 // contract: see boundaries.md Boundary D protocol (state snapshot shape)
 public final class BotStateJson {
 
-    private BotStateJson() {
-    }
+    private BotStateJson() {}
 
     /**
      * Render the snapshot as one compact JSON line.

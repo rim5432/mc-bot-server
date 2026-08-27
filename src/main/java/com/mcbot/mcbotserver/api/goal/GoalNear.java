@@ -36,7 +36,6 @@ public record GoalNear(CellPos center, int range) implements Goal {
 
     @Override
     public String describe() {
-        return "GoalNear(" + center.x() + "," + center.y() + ","
-            + center.z() + ",r=" + range + ")";
+        return "GoalNear(" + center.x() + "," + center.y() + "," + center.z() + ",r=" + range + ")";
     }
 }

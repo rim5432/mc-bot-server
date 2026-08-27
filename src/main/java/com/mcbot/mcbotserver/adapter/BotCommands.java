@@ -12,7 +12,6 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
-
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
@@ -59,11 +58,12 @@ public final class BotCommands {
      *                     was actually set; backs /bot reset;
      *                     never null
      */
-    public record Channels(EventQueue events, CommandBus bus,
-                           StateChannel state,
-                           IntSupplier stopAllTasks,
-                           BooleanSupplier resetCrashLatch) {
-    }
+    public record Channels(
+            EventQueue events,
+            CommandBus bus,
+            StateChannel state,
+            IntSupplier stopAllTasks,
+            BooleanSupplier resetCrashLatch) {}
 
     /**
      * Register the /bot subtree on the dispatcher.
@@ -72,18 +72,17 @@ public final class BotCommands {
      * @param live       channel accessor returning null before the
      *                   first /botspawn; never null
      */
-    public static void register(CommandDispatcher<CommandSourceStack> dispatcher,
-                                Supplier<Channels> live) {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, Supplier<Channels> live) {
         dispatcher.register(Commands.literal("bot")
-            .requires(src -> src.hasPermission(2))
-            .then(statusBranch(live))
-            .then(gotoBranch(live))
-            .then(digBranch(live))
-            .then(mineBranch(live))
-            .then(cancelBranch(live))
-            .then(stopBranch(live))
-            .then(eventsBranch(live))
-            .then(resetBranch(live)));
+                .requires(src -> src.hasPermission(2))
+                .then(statusBranch(live))
+                .then(gotoBranch(live))
+                .then(digBranch(live))
+                .then(mineBranch(live))
+                .then(cancelBranch(live))
+                .then(stopBranch(live))
+                .then(eventsBranch(live))
+                .then(resetBranch(live)));
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> statusBranch(
@@ -97,14 +96,16 @@ public final class BotCommands {
             // Human line first - the JSON block is contract surface
             // for harnesses, not something a person should have to
             // read in chat.
-            ctx.getSource().sendSuccess(() -> Component.literal(
-                "Bot at [" + snap.pos().x() + ", " + snap.pos().y()
-                    + ", " + snap.pos().z() + "] in "
-                    + snap.dimension() + "; task: "
-                    + snap.currentTaskSummary()), false);
+            ctx.getSource()
+                    .sendSuccess(
+                            () -> Component.literal("Bot at [" + snap.pos().x() + ", "
+                                    + snap.pos().y()
+                                    + ", " + snap.pos().z() + "] in "
+                                    + snap.dimension() + "; task: "
+                                    + snap.currentTaskSummary()),
+                            false);
             JsonObject root = ok();
-            root.add("state",
-                BotStateJson.toJsonObject(snap));
+            root.add("state", BotStateJson.toJsonObject(snap));
             return answer(ctx.getSource(), root);
         });
     }
@@ -112,41 +113,32 @@ public final class BotCommands {
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> gotoBranch(
             Supplier<Channels> live) {
         return Commands.literal("goto")
-            .then(Commands.argument("x", IntegerArgumentType.integer())
-                .then(Commands.argument("y", IntegerArgumentType.integer())
-                    .then(Commands.argument("z", IntegerArgumentType.integer())
-                        .then(Commands.argument("tolerance",
-                                    IntegerArgumentType.integer(0))
-                            .then(Commands.argument("timeoutTicks",
-                                        IntegerArgumentType.integer(1))
-                                .executes(ctx ->
-                                    runGoto(ctx, live, null))
-                                .then(Commands.argument("key",
-                                            StringArgumentType.string())
-                                    .executes(ctx -> runGoto(ctx, live,
-                                        StringArgumentType.getString(ctx,
-                                            "key")))))))));
+                .then(Commands.argument("x", IntegerArgumentType.integer())
+                        .then(Commands.argument("y", IntegerArgumentType.integer())
+                                .then(Commands.argument("z", IntegerArgumentType.integer())
+                                        .then(Commands.argument("tolerance", IntegerArgumentType.integer(0))
+                                                .then(Commands.argument("timeoutTicks", IntegerArgumentType.integer(1))
+                                                        .executes(ctx -> runGoto(ctx, live, null))
+                                                        .then(Commands.argument("key", StringArgumentType.string())
+                                                                .executes(ctx -> runGoto(
+                                                                        ctx,
+                                                                        live,
+                                                                        StringArgumentType.getString(
+                                                                                ctx, "key")))))))));
     }
 
-    private static int runGoto(CommandContext<CommandSourceStack> ctx,
-                               Supplier<Channels> live, String key) {
+    private static int runGoto(CommandContext<CommandSourceStack> ctx, Supplier<Channels> live, String key) {
         Channels ch = live.get();
         if (ch == null) {
             return answer(ctx.getSource(), err("no active bot"));
         }
         Map<String, String> args = new LinkedHashMap<>();
-        args.put("x", String.valueOf(
-            IntegerArgumentType.getInteger(ctx, "x")));
-        args.put("y", String.valueOf(
-            IntegerArgumentType.getInteger(ctx, "y")));
-        args.put("z", String.valueOf(
-            IntegerArgumentType.getInteger(ctx, "z")));
-        args.put("tolerance", String.valueOf(
-            IntegerArgumentType.getInteger(ctx, "tolerance")));
-        args.put("timeoutTicks", String.valueOf(
-            IntegerArgumentType.getInteger(ctx, "timeoutTicks")));
-        SubmitResult result = ch.bus().submit(
-            new BotCommand("goto", args), key);
+        args.put("x", String.valueOf(IntegerArgumentType.getInteger(ctx, "x")));
+        args.put("y", String.valueOf(IntegerArgumentType.getInteger(ctx, "y")));
+        args.put("z", String.valueOf(IntegerArgumentType.getInteger(ctx, "z")));
+        args.put("tolerance", String.valueOf(IntegerArgumentType.getInteger(ctx, "tolerance")));
+        args.put("timeoutTicks", String.valueOf(IntegerArgumentType.getInteger(ctx, "timeoutTicks")));
+        SubmitResult result = ch.bus().submit(new BotCommand("goto", args), key);
         JsonObject root = new JsonObject();
         if (result instanceof SubmitResult.Ok accepted) {
             root.addProperty("ok", true);
@@ -154,8 +146,7 @@ public final class BotCommands {
             root.addProperty("replay", accepted.idempotencyReplay());
         } else {
             root.addProperty("ok", false);
-            root.addProperty("reason",
-                ((SubmitResult.Rejected) result).reason());
+            root.addProperty("reason", ((SubmitResult.Rejected) result).reason());
         }
         return answer(ctx.getSource(), root);
     }
@@ -169,33 +160,26 @@ public final class BotCommands {
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> digBranch(
             Supplier<Channels> live) {
         var pos = Commands.argument("x", IntegerArgumentType.integer())
-            .then(Commands.argument("y", IntegerArgumentType.integer())
-                .then(Commands.argument("z", IntegerArgumentType.integer())
-                    .executes(ctx -> runDig(ctx, live, 1200L))
-                    .then(Commands.argument("timeoutTicks",
-                                IntegerArgumentType.integer(1))
-                        .executes(ctx -> runDig(ctx, live,
-                            (long) IntegerArgumentType.getInteger(
-                                ctx, "timeoutTicks"))))));
+                .then(Commands.argument("y", IntegerArgumentType.integer())
+                        .then(Commands.argument("z", IntegerArgumentType.integer())
+                                .executes(ctx -> runDig(ctx, live, 1200L))
+                                .then(Commands.argument("timeoutTicks", IntegerArgumentType.integer(1))
+                                        .executes(ctx -> runDig(ctx, live, (long)
+                                                IntegerArgumentType.getInteger(ctx, "timeoutTicks"))))));
         return Commands.literal("dig").then(pos);
     }
 
-    private static int runDig(CommandContext<CommandSourceStack> ctx,
-                              Supplier<Channels> live, long timeoutTicks) {
+    private static int runDig(CommandContext<CommandSourceStack> ctx, Supplier<Channels> live, long timeoutTicks) {
         Channels ch = live.get();
         if (ch == null) {
             return answer(ctx.getSource(), err("no active bot"));
         }
         Map<String, String> args = new LinkedHashMap<>();
-        args.put("x", String.valueOf(
-            IntegerArgumentType.getInteger(ctx, "x")));
-        args.put("y", String.valueOf(
-            IntegerArgumentType.getInteger(ctx, "y")));
-        args.put("z", String.valueOf(
-            IntegerArgumentType.getInteger(ctx, "z")));
+        args.put("x", String.valueOf(IntegerArgumentType.getInteger(ctx, "x")));
+        args.put("y", String.valueOf(IntegerArgumentType.getInteger(ctx, "y")));
+        args.put("z", String.valueOf(IntegerArgumentType.getInteger(ctx, "z")));
         args.put("timeoutTicks", String.valueOf(timeoutTicks));
-        SubmitResult result = ch.bus().submit(
-            new BotCommand("dig", args), null);
+        SubmitResult result = ch.bus().submit(new BotCommand("dig", args), null);
         JsonObject root = new JsonObject();
         if (result instanceof SubmitResult.Ok accepted) {
             root.addProperty("ok", true);
@@ -203,8 +187,7 @@ public final class BotCommands {
             root.addProperty("replay", accepted.idempotencyReplay());
         } else {
             root.addProperty("ok", false);
-            root.addProperty("reason",
-                ((SubmitResult.Rejected) result).reason());
+            root.addProperty("reason", ((SubmitResult.Rejected) result).reason());
         }
         return answer(ctx.getSource(), root);
     }
@@ -221,33 +204,25 @@ public final class BotCommands {
         // string(), not word(): registry ids carry a colon and word()
         // cannot parse one - the caller must quote the id (same rule
         // as the menu verbs' item ids).
-        var args = Commands.argument("blockType",
-                    StringArgumentType.string())
-            .then(Commands.argument("count",
-                        IntegerArgumentType.integer(1))
-                .executes(ctx -> runMine(ctx, live, 2400L))
-                .then(Commands.argument("timeoutTicks",
-                            IntegerArgumentType.integer(1))
-                    .executes(ctx -> runMine(ctx, live,
-                        (long) IntegerArgumentType.getInteger(
-                            ctx, "timeoutTicks")))));
+        var args = Commands.argument("blockType", StringArgumentType.string())
+                .then(Commands.argument("count", IntegerArgumentType.integer(1))
+                        .executes(ctx -> runMine(ctx, live, 2400L))
+                        .then(Commands.argument("timeoutTicks", IntegerArgumentType.integer(1))
+                                .executes(ctx -> runMine(
+                                        ctx, live, (long) IntegerArgumentType.getInteger(ctx, "timeoutTicks")))));
         return Commands.literal("mine").then(args);
     }
 
-    private static int runMine(CommandContext<CommandSourceStack> ctx,
-                               Supplier<Channels> live, long timeoutTicks) {
+    private static int runMine(CommandContext<CommandSourceStack> ctx, Supplier<Channels> live, long timeoutTicks) {
         Channels ch = live.get();
         if (ch == null) {
             return answer(ctx.getSource(), err("no active bot"));
         }
         Map<String, String> args = new LinkedHashMap<>();
-        args.put("blockType",
-            StringArgumentType.getString(ctx, "blockType"));
-        args.put("count", String.valueOf(
-            IntegerArgumentType.getInteger(ctx, "count")));
+        args.put("blockType", StringArgumentType.getString(ctx, "blockType"));
+        args.put("count", String.valueOf(IntegerArgumentType.getInteger(ctx, "count")));
         args.put("timeoutTicks", String.valueOf(timeoutTicks));
-        SubmitResult result = ch.bus().submit(
-            new BotCommand("mine", args), null);
+        SubmitResult result = ch.bus().submit(new BotCommand("mine", args), null);
         JsonObject root = new JsonObject();
         if (result instanceof SubmitResult.Ok accepted) {
             root.addProperty("ok", true);
@@ -255,8 +230,7 @@ public final class BotCommands {
             root.addProperty("replay", accepted.idempotencyReplay());
         } else {
             root.addProperty("ok", false);
-            root.addProperty("reason",
-                ((SubmitResult.Rejected) result).reason());
+            root.addProperty("reason", ((SubmitResult.Rejected) result).reason());
         }
         return answer(ctx.getSource(), root);
     }
@@ -264,20 +238,14 @@ public final class BotCommands {
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> cancelBranch(
             Supplier<Channels> live) {
         return Commands.literal("cancel")
-            .then(Commands.argument("taskId",
-                    StringArgumentType.word())
-                .executes(ctx -> {
+                .then(Commands.argument("taskId", StringArgumentType.word()).executes(ctx -> {
                     Channels ch = live.get();
                     if (ch == null) {
-                        return answer(ctx.getSource(),
-                            err("no active bot"));
+                        return answer(ctx.getSource(), err("no active bot"));
                     }
-                    String taskId =
-                        StringArgumentType.getString(ctx, "taskId");
+                    String taskId = StringArgumentType.getString(ctx, "taskId");
                     boolean removed = ch.bus().cancel(taskId);
-                    return answer(ctx.getSource(), removed
-                        ? ok()
-                        : err("no such task: " + taskId));
+                    return answer(ctx.getSource(), removed ? ok() : err("no such task: " + taskId));
                 }));
     }
 
@@ -289,9 +257,10 @@ public final class BotCommands {
                 return answer(ctx.getSource(), err("no active bot"));
             }
             int cancelled = ch.stopAllTasks().getAsInt();
-            ctx.getSource().sendSuccess(() -> Component.literal(
-                "stopped " + cancelled + " task"
-                    + (cancelled == 1 ? "" : "s")), false);
+            ctx.getSource()
+                    .sendSuccess(
+                            () -> Component.literal("stopped " + cancelled + " task" + (cancelled == 1 ? "" : "s")),
+                            false);
             JsonObject root = ok();
             root.addProperty("cancelled", cancelled);
             return answer(ctx.getSource(), root);
@@ -306,29 +275,27 @@ public final class BotCommands {
         // narrowing keeps EVENT_GAP / EVENT_DROPPED and the true
         // cursor fields - see EventBatch.narrowedToKindPrefix.
         return Commands.literal("events")
-            .executes(ctx -> runEvents(ctx, live, 0L, ""))
-            .then(Commands.argument("since",
-                        IntegerArgumentType.integer(0))
-                .executes(ctx -> runEvents(ctx, live,
-                    IntegerArgumentType.getInteger(ctx, "since"), ""))
-                .then(Commands.argument("only",
-                            StringArgumentType.word())
-                    .executes(ctx -> runEvents(ctx, live,
-                        IntegerArgumentType.getInteger(ctx, "since"),
-                        StringArgumentType.getString(ctx, "only")))));
+                .executes(ctx -> runEvents(ctx, live, 0L, ""))
+                .then(Commands.argument("since", IntegerArgumentType.integer(0))
+                        .executes(ctx -> runEvents(ctx, live, IntegerArgumentType.getInteger(ctx, "since"), ""))
+                        .then(Commands.argument("only", StringArgumentType.word())
+                                .executes(ctx -> runEvents(
+                                        ctx,
+                                        live,
+                                        IntegerArgumentType.getInteger(ctx, "since"),
+                                        StringArgumentType.getString(ctx, "only")))));
     }
 
-    private static int runEvents(CommandContext<CommandSourceStack> ctx,
-                                 Supplier<Channels> live, long since,
-                                 String onlyPrefix) {
+    private static int runEvents(
+            CommandContext<CommandSourceStack> ctx, Supplier<Channels> live, long since, String onlyPrefix) {
         Channels ch = live.get();
         if (ch == null) {
             return answer(ctx.getSource(), err("no active bot"));
         }
         JsonObject root = ok();
-        root.add("batch", EventBatchJson.toJsonObject(
-            ch.events().statusSnapshot(since)
-                .narrowedToKindPrefix(onlyPrefix)));
+        root.add(
+                "batch",
+                EventBatchJson.toJsonObject(ch.events().statusSnapshot(since).narrowedToKindPrefix(onlyPrefix)));
         return answer(ctx.getSource(), root);
     }
 

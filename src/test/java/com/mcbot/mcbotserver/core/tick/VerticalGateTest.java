@@ -1,6 +1,8 @@
 package com.mcbot.mcbotserver.core.tick;
 
-import com.mcbot.mcbotserver.api.actor.Claim;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.process.Directive;
@@ -9,13 +11,7 @@ import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 import com.mcbot.mcbotserver.core.pathing.BasicMoves;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
-
 import org.junit.jupiter.api.Test;
-
-import java.lang.reflect.Field;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Vertical gate (issue 0001 fix 6): trigger evaluation
@@ -49,13 +45,11 @@ class VerticalGateTest {
     @Test
     void airborneTicksDoNotTripFuse() throws ReflectiveOperationException {
         MockWorldView world = MockWorldView.pavedFloor(60);
-        Vec3[] position = { new Vec3(0.5, 64, 0.5) };
+        Vec3[] position = {new Vec3(0.5, 64, 0.5)};
         // Always airborne.
-        PathingBehavior mover = new PathingBehavior("mover",
-            () -> position[0], () -> false, BasicMoves::from);
+        PathingBehavior mover = new PathingBehavior("mover", () -> position[0], () -> false, BasicMoves::from);
         RecordingActor actor = new RecordingActor();
-        Directive directive = Directive.of(
-            new GoalBlock(new CellPos(40, 64, 0)));
+        Directive directive = Directive.of(new GoalBlock(new CellPos(40, 64, 0)));
 
         // First tick: wasOnGround=false, onGround=false. This is
         // NOT a landing edge (landing = onGround && !wasOnGround).
@@ -72,31 +66,31 @@ class VerticalGateTest {
         int stuckTick = -1;
         String stuckChannel = null;
         for (int i = 1; i <= 30; i++) {
-            position[0] = new Vec3(position[0].x(),
-                position[0].y() - 0.3, position[0].z());
+            position[0] = new Vec3(position[0].x(), position[0].y() - 0.3, position[0].z());
             ExecutionReport r = mover.tick(world, directive, actor);
-            boolean stuck =
-                r.status() == ExecutionReport.Status.STUCK
-                || (r.status() == ExecutionReport.Status.FAILED
-                    && "STUCK".equals(r.reason()));
+            boolean stuck = r.status() == ExecutionReport.Status.STUCK
+                    || (r.status() == ExecutionReport.Status.FAILED && "STUCK".equals(r.reason()));
             if (stuck) {
                 stuckTick = i;
-                stuckChannel = r.status()
-                    + (r.reason() == null ? "" : "+" + r.reason());
+                stuckChannel = r.status() + (r.reason() == null ? "" : "+" + r.reason());
                 break;
             }
         }
-        assertEquals(-1, stuckTick,
-            "plan-progress fuse must not fire while the body is "
-            + "airborne: trigger evaluation is gated by onGround. "
-            + "Fired at i=" + stuckTick + " (" + stuckChannel + ")");
+        assertEquals(
+                -1,
+                stuckTick,
+                "plan-progress fuse must not fire while the body is "
+                        + "airborne: trigger evaluation is gated by onGround. "
+                        + "Fired at i=" + stuckTick + " (" + stuckChannel + ")");
 
         // ticksSincePlanProgress must not have accumulated while
         // airborne: PlanProgressFuse.evaluate is gated, so the counter
         // stays at the ctor-default 0. The first tick did not
         // credit progress (gate was engaged even on tick 1).
-        assertEquals(0, PathingTestAccess.ticksSincePlanProgress(mover),
-            "airborne ticks must not increment ticksSincePlanProgress");
+        assertEquals(
+                0,
+                PathingTestAccess.ticksSincePlanProgress(mover),
+                "airborne ticks must not increment ticksSincePlanProgress");
     }
 
     /**
@@ -114,16 +108,13 @@ class VerticalGateTest {
      * on the landing tick.
      */
     @Test
-    void landingEdgeBypassesReplanCooldown()
-        throws ReflectiveOperationException {
+    void landingEdgeBypassesReplanCooldown() throws ReflectiveOperationException {
         MockWorldView world = MockWorldView.pavedFloor(60);
-        Vec3[] position = { new Vec3(0.5, 64, 0.5) };
-        boolean[] onGround = { true };
-        PathingBehavior mover = new PathingBehavior("mover",
-            () -> position[0], () -> onGround[0], BasicMoves::from);
+        Vec3[] position = {new Vec3(0.5, 64, 0.5)};
+        boolean[] onGround = {true};
+        PathingBehavior mover = new PathingBehavior("mover", () -> position[0], () -> onGround[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
-        Directive directive = Directive.of(
-            new GoalBlock(new CellPos(40, 64, 0)));
+        Directive directive = Directive.of(new GoalBlock(new CellPos(40, 64, 0)));
 
         // Tick 1: landing edge, neverPlanned=true, replan fires.
         // Synchronous plan completes within the tick, so waypoints
@@ -137,9 +128,10 @@ class VerticalGateTest {
             position[0] = new Vec3(0.5 + i * 0.2, 64, 0.5);
             mover.tick(world, directive, actor);
         }
-        assertEquals(5, PathingTestAccess.ticksSincePlan(mover),
-            "5 ticks after first replan: ticksSincePlan should be 5, "
-            + "in the REPLAN_COOLDOWN=10 window");
+        assertEquals(
+                5,
+                PathingTestAccess.ticksSincePlan(mover),
+                "5 ticks after first replan: ticksSincePlan should be 5, " + "in the REPLAN_COOLDOWN=10 window");
 
         // Now jump 5m LATERALLY off the plan line. The smoothed plan
         // is one long segment [(0,64,0),(40,64,0)], so an along-track
@@ -150,22 +142,21 @@ class VerticalGateTest {
         position[0] = new Vec3(position[0].x(), 64, position[0].z() + 5);
         mover.tick(world, directive, actor);
         // Verify: no replan fired (ticksSincePlan still 6, not 0).
-        assertEquals(6, PathingTestAccess.ticksSincePlan(mover),
-            "offPath with ticksSincePlan in cooldown: no replan");
+        assertEquals(6, PathingTestAccess.ticksSincePlan(mover), "offPath with ticksSincePlan in cooldown: no replan");
 
         // Go airborne (jump or fall off edge). wasOnGround was true
         // (steady grounded before jump) so this is NOT a landing
         // edge. The gate suppresses trigger evaluation entirely.
         onGround[0] = false;
         mover.tick(world, directive, actor);
-        assertEquals(7, PathingTestAccess.ticksSincePlan(mover),
-            "airborne tick: gate skips trigger eval, ticksSincePlan "
-            + "increments to 7, no replan");
+        assertEquals(
+                7,
+                PathingTestAccess.ticksSincePlan(mover),
+                "airborne tick: gate skips trigger eval, ticksSincePlan " + "increments to 7, no replan");
 
         // Still airborne.
         mover.tick(world, directive, actor);
-        assertEquals(8, PathingTestAccess.ticksSincePlan(mover),
-            "still airborne: gate still skips trigger eval");
+        assertEquals(8, PathingTestAccess.ticksSincePlan(mover), "still airborne: gate still skips trigger eval");
 
         // Land. onGround goes false -> true. landing = true. The
         // gate evaluates triggers AND bypasses the cooldown via
@@ -176,9 +167,11 @@ class VerticalGateTest {
         // the request.
         onGround[0] = true;
         mover.tick(world, directive, actor);
-        assertEquals(0, PathingTestAccess.ticksSincePlan(mover),
-            "landing edge must request replan immediately, "
-            + "bypassing the cooldown: ticksSincePlan should be 0");
+        assertEquals(
+                0,
+                PathingTestAccess.ticksSincePlan(mover),
+                "landing edge must request replan immediately, "
+                        + "bypassing the cooldown: ticksSincePlan should be 0");
     }
 
     /**
@@ -190,16 +183,13 @@ class VerticalGateTest {
      * ground-only behavior.
      */
     @Test
-    void steadyGroundedStillFiresFuseAt20()
-        throws ReflectiveOperationException {
+    void steadyGroundedStillFiresFuseAt20() throws ReflectiveOperationException {
         MockWorldView world = MockWorldView.pavedFloor(60);
-        Vec3[] position = { new Vec3(0.5, 64, 0.5) };
+        Vec3[] position = {new Vec3(0.5, 64, 0.5)};
         // Always grounded (same default as the 3-arg constructor).
-        PathingBehavior mover = new PathingBehavior("mover",
-            () -> position[0], () -> true, BasicMoves::from);
+        PathingBehavior mover = new PathingBehavior("mover", () -> position[0], () -> true, BasicMoves::from);
         RecordingActor actor = new RecordingActor();
-        Directive directive = Directive.of(
-            new GoalBlock(new CellPos(40, 64, 0)));
+        Directive directive = Directive.of(new GoalBlock(new CellPos(40, 64, 0)));
 
         // First tick: plan adopted.
         mover.tick(world, directive, actor);
@@ -210,19 +200,18 @@ class VerticalGateTest {
         int stuckTick = -1;
         for (int i = 1; i <= 25; i++) {
             ExecutionReport r = mover.tick(world, directive, actor);
-            boolean stuck =
-                r.status() == ExecutionReport.Status.STUCK
-                || (r.status() == ExecutionReport.Status.FAILED
-                    && "STUCK".equals(r.reason()));
+            boolean stuck = r.status() == ExecutionReport.Status.STUCK
+                    || (r.status() == ExecutionReport.Status.FAILED && "STUCK".equals(r.reason()));
             if (stuck) {
                 stuckTick = i;
                 break;
             }
         }
-        assertTrue(stuckTick > 0 && stuckTick <= 21,
-            "steady-grounded body must fire STUCK within 21 ticks: "
-            + "fix 6 must not change ground-only behavior. "
-            + "Fired at i=" + stuckTick);
+        assertTrue(
+                stuckTick > 0 && stuckTick <= 21,
+                "steady-grounded body must fire STUCK within 21 ticks: "
+                        + "fix 6 must not change ground-only behavior. "
+                        + "Fired at i=" + stuckTick);
     }
 
     /**
@@ -239,15 +228,12 @@ class VerticalGateTest {
      * cannot fire a replan in airborne mode.
      */
     @Test
-    void alwaysAirborneIsolatesTriggerEvaluation()
-        throws ReflectiveOperationException {
+    void alwaysAirborneIsolatesTriggerEvaluation() throws ReflectiveOperationException {
         MockWorldView world = MockWorldView.pavedFloor(60);
-        Vec3[] position = { new Vec3(0.5, 64, 0.5) };
-        PathingBehavior mover = new PathingBehavior("mover",
-            () -> position[0], () -> false, BasicMoves::from);
+        Vec3[] position = {new Vec3(0.5, 64, 0.5)};
+        PathingBehavior mover = new PathingBehavior("mover", () -> position[0], () -> false, BasicMoves::from);
         RecordingActor actor = new RecordingActor();
-        Directive directive = Directive.of(
-            new GoalBlock(new CellPos(40, 64, 0)));
+        Directive directive = Directive.of(new GoalBlock(new CellPos(40, 64, 0)));
 
         // 50 ticks of free-fall. Gate engaged every tick. No
         // trigger evaluation; ticksSincePlanProgress stays 0;
@@ -256,21 +242,24 @@ class VerticalGateTest {
         // resetting to 0 (which is what a successful replan
         // request would do).
         for (int i = 0; i < 50; i++) {
-            position[0] = new Vec3(position[0].x(),
-                position[0].y() - 0.3, position[0].z());
+            position[0] = new Vec3(position[0].x(), position[0].y() - 0.3, position[0].z());
             mover.tick(world, directive, actor);
         }
-        assertEquals(0, PathingTestAccess.ticksSincePlanProgress(mover),
-            "airborne ticks must not touch ticksSincePlanProgress");
+        assertEquals(
+                0,
+                PathingTestAccess.ticksSincePlanProgress(mover),
+                "airborne ticks must not touch ticksSincePlanProgress");
 
         // ticksSincePlan started at REPLAN_COOLDOWN=10, was
         // incremented 50 times, and was NEVER reset to 0 (no
         // replan was requested because the gate stayed engaged
         // and the neverPlanned short-circuit is also gated).
         // 10 + 50 = 60.
-        assertEquals(60, PathingTestAccess.ticksSincePlan(mover),
-            "ticksSincePlan should equal 10 (ctor) + 50 (tick "
-            + "increments) with no reset to 0: the gate prevented "
-            + "any replan from being requested");
+        assertEquals(
+                60,
+                PathingTestAccess.ticksSincePlan(mover),
+                "ticksSincePlan should equal 10 (ctor) + 50 (tick "
+                        + "increments) with no reset to 0: the gate prevented "
+                        + "any replan from being requested");
     }
 }

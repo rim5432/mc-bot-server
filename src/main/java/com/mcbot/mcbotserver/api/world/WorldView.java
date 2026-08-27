@@ -2,7 +2,6 @@ package com.mcbot.mcbotserver.api.world;
 
 import com.mcbot.mcbotserver.api.inventory.InventoryView;
 import com.mcbot.mcbotserver.api.types.CellPos;
-
 import java.util.List;
 
 /**
@@ -81,8 +80,7 @@ public interface WorldView {
      * @param mode   consistency requested, per decision 17b
      * @return matching snapshots, unordered; never null, possibly empty
      */
-    List<EntitySnapshot> getEntities(CellPos center, double radius,
-                                     ViewMode mode);
+    List<EntitySnapshot> getEntities(CellPos center, double radius, ViewMode mode);
 
     /**
      * Whether the chunk containing the cell is loaded — the first-class

@@ -86,6 +86,5 @@ public final class EventKind {
      *  correlates with the task stream. */
     public static final String BLOCK_BROKEN = "BLOCK_BROKEN";
 
-    private EventKind() {
-    }
+    private EventKind() {}
 }

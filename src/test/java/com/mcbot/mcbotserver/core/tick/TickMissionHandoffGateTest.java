@@ -1,5 +1,9 @@
 package com.mcbot.mcbotserver.core.tick;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
@@ -13,14 +17,8 @@ import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.core.reflex.FreezeOnLowHealthRule;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
-
-import org.junit.jupiter.api.Test;
-
 import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 
 /**
  * G4 mission-handoff gate: the pause / resume / drop transitions and
@@ -42,20 +40,16 @@ class TickMissionHandoffGateTest {
     @Test
     void pauseResumeDropEmitLifecycleEvents() {
         float[] health = {20f};
-        InMemoryEventQueue events =
-            new InMemoryEventQueue(() -> 2L, () -> 9000L);
-        SurvivalReflexLayer layer = new SurvivalReflexLayer(
-            (world, board) -> board.botHealth = health[0]);
+        InMemoryEventQueue events = new InMemoryEventQueue(() -> 2L, () -> 9000L);
+        SurvivalReflexLayer layer = new SurvivalReflexLayer((world, board) -> board.botHealth = health[0]);
         layer.addRule(new FreezeOnLowHealthRule());
         TaskArbiter arbiter = new TaskArbiter();
         CountingMission mission = new CountingMission();
         arbiter.register(mission);
         arbiter.requestControl(mission);
         PipelineActor actor = new PipelineActor();
-        PathingBehavior mover = new PathingBehavior("mover",
-            () -> new Vec3(0.5, 64, 0.5), BasicMoves::from);
-        var controller = TickGateFixtures.controller(health, layer,
-            arbiter, mover, actor, events);
+        PathingBehavior mover = new PathingBehavior("mover", () -> new Vec3(0.5, 64, 0.5), BasicMoves::from);
+        var controller = TickGateFixtures.controller(health, layer, arbiter, mover, actor, events);
         MockWorldView world = TickGateFixtures.flooredWorld();
 
         // Establish the mission as current before any threat exists.
@@ -63,8 +57,7 @@ class TickMissionHandoffGateTest {
 
         health[0] = 3f;
         controller.onTick(world);
-        assertEquals(List.of(EventKind.TASK_PAUSED), kindsOf(events),
-            "preemption must surface as TASK_PAUSED");
+        assertEquals(List.of(EventKind.TASK_PAUSED), kindsOf(events), "preemption must surface as TASK_PAUSED");
 
         // Heal: drain the 20-tick hold window before asserting the
         // TASK_RESUMED event. Each pre-hold tick is also a tick
@@ -76,9 +69,10 @@ class TickMissionHandoffGateTest {
             controller.onTick(world);
         }
         controller.onTick(world);
-        assertEquals(List.of(EventKind.TASK_PAUSED, EventKind.TASK_RESUMED),
-            kindsOf(events),
-            "clean revalidation must surface as TASK_RESUMED");
+        assertEquals(
+                List.of(EventKind.TASK_PAUSED, EventKind.TASK_RESUMED),
+                kindsOf(events),
+                "clean revalidation must surface as TASK_RESUMED");
     }
 
     /**
@@ -88,26 +82,20 @@ class TickMissionHandoffGateTest {
     @Test
     void droppedMissionEmitsUrgentTaskDropped() {
         float[] health = {20f};
-        InMemoryEventQueue events =
-            new InMemoryEventQueue(() -> 2L, () -> 9000L);
-        SurvivalReflexLayer layer = new SurvivalReflexLayer(
-            (world, board) -> board.botHealth = health[0]);
+        InMemoryEventQueue events = new InMemoryEventQueue(() -> 2L, () -> 9000L);
+        SurvivalReflexLayer layer = new SurvivalReflexLayer((world, board) -> board.botHealth = health[0]);
         layer.addRule(new FreezeOnLowHealthRule());
         TaskArbiter arbiter = new TaskArbiter();
         CountingMission mission = new CountingMission() {
             @Override
-            public boolean resume(
-                    com.mcbot.mcbotserver.api.interrupt.InterruptionContext
-                        c) {
+            public boolean resume(com.mcbot.mcbotserver.api.interrupt.InterruptionContext c) {
                 return false;
             }
         };
         arbiter.register(mission);
         arbiter.requestControl(mission);
-        PathingBehavior mover = new PathingBehavior("mover",
-            () -> new Vec3(0.5, 64, 0.5), BasicMoves::from);
-        var controller = TickGateFixtures.controller(health, layer,
-            arbiter, mover, new PipelineActor(), events);
+        PathingBehavior mover = new PathingBehavior("mover", () -> new Vec3(0.5, 64, 0.5), BasicMoves::from);
+        var controller = TickGateFixtures.controller(health, layer, arbiter, mover, new PipelineActor(), events);
 
         controller.onTick(TickGateFixtures.flooredWorld());
         health[0] = 3f;
@@ -125,8 +113,7 @@ class TickMissionHandoffGateTest {
         assertEquals(EventKind.TASK_PAUSED, kinds.get(0));
         assertEquals(EventKind.TASK_DROPPED, kinds.get(1));
         BotEvent dropped = events.statusSnapshot(0).events().get(1);
-        assertTrue(dropped.urgent(),
-            "a dropped task is decision-critical: it will never finish");
+        assertTrue(dropped.urgent(), "a dropped task is decision-critical: it will never finish");
     }
 
     /**
@@ -136,21 +123,16 @@ class TickMissionHandoffGateTest {
     @Test
     void failedMissionSurfacesReasonInEventAttrs() {
         float[] health = {20f};
-        InMemoryEventQueue events =
-            new InMemoryEventQueue(() -> 1L, () -> 0L);
-        SurvivalReflexLayer layer = new SurvivalReflexLayer(
-            (world, board) -> board.botHealth = health[0]);
+        InMemoryEventQueue events = new InMemoryEventQueue(() -> 1L, () -> 0L);
+        SurvivalReflexLayer layer = new SurvivalReflexLayer((world, board) -> board.botHealth = health[0]);
         layer.addRule(new FreezeOnLowHealthRule());
         TaskArbiter arbiter = new TaskArbiter();
-        GotoProcess mission = new GotoProcess(
-            "gt-attrs", new GoalBlock(new CellPos(5, 80, 5)), 50, 400);
+        GotoProcess mission = new GotoProcess("gt-attrs", new GoalBlock(new CellPos(5, 80, 5)), 50, 400);
         arbiter.register(mission);
         arbiter.requestControl(mission);
         PipelineActor actor = new PipelineActor();
-        PathingBehavior mover = new PathingBehavior("mover",
-            () -> new Vec3(0.5, 64, 0.5), BasicMoves::from);
-        var controller = TickGateFixtures.controller(health, layer,
-            arbiter, mover, actor, events);
+        PathingBehavior mover = new PathingBehavior("mover", () -> new Vec3(0.5, 64, 0.5), BasicMoves::from);
+        var controller = TickGateFixtures.controller(health, layer, arbiter, mover, actor, events);
 
         for (int i = 0; i < 6; i++) {
             controller.onTick(TickGateFixtures.flooredWorld());
@@ -159,13 +141,11 @@ class TickMissionHandoffGateTest {
         assertFalse(mission.isActive(), "unreachable goal must fail");
         assertEquals("NO_PATH", mission.failureReasonOrNull());
         BotEvent failed = events.statusSnapshot(0).events().stream()
-            .filter(e -> EventKind.TASK_FAILED.equals(e.kind()))
-            .findFirst().orElseThrow(
-                () -> new AssertionError("TASK_MISSING"));
-        assertEquals("gt-attrs", failed.attrs().get("task"),
-            "task identity must be structured");
-        assertEquals("NO_PATH", failed.attrs().get("reason"),
-            "reason must be structured, not embedded in text");
+                .filter(e -> EventKind.TASK_FAILED.equals(e.kind()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("TASK_MISSING"));
+        assertEquals("gt-attrs", failed.attrs().get("task"), "task identity must be structured");
+        assertEquals("NO_PATH", failed.attrs().get("reason"), "reason must be structured, not embedded in text");
     }
 
     /**
@@ -178,21 +158,16 @@ class TickMissionHandoffGateTest {
     @Test
     void reflexInRetirementLapEmitsVerdictNotPaused() {
         float[] health = {20f};
-        InMemoryEventQueue events =
-            new InMemoryEventQueue(() -> 1L, () -> 0L);
-        SurvivalReflexLayer layer = new SurvivalReflexLayer(
-            (world, board) -> board.botHealth = health[0]);
+        InMemoryEventQueue events = new InMemoryEventQueue(() -> 1L, () -> 0L);
+        SurvivalReflexLayer layer = new SurvivalReflexLayer((world, board) -> board.botHealth = health[0]);
         layer.addRule(new FreezeOnLowHealthRule());
         TaskArbiter arbiter = new TaskArbiter();
-        GotoProcess mission = new GotoProcess(
-            "gt-lap", new GoalBlock(new CellPos(5, 80, 5)), 50, 400);
+        GotoProcess mission = new GotoProcess("gt-lap", new GoalBlock(new CellPos(5, 80, 5)), 50, 400);
         arbiter.register(mission);
         arbiter.requestControl(mission);
         PipelineActor actor = new PipelineActor();
-        PathingBehavior mover = new PathingBehavior("mover",
-            () -> new Vec3(0.5, 64, 0.5), BasicMoves::from);
-        var controller = TickGateFixtures.controller(health, layer,
-            arbiter, mover, actor, events);
+        PathingBehavior mover = new PathingBehavior("mover", () -> new Vec3(0.5, 64, 0.5), BasicMoves::from);
+        var controller = TickGateFixtures.controller(health, layer, arbiter, mover, actor, events);
 
         // Tick 1: planner fails the floating goal -> mission terminal
         // (active=false) but STILL current until stage 2 retires it.
@@ -204,13 +179,9 @@ class TickMissionHandoffGateTest {
         controller.onTick(TickGateFixtures.flooredWorld());
 
         List<String> kinds = kindsOf(events);
-        assertFalse(kinds.contains(EventKind.TASK_PAUSED),
-            "a decided mission must not be announced as paused");
-        assertEquals(EventKind.TASK_FAILED, kinds.get(0),
-            "the verdict survives the freeze arriving one tick late");
-        assertEquals("NO_PATH",
-            events.statusSnapshot(0).events().get(0).attrs()
-                .get("reason"));
+        assertFalse(kinds.contains(EventKind.TASK_PAUSED), "a decided mission must not be announced as paused");
+        assertEquals(EventKind.TASK_FAILED, kinds.get(0), "the verdict survives the freeze arriving one tick late");
+        assertEquals("NO_PATH", events.statusSnapshot(0).events().get(0).attrs().get("reason"));
 
         // Exactly-once emission: drive five more healthy ticks - the
         // retirement must not re-announce now that previousCurrent
@@ -218,8 +189,7 @@ class TickMissionHandoffGateTest {
         for (int i = 0; i < 5; i++) {
             controller.onTick(TickGateFixtures.flooredWorld());
         }
-        assertEquals(1, kindsOf(events).size(),
-            "the verdict must be emitted exactly once, ever");
+        assertEquals(1, kindsOf(events).size(), "the verdict must be emitted exactly once, ever");
     }
 
     /**
@@ -231,22 +201,16 @@ class TickMissionHandoffGateTest {
     @Test
     void reflexInRetirementLapEmitsCompletedNotPaused() {
         float[] health = {20f};
-        InMemoryEventQueue events =
-            new InMemoryEventQueue(() -> 1L, () -> 0L);
-        SurvivalReflexLayer layer = new SurvivalReflexLayer(
-            (world, board) -> board.botHealth = health[0]);
+        InMemoryEventQueue events = new InMemoryEventQueue(() -> 1L, () -> 0L);
+        SurvivalReflexLayer layer = new SurvivalReflexLayer((world, board) -> board.botHealth = health[0]);
         layer.addRule(new FreezeOnLowHealthRule());
         TaskArbiter arbiter = new TaskArbiter();
-        GotoProcess mission = new GotoProcess(
-            "gt-lap-ok", new GoalBlock(new CellPos(0, 64, 0)),
-            50, 400);
+        GotoProcess mission = new GotoProcess("gt-lap-ok", new GoalBlock(new CellPos(0, 64, 0)), 50, 400);
         arbiter.register(mission);
         arbiter.requestControl(mission);
         PipelineActor actor = new PipelineActor();
-        PathingBehavior mover = new PathingBehavior("mover",
-            () -> new Vec3(0.5, 64, 0.5), BasicMoves::from);
-        var controller = TickGateFixtures.controller(health, layer,
-            arbiter, mover, actor, events);
+        PathingBehavior mover = new PathingBehavior("mover", () -> new Vec3(0.5, 64, 0.5), BasicMoves::from);
+        var controller = TickGateFixtures.controller(health, layer, arbiter, mover, actor, events);
 
         // Tick 1: goal predicate passes immediately -> terminal.
         controller.onTick(TickGateFixtures.flooredWorld());
@@ -257,23 +221,20 @@ class TickMissionHandoffGateTest {
         controller.onTick(TickGateFixtures.flooredWorld());
 
         List<String> kinds = kindsOf(events);
-        assertFalse(kinds.contains(EventKind.TASK_PAUSED),
-            "a decided mission must not be announced as paused");
-        assertEquals(EventKind.TASK_COMPLETED, kinds.get(0),
-            "the success verdict survives the freeze");
+        assertFalse(kinds.contains(EventKind.TASK_PAUSED), "a decided mission must not be announced as paused");
+        assertEquals(EventKind.TASK_COMPLETED, kinds.get(0), "the success verdict survives the freeze");
 
         // Exactly-once emission across subsequent healthy ticks.
         for (int i = 0; i < 5; i++) {
             controller.onTick(TickGateFixtures.flooredWorld());
         }
-        assertEquals(1, kindsOf(events).size(),
-            "the verdict must be emitted exactly once, ever");
+        assertEquals(1, kindsOf(events).size(), "the verdict must be emitted exactly once, ever");
     }
 
     private static List<String> kindsOf(InMemoryEventQueue events) {
         return events.statusSnapshot(0).events().stream()
-            .map(BotEvent::kind)
-            .filter(k -> k.startsWith("TASK_"))
-            .toList();
+                .map(BotEvent::kind)
+                .filter(k -> k.startsWith("TASK_"))
+                .toList();
     }
 }

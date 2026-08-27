@@ -2,7 +2,6 @@ package com.mcbot.mcbotserver.core.behavior;
 
 import com.mcbot.mcbotserver.api.goal.Goal;
 import com.mcbot.mcbotserver.api.types.CellPos;
-
 import java.util.Objects;
 
 /**
@@ -74,8 +73,7 @@ final class NoPathEscalator {
      */
     NoPathEscalator(int baseBudget) {
         if (baseBudget <= 0) {
-            throw new IllegalArgumentException(
-                "baseBudget must be positive");
+            throw new IllegalArgumentException("baseBudget must be positive");
         }
         this.baseBudget = baseBudget;
     }
@@ -95,8 +93,7 @@ final class NoPathEscalator {
             reset();
             this.goal = goal;
         }
-        double distance =
-            PathingBehavior.anchorCell(goal).distanceTo(terminal);
+        double distance = PathingBehavior.anchorCell(goal).distanceTo(terminal);
         if (distance < bestDistance - IMPROVEMENT_EPSILON) {
             bestDistance = distance;
             witnesses = 0;

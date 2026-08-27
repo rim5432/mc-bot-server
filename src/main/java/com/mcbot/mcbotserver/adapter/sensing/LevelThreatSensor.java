@@ -5,7 +5,6 @@ import com.mcbot.mcbotserver.api.reflex.ThreatSensor;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.EntitySnapshot;
 import com.mcbot.mcbotserver.api.world.WorldView;
-
 import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -28,8 +27,7 @@ public final class LevelThreatSensor implements ThreatSensor {
     /** Scan radius in blocks; matches vanilla hostile awareness scale. */
     public static final double THREAT_RANGE = 16.0;
 
-    private static final Set<String> HOSTILE_TYPES =
-        Set.of(
+    private static final Set<String> HOSTILE_TYPES = Set.of(
             "minecraft:creeper",
             "minecraft:zombie",
             "minecraft:skeleton",
@@ -53,11 +51,7 @@ public final class LevelThreatSensor implements ThreatSensor {
     }
 
     private static final Set<String> RANGED_TYPES =
-        Set.of(
-            "minecraft:skeleton",
-            "minecraft:stray",
-            "minecraft:pillager",
-            "minecraft:witch");
+            Set.of("minecraft:skeleton", "minecraft:stray", "minecraft:pillager", "minecraft:witch");
 
     /**
      * Hostile types whose optimal tactics (kite and shoot) structurally
@@ -105,21 +99,24 @@ public final class LevelThreatSensor implements ThreatSensor {
      *                   unstamped board degrades to the freeze hold
      *                   rather than a dig-at-null
      */
-    public LevelThreatSensor(com.mcbot.mcbotserver.adapter.BindingWorldView
-                                 view,
-                             Supplier<CellPos> bodyPos,
-                             Supplier<Integer> airSupply,
-                             Supplier<Boolean> inLava,
-                             Supplier<Integer> fireTicks,
-                             Supplier<Integer> freezeTicks,
-                             Supplier<Boolean> inWall,
-                             Supplier<CellPos> suffocationBlock) {
-        if (view == null || bodyPos == null || airSupply == null
-                || inLava == null || fireTicks == null
-                || freezeTicks == null || inWall == null
+    public LevelThreatSensor(
+            com.mcbot.mcbotserver.adapter.BindingWorldView view,
+            Supplier<CellPos> bodyPos,
+            Supplier<Integer> airSupply,
+            Supplier<Boolean> inLava,
+            Supplier<Integer> fireTicks,
+            Supplier<Integer> freezeTicks,
+            Supplier<Boolean> inWall,
+            Supplier<CellPos> suffocationBlock) {
+        if (view == null
+                || bodyPos == null
+                || airSupply == null
+                || inLava == null
+                || fireTicks == null
+                || freezeTicks == null
+                || inWall == null
                 || suffocationBlock == null) {
-            throw new IllegalArgumentException(
-                "arguments must not be null");
+            throw new IllegalArgumentException("arguments must not be null");
         }
         this.view = view;
         this.bodyPos = bodyPos;
@@ -149,9 +146,8 @@ public final class LevelThreatSensor implements ThreatSensor {
         }
         board.suffocationBlock = eyeBlock;
         CellPos center = bodyPos.get();
-        List<EntitySnapshot> hits = world.getEntities(
-            center, THREAT_RANGE,
-            com.mcbot.mcbotserver.api.world.ViewMode.LIVE);
+        List<EntitySnapshot> hits =
+                world.getEntities(center, THREAT_RANGE, com.mcbot.mcbotserver.api.world.ViewMode.LIVE);
         EntitySnapshot nearest = null;
         double nearestDist = Double.MAX_VALUE;
         for (EntitySnapshot e : hits) {
@@ -165,7 +161,6 @@ public final class LevelThreatSensor implements ThreatSensor {
             }
         }
         board.nearestThreat = nearest;
-        board.nearestThreatDistance =
-            nearest != null ? nearestDist : Double.MAX_VALUE;
+        board.nearestThreatDistance = nearest != null ? nearestDist : Double.MAX_VALUE;
     }
 }

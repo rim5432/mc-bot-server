@@ -1,7 +1,6 @@
 package com.mcbot.mcbotserver.api.state;
 
 import com.mcbot.mcbotserver.api.types.CellPos;
-
 import java.util.Map;
 
 /**
@@ -39,16 +38,16 @@ import java.util.Map;
  */
 // contract: see boundaries.md Boundary D protocol (state snapshot shape)
 public record BotState(
-    CellPos pos,
-    float yaw,
-    float pitch,
-    String dimension,
-    Map<String, Integer> itemCounts,
-    int selectedHotbarSlot,
-    Map<String, Integer> effectAmplifiers,
-    String currentTaskSummary,
-    int healthHearts,
-    int freeSlots) {
+        CellPos pos,
+        float yaw,
+        float pitch,
+        String dimension,
+        Map<String, Integer> itemCounts,
+        int selectedHotbarSlot,
+        Map<String, Integer> effectAmplifiers,
+        String currentTaskSummary,
+        int healthHearts,
+        int freeSlots) {
 
     /**
      * Creates a validated snapshot.
@@ -69,26 +68,21 @@ public record BotState(
             throw new IllegalArgumentException("pos must not be null");
         }
         if (dimension == null) {
-            throw new IllegalArgumentException(
-                "dimension must not be null");
+            throw new IllegalArgumentException("dimension must not be null");
         }
         itemCounts = Map.copyOf(itemCounts);
         if (healthHearts < 0) {
-            throw new IllegalArgumentException(
-                "healthHearts must not be negative");
+            throw new IllegalArgumentException("healthHearts must not be negative");
         }
         if (freeSlots < 0) {
-            throw new IllegalArgumentException(
-                "freeSlots must not be negative");
+            throw new IllegalArgumentException("freeSlots must not be negative");
         }
         if (selectedHotbarSlot < 0 || selectedHotbarSlot > 8) {
-            throw new IllegalArgumentException(
-                "selectedHotbarSlot must be 0..8");
+            throw new IllegalArgumentException("selectedHotbarSlot must be 0..8");
         }
         effectAmplifiers = Map.copyOf(effectAmplifiers);
         if (currentTaskSummary == null) {
-            throw new IllegalArgumentException(
-                "currentTaskSummary must not be null");
+            throw new IllegalArgumentException("currentTaskSummary must not be null");
         }
     }
 }

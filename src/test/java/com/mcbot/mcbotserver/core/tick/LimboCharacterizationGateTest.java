@@ -1,6 +1,8 @@
 package com.mcbot.mcbotserver.core.tick;
 
-import com.mcbot.mcbotserver.api.actor.Claim;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.process.Directive;
@@ -9,13 +11,7 @@ import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 import com.mcbot.mcbotserver.core.pathing.BasicMoves;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
-
 import org.junit.jupiter.api.Test;
-
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Limbo-characterization gate (issue 0001 §3 branch 2, §7). Pins
@@ -69,12 +65,10 @@ class LimboCharacterizationGateTest {
         // (distance 0.707 from waypoint (1, 0)) - inside the
         // WAYPOINT_REACH band, so the waypoint is consumed
         // quickly. We hold the position XZ=0.5 and let Y fall.
-        Vec3[] position = { new Vec3(0.5, 64, 0.5) };
-        PathingBehavior mover = new PathingBehavior("mover",
-            () -> position[0], BasicMoves::from);
+        Vec3[] position = {new Vec3(0.5, 64, 0.5)};
+        PathingBehavior mover = new PathingBehavior("mover", () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
-        Directive directive = Directive.of(
-            new GoalBlock(new CellPos(40, 64, 0)));
+        Directive directive = Directive.of(new GoalBlock(new CellPos(40, 64, 0)));
 
         // First tick: plan adopted.
         mover.tick(world, directive, actor);
@@ -90,17 +84,13 @@ class LimboCharacterizationGateTest {
         int stuckTick = -1;
         String stuckChannel = null;
         for (int i = 1; i <= 100; i++) {
-            position[0] = new Vec3(position[0].x(),
-                position[0].y() - 0.3, position[0].z());
+            position[0] = new Vec3(position[0].x(), position[0].y() - 0.3, position[0].z());
             ExecutionReport r = mover.tick(world, directive, actor);
-            boolean stuck =
-                r.status() == ExecutionReport.Status.STUCK
-                || (r.status() == ExecutionReport.Status.FAILED
-                    && "STUCK".equals(r.reason()));
+            boolean stuck = r.status() == ExecutionReport.Status.STUCK
+                    || (r.status() == ExecutionReport.Status.FAILED && "STUCK".equals(r.reason()));
             if (stuck) {
                 stuckTick = i;
-                stuckChannel = r.status()
-                    + (r.reason() == null ? "" : "+" + r.reason());
+                stuckChannel = r.status() + (r.reason() == null ? "" : "+" + r.reason());
                 break;
             }
         }
@@ -110,11 +100,12 @@ class LimboCharacterizationGateTest {
         // characterization (inverse assertion, "no STUCK fires")
         // is the diff proof: the same body in pre-fix-4 never
         // sees STUCK at all.
-        assertTrue(stuckTick > 0 && stuckTick <= 21,
-            "plan-progress fuse must fire STUCK within 21 ticks of "
-            + "entering continuous Y motion (limbo); fired at i="
-            + stuckTick + " (" + stuckChannel + "). Form 1 from "
-            + "issue 0001 §7 with K=20 + first-observation +1 offset.");
+        assertTrue(
+                stuckTick > 0 && stuckTick <= 21,
+                "plan-progress fuse must fire STUCK within 21 ticks of "
+                        + "entering continuous Y motion (limbo); fired at i="
+                        + stuckTick + " (" + stuckChannel + "). Form 1 from "
+                        + "issue 0001 §7 with K=20 + first-observation +1 offset.");
     }
 
     /**
@@ -133,12 +124,10 @@ class LimboCharacterizationGateTest {
     @Test
     void restFiresStuckViaPlanProgressFuse() {
         MockWorldView world = MockWorldView.pavedFloor(60);
-        Vec3[] position = { new Vec3(0.5, 64, 0.5) };
-        PathingBehavior mover = new PathingBehavior("mover",
-            () -> position[0], BasicMoves::from);
+        Vec3[] position = {new Vec3(0.5, 64, 0.5)};
+        PathingBehavior mover = new PathingBehavior("mover", () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
-        Directive directive = Directive.of(
-            new GoalBlock(new CellPos(40, 64, 0)));
+        Directive directive = Directive.of(new GoalBlock(new CellPos(40, 64, 0)));
 
         // First tick: plan adopted, sentinel-latch init credits
         // progress (counter reset to 0).
@@ -154,11 +143,13 @@ class LimboCharacterizationGateTest {
                 break;
             }
         }
-        assertEquals(21, stuckTick,
-            "rig sanity: no plan-progress for STUCK_WINDOW ticks "
-            + "must fire STUCK. The +1 over STUCK_WINDOW is the "
-            + "first-observation credit on the outer tick (issue 0001 "
-            + "§Ruling a, Path A initialization). Same offset as the "
-            + "waterfall test, written the same way for the same reason.");
+        assertEquals(
+                21,
+                stuckTick,
+                "rig sanity: no plan-progress for STUCK_WINDOW ticks "
+                        + "must fire STUCK. The +1 over STUCK_WINDOW is the "
+                        + "first-observation credit on the outer tick (issue 0001 "
+                        + "§Ruling a, Path A initialization). Same offset as the "
+                        + "waterfall test, written the same way for the same reason.");
     }
 }

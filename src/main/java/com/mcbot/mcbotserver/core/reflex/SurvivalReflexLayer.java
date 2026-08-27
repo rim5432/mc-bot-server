@@ -6,7 +6,6 @@ import com.mcbot.mcbotserver.api.reflex.ReflexRule;
 import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
 import com.mcbot.mcbotserver.api.reflex.ThreatSensor;
 import com.mcbot.mcbotserver.api.world.WorldView;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -42,14 +41,11 @@ public final class SurvivalReflexLayer {
      * case the controller degrades target-consuming kinds to the
      * freeze hold.
      */
-    public record ReflexDecision(String ruleName, int priority,
-                                 ReflexAction action,
-                                 com.mcbot.mcbotserver.api.types.CellPos
-                                     target) {
+    public record ReflexDecision(
+            String ruleName, int priority, ReflexAction action, com.mcbot.mcbotserver.api.types.CellPos target) {
 
         /** Creates a targetless decision (every kind but DIG). */
-        public ReflexDecision(String ruleName, int priority,
-                              ReflexAction action) {
+        public ReflexDecision(String ruleName, int priority, ReflexAction action) {
             this(ruleName, priority, action, null);
         }
     }
@@ -136,14 +132,16 @@ public final class SurvivalReflexLayer {
      * @return the winning decision, or null when no rule fired and the
      *         mission stage may proceed
      */
-    public ReflexDecision tick(WorldView world, long tickCounter,
-                               long gameDay, long timeOfDayTicks,
-                               com.mcbot.mcbotserver.api.types.CellPos botPos,
-                               float botHealth) {
+    public ReflexDecision tick(
+            WorldView world,
+            long tickCounter,
+            long gameDay,
+            long timeOfDayTicks,
+            com.mcbot.mcbotserver.api.types.CellPos botPos,
+            float botHealth) {
         Objects.requireNonNull(world, "world");
         Objects.requireNonNull(botPos, "botPos");
-        blackboard.beginTick(tickCounter, gameDay, timeOfDayTicks,
-            botPos, botHealth);
+        blackboard.beginTick(tickCounter, gameDay, timeOfDayTicks, botPos, botHealth);
         sensor.sense(world, blackboard);
 
         ReflexDecision winner = null;
@@ -152,27 +150,21 @@ public final class SurvivalReflexLayer {
             boolean shouldFire;
             int effectivePriority;
             if (rule instanceof ReflexHysteresis h) {
-                shouldFire = decideHysteresis(h, rule.name(),
-                    rawPriority);
+                shouldFire = decideHysteresis(h, rule.name(), rawPriority);
                 // When held, the rule still reports as firing but the
                 // raw priority is negative (signal above trigger) -
                 // use the last positive priority we saw so the
                 // arbiter sees a stable number across the hold.
                 effectivePriority = shouldFire
-                    ? (rawPriority > 0
-                        ? rawPriority
-                        : hysteresisState.get(rule.name()).lastPriority)
-                    : -1;
+                        ? (rawPriority > 0 ? rawPriority : hysteresisState.get(rule.name()).lastPriority)
+                        : -1;
             } else {
                 shouldFire = rawPriority > 0;
                 effectivePriority = rawPriority;
             }
-            if (shouldFire
-                    && (winner == null
-                        || effectivePriority > winner.priority())) {
-                winner = new ReflexDecision(rule.name(),
-                    effectivePriority, rule.action(),
-                    rule.actionTarget(blackboard));
+            if (shouldFire && (winner == null || effectivePriority > winner.priority())) {
+                winner = new ReflexDecision(
+                        rule.name(), effectivePriority, rule.action(), rule.actionTarget(blackboard));
             }
         }
         return winner;
@@ -192,10 +184,8 @@ public final class SurvivalReflexLayer {
      *                     fires
      * @return true when the layer should report the rule as firing
      */
-    private boolean decideHysteresis(ReflexHysteresis h, String ruleName,
-                                     int rawPriority) {
-        HysteresisState s = hysteresisState.computeIfAbsent(ruleName,
-            k -> new HysteresisState());
+    private boolean decideHysteresis(ReflexHysteresis h, String ruleName, int rawPriority) {
+        HysteresisState s = hysteresisState.computeIfAbsent(ruleName, k -> new HysteresisState());
         if (rawPriority > 0) {
             s.lastPriority = rawPriority;
         }
@@ -205,9 +195,7 @@ public final class SurvivalReflexLayer {
         // keeps strict < so the deadband spans (trigger, release).
         // computePriority's <= and this state machine must agree -
         // a mismatch would shift the effective trigger by one tick.
-        boolean wantsActive = s.active
-            ? signal < h.releaseThreshold()
-            : signal <= h.triggerThreshold();
+        boolean wantsActive = s.active ? signal < h.releaseThreshold() : signal <= h.triggerThreshold();
         if (wantsActive == s.active) {
             return s.active;
         }

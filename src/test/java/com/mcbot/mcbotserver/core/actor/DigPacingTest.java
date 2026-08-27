@@ -1,15 +1,14 @@
 package com.mcbot.mcbotserver.core.actor;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.types.CellPos;
-
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Dig pacing gates (issue 0009, extended by issue 0007 Phase 1 tool
@@ -51,54 +50,45 @@ class DigPacingTest {
 
     @Test
     void gravelCostsEighteenBareHandTicks() {
-        float perTick = DigPacing.perTickProgress(
-            GRAVEL_DESTROY_SPEED, DigPacing.BARE_HAND_DIG_SPEED,
-            true, true);
+        float perTick = DigPacing.perTickProgress(GRAVEL_DESTROY_SPEED, DigPacing.BARE_HAND_DIG_SPEED, true, true);
         float before = DigPacing.cumulativeProgress(perTick, 17);
         float at = DigPacing.cumulativeProgress(perTick, 18);
-        assertTrue(before < 1.0f,
-            "tick 17 must not complete: " + before);
-        assertTrue(at >= 1.0f,
-            "tick 18 must complete the break: " + at);
+        assertTrue(before < 1.0f, "tick 17 must not complete: " + before);
+        assertTrue(at >= 1.0f, "tick 18 must complete the break: " + at);
     }
 
     @Test
     void stoneWithoutTheToolCostsOneHundredFiftyTicks() {
-        float perTick = DigPacing.perTickProgress(
-            STONE_DESTROY_SPEED, DigPacing.BARE_HAND_DIG_SPEED,
-            false, true);
+        float perTick = DigPacing.perTickProgress(STONE_DESTROY_SPEED, DigPacing.BARE_HAND_DIG_SPEED, false, true);
         assertTrue(DigPacing.cumulativeProgress(perTick, 149) < 1.0f);
-        assertTrue(DigPacing.cumulativeProgress(perTick, 150) >= 1.0f,
-            "the five-times tool penalty is vanilla, not balance");
+        assertTrue(
+                DigPacing.cumulativeProgress(perTick, 150) >= 1.0f,
+                "the five-times tool penalty is vanilla, not balance");
     }
 
     @Test
     void ironPickaxeDigsStoneInAboutEightTicks() {
         // toolSpeed 6.0, correct tool → divisor 30:
         // perTick = 6.0 / 1.5 / 30 = 0.1333; tick 8 = 1.067.
-        float perTick = DigPacing.perTickProgress(
-            STONE_DESTROY_SPEED, IRON_PICKAXE_SPEED, true, true);
-        assertTrue(DigPacing.cumulativeProgress(perTick, 7) < 1.0f,
-            "tick 7 must not complete with iron pickaxe: "
-                + DigPacing.cumulativeProgress(perTick, 7));
-        assertTrue(DigPacing.cumulativeProgress(perTick, 8) >= 1.0f,
-            "tick 8 must complete with iron pickaxe: "
-                + DigPacing.cumulativeProgress(perTick, 8));
+        float perTick = DigPacing.perTickProgress(STONE_DESTROY_SPEED, IRON_PICKAXE_SPEED, true, true);
+        assertTrue(
+                DigPacing.cumulativeProgress(perTick, 7) < 1.0f,
+                "tick 7 must not complete with iron pickaxe: " + DigPacing.cumulativeProgress(perTick, 7));
+        assertTrue(
+                DigPacing.cumulativeProgress(perTick, 8) >= 1.0f,
+                "tick 8 must complete with iron pickaxe: " + DigPacing.cumulativeProgress(perTick, 8));
     }
 
     @Test
     void woodenPickaxeDigsStoneSlowerThanIron() {
         // toolSpeed 2.0, correct tool → divisor 30:
         // perTick = 2.0 / 1.5 / 30 = 0.0444; tick 23 = 1.022.
-        float perTick = DigPacing.perTickProgress(
-            STONE_DESTROY_SPEED, WOODEN_PICKAXE_SPEED, true, true);
+        float perTick = DigPacing.perTickProgress(STONE_DESTROY_SPEED, WOODEN_PICKAXE_SPEED, true, true);
         assertTrue(DigPacing.cumulativeProgress(perTick, 22) < 1.0f);
         assertTrue(DigPacing.cumulativeProgress(perTick, 23) >= 1.0f);
         // Wooden is strictly slower than iron on the same block.
-        float ironPerTick = DigPacing.perTickProgress(
-            STONE_DESTROY_SPEED, IRON_PICKAXE_SPEED, true, true);
-        assertTrue(ironPerTick > perTick,
-            "iron pickaxe must dig faster than wooden");
+        float ironPerTick = DigPacing.perTickProgress(STONE_DESTROY_SPEED, IRON_PICKAXE_SPEED, true, true);
+        assertTrue(ironPerTick > perTick, "iron pickaxe must dig faster than wooden");
     }
 
     @Test
@@ -107,41 +97,36 @@ class DigPacingTest {
         // hasCorrectTool=false → divisor 100. The false case is a
         // low-tier tool on a high-tier block (e.g. wooden pickaxe on
         // obsidian): fast but no drops.
-        float correct = DigPacing.perTickProgress(
-            STONE_DESTROY_SPEED, IRON_PICKAXE_SPEED, true, true);
-        float incorrect = DigPacing.perTickProgress(
-            STONE_DESTROY_SPEED, IRON_PICKAXE_SPEED, false, true);
-        assertEquals(100f / 30f, correct / incorrect, 1e-4f,
-            "correct-tool divisor is 30, incorrect is 100 — "
-                + "the ratio must be 10/3");
+        float correct = DigPacing.perTickProgress(STONE_DESTROY_SPEED, IRON_PICKAXE_SPEED, true, true);
+        float incorrect = DigPacing.perTickProgress(STONE_DESTROY_SPEED, IRON_PICKAXE_SPEED, false, true);
+        assertEquals(
+                100f / 30f,
+                correct / incorrect,
+                1e-4f,
+                "correct-tool divisor is 30, incorrect is 100 — " + "the ratio must be 10/3");
     }
 
     @Test
     void zeroHardnessPopsOnTheFirstTick() {
-        float perTick = DigPacing.perTickProgress(
-            0f, DigPacing.BARE_HAND_DIG_SPEED, true, true);
-        assertTrue(Float.isInfinite(perTick),
-            "digSpeed / 0 is vanilla's insta-mine, and so is ours");
+        float perTick = DigPacing.perTickProgress(0f, DigPacing.BARE_HAND_DIG_SPEED, true, true);
+        assertTrue(Float.isInfinite(perTick), "digSpeed / 0 is vanilla's insta-mine, and so is ours");
         assertTrue(DigPacing.cumulativeProgress(perTick, 1) >= 1.0f);
     }
 
     @Test
     void unbreakableNeverAccumulates() {
-        assertEquals(0f, DigPacing.perTickProgress(
-            -1f, DigPacing.BARE_HAND_DIG_SPEED, true, true),
-            0f, "negative destroy speed means no progress, ever");
+        assertEquals(
+                0f,
+                DigPacing.perTickProgress(-1f, DigPacing.BARE_HAND_DIG_SPEED, true, true),
+                0f,
+                "negative destroy speed means no progress, ever");
     }
 
     @Test
     void airborneDiggingIsFiveTimesSlower() {
-        float grounded = DigPacing.perTickProgress(
-            GRAVEL_DESTROY_SPEED, DigPacing.BARE_HAND_DIG_SPEED,
-            true, true);
-        float airborne = DigPacing.perTickProgress(
-            GRAVEL_DESTROY_SPEED, DigPacing.BARE_HAND_DIG_SPEED,
-            true, false);
-        assertEquals(0.2f, airborne / grounded, 1e-6f,
-            "Player.getDigSpeed divides mid-air speed by 5");
+        float grounded = DigPacing.perTickProgress(GRAVEL_DESTROY_SPEED, DigPacing.BARE_HAND_DIG_SPEED, true, true);
+        float airborne = DigPacing.perTickProgress(GRAVEL_DESTROY_SPEED, DigPacing.BARE_HAND_DIG_SPEED, true, false);
+        assertEquals(0.2f, airborne / grounded, 1e-6f, "Player.getDigSpeed divides mid-air speed by 5");
     }
 
     @Test
@@ -152,12 +137,9 @@ class DigPacingTest {
             // its left edge.
             float f = stage / 10f;
             int observed = DigPacing.stageOf(f + 1e-6f);
-            assertTrue(observed >= stage,
-                "stage " + stage + " must be reachable, got "
-                    + observed);
+            assertTrue(observed >= stage, "stage " + stage + " must be reachable, got " + observed);
         }
-        assertEquals(9, DigPacing.stageOf(0.999f),
-            "a completed dig is a broken block, not crack 10");
+        assertEquals(9, DigPacing.stageOf(0.999f), "a completed dig is a broken block, not crack 10");
         assertEquals(9, DigPacing.stageOf(Float.MAX_VALUE));
     }
 
@@ -169,15 +151,10 @@ class DigPacingTest {
     @Test
     void digIntentPairsOnlyWithTheInteractChannel() {
         CellPos target = new CellPos(0, 64, 0);
-        new Claim(Channel.INTERACT, 10, "test",
-            new Intent.Dig(target));
-        assertThrows(IllegalArgumentException.class,
-            () -> new Claim(Channel.USE, 10, "test",
-                new Intent.Dig(target)));
-        assertThrows(IllegalArgumentException.class,
-            () -> new Claim(Channel.INTERACT, 10, "test",
-                new Intent.Use(true)));
-        assertThrows(IllegalArgumentException.class,
-            () -> new Intent.Dig(null));
+        new Claim(Channel.INTERACT, 10, "test", new Intent.Dig(target));
+        assertThrows(IllegalArgumentException.class, () -> new Claim(Channel.USE, 10, "test", new Intent.Dig(target)));
+        assertThrows(
+                IllegalArgumentException.class, () -> new Claim(Channel.INTERACT, 10, "test", new Intent.Use(true)));
+        assertThrows(IllegalArgumentException.class, () -> new Intent.Dig(null));
     }
 }

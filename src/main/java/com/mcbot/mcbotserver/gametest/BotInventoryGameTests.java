@@ -1,15 +1,21 @@
 package com.mcbot.mcbotserver.gametest;
 
+import static com.mcbot.mcbotserver.gametest.GametestRig.check;
+import static com.mcbot.mcbotserver.gametest.GametestRig.checkEquals;
+import static com.mcbot.mcbotserver.gametest.GametestRig.countItems;
+import static com.mcbot.mcbotserver.gametest.GametestRig.driveOnly;
+import static com.mcbot.mcbotserver.gametest.GametestRig.driveUntil;
+import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
+
 import com.mcbot.mcbotserver.McBotServer;
 import com.mcbot.mcbotserver.adapter.BindingMenu;
 import com.mcbot.mcbotserver.adapter.BotPlayerFacade;
+import com.mcbot.mcbotserver.api.actor.Channel;
+import com.mcbot.mcbotserver.api.actor.Claim;
+import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.menu.MenuClick;
 import com.mcbot.mcbotserver.api.menu.MenuView;
 import com.mcbot.mcbotserver.api.menu.SlotRole;
-import com.mcbot.mcbotserver.api.actor.Claim;
-import com.mcbot.mcbotserver.api.actor.Channel;
-import com.mcbot.mcbotserver.api.actor.Intent;
-
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
@@ -23,13 +29,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
-
-import static com.mcbot.mcbotserver.gametest.GametestRig.check;
-import static com.mcbot.mcbotserver.gametest.GametestRig.checkEquals;
-import static com.mcbot.mcbotserver.gametest.GametestRig.countItems;
-import static com.mcbot.mcbotserver.gametest.GametestRig.driveOnly;
-import static com.mcbot.mcbotserver.gametest.GametestRig.driveUntil;
-import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
 
 /**
  * Inventory and world-container menu acceptance, in-engine: item
@@ -48,8 +47,7 @@ import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
 @PrefixGameTestTemplate(false)
 public final class BotInventoryGameTests {
 
-    private BotInventoryGameTests() {
-    }
+    private BotInventoryGameTests() {}
 
     /**
      * Scenario: the DropSelected intent on the INTERACT channel spawns
@@ -74,43 +72,39 @@ public final class BotInventoryGameTests {
         var level = helper.getLevel();
 
         // Put 16 diamonds in hotbar slot 0 (the default selected slot).
-        rig.body().getInventory().container().setItem(0,
-            new ItemStack(Items.DIAMOND, 16));
-        checkEquals(16, rig.body().getInventory().container()
-            .getItem(0).getCount(), "setup: 16 diamonds in slot 0");
+        rig.body().getInventory().container().setItem(0, new ItemStack(Items.DIAMOND, 16));
+        checkEquals(16, rig.body().getInventory().container().getItem(0).getCount(), "setup: 16 diamonds in slot 0");
 
         // Submit the drop claim. Priority 200 beats any reflex or
         // behavior that might contest INTERACT (none should in an idle
         // body, but the high priority is defensive).
-        rig.actor().submit(new Claim(Channel.INTERACT, 200, "gt-drop",
-            new Intent.DropSelected(true)));
+        rig.actor().submit(new Claim(Channel.INTERACT, 200, "gt-drop", new Intent.DropSelected(true)));
 
         helper.startSequence()
-            // First driveTick fires the drop; subsequent ticks let the
-            // ItemEntity appear in getEntitiesOfClass (spawnAtLocation
-            // registers it immediately, but the entity tick may take one
-            // cycle to be visible).
-            .thenWaitUntil(driveUntil(rig, () -> {
-                var items = level.getEntitiesOfClass(ItemEntity.class,
-                    rig.body().getBoundingBox().inflate(3.0));
-                check(!items.isEmpty(),
-                    "an ItemEntity must spawn after DropSelected");
-            }))
-            .thenExecuteAfter(0, () -> {
-                var items = level.getEntitiesOfClass(ItemEntity.class,
-                    rig.body().getBoundingBox().inflate(3.0));
-                ItemEntity dropped = items.get(0);
-                check(Items.DIAMOND.equals(dropped.getItem().getItem()),
-                    "the dropped item must be a diamond, got "
-                        + dropped.getItem().getItem());
-                checkEquals(16, dropped.getItem().getCount(),
-                    "full-stack drop must spawn all 16 diamonds");
-                check(rig.body().getInventory().container()
-                    .getItem(0).isEmpty(),
-                    "the source slot must be empty after a full-stack drop");
-                rig.body().discard();
-            })
-            .thenSucceed();
+                // First driveTick fires the drop; subsequent ticks let the
+                // ItemEntity appear in getEntitiesOfClass (spawnAtLocation
+                // registers it immediately, but the entity tick may take one
+                // cycle to be visible).
+                .thenWaitUntil(driveUntil(rig, () -> {
+                    var items = level.getEntitiesOfClass(
+                            ItemEntity.class, rig.body().getBoundingBox().inflate(3.0));
+                    check(!items.isEmpty(), "an ItemEntity must spawn after DropSelected");
+                }))
+                .thenExecuteAfter(0, () -> {
+                    var items = level.getEntitiesOfClass(
+                            ItemEntity.class, rig.body().getBoundingBox().inflate(3.0));
+                    ItemEntity dropped = items.get(0);
+                    check(
+                            Items.DIAMOND.equals(dropped.getItem().getItem()),
+                            "the dropped item must be a diamond, got "
+                                    + dropped.getItem().getItem());
+                    checkEquals(16, dropped.getItem().getCount(), "full-stack drop must spawn all 16 diamonds");
+                    check(
+                            rig.body().getInventory().container().getItem(0).isEmpty(),
+                            "the source slot must be empty after a full-stack drop");
+                    rig.body().discard();
+                })
+                .thenSucceed();
     }
 
     /**
@@ -137,14 +131,11 @@ public final class BotInventoryGameTests {
         // Template-local coords must read through the helper - a raw
         // level read would interpret them as absolute world position
         // and answer with whatever sits outside the test box.
-        check(helper.getBlockState(placePos).isAir(),
-            "setup: placement cell must be air before the test");
+        check(helper.getBlockState(placePos).isAir(), "setup: placement cell must be air before the test");
 
         // Give the bot 16 stone in the selected hotbar slot (slot 0).
-        rig.body().getInventory().container().setItem(0,
-            new ItemStack(Items.STONE, 16));
-        checkEquals(16, rig.body().getInventory().container()
-            .getItem(0).getCount(), "setup: 16 stone in slot 0");
+        rig.body().getInventory().container().setItem(0, new ItemStack(Items.STONE, 16));
+        checkEquals(16, rig.body().getInventory().container().getItem(0).getCount(), "setup: 16 stone in slot 0");
 
         // Intents carry WORLD-absolute cells - the adapter reads them
         // straight out of the level, and its reach gate measures real
@@ -154,36 +145,40 @@ public final class BotInventoryGameTests {
         // Phase 1 executor.
         BlockPos absTarget = helper.absolutePos(target);
         var hit = new com.mcbot.mcbotserver.api.types.Vec3(
-            absTarget.getX() + 0.5, absTarget.getY() + 1.0,
-            absTarget.getZ() + 0.5);
+                absTarget.getX() + 0.5, absTarget.getY() + 1.0, absTarget.getZ() + 0.5);
 
         // Submit the place claim and drive one tick so the actor flushes
         // and the rising-edge gate fires.
-        rig.actor().submit(new Claim(Channel.INTERACT, 200, "gt-place",
-            new Intent.InteractBlock(
-                new com.mcbot.mcbotserver.api.types.CellPos(
-                    absTarget.getX(), absTarget.getY(), absTarget.getZ()),
-                com.mcbot.mcbotserver.api.types.Direction.UP,
-                hit)));
+        rig.actor()
+                .submit(new Claim(
+                        Channel.INTERACT,
+                        200,
+                        "gt-place",
+                        new Intent.InteractBlock(
+                                new com.mcbot.mcbotserver.api.types.CellPos(
+                                        absTarget.getX(), absTarget.getY(), absTarget.getZ()),
+                                com.mcbot.mcbotserver.api.types.Direction.UP,
+                                hit)));
         driveOnly(rig).run();
 
         helper.startSequence()
-            // The block placement is synchronous inside the tick (setBlock
-            // is immediate), but the item shrink and the level state may
-            // take one cycle to settle in getBlockState.
-            .thenWaitUntil(driveUntil(rig, () -> {
-                check(
-                    helper.getBlockState(placePos).is(Blocks.STONE),
-                    "a stone block must be placed above the dirt target, "
-                        + "got " + helper.getBlockState(placePos));
-            }))
-            .thenExecuteAfter(0, () -> {
-                checkEquals(15, rig.body().getInventory().container()
-                    .getItem(0).getCount(),
-                    "the source stack must shrink by one after placement");
-                rig.body().discard();
-            })
-            .thenSucceed();
+                // The block placement is synchronous inside the tick (setBlock
+                // is immediate), but the item shrink and the level state may
+                // take one cycle to settle in getBlockState.
+                .thenWaitUntil(driveUntil(rig, () -> {
+                    check(
+                            helper.getBlockState(placePos).is(Blocks.STONE),
+                            "a stone block must be placed above the dirt target, " + "got "
+                                    + helper.getBlockState(placePos));
+                }))
+                .thenExecuteAfter(0, () -> {
+                    checkEquals(
+                            15,
+                            rig.body().getInventory().container().getItem(0).getCount(),
+                            "the source stack must shrink by one after placement");
+                    rig.body().discard();
+                })
+                .thenSucceed();
     }
 
     /**
@@ -210,40 +205,39 @@ public final class BotInventoryGameTests {
         // index 9 = InventoryMenu slot 9). Hotbar stays empty.
         final int BACKPACK_MENU_SLOT = 9;
         final int HOTBAR0_MENU_SLOT = 36;
-        rig.body().getInventory().container().setItem(9,
-            new ItemStack(Items.DIAMOND, 8));
-        checkEquals(8, rig.body().getInventory().container()
-            .getItem(9).getCount(), "setup: 8 diamonds in backpack slot 9");
-        check(rig.body().getInventory().container().getItem(0).isEmpty(),
-            "setup: hotbar 0 must be empty");
+        rig.body().getInventory().container().setItem(9, new ItemStack(Items.DIAMOND, 8));
+        checkEquals(
+                8, rig.body().getInventory().container().getItem(9).getCount(), "setup: 8 diamonds in backpack slot 9");
+        check(rig.body().getInventory().container().getItem(0).isEmpty(), "setup: hotbar 0 must be empty");
 
         // Open the inventory menu through the facade.
         var facade = new BotPlayerFacade(rig.body());
         facade.syncPosition();
-        var menu = new BindingMenu(facade.facadeInventoryMenu(),
-            facade, "inventory", null);
+        var menu = new BindingMenu(facade.facadeInventoryMenu(), facade, "inventory", null);
 
         // Pick up: left-click the backpack slot. This goes through
         // Slot.tryRemove → Slot.remove → container.removeItem — the
         // phantom-compartment path that was broken before the override.
         menu.click(BACKPACK_MENU_SLOT, 0, MenuClick.PICKUP);
-        checkEquals("minecraft:diamond", menu.snapshot().carried().itemId(),
-            "after pickup: carried must be diamonds (removeItem must "
-                + "read the binding container, not the phantom super list)");
-        checkEquals(8, menu.snapshot().carried().count(),
-            "after pickup: carried must be all 8 diamonds");
-        check(rig.body().getInventory().container().getItem(9).isEmpty(),
-            "after pickup: backpack slot 9 must be empty (removeItem "
-                + "must have removed from the binding container)");
+        checkEquals(
+                "minecraft:diamond",
+                menu.snapshot().carried().itemId(),
+                "after pickup: carried must be diamonds (removeItem must "
+                        + "read the binding container, not the phantom super list)");
+        checkEquals(8, menu.snapshot().carried().count(), "after pickup: carried must be all 8 diamonds");
+        check(
+                rig.body().getInventory().container().getItem(9).isEmpty(),
+                "after pickup: backpack slot 9 must be empty (removeItem "
+                        + "must have removed from the binding container)");
 
         // Place: left-click hotbar 0. This goes through setByPlayer →
         // setItem (the path that always worked).
         menu.click(HOTBAR0_MENU_SLOT, 0, MenuClick.PICKUP);
-        check(menu.snapshot().carried().isEmpty(),
-            "after place: carried must be empty");
-        checkEquals(8, rig.body().getInventory().container()
-            .getItem(0).getCount(),
-            "after place: hotbar 0 must hold 8 diamonds");
+        check(menu.snapshot().carried().isEmpty(), "after place: carried must be empty");
+        checkEquals(
+                8,
+                rig.body().getInventory().container().getItem(0).getCount(),
+                "after place: hotbar 0 must hold 8 diamonds");
 
         rig.body().discard();
         helper.succeed();
@@ -270,9 +264,9 @@ public final class BotInventoryGameTests {
         var opener = new com.mcbot.mcbotserver.adapter.MenuOpener(facade);
         var menuOpt = opener.open(chestAbs);
 
-        check(menuOpt.isEmpty(),
-            "menu opener must return empty for a chest 8 blocks away "
-                + "(beyond 4.5 block reach)");
+        check(
+                menuOpt.isEmpty(),
+                "menu opener must return empty for a chest 8 blocks away " + "(beyond 4.5 block reach)");
 
         rig.body().discard();
         helper.succeed();
@@ -309,8 +303,9 @@ public final class BotInventoryGameTests {
         } catch (IllegalStateException expected) {
             threw = true;
         }
-        check(threw, "clicking a chest menu from beyond keep-open range "
-            + "must throw, not silently act on the container");
+        check(
+                threw,
+                "clicking a chest menu from beyond keep-open range " + "must throw, not silently act on the container");
 
         // close is the terminal cleanup path and stays usable.
         menu.close();
@@ -343,22 +338,19 @@ public final class BotInventoryGameTests {
         // 9 diamonds into the table grid.
         var rawMenu = tableMenu.rawMenu();
         net.minecraft.world.inventory.CraftingContainer craftSlots =
-            (net.minecraft.world.inventory.CraftingContainer)
-                rawMenu.slots.get(1).container;
+                (net.minecraft.world.inventory.CraftingContainer) rawMenu.slots.get(1).container;
         for (int i = 0; i < 9; i++) {
             craftSlots.setItem(i, new ItemStack(Items.DIAMOND, 1));
         }
 
         var chestMenu = opener.open(chestAbs).orElseThrow();
-        checkEquals("chest", chestMenu.snapshot().type(),
-            "the second open must yield the chest menu");
+        checkEquals("chest", chestMenu.snapshot().type(), "the second open must yield the chest menu");
 
-        checkEquals(9, countItems(rig, Items.DIAMOND),
-            "opening the chest must return the table-grid diamonds");
+        checkEquals(9, countItems(rig, Items.DIAMOND), "opening the chest must return the table-grid diamonds");
         for (int i = 0; i < 9; i++) {
-            check(craftSlots.getItem(i).isEmpty(),
-                "table grid slot " + i + " must be empty after the "
-                    + "menu was closed by the next open");
+            check(
+                    craftSlots.getItem(i).isEmpty(),
+                    "table grid slot " + i + " must be empty after the " + "menu was closed by the next open");
         }
 
         boolean threw = false;
@@ -367,8 +359,7 @@ public final class BotInventoryGameTests {
         } catch (IllegalStateException expected) {
             threw = true;
         }
-        check(threw, "clicking a binding displaced by a newer menu "
-            + "must throw (terminal state)");
+        check(threw, "clicking a binding displaced by a newer menu " + "must throw (terminal state)");
 
         rig.body().discard();
         helper.succeed();
@@ -386,12 +377,14 @@ public final class BotInventoryGameTests {
         var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
 
         // A west-east pair facing north: LEFT at x=6 connects east.
-        BlockState left = Blocks.CHEST.defaultBlockState()
-            .setValue(ChestBlock.FACING, Direction.NORTH)
-            .setValue(ChestBlock.TYPE, ChestType.LEFT);
-        BlockState right = Blocks.CHEST.defaultBlockState()
-            .setValue(ChestBlock.FACING, Direction.NORTH)
-            .setValue(ChestBlock.TYPE, ChestType.RIGHT);
+        BlockState left = Blocks.CHEST
+                .defaultBlockState()
+                .setValue(ChestBlock.FACING, Direction.NORTH)
+                .setValue(ChestBlock.TYPE, ChestType.LEFT);
+        BlockState right = Blocks.CHEST
+                .defaultBlockState()
+                .setValue(ChestBlock.FACING, Direction.NORTH)
+                .setValue(ChestBlock.TYPE, ChestType.RIGHT);
         BlockPos leftLocal = new BlockPos(6, GametestRig.WALK_Y, 8);
         BlockPos rightLocal = new BlockPos(7, GametestRig.WALK_Y, 8);
         helper.setBlock(leftLocal, left);
@@ -399,23 +392,19 @@ public final class BotInventoryGameTests {
 
         // Setup guard: neighbor updates must not have collapsed the
         // pair back to singles — otherwise the test proves nothing.
-        check(helper.getLevel().getBlockState(
-                helper.absolutePos(leftLocal))
-                .getValue(ChestBlock.TYPE) != ChestType.SINGLE,
-            "setup: the left half must stay a double-chest half");
+        check(
+                helper.getLevel().getBlockState(helper.absolutePos(leftLocal)).getValue(ChestBlock.TYPE)
+                        != ChestType.SINGLE,
+                "setup: the left half must stay a double-chest half");
 
         var actor = rig.actor();
         BlockPos leftAbs = helper.absolutePos(leftLocal);
-        var view = actor.openMenu(new com.mcbot.mcbotserver.api.types
-            .CellPos(leftAbs.getX(), leftAbs.getY(), leftAbs.getZ()));
-        check(view != null,
-            "opening either half of a double chest must succeed");
-        checkEquals(54, containerSlotsOf(view),
-            "a double chest must expose all 54 container slots");
-        checkEquals(SlotRole.CONTAINER, view.slot(53).role(),
-            "slot 53 (last chest slot) must be CONTAINER");
-        checkEquals(SlotRole.MAIN, view.slot(54).role(),
-            "slot 54 (first player slot) must be MAIN");
+        var view = actor.openMenu(
+                new com.mcbot.mcbotserver.api.types.CellPos(leftAbs.getX(), leftAbs.getY(), leftAbs.getZ()));
+        check(view != null, "opening either half of a double chest must succeed");
+        checkEquals(54, containerSlotsOf(view), "a double chest must expose all 54 container slots");
+        checkEquals(SlotRole.CONTAINER, view.slot(53).role(), "slot 53 (last chest slot) must be CONTAINER");
+        checkEquals(SlotRole.MAIN, view.slot(54).role(), "slot 54 (first player slot) must be MAIN");
         actor.closeMenu();
 
         rig.body().discard();
@@ -437,14 +426,12 @@ public final class BotInventoryGameTests {
         helper.setBlock(chestLocal, Blocks.CHEST);
         BlockPos chestAbs = helper.absolutePos(chestLocal);
 
-        rig.body().getInventory().container().setItem(0,
-            new ItemStack(Items.DIAMOND, 32));
+        rig.body().getInventory().container().setItem(0, new ItemStack(Items.DIAMOND, 32));
 
         var actor = rig.actor();
         var view = actor.openMenu(cellOf(chestAbs));
         check(view != null, "the chest must open");
-        checkEquals(27, containerSlotsOf(view),
-            "a single chest exposes 27 container slots");
+        checkEquals(27, containerSlotsOf(view), "a single chest exposes 27 container slots");
 
         // Role-based addressing: hotbar 0 is the FIRST HOTBAR-role
         // slot - its flat index differs per menu kind (54 here, 37 in
@@ -452,28 +439,24 @@ public final class BotInventoryGameTests {
         // the harness must never re-derive.
         int hotbar0 = firstSlotWithRole(view, SlotRole.HOTBAR);
         view = actor.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
-        checkEquals(32, view.slot(0).item().count(),
-            "the chest's first slot must hold the 32 diamonds");
-        check(view.slot(hotbar0).isEmpty(),
-            "hotbar 0 must be empty after the quick-move");
+        checkEquals(32, view.slot(0).item().count(), "the chest's first slot must hold the 32 diamonds");
+        check(view.slot(hotbar0).isEmpty(), "hotbar 0 must be empty after the quick-move");
         actor.closeMenu();
 
         // Reopen: the deposit survived the close (real block entity).
         view = actor.openMenu(cellOf(chestAbs));
-        checkEquals(32, view.slot(0).item().count(),
-            "the deposit must survive close and reopen");
+        checkEquals(32, view.slot(0).item().count(), "the deposit must survive close and reopen");
         hotbar0 = firstSlotWithRole(view, SlotRole.HOTBAR);
         view = actor.menuClick(0, 0, MenuClick.PICKUP);
-        checkEquals(32, view.carried().count(),
-            "the pickup must lift all 32 diamonds");
+        checkEquals(32, view.carried().count(), "the pickup must lift all 32 diamonds");
         view = actor.menuClick(hotbar0, 0, MenuClick.PICKUP);
-        check(view.carried().isEmpty(),
-            "the stack must land back in hotbar 0");
+        check(view.carried().isEmpty(), "the stack must land back in hotbar 0");
         actor.closeMenu();
 
-        checkEquals(32, rig.body().getInventory().container()
-            .getItem(0).getCount(),
-            "hotbar 0 must hold the 32 diamonds again");
+        checkEquals(
+                32,
+                rig.body().getInventory().container().getItem(0).getCount(),
+                "hotbar 0 must hold the 32 diamonds again");
 
         rig.body().discard();
         helper.succeed();
@@ -502,39 +485,40 @@ public final class BotInventoryGameTests {
         // Inventory-menu layout: armor slots 5-8 (5=head, 8=feet),
         // hotbar slots 36-44 (hotbar 0 = menu 36, hotbar 1 = 37).
         menu.click(36, 0, MenuClick.PICKUP);
-        checkEquals("minecraft:diamond_helmet",
-            menu.snapshot().carried().itemId(),
-            "pickup must lift the helmet from hotbar 0");
+        checkEquals(
+                "minecraft:diamond_helmet",
+                menu.snapshot().carried().itemId(),
+                "pickup must lift the helmet from hotbar 0");
         menu.click(5, 0, MenuClick.PICKUP);
-        check(menu.snapshot().carried().isEmpty(),
-            "the helmet must land on the head armor slot");
+        check(menu.snapshot().carried().isEmpty(), "the helmet must land on the head armor slot");
         menu.click(37, 0, MenuClick.PICKUP);
         menu.click(8, 0, MenuClick.PICKUP);
-        check(menu.snapshot().carried().isEmpty(),
-            "the boots must land on the feet armor slot");
+        check(menu.snapshot().carried().isEmpty(), "the boots must land on the feet armor slot");
 
-        check(Items.DIAMOND_HELMET.equals(container.getItem(36).getItem()),
-            "head storage (binding 36) must hold the helmet");
-        check(Items.DIAMOND_BOOTS.equals(container.getItem(39).getItem()),
-            "feet storage (binding 39) must hold the boots");
+        check(
+                Items.DIAMOND_HELMET.equals(container.getItem(36).getItem()),
+                "head storage (binding 36) must hold the helmet");
+        check(
+                Items.DIAMOND_BOOTS.equals(container.getItem(39).getItem()),
+                "feet storage (binding 39) must hold the boots");
 
         var view = rig.body().getInventory().snapshot();
-        checkEquals("minecraft:diamond_helmet",
-            view.armor().get(0).itemId(),
-            "InventoryView armor[0] (head) must report the helmet");
-        checkEquals("minecraft:diamond_boots",
-            view.armor().get(3).itemId(),
-            "InventoryView armor[3] (feet) must report the boots");
+        checkEquals(
+                "minecraft:diamond_helmet",
+                view.armor().get(0).itemId(),
+                "InventoryView armor[0] (head) must report the helmet");
+        checkEquals(
+                "minecraft:diamond_boots",
+                view.armor().get(3).itemId(),
+                "InventoryView armor[3] (feet) must report the boots");
 
         menu.close();
         rig.body().discard();
         helper.succeed();
     }
 
-    private static com.mcbot.mcbotserver.api.types.CellPos cellOf(
-            BlockPos abs) {
-        return new com.mcbot.mcbotserver.api.types.CellPos(abs.getX(),
-            abs.getY(), abs.getZ());
+    private static com.mcbot.mcbotserver.api.types.CellPos cellOf(BlockPos abs) {
+        return new com.mcbot.mcbotserver.api.types.CellPos(abs.getX(), abs.getY(), abs.getZ());
     }
 
     /** Count of CONTAINER-role slots in a menu snapshot (the opened

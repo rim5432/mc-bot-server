@@ -8,7 +8,6 @@ import com.mcbot.mcbotserver.api.world.BlockSnapshot;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
-
 import java.util.List;
 
 /**
@@ -22,8 +21,7 @@ import java.util.List;
  */
 final class TickGateFixtures {
 
-    private TickGateFixtures() {
-    }
+    private TickGateFixtures() {}
 
     /**
      * Canonical controller wiring for the pipeline gates: survival
@@ -39,26 +37,33 @@ final class TickGateFixtures {
      * @param events   event queue assertions drain; must not be null
      * @return the wired controller, never null
      */
-    static BotController controller(float[] health,
-                                    SurvivalReflexLayer layer,
-                                    TaskArbiter arbiter,
-                                    Behavior behavior,
-                                    Actor actor,
-                                    EventQueue events) {
-        return new BotController(layer, arbiter, List.of(behavior),
-            actor, () -> new CellPos(0, 64, 0), () -> health[0],
-            new BotController.GameClock() {
-                @Override
-                public long day() {
-                    return 1L;
-                }
+    static BotController controller(
+            float[] health,
+            SurvivalReflexLayer layer,
+            TaskArbiter arbiter,
+            Behavior behavior,
+            Actor actor,
+            EventQueue events) {
+        return new BotController(
+                layer,
+                arbiter,
+                List.of(behavior),
+                actor,
+                () -> new CellPos(0, 64, 0),
+                () -> health[0],
+                new BotController.GameClock() {
+                    @Override
+                    public long day() {
+                        return 1L;
+                    }
 
-                @Override
-                public long timeOfDayTicks() {
-                    return 6000L;
-                }
-            }, events, ctx -> {
-            });
+                    @Override
+                    public long timeOfDayTicks() {
+                        return 6000L;
+                    }
+                },
+                events,
+                ctx -> {});
     }
 
     /**
@@ -71,9 +76,7 @@ final class TickGateFixtures {
         MockWorldView world = new MockWorldView();
         for (int x = 0; x <= 60; x++) {
             for (int z = -2; z <= 12; z++) {
-                world.putBlock(new BlockSnapshot(
-                    new CellPos(x, 63, z),
-                    "minecraft:smooth_stone"));
+                world.putBlock(new BlockSnapshot(new CellPos(x, 63, z), "minecraft:smooth_stone"));
             }
         }
         return world;

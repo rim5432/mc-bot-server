@@ -21,11 +21,7 @@ import java.util.List;
  *                      in-memory queue has been wiped
  */
 // contract: see boundaries.md Boundary D protocol (event stream shape)
-public record EventBatch(
-    List<BotEvent> events,
-    int droppedCount,
-    long latestEventId,
-    long resetAt) {
+public record EventBatch(List<BotEvent> events, int droppedCount, long latestEventId, long resetAt) {
 
     /**
      * Creates a validated batch view.
@@ -38,8 +34,7 @@ public record EventBatch(
     public EventBatch {
         events = List.copyOf(events);
         if (droppedCount < 0) {
-            throw new IllegalArgumentException(
-                "droppedCount must not be negative");
+            throw new IllegalArgumentException("droppedCount must not be negative");
         }
         if (resetAt < 1) {
             throw new IllegalArgumentException("resetAt starts at 1");
@@ -75,7 +70,6 @@ public record EventBatch(
                 kept.add(event);
             }
         }
-        return new EventBatch(kept, droppedCount, latestEventId,
-            resetAt);
+        return new EventBatch(kept, droppedCount, latestEventId, resetAt);
     }
 }

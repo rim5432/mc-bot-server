@@ -32,8 +32,7 @@ import com.mcbot.mcbotserver.api.types.CellPos;
  * the freeze hold (missing data must not mint a dig-at-null).
  */
 // contract: see ADR-0003 section 2 (rules are data rows over the board)
-public final class DigOnSuffocationRule
-        implements ReflexRule, ReflexHysteresis {
+public final class DigOnSuffocationRule implements ReflexRule, ReflexHysteresis {
 
     /**
      * Flat firing priority; between SURFACE (110) and LAVA (130) -
@@ -75,8 +74,7 @@ public final class DigOnSuffocationRule
      */
     public DigOnSuffocationRule(int priority) {
         if (priority <= 0) {
-            throw new IllegalArgumentException(
-                "priority must be positive");
+            throw new IllegalArgumentException("priority must be positive");
         }
         this.priority = priority;
     }

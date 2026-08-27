@@ -1,5 +1,9 @@
 package com.mcbot.mcbotserver.core.tick;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
@@ -14,12 +18,7 @@ import com.mcbot.mcbotserver.core.reflex.DigOnSuffocationRule;
 import com.mcbot.mcbotserver.core.reflex.SurfaceOnLowAirRule;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
-
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Reflex claim-shape gate: the non-freeze action kinds map to the
@@ -43,19 +42,16 @@ class TickReflexActionGateTest {
     void lowAirReflexHoldsJumpInsteadOfHalting() {
         float[] health = {20f};
         int[] air = {ThreatBlackboard.MAX_AIR_SUPPLY};
-        SurvivalReflexLayer layer = new SurvivalReflexLayer(
-            (world, board) -> board.airSupply = air[0]);
+        SurvivalReflexLayer layer = new SurvivalReflexLayer((world, board) -> board.airSupply = air[0]);
         layer.addRule(new SurfaceOnLowAirRule());
         TaskArbiter arbiter = new TaskArbiter();
         CountingMission mission = new CountingMission();
         arbiter.register(mission);
         arbiter.requestControl(mission);
         PipelineActor actor = new PipelineActor();
-        PathingBehavior mover = new PathingBehavior("mover",
-            () -> new Vec3(0.5, 64, 0.5), BasicMoves::from);
-        var controller = TickGateFixtures.controller(health, layer,
-            arbiter, mover, actor,
-            new InMemoryEventQueue(() -> 1L, () -> 0L));
+        PathingBehavior mover = new PathingBehavior("mover", () -> new Vec3(0.5, 64, 0.5), BasicMoves::from);
+        var controller = TickGateFixtures.controller(
+                health, layer, arbiter, mover, actor, new InMemoryEventQueue(() -> 1L, () -> 0L));
         MockWorldView world = TickGateFixtures.flooredWorld();
         controller.onTick(world);
 
@@ -65,12 +61,10 @@ class TickReflexActionGateTest {
 
         Claim move = actor.lastClaim(Channel.MOVE);
         assertNotNull(move);
-        assertTrue(move.holder().startsWith("reflex:"),
-            "ascend claim must come from the reflex");
-        assertTrue(move.intent() instanceof Intent.Move hold
-                && hold.jump(),
-            "drowning reflex must hold jump, not halt: "
-                + move.intent());
+        assertTrue(move.holder().startsWith("reflex:"), "ascend claim must come from the reflex");
+        assertTrue(
+                move.intent() instanceof Intent.Move hold && hold.jump(),
+                "drowning reflex must hold jump, not halt: " + move.intent());
     }
 
     /**
@@ -85,20 +79,16 @@ class TickReflexActionGateTest {
         float[] health = {20f};
         boolean[] inWall = {false};
         CellPos[] eyeBlock = {null};
-        SurvivalReflexLayer layer = new SurvivalReflexLayer(
-            (world, board) -> {
-                board.inWall = inWall[0];
-                board.suffocationBlock =
-                    inWall[0] ? eyeBlock[0] : null;
-            });
+        SurvivalReflexLayer layer = new SurvivalReflexLayer((world, board) -> {
+            board.inWall = inWall[0];
+            board.suffocationBlock = inWall[0] ? eyeBlock[0] : null;
+        });
         layer.addRule(new DigOnSuffocationRule());
         TaskArbiter arbiter = new TaskArbiter();
         PipelineActor actor = new PipelineActor();
-        PathingBehavior mover = new PathingBehavior("mover",
-            () -> new Vec3(0.5, 64, 0.5), BasicMoves::from);
-        var controller = TickGateFixtures.controller(health, layer,
-            arbiter, mover, actor,
-            new InMemoryEventQueue(() -> 1L, () -> 0L));
+        PathingBehavior mover = new PathingBehavior("mover", () -> new Vec3(0.5, 64, 0.5), BasicMoves::from);
+        var controller = TickGateFixtures.controller(
+                health, layer, arbiter, mover, actor, new InMemoryEventQueue(() -> 1L, () -> 0L));
 
         CellPos target = new CellPos(0, 65, 0);
         inWall[0] = true;
@@ -107,22 +97,18 @@ class TickReflexActionGateTest {
 
         Claim move = actor.lastClaim(Channel.MOVE);
         assertNotNull(move);
-        assertTrue(move.holder().startsWith("reflex:"),
-            "hold claim must come from the reflex");
-        assertTrue(move.intent() instanceof Intent.Move hold
-                && !hold.jump() && hold.forward() == 0,
-            "the dig runs standing still: " + move.intent());
+        assertTrue(move.holder().startsWith("reflex:"), "hold claim must come from the reflex");
+        assertTrue(
+                move.intent() instanceof Intent.Move hold && !hold.jump() && hold.forward() == 0,
+                "the dig runs standing still: " + move.intent());
         Claim rot = actor.lastClaim(Channel.ROT);
-        assertNotNull(rot,
-            "the reflex must aim at the dig target");
+        assertNotNull(rot, "the reflex must aim at the dig target");
         assertTrue(rot.intent() instanceof Intent.Look);
         Claim interact = actor.lastClaim(Channel.INTERACT);
-        assertNotNull(interact,
-            "the reflex must hold the dig claim");
-        assertTrue(interact.intent() instanceof Intent.Dig d
-                && d.target().equals(target),
-            "the dig claim names the eye block: "
-                + interact.intent());
+        assertNotNull(interact, "the reflex must hold the dig claim");
+        assertTrue(
+                interact.intent() instanceof Intent.Dig d && d.target().equals(target),
+                "the dig claim names the eye block: " + interact.intent());
 
         // Targetless degrade: vital without position keeps the hold
         // but must not mint a dig-at-null.
@@ -130,7 +116,6 @@ class TickReflexActionGateTest {
         eyeBlock[0] = null;
         controller.onTick(new MockWorldView());
         assertNotNull(actor.lastClaim(Channel.MOVE));
-        assertNull(actor.lastClaim(Channel.INTERACT),
-            "a targetless DIG degrades to the freeze hold");
+        assertNull(actor.lastClaim(Channel.INTERACT), "a targetless DIG degrades to the freeze hold");
     }
 }

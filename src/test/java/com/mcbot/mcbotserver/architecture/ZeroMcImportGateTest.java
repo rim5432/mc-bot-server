@@ -1,5 +1,9 @@
 package com.mcbot.mcbotserver.architecture;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -7,12 +11,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
-
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Layer-1 architecture gate: {@code api/} and {@code core/} must never
@@ -47,22 +46,17 @@ class ZeroMcImportGateTest {
         Path projectRoot = findProjectRoot();
         List<String> violations = new ArrayList<>();
         for (String pkg : new String[] {"api", "core"}) {
-            Path pkgDir = projectRoot.resolve(
-                "src/main/java/com/mcbot/mcbotserver/" + pkg);
-            assertTrue(Files.isDirectory(pkgDir),
-                () -> "expected package dir to exist: " + pkgDir);
+            Path pkgDir = projectRoot.resolve("src/main/java/com/mcbot/mcbotserver/" + pkg);
+            assertTrue(Files.isDirectory(pkgDir), () -> "expected package dir to exist: " + pkgDir);
             scanTree(pkgDir, violations);
         }
-        assertEquals(List.of(), violations,
-            "MC imports leaked into the pure-Java trees:\n"
-                + String.join("\n", violations));
+        assertEquals(
+                List.of(), violations, "MC imports leaked into the pure-Java trees:\n" + String.join("\n", violations));
     }
 
-    private void scanTree(Path root, List<String> violations)
-            throws IOException {
+    private void scanTree(Path root, List<String> violations) throws IOException {
         try (Stream<Path> paths = Files.walk(root)) {
-            paths.filter(p -> p.toString().endsWith(".java"))
-                .forEach(p -> scanFile(p, violations));
+            paths.filter(p -> p.toString().endsWith(".java")).forEach(p -> scanFile(p, violations));
         }
     }
 
@@ -78,8 +72,7 @@ class ZeroMcImportGateTest {
             String trimmed = lines.get(i).trim();
             for (String forbidden : FORBIDDEN_PREFIXES) {
                 if (trimmed.startsWith(forbidden)) {
-                    violations.add(file.getFileName() + ":" + (i + 1)
-                        + ": " + trimmed);
+                    violations.add(file.getFileName() + ":" + (i + 1) + ": " + trimmed);
                 }
             }
         }
@@ -95,13 +88,11 @@ class ZeroMcImportGateTest {
         Path dir = Paths.get("").toAbsolutePath();
         assertNotNull(dir);
         for (int i = 0; i < 6 && dir != null; i++) {
-            if (Files.isDirectory(dir.resolve(
-                    "src/main/java/com/mcbot/mcbotserver"))) {
+            if (Files.isDirectory(dir.resolve("src/main/java/com/mcbot/mcbotserver"))) {
                 return dir;
             }
             dir = dir.getParent();
         }
-        throw new IllegalStateException(
-            "project root not found from working dir");
+        throw new IllegalStateException("project root not found from working dir");
     }
 }

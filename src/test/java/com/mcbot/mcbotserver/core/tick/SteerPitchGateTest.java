@@ -1,5 +1,8 @@
 package com.mcbot.mcbotserver.core.tick;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
@@ -10,13 +13,8 @@ import com.mcbot.mcbotserver.api.world.BlockSnapshot;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 import com.mcbot.mcbotserver.core.pathing.BasicMoves;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
-
-import org.junit.jupiter.api.Test;
-
 import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 
 /**
  * Terrain-following steer pitch gate (issue 0005 P0): the ROT claim's
@@ -32,8 +30,7 @@ class SteerPitchGateTest {
         MockWorldView world = MockWorldView.pavedFloor(8);
         for (int x = 2; x <= 3; x++) {
             for (int z = -2; z <= 2; z++) {
-                world.putBlock(new BlockSnapshot(
-                    new CellPos(x, 64, z), "minecraft:smooth_stone"));
+                world.putBlock(new BlockSnapshot(new CellPos(x, 64, z), "minecraft:smooth_stone"));
             }
         }
         return world;
@@ -41,10 +38,10 @@ class SteerPitchGateTest {
 
     private static Intent.Look lastLookClaim(RecordingActor actor) {
         return actor.submitted.stream()
-            .filter(c -> c.channel() == Channel.ROT)
-            .map(c -> (Intent.Look) c.intent())
-            .reduce((first, second) -> second)
-            .orElseThrow(() -> new AssertionError("no ROT claim"));
+                .filter(c -> c.channel() == Channel.ROT)
+                .map(c -> (Intent.Look) c.intent())
+                .reduce((first, second) -> second)
+                .orElseThrow(() -> new AssertionError("no ROT claim"));
     }
 
     /**
@@ -55,19 +52,15 @@ class SteerPitchGateTest {
     @Test
     void flatWaypointLooksLevel() {
         Vec3[] position = {new Vec3(0.5, 64, 0.5)};
-        PathingBehavior mover = new PathingBehavior("mover",
-            () -> position[0], BasicMoves::from);
+        PathingBehavior mover = new PathingBehavior("mover", () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
 
         // Tick past the P2.1 departure hold first.
-        for (int i = 0; i <= PathingBehavior.DEPARTURE_DELAY_TICKS;
-             i++) {
-            mover.tick(MockWorldView.pavedFloor(8), Directive.of(
-                new GoalBlock(new CellPos(7, 64, 0))), actor);
+        for (int i = 0; i <= PathingBehavior.DEPARTURE_DELAY_TICKS; i++) {
+            mover.tick(MockWorldView.pavedFloor(8), Directive.of(new GoalBlock(new CellPos(7, 64, 0))), actor);
         }
 
-        assertEquals(0f, lastLookClaim(actor).pitchDeg(), 1e-6,
-            "a same-level waypoint must pitch exactly 0");
+        assertEquals(0f, lastLookClaim(actor).pitchDeg(), 1e-6, "a same-level waypoint must pitch exactly 0");
     }
 
     /**
@@ -78,34 +71,29 @@ class SteerPitchGateTest {
      * cancel) and the engine sign (negative = up).
      */
     @Test
-    void jumpUpWaypointLooksUpAtExactAngle()
-        throws ReflectiveOperationException {
+    void jumpUpWaypointLooksUpAtExactAngle() throws ReflectiveOperationException {
         Vec3[] position = {new Vec3(0.5, 64, 0.5)};
-        PathingBehavior mover = new PathingBehavior("mover",
-            () -> position[0], BasicMoves::from);
+        PathingBehavior mover = new PathingBehavior("mover", () -> position[0], BasicMoves::from);
         RecordingActor actor = new RecordingActor();
 
         MockWorldView world = worldWithPlatform();
-        for (int i = 0; i <= PathingBehavior.DEPARTURE_DELAY_TICKS;
-             i++) {
-            mover.tick(world, Directive.of(
-                new GoalBlock(new CellPos(3, 65, 0))), actor);
+        for (int i = 0; i <= PathingBehavior.DEPARTURE_DELAY_TICKS; i++) {
+            mover.tick(world, Directive.of(new GoalBlock(new CellPos(3, 65, 0))), actor);
         }
 
         List<CellPos> waypoints = PathingTestAccess.waypoints(mover);
         int jumpUpIndex = waypoints.indexOf(new CellPos(2, 65, 0));
-        assertTrue(jumpUpIndex >= 0,
-            "plan must route through the plateau edge cell, got "
-                + waypoints);
+        assertTrue(jumpUpIndex >= 0, "plan must route through the plateau edge cell, got " + waypoints);
 
         PathingTestAccess.writeWaypointIndex(mover, jumpUpIndex);
         actor.submitted.clear();
-        mover.tick(world, Directive.of(
-            new GoalBlock(new CellPos(3, 65, 0))), actor);
+        mover.tick(world, Directive.of(new GoalBlock(new CellPos(3, 65, 0))), actor);
 
-        assertEquals((float) -Math.toDegrees(Math.atan2(1.0, 2.0)),
-            lastLookClaim(actor).pitchDeg(), 0.01,
-            "JumpUp steering pitch must be -atan2(dy=1, dx=2)");
+        assertEquals(
+                (float) -Math.toDegrees(Math.atan2(1.0, 2.0)),
+                lastLookClaim(actor).pitchDeg(),
+                0.01,
+                "JumpUp steering pitch must be -atan2(dy=1, dx=2)");
     }
 
     // Clamp-at-limit cases are pinned same-package in

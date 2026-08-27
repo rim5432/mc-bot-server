@@ -1,5 +1,8 @@
 package com.mcbot.mcbotserver.hygiene;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import com.mcbot.mcbotserver.testsupport.RepoRoot;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -7,12 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
-
 import org.junit.jupiter.api.Test;
-
-import com.mcbot.mcbotserver.testsupport.RepoRoot;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Offline gate over the English-only mandate: scans every tree the
@@ -55,41 +53,37 @@ class EnglishOnlyScan {
         for (String tree : new String[] {"src/main/java", "src/test/java"}) {
             scanJavaTree(root.resolve(tree), root, violations);
         }
-        assertEquals(List.of(), violations,
-            "CJK codepoints leaked into mandate-covered sources"
-                + " (AGENTS.md 0.3, code-health.md H-R3):\n"
-                + String.join("\n", violations)
-                + "\nTranslate the offending prose to English; citations"
-                + " from non-English sources are English translations,"
-                + " never reproduced originals. A genuine data literal"
-                + " joins ALLOWED_DATA_FILES by explicit review.");
+        assertEquals(
+                List.of(),
+                violations,
+                "CJK codepoints leaked into mandate-covered sources"
+                        + " (AGENTS.md 0.3, code-health.md H-R3):\n"
+                        + String.join("\n", violations)
+                        + "\nTranslate the offending prose to English; citations"
+                        + " from non-English sources are English translations,"
+                        + " never reproduced originals. A genuine data literal"
+                        + " joins ALLOWED_DATA_FILES by explicit review.");
     }
 
     /** Scans root-level markdown plus every .md under doc/ and
      * tool/. */
-    private void scanMarkdown(Path root, List<String> violations)
-            throws IOException {
+    private void scanMarkdown(Path root, List<String> violations) throws IOException {
         try (Stream<Path> files = Files.list(root)) {
-            files.filter(p -> p.getFileName().toString().endsWith(".md"))
-                .forEach(p -> scanFile(p, root, violations));
+            files.filter(p -> p.getFileName().toString().endsWith(".md")).forEach(p -> scanFile(p, root, violations));
         }
         for (String dir : new String[] {"doc", "tool"}) {
             try (Stream<Path> paths = Files.walk(root.resolve(dir))) {
-                paths.filter(p -> p.toString().endsWith(".md"))
-                    .forEach(p -> scanFile(p, root, violations));
+                paths.filter(p -> p.toString().endsWith(".md")).forEach(p -> scanFile(p, root, violations));
             }
         }
     }
 
-    private void scanJavaTree(Path tree, Path root,
-                              List<String> violations) {
+    private void scanJavaTree(Path tree, Path root, List<String> violations) {
         if (!Files.isDirectory(tree)) {
-            throw new IllegalStateException(
-                "expected source tree to exist: " + tree);
+            throw new IllegalStateException("expected source tree to exist: " + tree);
         }
         try (Stream<Path> paths = Files.walk(tree)) {
-            paths.filter(p -> p.toString().endsWith(".java"))
-                .forEach(p -> scanFile(p, root, violations));
+            paths.filter(p -> p.toString().endsWith(".java")).forEach(p -> scanFile(p, root, violations));
         } catch (IOException e) {
             violations.add("cannot walk " + tree + ": " + e.getMessage());
         }
@@ -114,8 +108,8 @@ class EnglishOnlyScan {
             lines.get(i).codePoints().forEach(cp -> {
                 if (isCjk(cp)) {
                     violations.add(relative + ":" + lineNumber
-                        + ": U+" + Integer.toHexString(cp).toUpperCase()
-                        + " '" + new String(Character.toChars(cp)) + "'");
+                            + ": U+" + Integer.toHexString(cp).toUpperCase()
+                            + " '" + new String(Character.toChars(cp)) + "'");
                 }
             });
         }
@@ -137,7 +131,6 @@ class EnglishOnlyScan {
                 || script == Character.UnicodeScript.HANGUL) {
             return true;
         }
-        return (cp >= 0x3000 && cp <= 0x303F)
-                || (cp >= 0xFF01 && cp <= 0xFF60);
+        return (cp >= 0x3000 && cp <= 0x303F) || (cp >= 0xFF01 && cp <= 0xFF60);
     }
 }

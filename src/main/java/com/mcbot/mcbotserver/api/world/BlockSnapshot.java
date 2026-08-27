@@ -12,7 +12,7 @@ import com.mcbot.mcbotserver.api.types.CellPos;
  *
  * @param pos     the cell this snapshot describes; never null
  * @param blockId id of the block; never null; two styles by design -
-     *           real blocks use the registry key ({@code minecraft:stone}),
+ *           real blocks use the registry key ({@code minecraft:stone}),
  *                ambient markers use the canonical constants {@link #AIR}
  *                and {@link #UNKNOWN}; never null - unknown is expressed
  *                by {@link #UNKNOWN}, not by null
@@ -40,8 +40,7 @@ public record BlockSnapshot(CellPos pos, String blockId) {
             throw new IllegalArgumentException("pos must not be null");
         }
         if (blockId == null || blockId.isBlank()) {
-            throw new IllegalArgumentException(
-                "blockId must not be blank");
+            throw new IllegalArgumentException("blockId must not be blank");
         }
     }
 

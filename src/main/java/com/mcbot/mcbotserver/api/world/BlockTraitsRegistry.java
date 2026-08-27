@@ -77,10 +77,8 @@ public interface BlockTraitsRegistry {
             }
 
             @Override
-            public BlockTraitsRegistry register(String blockId,
-                                                BlockTraits traits) {
-                throw new UnsupportedOperationException(
-                    "empty() is immutable; build your own");
+            public BlockTraitsRegistry register(String blockId, BlockTraits traits) {
+                throw new UnsupportedOperationException("empty() is immutable; build your own");
             }
         };
     }

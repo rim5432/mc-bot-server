@@ -1,19 +1,17 @@
 package com.mcbot.mcbotserver.boundaryd;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+
 import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.state.BotState;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.state.ChangeDetectingStateChannel;
-
-import org.junit.jupiter.api.Test;
-
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
+import org.junit.jupiter.api.Test;
 
 /**
  * Stage-0 state-channel gate: the third boundary-D semantic shape has
@@ -26,8 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 class StateChannelGateTest {
 
     private static BotState stateAt(int x, String task) {
-        return new BotState(new CellPos(x, 64, 0), 0f, 0f, "overworld",
-            Map.of(), 0, Map.of(), task, 20, 0);
+        return new BotState(new CellPos(x, 64, 0), 0f, 0f, "overworld", Map.of(), 0, Map.of(), task, 20, 0);
     }
 
     /**
@@ -36,12 +33,10 @@ class StateChannelGateTest {
      */
     @Test
     void pushOnTransitionOnly() {
-        InMemoryEventQueue queue =
-            new InMemoryEventQueue(() -> 9L, () -> 12000L);
+        InMemoryEventQueue queue = new InMemoryEventQueue(() -> 9L, () -> 12000L);
         BotState[] holder = {stateAt(0, "idle")};
         ChangeDetectingStateChannel channel =
-            new ChangeDetectingStateChannel(() -> holder[0], queue,
-                () -> 9L, () -> 12000L);
+                new ChangeDetectingStateChannel(() -> holder[0], queue, () -> 9L, () -> 12000L);
 
         BotState first = channel.current();
         assertEquals(stateAt(0, "idle"), first);
@@ -49,8 +44,7 @@ class StateChannelGateTest {
         assertEquals(1, events.size());
         assertEquals(EventKind.STATE_PUSH, events.get(0).kind());
         assertEquals("initial state", events.get(0).text());
-        assertEquals(9L, events.get(0).day(),
-            "stamps come from the injected clock");
+        assertEquals(9L, events.get(0).day(), "stamps come from the injected clock");
 
         // Same state again: no delta, no event.
         assertSame(channel.current(), first);
@@ -71,16 +65,14 @@ class StateChannelGateTest {
     /** current() always returns the freshest capture. */
     @Test
     void currentIsPullThroughNotCacheOnly() {
-        InMemoryEventQueue queue =
-            new InMemoryEventQueue(() -> 1L, () -> 0L);
+        InMemoryEventQueue queue = new InMemoryEventQueue(() -> 1L, () -> 0L);
         BotState[] holder = {stateAt(0, "idle")};
         ChangeDetectingStateChannel channel =
-            new ChangeDetectingStateChannel(() -> holder[0], queue,
-                () -> 1L, () -> 0L);
+                new ChangeDetectingStateChannel(() -> holder[0], queue, () -> 1L, () -> 0L);
 
         channel.current();
         holder[0] = stateAt(7, "follow");
-        assertEquals(stateAt(7, "follow"), channel.current(),
-            "pull must reflect the latest capture, not the last push");
+        assertEquals(
+                stateAt(7, "follow"), channel.current(), "pull must reflect the latest capture, not the last push");
     }
 }

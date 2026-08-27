@@ -2,9 +2,7 @@ package com.mcbot.mcbotserver.adapter;
 
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
 import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
-
 import com.mojang.logging.LogUtils;
-
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
@@ -12,7 +10,6 @@ import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-
 import net.minecraftforge.registries.ForgeRegistries;
 
 /**
@@ -54,8 +51,7 @@ final class MeleeResolver {
      * before the exact surface-distance gate. Generous on purpose -
      * the gate below is the authority.
      */
-    private static final double CANDIDATE_NET = MELEE_REACH_SURFACE
-        + 1.5;
+    private static final double CANDIDATE_NET = MELEE_REACH_SURFACE + 1.5;
 
     /**
      * Slack for the line-of-sight clip: a hit point this close to the
@@ -83,12 +79,10 @@ final class MeleeResolver {
         var box = body.getBoundingBox().inflate(CANDIDATE_NET);
         LivingEntity best = null;
         double bestDist = Double.MAX_VALUE;
-        for (LivingEntity e : body.level()
-                .getEntitiesOfClass(LivingEntity.class,
-                    box, other -> other != body && other.isAlive())) {
+        for (LivingEntity e :
+                body.level().getEntitiesOfClass(LivingEntity.class, box, other -> other != body && other.isAlive())) {
             var key = ForgeRegistries.ENTITY_TYPES.getKey(e.getType());
-            if (key == null || !LevelThreatSensor.hostileTypes()
-                    .contains(key.toString())) {
+            if (key == null || !LevelThreatSensor.hostileTypes().contains(key.toString())) {
                 continue;
             }
             // Vanilla-aligned reach: squared distance from the eye to
@@ -99,15 +93,12 @@ final class MeleeResolver {
             if (surfDistSq > MELEE_REACH_SURFACE * MELEE_REACH_SURFACE) {
                 continue;
             }
-            var targetCenter = e.position()
-                .add(0, e.getBbHeight() / 2, 0);
+            var targetCenter = e.position().add(0, e.getBbHeight() / 2, 0);
             var toTarget = targetCenter.subtract(eye);
-            if (view.dot(toTarget.normalize())
-                < Math.cos(Math.toRadians(AIM_CONE_DEG))) {
+            if (view.dot(toTarget.normalize()) < Math.cos(Math.toRadians(AIM_CONE_DEG))) {
                 continue;
             }
-            if (sightBlocked(eye, targetCenter)
-                || lavaBetween(eye, targetCenter)) {
+            if (sightBlocked(eye, targetCenter) || lavaBetween(eye, targetCenter)) {
                 continue;
             }
             if (surfDistSq < bestDist) {
@@ -121,11 +112,8 @@ final class MeleeResolver {
             // production log needs at INFO. The 8c09134 standoff
             // bug was found by walking these lines; a future tuning
             // pass will reach for the same lever.
-            LogUtils.getLogger().debug(
-                "[melee] HIT dist={} hp={}", bestDist,
-                best.getHealth());
-            best.hurt(body.damageSources()
-                .mobAttack(body), MELEE_DAMAGE);
+            LogUtils.getLogger().debug("[melee] HIT dist={} hp={}", bestDist, best.getHealth());
+            best.hurt(body.damageSources().mobAttack(body), MELEE_DAMAGE);
         }
     }
 
@@ -140,13 +128,12 @@ final class MeleeResolver {
      *         target (grazes at the hitbox face stay clear)
      */
     private boolean sightBlocked(Vec3 eye, Vec3 targetCenter) {
-        var clip = body.level().clip(new ClipContext(eye, targetCenter,
-            ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, body));
+        var clip = body.level()
+                .clip(new ClipContext(eye, targetCenter, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, body));
         if (clip.getType() == HitResult.Type.MISS) {
             return false;
         }
-        return eye.distanceTo(clip.getLocation())
-            < eye.distanceTo(targetCenter) - MELEE_CLIP_SLACK;
+        return eye.distanceTo(clip.getLocation()) < eye.distanceTo(targetCenter) - MELEE_CLIP_SLACK;
     }
 
     /**
@@ -164,8 +151,7 @@ final class MeleeResolver {
         int steps = (int) Math.ceil(delta.length() / 0.5);
         for (int i = 1; i < steps; i++) {
             var at = eye.add(delta.scale((double) i / steps));
-            if (body.level().getBlockState(BlockPos.containing(at))
-                    .is(Blocks.LAVA)) {
+            if (body.level().getBlockState(BlockPos.containing(at)).is(Blocks.LAVA)) {
                 return true;
             }
         }

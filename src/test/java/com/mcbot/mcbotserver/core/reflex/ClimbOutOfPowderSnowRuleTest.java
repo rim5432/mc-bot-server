@@ -1,21 +1,16 @@
 package com.mcbot.mcbotserver.core.reflex;
 
-import com.mcbot.mcbotserver.api.reflex.ReflexAction;
-import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
-import com.mcbot.mcbotserver.api.types.CellPos;
-import com.mcbot.mcbotserver.api.world.WorldView;
-import com.mcbot.mcbotserver.core.reflex.ClimbOutOfPowderSnowRule;
-import com.mcbot.mcbotserver.core.reflex.EngageOnHostileProximityRule;
-import com.mcbot.mcbotserver.core.reflex.FreezeOnLowHealthRule;
-import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
-import com.mcbot.mcbotserver.core.world.MockWorldView;
-
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import com.mcbot.mcbotserver.api.reflex.ReflexAction;
+import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
+import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.api.world.WorldView;
+import com.mcbot.mcbotserver.core.world.MockWorldView;
+import org.junit.jupiter.api.Test;
 
 /**
  * Powder-snow freeze-climb gates: the freezeTicks signal, the trigger
@@ -44,44 +39,37 @@ class ClimbOutOfPowderSnowRuleTest {
     @Test
     void firesAtOrAboveTriggerAndStaysSilentBelow() {
         ClimbOutOfPowderSnowRule rule = new ClimbOutOfPowderSnowRule();
-        assertEquals(ClimbOutOfPowderSnowRule.CLIMB_PRIORITY,
-            rule.computePriority(boardAt(100)), "at trigger fires");
-        assertEquals(ClimbOutOfPowderSnowRule.CLIMB_PRIORITY,
-            rule.computePriority(boardAt(140)), "fully frozen fires");
-        assertEquals(-1, rule.computePriority(boardAt(99)),
-            "below trigger stays silent");
-        assertEquals(-1, rule.computePriority(boardAt(0)),
-            "no freeze stays silent");
+        assertEquals(ClimbOutOfPowderSnowRule.CLIMB_PRIORITY, rule.computePriority(boardAt(100)), "at trigger fires");
+        assertEquals(ClimbOutOfPowderSnowRule.CLIMB_PRIORITY, rule.computePriority(boardAt(140)), "fully frozen fires");
+        assertEquals(-1, rule.computePriority(boardAt(99)), "below trigger stays silent");
+        assertEquals(-1, rule.computePriority(boardAt(0)), "no freeze stays silent");
     }
 
     @Test
     void actionIsAscend() {
-        assertEquals(ReflexAction.ASCEND,
-            new ClimbOutOfPowderSnowRule().action());
+        assertEquals(ReflexAction.ASCEND, new ClimbOutOfPowderSnowRule().action());
     }
 
     @Test
     void unSensedFreezeDefaultsToZeroAndNeverFires() {
         ThreatBlackboard board = new ThreatBlackboard();
         board.beginTick(0L, 0L, 0L, POS, 20f);
-        assertEquals(0, board.freezeTicks,
-            "beginTick resets freezeTicks to 0");
-        assertEquals(-1, new ClimbOutOfPowderSnowRule()
-            .computePriority(board),
-            "a rig whose sensor never stamps freeze must not climb-flap");
+        assertEquals(0, board.freezeTicks, "beginTick resets freezeTicks to 0");
+        assertEquals(
+                -1,
+                new ClimbOutOfPowderSnowRule().computePriority(board),
+                "a rig whose sensor never stamps freeze must not climb-flap");
     }
 
     @Test
     void badThresholdsAreRejected() {
-        assertThrows(IllegalArgumentException.class,
-            () -> new ClimbOutOfPowderSnowRule(0, 95),
-            "trigger must be >= 1");
-        assertThrows(IllegalArgumentException.class,
-            () -> new ClimbOutOfPowderSnowRule(140, 95),
-            "trigger must be < 140");
-        assertThrows(IllegalArgumentException.class,
-            () -> new ClimbOutOfPowderSnowRule(100, 0),
-            "priority must be positive");
+        assertThrows(IllegalArgumentException.class, () -> new ClimbOutOfPowderSnowRule(0, 95), "trigger must be >= 1");
+        assertThrows(
+                IllegalArgumentException.class, () -> new ClimbOutOfPowderSnowRule(140, 95), "trigger must be < 140");
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new ClimbOutOfPowderSnowRule(100, 0),
+                "priority must be positive");
     }
 
     /**
@@ -92,14 +80,12 @@ class ClimbOutOfPowderSnowRuleTest {
      */
     @Test
     void freezeClimbOutranksEngageWhenBothFire() {
-        SurvivalReflexLayer layer = new SurvivalReflexLayer(
-            (world, board) -> {
-                board.freezeTicks = 120;
-                board.nearestThreat = new com.mcbot.mcbotserver
-                    .api.world.EntitySnapshot("z-1", "minecraft:zombie",
-                    new CellPos(1, 64, 0), 20f, 20f);
-                board.nearestThreatDistance = 1.0;
-            });
+        SurvivalReflexLayer layer = new SurvivalReflexLayer((world, board) -> {
+            board.freezeTicks = 120;
+            board.nearestThreat = new com.mcbot.mcbotserver.api.world.EntitySnapshot(
+                    "z-1", "minecraft:zombie", new CellPos(1, 64, 0), 20f, 20f);
+            board.nearestThreatDistance = 1.0;
+        });
         layer.addRule(new EngageOnHostileProximityRule());
         layer.addRule(new ClimbOutOfPowderSnowRule());
         var decision = layer.tick(WORLD, 1L, 0L, 0L, POS, 20f);
@@ -116,8 +102,7 @@ class ClimbOutOfPowderSnowRuleTest {
      */
     @Test
     void lowHealthFreezeOutranksClimbWhenBothFire() {
-        SurvivalReflexLayer layer = new SurvivalReflexLayer(
-            (world, board) -> board.freezeTicks = 120);
+        SurvivalReflexLayer layer = new SurvivalReflexLayer((world, board) -> board.freezeTicks = 120);
         layer.addRule(new FreezeOnLowHealthRule());
         layer.addRule(new ClimbOutOfPowderSnowRule());
         var decision = layer.tick(WORLD, 1L, 0L, 0L, POS, 4f);
@@ -132,8 +117,7 @@ class ClimbOutOfPowderSnowRuleTest {
      */
     @Test
     void healthyFreezeClimbsInsteadOfParking() {
-        SurvivalReflexLayer layer = new SurvivalReflexLayer(
-            (world, board) -> board.freezeTicks = 120);
+        SurvivalReflexLayer layer = new SurvivalReflexLayer((world, board) -> board.freezeTicks = 120);
         layer.addRule(new FreezeOnLowHealthRule());
         layer.addRule(new ClimbOutOfPowderSnowRule());
         var decision = layer.tick(WORLD, 1L, 0L, 0L, POS, 20f);
@@ -150,13 +134,11 @@ class ClimbOutOfPowderSnowRuleTest {
     @Test
     void thawBelowTriggerReleasesClimb() {
         int[] freeze = {120};
-        SurvivalReflexLayer layer = new SurvivalReflexLayer(
-            (world, board) -> board.freezeTicks = freeze[0]);
+        SurvivalReflexLayer layer = new SurvivalReflexLayer((world, board) -> board.freezeTicks = freeze[0]);
         layer.addRule(new ClimbOutOfPowderSnowRule());
-        assertNotNull(layer.tick(WORLD, 1L, 0L, 0L, POS, 20f),
-            "freeze above trigger fires");
+        assertNotNull(layer.tick(WORLD, 1L, 0L, 0L, POS, 20f), "freeze above trigger fires");
         freeze[0] = 50;
-        assertNull(layer.tick(WORLD, 2L, 0L, 0L, POS, 20f),
-            "freeze below trigger releases immediately (no hysteresis)");
+        assertNull(
+                layer.tick(WORLD, 2L, 0L, 0L, POS, 20f), "freeze below trigger releases immediately (no hysteresis)");
     }
 }

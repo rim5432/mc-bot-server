@@ -75,7 +75,6 @@ public enum Direction {
      * @return the adjacent cell in this face's direction
      */
     public CellPos relative(CellPos origin) {
-        return new CellPos(origin.x() + dx, origin.y() + dy,
-            origin.z() + dz);
+        return new CellPos(origin.x() + dx, origin.y() + dy, origin.z() + dz);
     }
 }

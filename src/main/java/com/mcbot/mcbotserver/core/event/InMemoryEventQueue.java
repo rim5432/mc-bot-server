@@ -4,7 +4,6 @@ import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventBatch;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.event.EventQueue;
-
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -68,8 +67,7 @@ public final class InMemoryEventQueue implements EventQueue {
     private int droppedSinceLastPoll;
 
     /** One queued event paired with its immutable stream id. */
-    private record Entry(long id, BotEvent event) {
-    }
+    private record Entry(long id, BotEvent event) {}
 
     /**
      * Creates a queue whose synthetic drop notices carry live stamps.
@@ -77,8 +75,7 @@ public final class InMemoryEventQueue implements EventQueue {
      * @param daySupplier       in-game day counter accessor; never null
      * @param timeOfDaySupplier time-of-day ticks accessor; never null
      */
-    public InMemoryEventQueue(LongSupplier daySupplier,
-                              LongSupplier timeOfDaySupplier) {
+    public InMemoryEventQueue(LongSupplier daySupplier, LongSupplier timeOfDaySupplier) {
         if (daySupplier == null || timeOfDaySupplier == null) {
             throw new IllegalArgumentException("suppliers must not be null");
         }
@@ -107,24 +104,24 @@ public final class InMemoryEventQueue implements EventQueue {
         // a post-reset state. Both are excluded - see class Javadoc
         // for the rationale. Once those gates pass, the gap fires if
         // the caller's cursor is older than the oldest retained id.
-        if (sinceEventId > 0 && sinceEventId < lastEventId
-            && !entries.isEmpty()) {
+        if (sinceEventId > 0 && sinceEventId < lastEventId && !entries.isEmpty()) {
             long oldestId = entries.peekFirst().id();
             if (sinceEventId < oldestId - 1) {
                 long gap = oldestId - sinceEventId - 1;
-                Map<String, String> gapAttrs =
-                    new LinkedHashMap<>();
+                Map<String, String> gapAttrs = new LinkedHashMap<>();
                 gapAttrs.put("count", String.valueOf(gap));
                 gapAttrs.put("since", String.valueOf(sinceEventId));
                 gapAttrs.put("oldest", String.valueOf(oldestId));
-                page.add(new BotEvent(EventKind.EVENT_GAP,
-                    daySupplier.getAsLong(),
-                    timeOfDaySupplier.getAsLong(),
-                    true, Map.copyOf(gapAttrs),
-                    "events between since=" + sinceEventId
-                        + " and oldest=" + oldestId
-                        + " were lost; call getState() and re-poll from "
-                        + oldestId));
+                page.add(new BotEvent(
+                        EventKind.EVENT_GAP,
+                        daySupplier.getAsLong(),
+                        timeOfDaySupplier.getAsLong(),
+                        true,
+                        Map.copyOf(gapAttrs),
+                        "events between since=" + sinceEventId
+                                + " and oldest=" + oldestId
+                                + " were lost; call getState() and re-poll from "
+                                + oldestId));
             }
         }
         for (Entry e : entries) {
@@ -135,13 +132,15 @@ public final class InMemoryEventQueue implements EventQueue {
         int dropped = droppedSinceLastPoll;
         droppedSinceLastPoll = 0;
         if (dropped > 0) {
-            page.add(new BotEvent(EventKind.EVENT_DROPPED,
-                daySupplier.getAsLong(), timeOfDaySupplier.getAsLong(),
-                false, Map.of("count", String.valueOf(dropped)),
-                dropped + " events could not be recorded"));
+            page.add(new BotEvent(
+                    EventKind.EVENT_DROPPED,
+                    daySupplier.getAsLong(),
+                    timeOfDaySupplier.getAsLong(),
+                    false,
+                    Map.of("count", String.valueOf(dropped)),
+                    dropped + " events could not be recorded"));
         }
-        return new EventBatch(
-            List.copyOf(page), dropped, lastEventId, resetMarker);
+        return new EventBatch(List.copyOf(page), dropped, lastEventId, resetMarker);
     }
 
     @Override

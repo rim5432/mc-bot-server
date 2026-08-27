@@ -37,8 +37,7 @@ public final class MinimalReflex {
 
     private static final String HOLDER = "minimal-reflex";
 
-    private MinimalReflex() {
-    }
+    private MinimalReflex() {}
 
     /**
      * Apply the degraded-mode body policy for one tick: jump while in
@@ -51,13 +50,11 @@ public final class MinimalReflex {
      *                      ascend a crashed bot that is drowning
      * @param actor         claim surface; never null
      */
-    public static void tick(boolean inLethalFluid, int airSupply,
-                            Actor actor) {
+    public static void tick(boolean inLethalFluid, int airSupply, Actor actor) {
         if (actor == null) {
             throw new IllegalArgumentException("actor must not be null");
         }
         boolean jump = inLethalFluid || airSupply < AIR_TRIGGER;
-        actor.submit(new Claim(Channel.MOVE, MINIMAL_PRIORITY, HOLDER,
-            new Intent.Move(0, 0, jump, false)));
+        actor.submit(new Claim(Channel.MOVE, MINIMAL_PRIORITY, HOLDER, new Intent.Move(0, 0, jump, false)));
     }
 }

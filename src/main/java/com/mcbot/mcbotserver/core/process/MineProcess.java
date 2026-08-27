@@ -10,7 +10,6 @@ import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.BlockSnapshot;
 import com.mcbot.mcbotserver.api.world.ViewMode;
 import com.mcbot.mcbotserver.api.world.WorldView;
-
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -53,12 +52,10 @@ import java.util.function.Supplier;
  * side-effect-free) + issue 0014 §3 (MineProcess architecture).
  */
 // contract: see boundaries.md section B + issue 0014 §3
-public final class MineProcess implements BotProcess, TerminalMission,
-        DigMission {
+public final class MineProcess implements BotProcess, TerminalMission, DigMission {
 
     /** One completed break, drained by the handler for BLOCK_BROKEN. */
-    public record BlockBreak(CellPos pos, String blockId) {
-    }
+    public record BlockBreak(CellPos pos, String blockId) {}
 
     /** Mission phases (package-private: offline tests assert these). */
     enum Phase {
@@ -114,16 +111,18 @@ public final class MineProcess implements BotProcess, TerminalMission,
      * @param botPosition live body-position accessor used as the search
      *                    center; must not be null
      */
-    public MineProcess(String taskId, String blockType, int targetCount,
-                       int priority, long timeoutTicks,
-                       Supplier<CellPos> botPosition) {
+    public MineProcess(
+            String taskId,
+            String blockType,
+            int targetCount,
+            int priority,
+            long timeoutTicks,
+            Supplier<CellPos> botPosition) {
         if (taskId == null || taskId.isBlank()) {
-            throw new IllegalArgumentException(
-                "taskId must not be null or blank");
+            throw new IllegalArgumentException("taskId must not be null or blank");
         }
         if (blockType == null || blockType.isBlank()) {
-            throw new IllegalArgumentException(
-                "blockType must not be null or blank");
+            throw new IllegalArgumentException("blockType must not be null or blank");
         }
         if (targetCount <= 0) {
             throw new IllegalArgumentException("targetCount must be positive");
@@ -132,13 +131,11 @@ public final class MineProcess implements BotProcess, TerminalMission,
             throw new IllegalArgumentException("timeoutTicks must be positive");
         }
         if (botPosition == null) {
-            throw new IllegalArgumentException(
-                "botPosition must not be null");
+            throw new IllegalArgumentException("botPosition must not be null");
         }
         CellPos start = botPosition.get();
         if (start == null) {
-            throw new IllegalArgumentException(
-                "botPosition must yield a non-null position");
+            throw new IllegalArgumentException("botPosition must yield a non-null position");
         }
         this.taskId = taskId;
         this.blockType = blockType;
@@ -203,8 +200,7 @@ public final class MineProcess implements BotProcess, TerminalMission,
         for (int dy = -searchRadius; dy <= searchRadius; dy++) {
             for (int dx = -searchRadius; dx <= searchRadius; dx++) {
                 for (int dz = -searchRadius; dz <= searchRadius; dz++) {
-                    CellPos pos = new CellPos(
-                        center.x() + dx, center.y() + dy, center.z() + dz);
+                    CellPos pos = new CellPos(center.x() + dx, center.y() + dy, center.z() + dz);
                     if (skipSet.contains(pos)) {
                         continue;
                     }
@@ -216,11 +212,9 @@ public final class MineProcess implements BotProcess, TerminalMission,
             }
         }
         if (candidates.isEmpty()) {
-            return fail("no " + blockType + " within " + searchRadius
-                + " (" + skipSet.size() + " skipped)");
+            return fail("no " + blockType + " within " + searchRadius + " (" + skipSet.size() + " skipped)");
         }
-        candidates.sort(Comparator.comparingInt(
-            p -> chebyshev(center, p)));
+        candidates.sort(Comparator.comparingInt(p -> chebyshev(center, p)));
         currentTarget = candidates.get(0);
         phase = Phase.MOVING;
         ticksInCurrentPhase = 0;
@@ -438,13 +432,11 @@ public final class MineProcess implements BotProcess, TerminalMission,
      * mission-level failure (ADR-0005).
      */
     private Directive holdDirective() {
-        CellPos anchor = currentTarget != null ? currentTarget
-            : initialPosition;
+        CellPos anchor = currentTarget != null ? currentTarget : initialPosition;
         return Directive.of(new GoalNear(anchor, 2));
     }
 
     private static int chebyshev(CellPos a, CellPos b) {
-        return Math.max(Math.abs(a.x() - b.x()),
-            Math.max(Math.abs(a.y() - b.y()), Math.abs(a.z() - b.z())));
+        return Math.max(Math.abs(a.x() - b.x()), Math.max(Math.abs(a.y() - b.y()), Math.abs(a.z() - b.z())));
     }
 }

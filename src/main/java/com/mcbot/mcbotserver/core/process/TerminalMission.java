@@ -1,6 +1,7 @@
 package com.mcbot.mcbotserver.core.process;
 
 import java.util.Map;
+
 /**
  * Missions that know how they ended. Implemented by processes with
  * terminal states so the tick pipeline can emit boundary-D completion

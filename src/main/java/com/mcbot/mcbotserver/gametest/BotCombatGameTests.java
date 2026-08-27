@@ -1,5 +1,11 @@
 package com.mcbot.mcbotserver.gametest;
 
+import static com.mcbot.mcbotserver.gametest.GametestRig.check;
+import static com.mcbot.mcbotserver.gametest.GametestRig.checkEquals;
+import static com.mcbot.mcbotserver.gametest.GametestRig.driveOnly;
+import static com.mcbot.mcbotserver.gametest.GametestRig.driveUntil;
+import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
+
 import com.mcbot.mcbotserver.McBotServer;
 import com.mcbot.mcbotserver.adapter.BotAssembly;
 import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
@@ -7,27 +13,16 @@ import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.process.DefendProcess;
-
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.monster.Skeleton;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
-
-import java.util.List;
-
-import static com.mcbot.mcbotserver.gametest.GametestRig.check;
-import static com.mcbot.mcbotserver.gametest.GametestRig.checkEquals;
-import static com.mcbot.mcbotserver.gametest.GametestRig.driveOnly;
-import static com.mcbot.mcbotserver.gametest.GametestRig.driveUntil;
-import static com.mcbot.mcbotserver.gametest.GametestRig.positionOf;
-import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
 
 /**
  * Combat acceptance, in-engine: structural refusal of ranged
@@ -53,8 +48,7 @@ public final class BotCombatGameTests {
      */
     private static final int REFUSAL_WINDOW_TICKS = 15;
 
-    private BotCombatGameTests() {
-    }
+    private BotCombatGameTests() {}
 
     /**
      * Scenario 5: a ranged hostile is REFUSED, not chased. The planner
@@ -78,8 +72,7 @@ public final class BotCombatGameTests {
         Skeleton skeleton = EntityType.SKELETON.create(level);
         check(skeleton != null, "skeleton creation failed");
         var sAbs = helper.absolutePos(new BlockPos(11, GametestRig.WALK_Y, 8));
-        skeleton.moveTo(sAbs.getX() + 0.5, sAbs.getY(),
-            sAbs.getZ() + 0.5, 0f, 0f);
+        skeleton.moveTo(sAbs.getX() + 0.5, sAbs.getY(), sAbs.getZ() + 0.5, 0f, 0f);
         skeleton.setNoAi(true);
         level.addFreshEntity(skeleton);
 
@@ -87,41 +80,41 @@ public final class BotCombatGameTests {
         int[] waited = {0};
 
         helper.startSequence()
-            .thenWaitUntil(driveUntil(rig, () -> {
-                waited[0]++;
-                check(!mission.isActive(),
-                    "waiting for the refusal");
-            }))
-            .thenExecuteFor(3, driveOnly(rig))
-            .thenExecuteAfter(0, () -> {
-                check(!mission.missionSucceeded(),
-                    "a refusal is a failure, not a success");
-                checkEquals(DefendProcess.REASON_REFUSED,
-                    mission.failureReasonOrNull(),
-                    "the refusal reason must be structured");
-                BotEvent failed = rig.events().statusSnapshot(0)
-                    .events().stream()
-                    .filter(e -> EventKind.TASK_FAILED.equals(e.kind()))
-                    .findFirst().orElse(null);
-                check(failed != null, "TASK_FAILED must be in stream");
-                checkEquals("ENGAGEMENT_REFUSED",
-                    failed.attrs().get("reason"),
-                    "refusal reason must be structured");
-                checkEquals("minecraft:skeleton",
-                    failed.attrs().get("threatType"),
-                    "the refused type must reach the harness");
-                check(waited[0] <= REFUSAL_WINDOW_TICKS,
-                    "a structural refusal lands on the engage tick, not "
-                        + "after a chase; waited " + waited[0] + " ticks");
-                List<String> kinds = rig.events().statusSnapshot(0)
-                    .events().stream()
-                    .map(BotEvent::kind).toList();
-                check(!kinds.contains(EventKind.TASK_PAUSED),
-                    "a standoff-range skeleton must not trip the engage "
-                        + "reflex (no TASK_PAUSED expected)");
-                rig.body().discard();
-            })
-            .thenSucceed();
+                .thenWaitUntil(driveUntil(rig, () -> {
+                    waited[0]++;
+                    check(!mission.isActive(), "waiting for the refusal");
+                }))
+                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    check(!mission.missionSucceeded(), "a refusal is a failure, not a success");
+                    checkEquals(
+                            DefendProcess.REASON_REFUSED,
+                            mission.failureReasonOrNull(),
+                            "the refusal reason must be structured");
+                    BotEvent failed = rig.events().statusSnapshot(0).events().stream()
+                            .filter(e -> EventKind.TASK_FAILED.equals(e.kind()))
+                            .findFirst()
+                            .orElse(null);
+                    check(failed != null, "TASK_FAILED must be in stream");
+                    checkEquals(
+                            "ENGAGEMENT_REFUSED", failed.attrs().get("reason"), "refusal reason must be structured");
+                    checkEquals(
+                            "minecraft:skeleton",
+                            failed.attrs().get("threatType"),
+                            "the refused type must reach the harness");
+                    check(
+                            waited[0] <= REFUSAL_WINDOW_TICKS,
+                            "a structural refusal lands on the engage tick, not " + "after a chase; waited " + waited[0]
+                                    + " ticks");
+                    List<String> kinds = rig.events().statusSnapshot(0).events().stream()
+                            .map(BotEvent::kind)
+                            .toList();
+                    check(
+                            !kinds.contains(EventKind.TASK_PAUSED),
+                            "a standoff-range skeleton must not trip the engage " + "reflex (no TASK_PAUSED expected)");
+                    rig.body().discard();
+                })
+                .thenSucceed();
     }
 
     /**
@@ -149,44 +142,43 @@ public final class BotCombatGameTests {
         Zombie zombie = EntityType.ZOMBIE.create(level);
         check(zombie != null, "zombie creation failed");
         var zAbs = helper.absolutePos(new BlockPos(7, GametestRig.WALK_Y, 8));
-        zombie.moveTo(zAbs.getX() + 0.5, zAbs.getY(),
-            zAbs.getZ() + 0.5, 0f, 0f);
+        zombie.moveTo(zAbs.getX() + 0.5, zAbs.getY(), zAbs.getZ() + 0.5, 0f, 0f);
         zombie.setNoAi(true);
         level.addFreshEntity(zombie);
 
         helper.startSequence()
-            .thenWaitUntil(driveUntil(rig,
-                () -> check(zombie.isDeadOrDying() || zombie.isRemoved(),
-                    "waiting for the fight to end")))
-            .thenWaitUntil(driveUntil(rig,
-                () -> check(reflexEngageVerdict(rig.events()) != null,
-                    "waiting for the reflex mission verdict")))
-            .thenExecuteFor(3, driveOnly(rig))
-            .thenExecuteAfter(0, () -> {
-                BotEvent verdict = reflexEngageVerdict(rig.events());
-                check(verdict != null,
-                    "the fight must be reflex-owned (a reflex-engage "
-                        + "mission verdict in the stream)");
-                checkEquals(DefendProcess.REASON_ESCAPED,
-                    verdict.attrs().get("reason"),
-                    "the absence-after-grace verdict must be TARGET_ESCAPED");
-                check(zombie.isDeadOrDying() || zombie.isRemoved(),
-                    "the zombie must not survive the engagement");
-                check(rig.body().isAlive(),
-                    "the body must walk away from this fight");
-                rig.body().discard();
-            })
-            .thenSucceed();
+                .thenWaitUntil(driveUntil(
+                        rig, () -> check(zombie.isDeadOrDying() || zombie.isRemoved(), "waiting for the fight to end")))
+                .thenWaitUntil(driveUntil(
+                        rig,
+                        () -> check(
+                                reflexEngageVerdict(rig.events()) != null, "waiting for the reflex mission verdict")))
+                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    BotEvent verdict = reflexEngageVerdict(rig.events());
+                    check(
+                            verdict != null,
+                            "the fight must be reflex-owned (a reflex-engage " + "mission verdict in the stream)");
+                    checkEquals(
+                            DefendProcess.REASON_ESCAPED,
+                            verdict.attrs().get("reason"),
+                            "the absence-after-grace verdict must be TARGET_ESCAPED");
+                    check(zombie.isDeadOrDying() || zombie.isRemoved(), "the zombie must not survive the engagement");
+                    check(rig.body().isAlive(), "the body must walk away from this fight");
+                    rig.body().discard();
+                })
+                .thenSucceed();
     }
 
     private static DefendProcess submitDefend(GametestRig.Rig rig) {
-        String taskId = "gt-df-" + Integer.toHexString(
-            System.identityHashCode(rig.body()));
-        DefendProcess mission = new DefendProcess(taskId, 60,
-            GametestRig.MISSION_BUDGET,
-            () -> GametestRig.positionOf(rig.body()),
-            LevelThreatSensor.hostileTypes(),
-            LevelThreatSensor.rangedTypes());
+        String taskId = "gt-df-" + Integer.toHexString(System.identityHashCode(rig.body()));
+        DefendProcess mission = new DefendProcess(
+                taskId,
+                60,
+                GametestRig.MISSION_BUDGET,
+                () -> GametestRig.positionOf(rig.body()),
+                LevelThreatSensor.hostileTypes(),
+                LevelThreatSensor.rangedTypes());
         rig.arbiter().register(mission);
         rig.arbiter().requestControl(mission);
         return mission;
@@ -202,14 +194,12 @@ public final class BotCombatGameTests {
      * @return the verdict event, or null when no reflex mission has
      *         retired yet
      */
-    private static BotEvent reflexEngageVerdict(
-            InMemoryEventQueue events) {
+    private static BotEvent reflexEngageVerdict(InMemoryEventQueue events) {
         return events.statusSnapshot(0).events().stream()
-            .filter(e -> EventKind.TASK_FAILED.equals(e.kind())
-                || EventKind.TASK_COMPLETED.equals(e.kind()))
-            .filter(e -> e.attrs().getOrDefault("task", "")
-                .startsWith("reflex-engage"))
-            .findFirst().orElse(null);
+                .filter(e -> EventKind.TASK_FAILED.equals(e.kind()) || EventKind.TASK_COMPLETED.equals(e.kind()))
+                .filter(e -> e.attrs().getOrDefault("task", "").startsWith("reflex-engage"))
+                .findFirst()
+                .orElse(null);
     }
 
     /**
@@ -233,46 +223,44 @@ public final class BotCombatGameTests {
         var level = helper.getLevel();
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
-                helper.setBlock(
-                    new BlockPos(x, GametestRig.FLOOR_Y + 7, z),
-                    Blocks.SMOOTH_STONE);
+                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y + 7, z), Blocks.SMOOTH_STONE);
             }
         }
         Zombie zombie = EntityType.ZOMBIE.create(level);
         check(zombie != null, "zombie creation failed");
         var zAbs = helper.absolutePos(new BlockPos(7, GametestRig.WALK_Y, 8));
-        zombie.moveTo(zAbs.getX() + 0.5, zAbs.getY(),
-            zAbs.getZ() + 0.5, 0f, 0f);
+        zombie.moveTo(zAbs.getX() + 0.5, zAbs.getY(), zAbs.getZ() + 0.5, 0f, 0f);
         zombie.setHealth(8f);
         level.addFreshEntity(zombie);
 
         helper.startSequence()
-            .thenWaitUntil(driveUntil(rig,
-                () -> check(zombie.isDeadOrDying() || zombie.isRemoved(),
-                    "waiting for the retaliation fight to end")))
-            .thenWaitUntil(driveUntil(rig,
-                () -> check(reflexEngageVerdict(rig.events()) != null,
-                    "waiting for the reflex mission verdict")))
-            .thenExecuteFor(3, driveOnly(rig))
-            .thenExecuteAfter(0, () -> {
-                BotEvent verdict = reflexEngageVerdict(rig.events());
-                check(verdict != null,
-                    "the retaliation fight must be reflex-owned");
-                checkEquals(DefendProcess.REASON_ESCAPED,
-                    verdict.attrs().get("reason"),
-                    "a killed target ends as TARGET_ESCAPED");
-                check(zombie.isDeadOrDying() || zombie.isRemoved(),
-                    "the retaliating zombie must not survive");
-                check(rig.body().isAlive(),
-                    "the body must survive being fought back");
-                check(rig.body().getHealth()
-                        > com.mcbot.mcbotserver.core.reflex
-                            .FreezeOnLowHealthRule.FREEZE_THRESHOLD,
-                    "survival means staying above the freeze threshold, "
-                        + "got " + rig.body().getHealth());
-                rig.body().discard();
-            })
-            .thenSucceed();
+                .thenWaitUntil(driveUntil(
+                        rig,
+                        () -> check(
+                                zombie.isDeadOrDying() || zombie.isRemoved(),
+                                "waiting for the retaliation fight to end")))
+                .thenWaitUntil(driveUntil(
+                        rig,
+                        () -> check(
+                                reflexEngageVerdict(rig.events()) != null, "waiting for the reflex mission verdict")))
+                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    BotEvent verdict = reflexEngageVerdict(rig.events());
+                    check(verdict != null, "the retaliation fight must be reflex-owned");
+                    checkEquals(
+                            DefendProcess.REASON_ESCAPED,
+                            verdict.attrs().get("reason"),
+                            "a killed target ends as TARGET_ESCAPED");
+                    check(zombie.isDeadOrDying() || zombie.isRemoved(), "the retaliating zombie must not survive");
+                    check(rig.body().isAlive(), "the body must survive being fought back");
+                    check(
+                            rig.body().getHealth()
+                                    > com.mcbot.mcbotserver.core.reflex.FreezeOnLowHealthRule.FREEZE_THRESHOLD,
+                            "survival means staying above the freeze threshold, " + "got "
+                                    + rig.body().getHealth());
+                    rig.body().discard();
+                })
+                .thenSucceed();
     }
 
     /**
@@ -287,45 +275,41 @@ public final class BotCombatGameTests {
      * - that zero-damage fact is the pin. If the LOS clip regresses,
      * swings land and this fails with a damaged zombie.
      */
-    @GameTest(template = "empty16x8x16",
-        timeoutTicks = (int) BotAssembly.ENGAGE_MISSION_TIMEOUT_TICKS
-            + 100)
+    @GameTest(template = "empty16x8x16", timeoutTicks = (int) BotAssembly.ENGAGE_MISSION_TIMEOUT_TICKS + 100)
     public static void holdsFireWhenSightBlocked(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(4, GametestRig.WALK_Y, 8));
         var level = helper.getLevel();
         for (int z = 0; z < 16; z++) {
             for (int y = 1; y <= 3; y++) {
-                helper.setBlock(new BlockPos(8, GametestRig.FLOOR_Y + y, z),
-                    Blocks.SMOOTH_STONE);
+                helper.setBlock(new BlockPos(8, GametestRig.FLOOR_Y + y, z), Blocks.SMOOTH_STONE);
             }
         }
         Zombie zombie = EntityType.ZOMBIE.create(level);
         check(zombie != null, "zombie creation failed");
         var zAbs = helper.absolutePos(new BlockPos(9, GametestRig.WALK_Y, 8));
-        zombie.moveTo(zAbs.getX() + 0.5, zAbs.getY(),
-            zAbs.getZ() + 0.5, 0f, 0f);
+        zombie.moveTo(zAbs.getX() + 0.5, zAbs.getY(), zAbs.getZ() + 0.5, 0f, 0f);
         zombie.setNoAi(true);
         level.addFreshEntity(zombie);
 
         helper.startSequence()
-            .thenWaitUntil(driveUntil(rig,
-                () -> check(reflexEngageVerdict(rig.events()) != null,
-                    "waiting for the walled-off engagement to time out")))
-            .thenExecuteFor(3, driveOnly(rig))
-            .thenExecuteAfter(0, () -> {
-                BotEvent verdict = reflexEngageVerdict(rig.events());
-                check(verdict != null, "a verdict must be present");
-                checkEquals(DefendProcess.REASON_TIMEOUT,
-                    verdict.attrs().get("reason"),
-                    "an undamageable target must fail by budget, "
-                        + "not by success or escape");
-                checkEquals(20f, zombie.getHealth(),
-                    "no swing may land through a full wall");
-                check(rig.body().isAlive(),
-                    "the standoff must be harmless to the body too");
-                rig.body().discard();
-            })
-            .thenSucceed();
+                .thenWaitUntil(driveUntil(
+                        rig,
+                        () -> check(
+                                reflexEngageVerdict(rig.events()) != null,
+                                "waiting for the walled-off engagement to time out")))
+                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    BotEvent verdict = reflexEngageVerdict(rig.events());
+                    check(verdict != null, "a verdict must be present");
+                    checkEquals(
+                            DefendProcess.REASON_TIMEOUT,
+                            verdict.attrs().get("reason"),
+                            "an undamageable target must fail by budget, " + "not by success or escape");
+                    checkEquals(20f, zombie.getHealth(), "no swing may land through a full wall");
+                    check(rig.body().isAlive(), "the standoff must be harmless to the body too");
+                    rig.body().discard();
+                })
+                .thenSucceed();
     }
 
     /**
@@ -350,9 +334,7 @@ public final class BotCombatGameTests {
         var level = helper.getLevel();
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
-                helper.setBlock(
-                    new BlockPos(x, GametestRig.FLOOR_Y + 7, z),
-                    Blocks.SMOOTH_STONE);
+                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y + 7, z), Blocks.SMOOTH_STONE);
             }
         }
         // Isolation wall (2 high, perimeter): the empty template has
@@ -365,58 +347,53 @@ public final class BotCombatGameTests {
         // fight (7 blocks, clear interior) is untouched.
         for (int x = 0; x < 16; x++) {
             for (int y = 1; y <= 2; y++) {
-                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y + y,
-                    0), Blocks.SMOOTH_STONE);
-                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y + y,
-                    15), Blocks.SMOOTH_STONE);
+                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y + y, 0), Blocks.SMOOTH_STONE);
+                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y + y, 15), Blocks.SMOOTH_STONE);
             }
         }
         for (int z = 1; z < 15; z++) {
             for (int y = 1; y <= 2; y++) {
-                helper.setBlock(new BlockPos(0, GametestRig.FLOOR_Y + y,
-                    z), Blocks.SMOOTH_STONE);
-                helper.setBlock(new BlockPos(15, GametestRig.FLOOR_Y + y,
-                    z), Blocks.SMOOTH_STONE);
+                helper.setBlock(new BlockPos(0, GametestRig.FLOOR_Y + y, z), Blocks.SMOOTH_STONE);
+                helper.setBlock(new BlockPos(15, GametestRig.FLOOR_Y + y, z), Blocks.SMOOTH_STONE);
             }
         }
         Zombie zombie = EntityType.ZOMBIE.create(level);
         check(zombie != null, "zombie creation failed");
-        var zAbs = helper.absolutePos(
-            new BlockPos(10, GametestRig.WALK_Y, 8));
-        zombie.moveTo(zAbs.getX() + 0.5, zAbs.getY(),
-            zAbs.getZ() + 0.5, 0f, 0f);
+        var zAbs = helper.absolutePos(new BlockPos(10, GametestRig.WALK_Y, 8));
+        zombie.moveTo(zAbs.getX() + 0.5, zAbs.getY(), zAbs.getZ() + 0.5, 0f, 0f);
         zombie.setHealth(8f);
         level.addFreshEntity(zombie);
 
         helper.startSequence()
-            .thenWaitUntil(driveUntil(rig,
-                () -> check(zombie.getTarget() == rig.body(),
-                    "waiting for the world to acquire the body")))
-            .thenWaitUntil(driveUntil(rig,
-                () -> check(zombie.isDeadOrDying() || zombie.isRemoved(),
-                    "waiting for the sight-started fight to end")))
-            .thenWaitUntil(driveUntil(rig,
-                () -> check(reflexEngageVerdict(rig.events()) != null,
-                    "waiting for the reflex mission verdict")))
-            .thenExecuteFor(3, driveOnly(rig))
-            .thenExecuteAfter(0, () -> {
-                BotEvent verdict = reflexEngageVerdict(rig.events());
-                check(verdict != null,
-                    "the sight-started fight must be reflex-owned");
-                checkEquals(DefendProcess.REASON_ESCAPED,
-                    verdict.attrs().get("reason"),
-                    "a killed target ends as TARGET_ESCAPED");
-                check(zombie.isDeadOrDying() || zombie.isRemoved(),
-                    "the aggressor must not survive");
-                check(rig.body().isAlive(),
-                    "the body must survive being hunted");
-                check(rig.body().getHealth()
-                        > com.mcbot.mcbotserver.core.reflex
-                            .FreezeOnLowHealthRule.FREEZE_THRESHOLD,
-                    "survival means staying above the freeze threshold, "
-                        + "got " + rig.body().getHealth());
-                rig.body().discard();
-            })
-            .thenSucceed();
+                .thenWaitUntil(driveUntil(
+                        rig,
+                        () -> check(zombie.getTarget() == rig.body(), "waiting for the world to acquire the body")))
+                .thenWaitUntil(driveUntil(
+                        rig,
+                        () -> check(
+                                zombie.isDeadOrDying() || zombie.isRemoved(),
+                                "waiting for the sight-started fight to end")))
+                .thenWaitUntil(driveUntil(
+                        rig,
+                        () -> check(
+                                reflexEngageVerdict(rig.events()) != null, "waiting for the reflex mission verdict")))
+                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    BotEvent verdict = reflexEngageVerdict(rig.events());
+                    check(verdict != null, "the sight-started fight must be reflex-owned");
+                    checkEquals(
+                            DefendProcess.REASON_ESCAPED,
+                            verdict.attrs().get("reason"),
+                            "a killed target ends as TARGET_ESCAPED");
+                    check(zombie.isDeadOrDying() || zombie.isRemoved(), "the aggressor must not survive");
+                    check(rig.body().isAlive(), "the body must survive being hunted");
+                    check(
+                            rig.body().getHealth()
+                                    > com.mcbot.mcbotserver.core.reflex.FreezeOnLowHealthRule.FREEZE_THRESHOLD,
+                            "survival means staying above the freeze threshold, " + "got "
+                                    + rig.body().getHealth());
+                    rig.body().discard();
+                })
+                .thenSucceed();
     }
 }

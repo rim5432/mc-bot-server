@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.adapter;
 
+import java.util.Optional;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -12,8 +13,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
-
-import java.util.Optional;
 
 /**
  * Crafting menu variant that bypasses the vanilla
@@ -68,8 +67,7 @@ public final class BotCraftingMenu extends CraftingMenu {
      * @param access      the world-position access for recipe resolution;
      *                    never null
      */
-    public BotCraftingMenu(int containerId, Inventory inventory,
-                           ContainerLevelAccess access) {
+    public BotCraftingMenu(int containerId, Inventory inventory, ContainerLevelAccess access) {
         super(containerId, inventory, access);
         this.player = inventory.player;
     }
@@ -109,22 +107,18 @@ public final class BotCraftingMenu extends CraftingMenu {
         if (level.isClientSide()) {
             return;
         }
-        ResultContainer resultSlots =
-            (ResultContainer) menu.slots.get(0).container;
-        CraftingContainer craftSlots =
-            (CraftingContainer) menu.slots.get(1).container;
+        ResultContainer resultSlots = (ResultContainer) menu.slots.get(0).container;
+        CraftingContainer craftSlots = (CraftingContainer) menu.slots.get(1).container;
 
         ItemStack result = ItemStack.EMPTY;
-        Optional<CraftingRecipe> recipe = level.getServer()
-            .getRecipeManager()
-            .getRecipeFor(RecipeType.CRAFTING, craftSlots, level);
+        Optional<CraftingRecipe> recipe =
+                level.getServer().getRecipeManager().getRecipeFor(RecipeType.CRAFTING, craftSlots, level);
         if (recipe.isPresent()) {
             CraftingRecipe r = recipe.get();
             // Record recipe-used bookkeeping (for recipe-unlock mods);
             // the bot has no recipe book but recording is harmless.
             resultSlots.setRecipeUsed(r);
-            ItemStack assembled = r.assemble(craftSlots,
-                level.registryAccess());
+            ItemStack assembled = r.assemble(craftSlots, level.registryAccess());
             if (assembled.isItemEnabled(level.enabledFeatures())) {
                 result = assembled;
             }

@@ -92,9 +92,7 @@ public final class ThreatBlackboard {
     public CellPos suffocationBlock;
 
     /** Reset all fields to a fresh-tick baseline before sensing. */
-    public void beginTick(long tickCounter, long gameDay,
-                          long timeOfDayTicks, CellPos position,
-                          float health) {
+    public void beginTick(long tickCounter, long gameDay, long timeOfDayTicks, CellPos position, float health) {
         this.tick = tickCounter;
         this.day = gameDay;
         this.t = timeOfDayTicks;

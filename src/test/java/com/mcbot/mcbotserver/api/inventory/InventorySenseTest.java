@@ -1,15 +1,14 @@
 package com.mcbot.mcbotserver.api.inventory;
 
-import org.junit.jupiter.api.Test;
-
-import java.util.ArrayList;
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.ArrayList;
+import java.util.List;
+import org.junit.jupiter.api.Test;
 
 /**
  * Offline gates for the Phase 1 inventory sense api: {@link ItemView}
@@ -45,20 +44,17 @@ class InventorySenseTest {
 
     @Test
     void rejectsNullItemId() {
-        assertThrows(IllegalArgumentException.class,
-            () -> new ItemView(null, 1, ""));
+        assertThrows(IllegalArgumentException.class, () -> new ItemView(null, 1, ""));
     }
 
     @Test
     void rejectsNegativeCount() {
-        assertThrows(IllegalArgumentException.class,
-            () -> new ItemView("minecraft:dirt", -1, ""));
+        assertThrows(IllegalArgumentException.class, () -> new ItemView("minecraft:dirt", -1, ""));
     }
 
     @Test
     void rejectsNullNbtDigest() {
-        assertThrows(IllegalArgumentException.class,
-            () -> new ItemView("minecraft:dirt", 1, null));
+        assertThrows(IllegalArgumentException.class, () -> new ItemView("minecraft:dirt", 1, null));
     }
 
     @Test
@@ -90,52 +86,43 @@ class InventorySenseTest {
 
     @Test
     void rejectsNullMain() {
-        assertThrows(IllegalArgumentException.class,
-            () -> new InventoryView(null, 0, emptyArmor(), ItemView.EMPTY));
+        assertThrows(IllegalArgumentException.class, () -> new InventoryView(null, 0, emptyArmor(), ItemView.EMPTY));
     }
 
     @Test
     void rejectsWrongMainSize() {
-        var tooSmall = new ArrayList<ItemView>(
-            List.of(ItemView.EMPTY, ItemView.EMPTY));
-        assertThrows(IllegalArgumentException.class,
-            () -> new InventoryView(tooSmall, 0, emptyArmor(),
-                ItemView.EMPTY));
+        var tooSmall = new ArrayList<ItemView>(List.of(ItemView.EMPTY, ItemView.EMPTY));
+        assertThrows(
+                IllegalArgumentException.class, () -> new InventoryView(tooSmall, 0, emptyArmor(), ItemView.EMPTY));
     }
 
     @Test
     void rejectsNullArmor() {
-        assertThrows(IllegalArgumentException.class,
-            () -> new InventoryView(emptyMain(), 0, null,
-                ItemView.EMPTY));
+        assertThrows(IllegalArgumentException.class, () -> new InventoryView(emptyMain(), 0, null, ItemView.EMPTY));
     }
 
     @Test
     void rejectsWrongArmorSize() {
         var tooSmall = new ArrayList<ItemView>(List.of(ItemView.EMPTY));
-        assertThrows(IllegalArgumentException.class,
-            () -> new InventoryView(emptyMain(), 0, tooSmall,
-                ItemView.EMPTY));
+        assertThrows(IllegalArgumentException.class, () -> new InventoryView(emptyMain(), 0, tooSmall, ItemView.EMPTY));
     }
 
     @Test
     void rejectsNullOffhand() {
-        assertThrows(IllegalArgumentException.class,
-            () -> new InventoryView(emptyMain(), 0, emptyArmor(), null));
+        assertThrows(IllegalArgumentException.class, () -> new InventoryView(emptyMain(), 0, emptyArmor(), null));
     }
 
     @Test
     void rejectsSelectedSlotBelowZero() {
-        assertThrows(IllegalArgumentException.class,
-            () -> new InventoryView(emptyMain(), -1, emptyArmor(),
-                ItemView.EMPTY));
+        assertThrows(
+                IllegalArgumentException.class, () -> new InventoryView(emptyMain(), -1, emptyArmor(), ItemView.EMPTY));
     }
 
     @Test
     void rejectsSelectedSlotAboveHotbar() {
-        assertThrows(IllegalArgumentException.class,
-            () -> new InventoryView(emptyMain(),
-                InventoryView.HOTBAR_SIZE, emptyArmor(), ItemView.EMPTY));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new InventoryView(emptyMain(), InventoryView.HOTBAR_SIZE, emptyArmor(), ItemView.EMPTY));
     }
 
     // ── InventoryView queries ─────────────────────────────────
@@ -145,8 +132,7 @@ class InventorySenseTest {
         var main = emptyMain();
         main.set(3, new ItemView("minecraft:iron_pickaxe", 1));
         var inv = new InventoryView(main, 3, emptyArmor(), ItemView.EMPTY);
-        assertEquals("minecraft:iron_pickaxe",
-            inv.getSelected().itemId());
+        assertEquals("minecraft:iron_pickaxe", inv.getSelected().itemId());
         assertEquals(1, inv.getSelected().count());
     }
 
@@ -156,10 +142,8 @@ class InventorySenseTest {
         // armor row or offhand: equipment is not transferable stack.
         var armor = emptyArmor();
         armor.set(0, new ItemView("minecraft:iron_helmet", 1));
-        var inv = new InventoryView(emptyMain(), 0, armor,
-            new ItemView("minecraft:shield", 1));
-        assertTrue(inv.main().stream().allMatch(ItemView.EMPTY::equals),
-            "equipment leaked into the main slice");
+        var inv = new InventoryView(emptyMain(), 0, armor, new ItemView("minecraft:shield", 1));
+        assertTrue(inv.main().stream().allMatch(ItemView.EMPTY::equals), "equipment leaked into the main slice");
     }
 
     @Test
@@ -181,11 +165,9 @@ class InventorySenseTest {
         main.set(35, new ItemView("minecraft:dirt", 1));
         var inv = new InventoryView(main, 0, emptyArmor(), ItemView.EMPTY);
         var backpack = inv.backpack();
-        assertEquals(InventoryView.MAIN_SIZE - InventoryView.HOTBAR_SIZE,
-            backpack.size());
+        assertEquals(InventoryView.MAIN_SIZE - InventoryView.HOTBAR_SIZE, backpack.size());
         assertEquals("minecraft:diamond", backpack.get(0).itemId());
-        assertEquals("minecraft:dirt",
-            backpack.get(backpack.size() - 1).itemId());
+        assertEquals("minecraft:dirt", backpack.get(backpack.size() - 1).itemId());
     }
 
     // ── Immutability ──────────────────────────────────────────
@@ -199,9 +181,8 @@ class InventorySenseTest {
         main.set(0, new ItemView("minecraft:diamond", 1));
         var inv = new InventoryView(main, 0, emptyArmor(), ItemView.EMPTY);
         main.set(0, new ItemView("minecraft:dirt", 64));
-        assertEquals("minecraft:diamond",
-            inv.main().get(0).itemId(),
-            "snapshot unaffected by post-construction mutation");
+        assertEquals(
+                "minecraft:diamond", inv.main().get(0).itemId(), "snapshot unaffected by post-construction mutation");
     }
 
     @Test
@@ -214,10 +195,8 @@ class InventorySenseTest {
     @Test
     void hotbarAndBackpackAreUnmodifiable() {
         var inv = InventoryView.empty();
-        assertThrows(UnsupportedOperationException.class,
-            () -> inv.hotbar().set(0, new ItemView("x", 1)));
-        assertThrows(UnsupportedOperationException.class,
-            () -> inv.backpack().set(0, new ItemView("x", 1)));
+        assertThrows(UnsupportedOperationException.class, () -> inv.hotbar().set(0, new ItemView("x", 1)));
+        assertThrows(UnsupportedOperationException.class, () -> inv.backpack().set(0, new ItemView("x", 1)));
     }
 
     // ── helpers ────────────────────────────────────────────────
