@@ -263,6 +263,7 @@ public final class BotAssembly {
                 clockOf(level),
                 events,
                 CrashReporter.consoleFallback(),
+                new VanillaToolCatalog(),
                 engageFactory,
                 rescueFactory,
                 forageFactory);

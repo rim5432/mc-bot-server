@@ -4,6 +4,7 @@ import com.mcbot.mcbotserver.api.actor.Actor;
 import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
+import com.mcbot.mcbotserver.api.actor.ToolCatalog;
 import com.mcbot.mcbotserver.api.behavior.Behavior;
 import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
 import com.mcbot.mcbotserver.api.event.BotEvent;
@@ -157,6 +158,9 @@ public final class BotController {
     /** Reflex claim construction (aim-and-dig, eat select-and-use). */
     private final ReflexClaimInjector claimInjector;
 
+    /** Mission dig tool auto-selection (hotbar scan + SLOT claim). */
+    private final ToolSelector toolSelector;
+
     private int ticksSinceKeepalive;
 
     /**
@@ -289,6 +293,7 @@ public final class BotController {
                 clock,
                 events,
                 crashReporter,
+                ToolCatalog.none(),
                 engageMissionFactory,
                 rescueMissionFactory,
                 null);
@@ -309,6 +314,8 @@ public final class BotController {
      * @param events        event stream for the primary crash channel;
      *                      never null
      * @param crashReporter fallback reporter; never null
+     * @param toolCatalog dig-speed seam for mission tool selection;
+     *                      never null
      * @param engageMissionFactory supplies one fresh defend mission
      *                      per reflex engage submission; may be null
      * @param rescueMissionFactory supplies one fresh rescue mission
@@ -328,6 +335,7 @@ public final class BotController {
             GameClock clock,
             EventQueue events,
             CrashReporter crashReporter,
+            ToolCatalog toolCatalog,
             Supplier<BotProcess> engageMissionFactory,
             Supplier<BotProcess> rescueMissionFactory,
             Supplier<BotProcess> hungryMissionFactory) {
@@ -348,6 +356,7 @@ public final class BotController {
         this.rescueSeat = new ReflexMissionSeat(arbiter, PATHING_RESUBMIT_COOLDOWN);
         this.hungrySeat = new ReflexMissionSeat(arbiter, PATHING_RESUBMIT_COOLDOWN);
         this.claimInjector = new ReflexClaimInjector(actor, positionSource::get);
+        this.toolSelector = new ToolSelector(Objects.requireNonNull(toolCatalog, "toolCatalog"));
     }
 
     /**
@@ -605,6 +614,7 @@ public final class BotController {
         // preemption still wins because the reflex layer runs first
         // and parks missions.
         if (arbiter.current() instanceof DigMission dm && dm.isDigging()) {
+            toolSelector.select(world, actor, dm.priority(), "mission:dig:" + dm.missionTaskId(), dm.digTarget());
             claimInjector.aimAndDig(dm.priority(), "mission:dig:" + dm.missionTaskId(), dm.digTarget());
         }
 
