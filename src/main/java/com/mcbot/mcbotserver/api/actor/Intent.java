@@ -101,28 +101,24 @@ public sealed interface Intent {
     record DropSelected(boolean fullStack) implements Intent {}
 
     /**
-     * Right-click a block: place a block from the selected hotbar slot
-     * onto the clicked face, resolved on the INTERACT channel. One-shot
-     * action — the adapter fires on the rising edge (same shape USE uses
-     * for melee swings and DropSelected uses for item drops); a held
-     * claim across ticks does not place repeatedly.
+     * Right-click a block, resolved on the INTERACT channel: the
+     * vanilla non-sneak use chain at the clicked cell - block
+     * interaction first (open a door, press a button), then the held
+     * item's use-on (BlockItem placement, hoe tilling, flint ignition)
+     * when the block interaction passed. One-shot action — the adapter
+     * fires on the rising edge (same shape USE uses for melee swings
+     * and DropSelected uses for item drops); a held claim across ticks
+     * does not act repeatedly.
      *
-     * <p>Phase 1 scope (issue 0007): only block placement is implemented
-     * — the adapter checks that the selected item is a BlockItem,
-     * computes the placement cell as {@code target.relative(face)}, and
-     * calls {@code level.setBlock} directly (bypassing
-     * ServerPlayerGameMode.useItemOn, which requires a ServerPlayer the
-     * carrier does not have until Phase 2's BotPlayerFacade). Use-block
-     * interactions (open a chest, press a button) and direction-aware
-     * block states (stairs, pistons) are deferred to Phase 2 — they need
-     * either a Player parameter or BlockState.getStateForPlacement context.
+     * <p>Phase 2 scope (issue 0007): the chain runs through the
+     * BotPlayerFacade, so placement rides BlockItem.place's own state
+     * machine (direction-aware states, replaceable cells) instead of
+     * the Phase 1 default-state setBlock. Container blocks stay
+     * menu-verb territory; a right-click on them is a silent no-op.
      *
-     * <p>The placement position depends on the face: placing on the UP
-     * face puts the block above the target, on the NORTH face puts it
-     * north of the target, etc. {@code hitPos} is the absolute
-     * intersection point of the ray with the cube face — carried for
-     * Phase 2 direction-aware placement and sub-face targeting (e.g.
-     * which half of a stair), but not used by the Phase 1 executor.
+     * <p>{@code hitPos} is the absolute intersection point of the ray
+     * with the cube face — carried as the hit location the vanilla
+     * context reads for sub-face and orientation decisions.
      *
      * @param target the clicked block cell; never null
      * @param face   which face of the target was clicked; never null

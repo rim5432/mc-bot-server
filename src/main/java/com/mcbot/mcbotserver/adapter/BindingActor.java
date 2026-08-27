@@ -45,7 +45,7 @@ public final class BindingActor implements Actor, MenuTransactions {
     private final PresenceLayer presence;
     /** Held-dig execution: destroy progress + the break (0009). */
     private final DigExecutor dig;
-    /** One-shot block placement from the selected hotbar slot (0007). */
+    /** One-shot right-click chain from the selected hotbar slot (0007). */
     private final InteractBlockExecutor interact;
 
     /**
@@ -76,8 +76,12 @@ public final class BindingActor implements Actor, MenuTransactions {
         this.melee = new MeleeResolver(body);
         this.presence = new PresenceLayer(body);
         this.dig = new DigExecutor(body);
-        this.interact = new InteractBlockExecutor(body);
-        this.menus = new MenuOpener(new BotPlayerFacade(body));
+        // One facade per body serves both the right-click chain and the
+        // menu transactions - a second instance would fork the
+        // containerMenu state the MenuOpener owns.
+        BotPlayerFacade facade = new BotPlayerFacade(body);
+        this.interact = new InteractBlockExecutor(body, facade);
+        this.menus = new MenuOpener(facade);
     }
 
     @Override

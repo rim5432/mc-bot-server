@@ -108,11 +108,21 @@ public final class WorldCommands {
                 .requires(src -> src.hasPermission(2))
                 .then(Commands.argument("slot", IntegerArgumentType.integer(0, 8))
                         .executes(ctx -> runEquip(ctx, live)));
+        var use = Commands.literal("use")
+                .requires(src -> src.hasPermission(2))
+                .then(Commands.argument("x", IntegerArgumentType.integer())
+                        .then(Commands.argument("y", IntegerArgumentType.integer())
+                                .then(Commands.argument("z", IntegerArgumentType.integer())
+                                        .then(Commands.argument(
+                                                        "face",
+                                                        com.mojang.brigadier.arguments.StringArgumentType.word())
+                                                .executes(ctx -> runUse(ctx, live))))));
         dispatcher.register(block);
         dispatcher.register(blocks);
         dispatcher.register(entities);
         dispatcher.register(place);
         dispatcher.register(equip);
+        dispatcher.register(use);
     }
 
     /**
@@ -167,6 +177,54 @@ public final class WorldCommands {
             root.addProperty(
                     "reason", "rejected (no block item in the selected slot," + " cannot survive, or obstructed)");
             return CommandResponse.answer(ctx.getSource(), root);
+        }
+        return CommandResponse.answer(ctx.getSource(), root);
+    }
+
+    /**
+     * Synchronous one-shot use (issue 0007 Phase 2): right-click chain
+     * against the target cell - block interaction first, then the held
+     * item's use-on. Unlike place there is no reliable post-state read
+     * (a pressed button springs back), so the executor's consumed
+     * verdict IS the reply: {@code used:true} on a consumed action,
+     * {@code used:false} plus a reason otherwise.
+     */
+    private static int runUse(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
+        Live l = live.get();
+        if (l == null) {
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
+        }
+        Direction face;
+        try {
+            face = Direction.valueOf(com.mojang.brigadier.arguments.StringArgumentType.getString(ctx, "face")
+                    .toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return CommandResponse.answer(
+                    ctx.getSource(),
+                    CommandResponse.err("unknown face: "
+                            + com.mojang.brigadier.arguments.StringArgumentType.getString(ctx, "face")
+                            + " (up, down, north, south, east, west)"));
+        }
+        CellPos target = new CellPos(
+                IntegerArgumentType.getInteger(ctx, "x"),
+                IntegerArgumentType.getInteger(ctx, "y"),
+                IntegerArgumentType.getInteger(ctx, "z"));
+        BlockSnapshot clicked = l.view().getBlock(target, ViewMode.LIVE);
+        if (clicked == null) {
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("chunk not loaded"));
+        }
+        // hitPos is contractually non-null; the executor reads it as the
+        // vanilla hit location.
+        boolean used = l.interact()
+                .use(new Intent.InteractBlock(
+                        target, face, new Vec3(target.x() + 0.5, target.y() + 0.5, target.z() + 0.5)));
+        JsonObject root = CommandResponse.ok();
+        root.addProperty("used", used);
+        root.addProperty("target", clicked.blockId());
+        if (!used) {
+            root.addProperty(
+                    "reason",
+                    "no action (out of reach, container block, block and item" + " both passed, or empty hand)");
         }
         return CommandResponse.answer(ctx.getSource(), root);
     }
