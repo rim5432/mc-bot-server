@@ -78,10 +78,7 @@ RUN_GAMETEST = ["runGameTestServer"]
 
 # canonical -Plint dashboard round; mirrors the invocation documented
 # in doc/guide/build-and-run.md - change both in the same commit
-LINT_TASKS = [
-    "pmdMain", "pmdTest", "cpdCheck", "spotbugsMain", "spotbugsTest",
-    "compileJava", "compileTestJava", "-Plint", "--continue",
-]
+LINT_TASKS = ["qualityCheck", "-Plint", "--continue"]
 
 # 这些 task 跑时强制 --no-daemon（防 daemon 残留 / 锁冲突）
 NEEDS_NO_DAEMON = {

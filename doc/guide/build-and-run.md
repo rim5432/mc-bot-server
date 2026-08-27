@@ -33,16 +33,16 @@ hygiene outweighs ~10s of build time):
    `python tool/mcbot_tool.py test` and fail the build on
    violation - no opt-in, no memory required. Block-verified by
    probe (an injected unused import fails `test` in 19s).
-2. **Dashboards stay behind `-Plint`.** PMD, CPD, SpotBugs (and
-   Error Prone on the `-Plint` compiles) write `build/reports/*`
-   under the build lock via the generic gradle passthrough:
+2. **Everything else is one command.** PMD, CPD, SpotBugs (and
+   Error Prone on the `-Plint` compiles) run behind `-Plint` through
+   the consolidated `qualityCheck` task - one invocation, one verdict:
 
 ```bash
-python tool/mcbot_tool.py gradle \
-    pmdMain pmdTest cpdCheck spotbugsMain spotbugsTest \
-    compileJava compileTestJava \
-    -Plint --continue
+python tool/mcbot_tool.py lint   # = gradle qualityCheck -Plint --continue
 ```
+
+`LINT_TASKS` in tool/mcbot_tool.py mirrors this section; change both
+in the same commit.
 
 Postures after the 2026-08-27 promotion:
 
@@ -51,7 +51,7 @@ Postures after the 2026-08-27 promotion:
 | Checkstyle | **hard gate, default `test` flow** | naming, imports, Javadoc, modifier order, EmptyBlock; 2026-08-27 added TodoComment, IllegalCatch (narrowed), IllegalThrows, MissingDeprecated, JavadocVariable (public constants), RegexpSinglelineJava (bans printStackTrace() and System.exit()) |
 | Spotless check | **hard gate, default `test` flow** | `palantirJavaFormat` output == ecosystem standard (4-space / 120 cols / K&R); `spotlessApply` runs ungated any time |
 | PMD main + test | **RED WALL, `-Plint` fails on violation** | zero findings held since the 2026-08-27 paydown (17 -> 0 via per-channel/per-kind/stage extractions); only project-documented `@SuppressWarnings("PMD.TooManyMethods")` exemptions remain on MineProcess and BotController
-| CPD | advisory, never fails | duplicate blocks >=100 tokens; 2026-08-27 fixed BotCommands/WorldCommands response-helper duplication (extracted CommandResponse) and runDig/runMine/goto duplication (extracted submitCommand); 11 remain (3 main, 8 test) for a future dedup round |
+| CPD | **RED WALL, `-Plint` fails at >=140 tokens** | main-side duplication cleared 2026-08-27 (CommandResponse, submitCommand, CommandHandlerGuards, BindingInventory.toView sharing, GametestRig.fillPool); the threshold sits above the largest surviving test-side copy (131), so only new main-scale duplication fires - sub-threshold dups stay periodic manual review |
 | SpotBugs (api+core scope only) | **advisory dashboard** (`ignoreFailures`) | `onlyAnalyze` limits to engine-free packages, which need no MC auxclasspath; first pass flagged ThreatBlackboard dead fields, EI2 exposures |
 | Error Prone (on `-Plint` compiles) | **11 checks at ERROR + NullAway, rest warnings** | core pinned 2.42.0 (last JDK17 runtime); ReferenceEquality OFF; promoted guards: StreamResourceLeak, JdkObsolete, DefaultCharset, StringCharset, MissingOverride, EqualsIncompatibleType, InterruptedExceptionSwallowed, StringCaseLocaleUsage, SystemOut, NonApiType — zero-violation baseline; NullAway enforces @Nullable/@NonNull on api.. (jsr305), 6 annotated nullable sites, off for test code |
 | JaCoCo coverage | **manual lens** (`gradle jacocoTestReport`) | offline-layer truth only: adapter/gametest/client read 0% by design (engine-covered), core layers 86-97%; watch `core/command`, `api/interrupt`, `api/state` |

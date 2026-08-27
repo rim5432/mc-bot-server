@@ -48,7 +48,8 @@ class LintPostureGateTest {
                     "tasks.withType(com.github.spotbugs.snom.SpotBugsTask).configureEach {",
                     List.of("enabled = project.hasProperty('lint')", "ignoreFailures = true")),
             new Posture("options.errorprone {", List.of("enabled = project.hasProperty('lint')")),
-            new Posture("tasks.register('cpdCheck', JavaExec) {", List.of("enabled = project.hasProperty('lint')")));
+            new Posture("tasks.register('cpdCheck', JavaExec) {", List.of("enabled = project.hasProperty('lint')")),
+            new Posture("tasks.register('qualityCheck') {", List.of("'pmdMain'", "'spotbugsTest'", "'spotlessCheck'")));
 
     /** Soft-posture budget: exactly the SpotBugs dashboard softens, nothing else. */
     private static final int PINNED_IGNORE_FAILURES = 1;

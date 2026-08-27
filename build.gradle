@@ -307,6 +307,20 @@ tasks.register('cpdCheck', JavaExec) {
     enabled = project.hasProperty('lint')
 }
 
+// One-command quality verdict: compile both source sets, then run every
+// gate and analyzer in its configured posture - checkstyle/spotless as
+// plain gates, PMD and CPD as red walls, SpotBugs as dashboard. Coverage
+// and mutation lenses stay separate on purpose: they are research
+// rounds, not per-commit checks. Entry point: mcbot_tool.py lint.
+tasks.register('qualityCheck') {
+    group = 'verification'
+    description = 'Full static-analysis verdict (compile + style + walls + dashboards).'
+    dependsOn 'compileJava', 'compileTestJava',
+            'checkstyleMain', 'checkstyleTest', 'spotlessCheck',
+            'pmdMain', 'pmdTest', 'cpdCheck',
+            'spotbugsMain', 'spotbugsTest'
+}
+
 idea {
     module {
         downloadSources = true
