@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.core.menu;
 
+import com.mcbot.mcbotserver.api.menu.ArmorCatalog;
 import com.mcbot.mcbotserver.api.menu.CraftingView;
 import com.mcbot.mcbotserver.api.menu.MenuClick;
 import com.mcbot.mcbotserver.api.menu.MenuView;
@@ -16,7 +17,8 @@ import java.util.Map;
  * menus without performing any of them. Dispatch only - the planning
  * implementations live in {@link CraftingPlanner} (crafting surfaces),
  * {@link TransferPlanner} (container/furnace transfers, exact-count
- * split carries) and the shared sourcing primitives in
+ * split carries), {@link WearPlanner} (armor wearing) and the shared
+ * sourcing primitives in
  * {@link PlayerRegion}. All plans are computed before the first
  * click, so an invalid request performs none.
  */
@@ -285,5 +287,24 @@ public final class MenuPlanner {
         }
         TransferPlanner.splitCarry(sourceStacks, destinations, planned, steps);
         return List.copyOf(steps);
+    }
+
+    /**
+     * Plan wearing the best available armor: for each own-inventory
+     * armor slot (flat 5..8, head..feet), the highest-protection
+     * wearable in the player region replaces a strictly worse (or
+     * absent) worn piece; equal or unclassifiable worn pieces stay
+     * on. Computed on one snapshot - moves never interfere, see
+     * {@link WearPlanner}.
+     *
+     * @param menu    the own-inventory snapshot; never null
+     * @param catalog armor classification; never null
+     * @return the click sequence in execution order; never null, may
+     *         be empty when nothing improves
+     * @throws IllegalArgumentException when the menu carries no
+     *                                  ARMOR-role slots
+     */
+    public static List<Step> planWear(MenuView menu, ArmorCatalog catalog) {
+        return WearPlanner.plan(menu, catalog);
     }
 }

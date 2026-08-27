@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.adapter;
 
+import com.mcbot.mcbotserver.api.menu.ArmorCatalog;
 import com.mcbot.mcbotserver.api.menu.MenuTransactions;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
@@ -26,11 +27,18 @@ public final class MenuCommands {
      * @param tx      the actor's menu transaction surface; never null
      * @param catalog recipe lookup over the server RecipeManager;
      *                never null
+     * @param armor   armor classification over the item registry;
+     *                never null
      * @param level   the bot's server level (scan source); never null
      * @param botPos  the bot body's block position (scan center);
      *                never null
      */
-    public record Live(MenuTransactions tx, RecipeCatalog catalog, ServerLevel level, Supplier<BlockPos> botPos) {}
+    public record Live(
+            MenuTransactions tx,
+            RecipeCatalog catalog,
+            ArmorCatalog armor,
+            ServerLevel level,
+            Supplier<BlockPos> botPos) {}
 
     /**
      * Register the menu / scan / recipes subtrees on the dispatcher.
@@ -51,6 +59,7 @@ public final class MenuCommands {
                 .then(openBranch(live))
                 .then(Commands.literal("open-inventory")
                         .executes(ctx -> MenuVerbs.runOpenInventory(live, ctx.getSource())))
+                .then(Commands.literal("wear").executes(ctx -> WearVerbs.runWear(live, ctx.getSource())))
                 .then(Commands.literal("snapshot").executes(ctx -> MenuVerbs.runSnapshot(live, ctx.getSource())))
                 .then(Commands.literal("close").executes(ctx -> MenuVerbs.runClose(live, ctx.getSource())))
                 .then(depositBranch(live))

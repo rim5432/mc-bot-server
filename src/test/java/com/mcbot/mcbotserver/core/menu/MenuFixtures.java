@@ -130,4 +130,29 @@ final class MenuFixtures {
         }
         return new MenuView("furnace", null, ItemView.EMPTY, 39, slots);
     }
+
+    /** Own-inventory fake: result 0, grid 1..4, ARMOR 5..8 (head
+     * first), MAIN 9..35, HOTBAR 36..44, OFFHAND 45 - the
+     * MenuSlotLayouts survival layout mirrored. */
+    static MenuView ownInventory(Builder b) {
+        b.roles.putIfAbsent(0, SlotRole.RESULT);
+        for (int i = 1; i <= 4; i++) {
+            b.roles.putIfAbsent(i, SlotRole.GRID);
+        }
+        for (int i = 5; i <= 8; i++) {
+            b.roles.putIfAbsent(i, SlotRole.ARMOR);
+        }
+        for (int i = 9; i <= 35; i++) {
+            b.roles.putIfAbsent(i, SlotRole.MAIN);
+        }
+        for (int i = 36; i <= 44; i++) {
+            b.roles.putIfAbsent(i, SlotRole.HOTBAR);
+        }
+        b.roles.putIfAbsent(45, SlotRole.OFFHAND);
+        List<SlotView> slots = new ArrayList<>(46);
+        for (int i = 0; i < 46; i++) {
+            slots.add(new SlotView(i, b.items.getOrDefault(i, ItemView.EMPTY), b.roles.get(i)));
+        }
+        return new MenuView("inventory", null, ItemView.EMPTY, 46, slots);
+    }
 }

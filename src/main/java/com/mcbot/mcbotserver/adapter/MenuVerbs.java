@@ -18,7 +18,8 @@ import net.minecraft.commands.CommandSourceStack;
 /**
  * Executor half of the menu verb surface: the imperative verbs that
  * mutate or read one bot's open menu (open/close, snapshot, counted
- * deposit/take, craft). Brigadier tree construction stays with
+ * deposit/take, craft; armor wearing lives in {@link WearVerbs}).
+ * Brigadier tree construction stays with
  * {@link MenuCommands}; this class holds only the wiring-neutral
  * behavior.
  */
@@ -221,13 +222,14 @@ final class MenuVerbs {
     /**
      * Execute planner steps in order; every click answers the
      * post-click snapshot, so the last answer is the final state.
+     * Shared with {@link WearVerbs}.
      *
      * @param tx    the menu surface; never null
      * @param steps click sequence; may be empty (returns {@code last})
      * @param last  the snapshot the plan was computed from; never null
      * @return the post-execution snapshot; never null
      */
-    private static MenuView executeSteps(MenuTransactions tx, List<MenuPlanner.Step> steps, MenuView last) {
+    static MenuView executeSteps(MenuTransactions tx, List<MenuPlanner.Step> steps, MenuView last) {
         MenuView view = last;
         for (MenuPlanner.Step step : steps) {
             view = tx.menuClick(step.slot(), step.button(), step.kind());

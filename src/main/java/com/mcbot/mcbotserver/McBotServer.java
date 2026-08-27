@@ -358,6 +358,7 @@ public class McBotServer {
         return new com.mcbot.mcbotserver.adapter.MenuCommands.Live(
                 activeActor,
                 activeCatalog,
+                new com.mcbot.mcbotserver.adapter.VanillaArmorCatalog(),
                 (net.minecraft.server.level.ServerLevel) activeBody.level(),
                 activeBody::blockPosition);
     }
