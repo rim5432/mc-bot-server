@@ -59,6 +59,7 @@ final class ReflexRescueSeat implements ReflexSeat {
      * already announced by the transition detector; keeping the corpse
      * would only blur the parked/awaiting queries below.
      */
+    @Override
     public void retireFinished() {
         if (rescue != null && !rescue.isActive()) {
             rescue = null;
@@ -69,6 +70,7 @@ final class ReflexRescueSeat implements ReflexSeat {
      * @return true when no rescue mission is live and the resubmit
      *         cooldown has elapsed
      */
+    @Override
     public boolean maySubmit() {
         return rescue == null && ticksSinceSubmit >= RESCUE_RESUBMIT_COOLDOWN;
     }
@@ -78,12 +80,15 @@ final class ReflexRescueSeat implements ReflexSeat {
      *
      * @param mission the freshly registered rescue mission; never null
      */
+    @Override
     public void submitted(BotProcess mission) {
         rescue = mission;
         ticksSinceSubmit = 0;
     }
 
     /**
+     * Reports whether the live rescue mission sits parked.
+     *
      * @return true when the live rescue mission sits in the arbiter's
      *         paused slot (a survival reflex parked it mid-route)
      */
@@ -92,6 +97,8 @@ final class ReflexRescueSeat implements ReflexSeat {
     }
 
     /**
+     * Reports a registered rescue mission waiting for its seat.
+     *
      * @return true when the live rescue mission is registered but
      *         neither seated nor parked
      */

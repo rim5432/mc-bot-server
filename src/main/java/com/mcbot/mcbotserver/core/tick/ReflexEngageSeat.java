@@ -55,6 +55,7 @@ final class ReflexEngageSeat implements ReflexSeat {
      * announced by the transition detector; keeping the corpse would
      * only blur the parked/awaiting queries below.
      */
+    @Override
     public void retireFinished() {
         if (fight != null && !fight.isActive()) {
             fight = null;
@@ -65,6 +66,7 @@ final class ReflexEngageSeat implements ReflexSeat {
      * @return true when no fight is live and the resubmit cooldown
      *         has elapsed
      */
+    @Override
     public boolean maySubmit() {
         return fight == null && ticksSinceSubmit >= ENGAGE_RESUBMIT_COOLDOWN;
     }
@@ -74,12 +76,15 @@ final class ReflexEngageSeat implements ReflexSeat {
      *
      * @param mission the freshly registered fight; never null
      */
+    @Override
     public void submitted(BotProcess mission) {
         fight = mission;
         ticksSinceSubmit = 0;
     }
 
     /**
+     * Reports whether the live fight currently sits parked.
+     *
      * @return true when the live fight sits in the arbiter's paused
      *         slot (a survival reflex parked it mid-fight)
      */
@@ -88,6 +93,8 @@ final class ReflexEngageSeat implements ReflexSeat {
     }
 
     /**
+     * Reports a registered fight still waiting for its seat.
+     *
      * @return true when the live fight is registered but neither
      *         seated nor parked
      */

@@ -76,6 +76,7 @@ public final class DigProcess implements BotProcess, TerminalMission, DigMission
     }
 
     /** Arbiter seat priority for the mission-dig claim path. */
+    @Override
     public int priority() {
         return priority;
     }

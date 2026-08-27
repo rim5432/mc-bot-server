@@ -34,7 +34,7 @@ import net.minecraft.world.item.ItemStack;
  * <p>Contract: see boundaries.md section A (all world mutation behind
  * the actor/menu surface) and issue 0007 risk 2 ("core never writes
  * menu state"). The core planner reads {@link #snapshot()} and calls
- * {@link #click(int, int, ClickType)}; it never touches slot state
+ * {@link #click(int, int, MenuClick)}; it never touches slot state
  * directly. {@code ResultSlot.onTake} consumes crafting-grid materials
  * on take — bypassing {@code clicked()} would duplicate items.
  *

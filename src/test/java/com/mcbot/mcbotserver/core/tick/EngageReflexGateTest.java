@@ -39,6 +39,9 @@ import org.junit.jupiter.api.Test;
  * ledger 23. The 2026-08-24 night-cave death is the failure this
  * guards: nothing engaged a hostile without an explicit mission.
  */
+// `arbiter.current() == mission` asserts seat IDENTITY on purpose: an
+// equal-valued clone sitting in the arbiter would be a real bug here.
+@SuppressWarnings("PMD.CompareObjectsWithEquals")
 class EngageReflexGateTest {
 
     /** Parkable mission stub counting ticks and park/resume calls. */

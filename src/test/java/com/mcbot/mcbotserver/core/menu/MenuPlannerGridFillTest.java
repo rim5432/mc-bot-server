@@ -73,15 +73,15 @@ class MenuPlannerGridFillTest {
 
     @Test
     void mixedRecipeComposesFromSingleMaterialPlans() {
-        String PLANK = "minecraft:oak_planks";
-        String STICK = "minecraft:stick";
+        String plank = "minecraft:oak_planks";
+        String stick = "minecraft:stick";
         CraftingView menu = MenuFixtures.table(
-                MenuFixtures.builder().put(SlotRole.HOTBAR, 37, PLANK, 12).put(SlotRole.HOTBAR, 38, STICK, 8));
+                MenuFixtures.builder().put(SlotRole.HOTBAR, 37, plank, 12).put(SlotRole.HOTBAR, 38, stick, 8));
 
         // Wooden pickaxe column by column: each sub-plan leaves the
         // cursor empty, so the next one starts clean.
-        List<MenuPlanner.Step> planks = MenuPlanner.planGridFill(menu, PLANK, 0, 3, 6);
-        List<MenuPlanner.Step> sticks = MenuPlanner.planGridFill(menu, STICK, 1, 4);
+        List<MenuPlanner.Step> planks = MenuPlanner.planGridFill(menu, plank, 0, 3, 6);
+        List<MenuPlanner.Step> sticks = MenuPlanner.planGridFill(menu, stick, 1, 4);
 
         assertEquals(
                 List.of(

@@ -219,7 +219,8 @@ class CombatSkeletonGateTest {
                 "gt-def", 60, 400, () -> new CellPos(0, 64, 0), hostiles, Set.of("minecraft:skeleton"));
         RecordingActor actor = new RecordingActor();
 
-        Directive directive = defend.onTick(world);
+        // onTick performs the state transition the asserts below read.
+        defend.onTick(world);
 
         assertFalse(defend.isActive(), "refusal is immediate - no bleeding chase");
         assertFalse(defend.missionSucceeded());

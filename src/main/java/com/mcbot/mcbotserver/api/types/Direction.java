@@ -48,21 +48,32 @@ public enum Direction {
     }
 
     /**
-     * The unit-step vector of this face, used to compute the adjacent
-     * cell (e.g. the placement position is {@code target.relative(face)}).
+     * Returns the x component of the face normal.
      *
-     * @return x component of the face normal
+     * <p>The unit-step vector of this face is used to compute the
+     * adjacent cell (e.g. the placement position is
+     * {@code target.relative(face)}).
+     *
+     * @return the x component
      */
     public int dx() {
         return dx;
     }
 
-    /** @return y component of the face normal. */
+    /**
+     * Returns the y component of the face normal.
+     *
+     * @return the y component
+     */
     public int dy() {
         return dy;
     }
 
-    /** @return z component of the face normal. */
+    /**
+     * Returns the z component of the face normal.
+     *
+     * @return the z component
+     */
     public int dz() {
         return dz;
     }

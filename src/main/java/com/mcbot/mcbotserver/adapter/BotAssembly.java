@@ -119,7 +119,6 @@ public final class BotAssembly {
         BindingActor actor = new BindingActor(body);
 
         SurvivalReflexLayer reflex = new SurvivalReflexLayer(new LevelThreatSensor(
-                view,
                 () -> poseOf(body),
                 body::getAirSupply,
                 body::isInLava,

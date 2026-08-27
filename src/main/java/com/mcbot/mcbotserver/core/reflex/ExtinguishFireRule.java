@@ -70,8 +70,6 @@ public final class ExtinguishFireRule implements ReflexRule, ReflexHysteresis {
      * mission time to reach water without the rule flickering off as
      * fireTicks decrements tick by tick.
      */
-    private static final float RELEASE_DAMAGE_FRACTION = 0.5f;
-
     private final int priority;
 
     /** Creates the rule with the default table's priority. */

@@ -65,7 +65,6 @@ public final class LevelThreatSensor implements ThreatSensor {
         return RANGED_TYPES;
     }
 
-    private final com.mcbot.mcbotserver.adapter.BindingWorldView view;
     private final Supplier<CellPos> bodyPos;
     private final Supplier<Integer> airSupply;
     private final Supplier<Boolean> inLava;
@@ -77,7 +76,6 @@ public final class LevelThreatSensor implements ThreatSensor {
     /**
      * Creates a sensor scanning around the live body position.
      *
-     * @param view       perception read; never null
      * @param bodyPos    current body cell supplier; never null
      * @param airSupply  body air supplier (vanilla
      *                   {@code body::getAirSupply}); never null - a
@@ -100,7 +98,6 @@ public final class LevelThreatSensor implements ThreatSensor {
      *                   rather than a dig-at-null
      */
     public LevelThreatSensor(
-            com.mcbot.mcbotserver.adapter.BindingWorldView view,
             Supplier<CellPos> bodyPos,
             Supplier<Integer> airSupply,
             Supplier<Boolean> inLava,
@@ -108,8 +105,7 @@ public final class LevelThreatSensor implements ThreatSensor {
             Supplier<Integer> freezeTicks,
             Supplier<Boolean> inWall,
             Supplier<CellPos> suffocationBlock) {
-        if (view == null
-                || bodyPos == null
+        if (bodyPos == null
                 || airSupply == null
                 || inLava == null
                 || fireTicks == null
@@ -118,7 +114,6 @@ public final class LevelThreatSensor implements ThreatSensor {
                 || suffocationBlock == null) {
             throw new IllegalArgumentException("arguments must not be null");
         }
-        this.view = view;
         this.bodyPos = bodyPos;
         this.airSupply = airSupply;
         this.inLava = inLava;

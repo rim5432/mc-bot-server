@@ -21,6 +21,8 @@ import org.junit.jupiter.api.Test;
  * armor / 1 offhand, hotbar indices 0-8) mirrors vanilla
  * {@code Inventory.getContainerSize()}=41.
  */
+// TooManyMethods counts test methods; many small tests are the point here.
+@SuppressWarnings("PMD.TooManyMethods")
 class InventorySenseTest {
 
     // ── ItemView ──────────────────────────────────────────────

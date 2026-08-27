@@ -89,7 +89,7 @@ public final class PathingBehavior implements Behavior {
     /**
      * Horizontal reach that counts as "waypoint touched", in metres.
      * Frame: XZ only (`Math.hypot(dx, dz)` in
-     * {@link WaypointCursor#advance} and {@link #distanceToWaypoint}).
+     * {@link WaypointCursor#advance} and {@code distanceToSegment}).
      * Y is intentionally ignored - a position directly above a waypoint
      * is treated as "not at the waypoint" for reach purposes; the
      * goal predicate is the 3D cell-equality authority for arrival.

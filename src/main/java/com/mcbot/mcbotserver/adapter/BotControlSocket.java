@@ -71,7 +71,7 @@ public final class BotControlSocket {
         }
         int port = Integer.parseInt(props.getProperty("rcon.port", "25575"));
         try {
-            listener = new ServerSocket(port, 8, InetAddress.getByName("127.0.0.1"));
+            listener = new ServerSocket(port, 8, InetAddress.getLoopbackAddress());
         } catch (IOException e) {
             return;
         }

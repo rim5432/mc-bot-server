@@ -171,7 +171,7 @@ public final class BotLocomotionGameTests {
         BlockPos start = new BlockPos(3, GametestRig.WALK_Y, 8);
         var rig = rig(helper, start);
         CellPos goalCell = localToCell(helper, new BlockPos(13, GametestRig.WALK_Y, 8));
-        var mission = submitGoto(rig, goalCell);
+        submitGoto(rig, goalCell);
         int startAbsX = helper.absolutePos(start).getX();
 
         // Pre-shove body Z. Used by the post-shove displacement
