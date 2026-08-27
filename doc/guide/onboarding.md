@@ -35,11 +35,15 @@ Cold-start reading order; each step assumes the ones before it.
    blockers are all checked off; that is your next work.
 8. On demand: [architecture/ledger.md](../architecture/ledger.md)
    full verdict texts (use the number you got from boundaries'
-   index), the `reference/*-notes.md` design distillations,
-   [guide/build-and-run.md](build-and-run.md) plus `tool/README.md`
-   the moment you actually run something, and the decompiled
-   MC/Forge tree under `D:/mc-decompiled/forge-1.20.1-47.4.10/` for
-   vanilla API confirmation (read-only).
+   index), [architecture/code-health.md](../architecture/code-health.md)
+   the rule registry plus health/refactor round queue,
+   [reference/toolchain.md](../reference/toolchain.md) the lint-stack
+   versions and gate postures, the `reference/*-notes.md` design
+   distillations, [guide/build-and-run.md](build-and-run.md) plus
+   `tool/README.md` the moment you actually run something, and the
+   decompiled MC/Forge tree under
+   `D:/mc-decompiled/forge-1.20.1-47.4.10/` for vanilla API
+   confirmation (read-only).
 
 A new agent should be able to write code against the contract within
 one day of this order - the Stage 0 gate in the workplan is the
