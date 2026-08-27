@@ -69,6 +69,10 @@ import net.minecraft.world.effect.MobEffectInstance;
 //            D2 (claim surface per channel)
 public final class BotAssembly {
 
+    /** Passive mobs worth hunting (issue 0010 D3 food sources). */
+    private static final java.util.Set<String> PASSIVE_FOOD_TYPES = java.util.Set.of(
+            "minecraft:cow", "minecraft:pig", "minecraft:sheep", "minecraft:chicken", "minecraft:rabbit");
+
     /**
      * Tick budget for one reflex-owned engage mission: long enough for
      * a melee fight plus its grace window, short enough that an
@@ -246,7 +250,8 @@ public final class BotAssembly {
                         () -> poseOf(body),
                         () -> com.mcbot.mcbotserver.adapter.sensing.ForageSensor.nearestBerryBush(
                                 level, poseOf(body), 16),
-                        new VanillaFoodCatalog());
+                        new VanillaFoodCatalog(),
+                        PASSIVE_FOOD_TYPES);
 
         BotController controller = new BotController(
                 reflex,

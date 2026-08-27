@@ -55,7 +55,7 @@ class HungryProcessTest {
         assertFalse(hungry.isActive());
         assertFalse(hungry.missionSucceeded());
         assertEquals(HungryProcess.REASON_EXHAUSTED, hungry.failureReasonOrNull());
-        assertEquals("forage", hungry.verdictAttrs().get("strategy"));
+        assertEquals("none", hungry.verdictAttrs().get("strategy"));
     }
 
     @Test
@@ -105,8 +105,66 @@ class HungryProcessTest {
         assertEquals(HungryProcess.REASON_TIMEOUT, hungry.failureReasonOrNull());
     }
 
+    @Test
+    void huntsNearestPassiveMobWhenNoBush() {
+        MockWorldView world = new MockWorldView();
+        world.addEntity(new com.mcbot.mcbotserver.api.world.EntitySnapshot(
+                "cow-1", "minecraft:cow", new CellPos(5, 64, 0), 10f, 10f));
+        HungryProcess hungry = mission(() -> null);
+
+        var directive = hungry.onTick(world);
+
+        assertEquals(new GoalNear(new CellPos(5, 64, 0), 2), directive.goal());
+        assertEquals(
+                "cow-1",
+                ((com.mcbot.mcbotserver.api.process.Attack)
+                                directive.overrides().combat())
+                        .targetId());
+    }
+
+    @Test
+    void vanishedPreyWalksLastCellThenExhausts() {
+        MockWorldView world = new MockWorldView();
+        CellPos cowCell = new CellPos(5, 64, 0);
+        world.addEntity(
+                new com.mcbot.mcbotserver.api.world.EntitySnapshot("cow-1", "minecraft:cow", cowCell, 10f, 10f));
+        HungryProcess hungry =
+                new HungryProcess("t-h", 50, 500, () -> BODY, () -> null, CATALOG, java.util.Set.of("minecraft:cow"));
+        hungry.onTick(world);
+        world.removeEntity("cow-1");
+
+        var directive = hungry.onTick(world);
+        assertEquals(new GoalNear(cowCell, 0), directive.goal(), "collect walks the prey's last cell");
+        for (int i = 0; i < 60 && hungry.isActive(); i++) {
+            hungry.onTick(world);
+        }
+
+        assertFalse(hungry.isActive());
+        assertEquals(HungryProcess.REASON_EXHAUSTED, hungry.failureReasonOrNull());
+        assertEquals("hunt", hungry.verdictAttrs().get("strategy"));
+    }
+
+    @Test
+    void collectedDropCompletesTheHunt() {
+        MockWorldView world = new MockWorldView();
+        CellPos cowCell = new CellPos(5, 64, 0);
+        world.addEntity(
+                new com.mcbot.mcbotserver.api.world.EntitySnapshot("cow-1", "minecraft:cow", cowCell, 10f, 10f));
+        HungryProcess hungry =
+                new HungryProcess("t-h", 50, 500, () -> BODY, () -> null, CATALOG, java.util.Set.of("minecraft:cow"));
+        hungry.onTick(world);
+        world.removeEntity("cow-1");
+        hungry.onTick(world);
+
+        world.setInventory(worldWithFood().getInventory());
+        hungry.onTick(world);
+
+        assertFalse(hungry.isActive());
+        assertTrue(hungry.missionSucceeded());
+    }
+
     private static HungryProcess mission(java.util.function.Supplier<CellPos> target) {
-        return new HungryProcess("t-hungry-1", 50, 9, () -> BODY, target, CATALOG);
+        return new HungryProcess("t-hungry-1", 50, 9, () -> BODY, target, CATALOG, java.util.Set.of("minecraft:cow"));
     }
 
     private static MockWorldView worldWithFood() {

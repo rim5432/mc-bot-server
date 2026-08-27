@@ -6,7 +6,7 @@ covers:
   - doc/architecture/boundaries.md
   - src/main/java/com/mcbot/mcbotserver/api/reflex/ThreatBlackboard.java
   - src/main/java/com/mcbot/mcbotserver/core/process/
-status: open (forage strategy COMPLETE 2026-08-27: consumption reflex (ledger 34) + ground pickup + ForageSensor + HungryProcess + the third reflex seat with ACQUIRE_FOOD_WHEN_HUNGRY (ledger 35, seat dispatch promoted to ReflexMissionSeat). REMAINING: hunt/fish strategies only)
+status: open (forage + hunt COMPLETE 2026-08-27: HungryProcess is the full section-4.2 state machine - ASSESS picks forage-then-hunt, hunt engages passive food mobs with the DefendProcess directive vocabulary, vanished prey walks its last cell for pickup; ledgers 34/35. REMAINING: fish only (rod-cast timing, section 7))
 related:
   - doc/architecture/issues/0008-extreme-scenario-survival-framework.md
   - doc/architecture/issues/0007-player-parity-interaction.md

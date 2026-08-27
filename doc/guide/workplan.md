@@ -146,8 +146,14 @@ landed (archive). Remaining:
            FORAGE action + ACQUIRE_FOOD_WHEN_HUNGRY (80, the eat
            rule's exact complement, exclusivity-pinned) hands off to
            HungryProcess through it.
-  - [ ] M  Hunt strategy: passive-mob target classification (0010
-           D3) + drop collection follow-up.          [dep: none]
+  - [x] M  Hunt strategy (landed 2026-08-27): D3's classification
+           is a food-types set (cow/pig/sheep/chicken/rabbit) on
+           HungryProcess; the hunt phase engages the nearest prey
+           with the DefendProcess directive vocabulary (GoalNear +
+           Attack - CombatBehavior kills, no weapon required); a
+           vanished prey walks its last cell for pickup (GroundPickup)
+           and the inventory check closes the loop; no-bush-no-prey
+           is FOOD_STRATEGY_EXHAUSTED.   [dep: none]
   - [ ] M  Fish strategy: rod-cast timing behavior (0010 section 7
            open dependency).                          [dep: none]
   - [ ] M  Loop acceptance: unattended mine -> craft -> equip ->
