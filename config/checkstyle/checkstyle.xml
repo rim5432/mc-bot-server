@@ -4,8 +4,9 @@
         "https://checkstyle.org/dtds/configuration_1_3.dtd">
 <!--
   Encodes the machine-checkable subset of AGENTS.md section 1 (code style)
-  as checkstyle rules. Introduced 2026-08-27 alongside PMD; runs advisory
-  via -Plint until promoted to a gate (doc/guide/build-and-run.md).
+  as checkstyle rules. Introduced 2026-08-27 alongside PMD; promoted from
+  the -Plint suite into the default `test` flow the same day once the
+  tree held zero violations (doc/guide/build-and-run.md carries postures).
 
   Deliberately NOT encoded here, each owned elsewhere:
   - final-everywhere (section 1.6): FinalParameters/FinalLocalVariable are

@@ -23,26 +23,33 @@ python tool/mcbot_tool.py test            # JUnit tests
 python tool/mcbot_tool.py status          # lock + processes + last log
 ```
 
-## Static analysis (`-Plint`)
+## Static analysis
 
-Checkstyle, PMD, CPD, SpotBugs and Spotless-check form one opt-in
-suite (Error Prone additionally rides the `-Plint` compiles). It writes
-`build/reports/*`, so it runs under the build lock via the generic
-gradle passthrough:
+Two postures, split at the 2026-08-27 promotion (user ruling:
+hygiene outweighs ~10s of build time):
+
+1. **Hard gates ride the default `test` flow.** `checkstyleMain`,
+   `checkstyleTest` and `spotlessCheck` run on every
+   `python tool/mcbot_tool.py test` and fail the build on
+   violation - no opt-in, no memory required. Block-verified by
+   probe (an injected unused import fails `test` in 19s).
+2. **Dashboards stay behind `-Plint`.** PMD, CPD, SpotBugs (and
+   Error Prone on the `-Plint` compiles) write `build/reports/*`
+   under the build lock via the generic gradle passthrough:
 
 ```bash
 python tool/mcbot_tool.py gradle \
-    checkstyleMain checkstyleTest pmdMain pmdTest cpdCheck \
-    spotlessCheck spotbugsMain spotbugsTest compileJava compileTestJava \
+    pmdMain pmdTest cpdCheck spotbugsMain spotbugsTest \
+    compileJava compileTestJava \
     -Plint --continue
 ```
 
-Postures after the 2026-08-27 second round:
+Postures after the 2026-08-27 promotion:
 
 | Suite | Posture | Notes |
 |---|---|---|
-| Checkstyle | **fails on violation** | semantic/style rules only; layout ownership moved to Spotless |
-| Spotless check | **fails on violation** | `palantirJavaFormat` output == ecosystem standard (4-space / 120 cols / K&R); `spotlessApply` runs ungated any time |
+| Checkstyle | **hard gate, default `test` flow** | semantic/style rules only; layout ownership moved to Spotless |
+| Spotless check | **hard gate, default `test` flow** | `palantirJavaFormat` output == ecosystem standard (4-space / 120 cols / K&R); `spotlessApply` runs ungated any time |
 | PMD main + test | **advisory dashboard** (`ignoreFailures`) | god-class metrics each run - MenuPlanner WMC=110, BotController.runPipeline CC=23 at install time; flip to failing after paydown |
 | CPD | advisory, never fails | duplicate blocks >=100 tokens for dedup rounds |
 | SpotBugs (api+core scope only) | **advisory dashboard** (`ignoreFailures`) | `onlyAnalyze` limits to engine-free packages, which need no MC auxclasspath; first pass flagged ThreatBlackboard dead fields, EI2 exposures |

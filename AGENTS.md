@@ -160,7 +160,8 @@ advice.
   fields.
 - Formatting: canonical form comes from Spotless with
   `palantir-java-format` (`python tool/mcbot_tool.py gradle
-  spotlessApply`; lint-gated width check at 120 via checkstyle) -
+  spotlessApply`; checkstyle + spotlessCheck fail the default
+  `test` flow on violation, width 120 included) -
   never hand-reformat. Still review-enforced: `final` everywhere
   applicable, trailing commas on multi-line lists.
 - Imports explicit, no wildcards below 20 classes from one package;

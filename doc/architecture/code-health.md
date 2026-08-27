@@ -95,7 +95,7 @@ admitted here may encode a size cap.
 | H-R7 Package structure | Main modules single-level, module names never reused as subpackages; test packages mirror main or are sanctioned metas | `architecture.PackageStructureGateTest` | gated 2026-08-25 |
 | H-R8 Contract markers present | Every src/main implementer of a boundary interface carries its `contract: see` pointer (AGENTS.md 1.4.3.1) | `architecture.BoundaryContractMarkerTest` | gated 2026-08-25 |
 | H-R9 Review claims cite or are unverified | Every factual claim in a review/assessment carries a file:line or doc-anchor citation; quoted promises are checked against the anchor; "does this abstraction exist" checks the abstraction-status table first | not mechanically checkable | review-only since 2026-08-27 |
-| H-R10 Style law is machine-owned | AGENTS section 1 semantic rules (naming, javadoc presence, import purity, width) fail the checkstyle tasks; layout is formatter-canonical (Spotless/palantir) and never hand-reformatted | `checkstyle*` + `spotlessCheck` gradle tasks (`build.gradle`, -Plint suite; wired in f8b63b2) | gated (-Plint) 2026-08-27 |
+| H-R10 Style law is machine-owned | AGENTS section 1 semantic rules (naming, javadoc presence, import purity, width) fail the checkstyle tasks; layout is formatter-canonical (Spotless/palantir) and never hand-reformatted | `checkstyle*` + `spotlessCheck` on the default `test` flow (`build.gradle`; wired f8b63b2, promoted same day) | gated (default test path) 2026-08-27 |
 
 ### Rule detail
 
@@ -173,11 +173,12 @@ admitted here may encode a size cap.
   columns), so hand-reformatting is a defect, not a style choice.
   Stays review-only by recorded decision: `final`-everywhere,
   trailing commas, record layout (no reliable AST mapping; see the
-  checkstyle.xml header for the full ownership map). The gate rides
-  the opt-in `-Plint` suite today; PMD flips to failing only after
-  the god-class paydown round, and promoting the hard gates into
-  the default `test` path is the standing recommendation once the
-  suite's runtime cost is confirmed stable across agents.
+  checkstyle.xml header for the full ownership map). The gate rode
+  the opt-in `-Plint` suite for its first hours, then moved into
+  the default `test` flow the same day under the user ruling that
+  hygiene outweighs ~10s of build time - block-verified by probe
+  (an injected unused import fails `test` outright). PMD flips to
+  failing only after the god-class paydown round lands.
 
 ## Abstraction status (single lookup)
 

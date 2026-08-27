@@ -97,6 +97,9 @@ dependencies {
 
 tasks.named('test', Test).configure {
     useJUnitPlatform()
+    // hard style gates ride every test run - user ruling 2026-08-27:
+    // hygiene outweighs ~10s of build time; see doc/guide/build-and-run.md
+    dependsOn 'checkstyleMain', 'checkstyleTest', 'spotlessCheck'
     testLogging {
         events 'failed', 'skipped'
         exceptionFormat 'full'
@@ -142,11 +145,12 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
-// ===== Static analysis (advisory until promoted to a gate) =====
-// Runs only with -Plint (python tool/mcbot_tool.py gradle -Plint
-// checkstyleMain pmdMain pmdTest cpdCheck); the plain compile/test flows
-// stay inert. Promotion to always-on happens via doc/guide/build-and-run.md
-// once configs hold zero violations on the current tree.
+// ===== Static analysis =====
+// Hard gates (checkstyle semantic set + spotlessCheck) ride the
+// default `test` flow since the 2026-08-27 promotion (zero-violation
+// baseline proved first; user accepted the ~10s cost). Dashboards
+// (PMD/CPD/SpotBugs) and Error Prone stay behind -Plint until their
+// paydown/triage rounds land; postures in doc/guide/build-and-run.md.
 checkstyle {
     // All of 13.x and 14.x ship Java-21 bytecode (probed 2026-08-27);
     // the dev toolchain locks Java 17, so pin the last 17-runnable line
@@ -159,9 +163,6 @@ pmd {
     // explicit wiring required: leaving it to the config/pmd default path
     // silently runs the plugin's built-in ruleset instead (observed)
     ruleSetFiles = files('config/pmd/ruleset.xml')
-}
-tasks.withType(Checkstyle).configureEach {
-    enabled = project.hasProperty('lint')
 }
 tasks.withType(Pmd).configureEach {
     enabled = project.hasProperty('lint')
@@ -211,15 +212,8 @@ spotless {
         endWithNewline()
     }
 }
-tasks.matching { it.name.startsWith('spotless') }.configureEach {
-    // apply tasks stay runnable at any time; only check joins the
-    // gated lint suite (-Plint). Layout ownership moves from
-    // checkstyle's Indentation module to the formatter once the
-    // reformat lands.
-    if (it.name.toLowerCase().endsWith('check')) {
-        it.enabled = project.hasProperty('lint')
-    }
-}
+// spotlessCheck rides the default `test` flow with checkstyle (see
+// tasks.named('test') above); apply tasks stay runnable at any time.
 tasks.register('cpdCheck', JavaExec) {
     group = 'verification'
     description = 'Copy-paste detection over src/main/java and src/test/java (PMD CPD).'
