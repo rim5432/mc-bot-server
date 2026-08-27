@@ -33,25 +33,25 @@ class LintPostureGateTest {
 
     /**
      * The pinned wiring. Hard gates: checkstyle and spotlessCheck hang
-     * off the test task. Dashboards: PMD, SpotBugs and cpdCheck enable
-     * only under -Plint; PMD and SpotBugs additionally soften with
-     * ignoreFailures until their written flip conditions land.
+     * off the test task; PMD is a RED WALL under -Plint since its flip
+     * condition landed (zero findings held, 2026-08-27 paydown).
+     * Dashboards: SpotBugs and cpdCheck enable only under -Plint;
+     * SpotBugs additionally softens with ignoreFailures until its own
+     * first-triage flip lands.
      */
     private static final List<Posture> PINNED_POSTURES = List.of(
             new Posture(
                     "tasks.named('test', Test).configure {",
                     List.of("dependsOn 'checkstyleMain', 'checkstyleTest', 'spotlessCheck'")),
-            new Posture(
-                    "tasks.withType(Pmd).configureEach {",
-                    List.of("enabled = project.hasProperty('lint')", "ignoreFailures = true")),
+            new Posture("tasks.withType(Pmd).configureEach {", List.of("enabled = project.hasProperty('lint')")),
             new Posture(
                     "tasks.withType(com.github.spotbugs.snom.SpotBugsTask).configureEach {",
                     List.of("enabled = project.hasProperty('lint')", "ignoreFailures = true")),
             new Posture("options.errorprone {", List.of("enabled = project.hasProperty('lint')")),
             new Posture("tasks.register('cpdCheck', JavaExec) {", List.of("enabled = project.hasProperty('lint')")));
 
-    /** Soft-posture budget: exactly the PMD and SpotBugs dashboards soften, nothing else. */
-    private static final int PINNED_IGNORE_FAILURES = 2;
+    /** Soft-posture budget: exactly the SpotBugs dashboard softens, nothing else. */
+    private static final int PINNED_IGNORE_FAILURES = 1;
 
     /** Fails when any pinned posture block drifts inside build.gradle. */
     @Test

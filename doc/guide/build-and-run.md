@@ -50,16 +50,26 @@ Postures after the 2026-08-27 promotion:
 |---|---|---|
 | Checkstyle | **hard gate, default `test` flow** | semantic/style rules only; layout ownership moved to Spotless |
 | Spotless check | **hard gate, default `test` flow** | `palantirJavaFormat` output == ecosystem standard (4-space / 120 cols / K&R); `spotlessApply` runs ungated any time |
-| PMD main + test | **advisory dashboard** (`ignoreFailures`) | god-class metrics each run - MenuPlanner WMC=110, BotController.runPipeline CC=23 at install time; flip to failing after paydown |
+| PMD main + test | **RED WALL, `-Plint` fails on violation** | zero findings held since the 2026-08-27 paydown (17 -> 0 via per-channel/per-kind/stage extractions); only project-documented `@SuppressWarnings("PMD.TooManyMethods")` exemptions remain on MineProcess and BotController
 | CPD | advisory, never fails | duplicate blocks >=100 tokens for dedup rounds |
 | SpotBugs (api+core scope only) | **advisory dashboard** (`ignoreFailures`) | `onlyAnalyze` limits to engine-free packages, which need no MC auxclasspath; first pass flagged ThreatBlackboard dead fields, EI2 exposures |
 | Error Prone (on `-Plint` compiles) | **warnings, compiles on** | core pinned 2.42.0 (last JDK17 runtime); ReferenceEquality OFF project-wide (identity-intent ruling); ~20 install-round findings fixed at root |
+| JaCoCo coverage | **manual lens** (`gradle jacocoTestReport`) | offline-layer truth only: adapter/gametest/client read 0% by design (engine-covered), core layers 86-97%; watch `core/command`, `api/interrupt`, `api/state` |
+| PIT mutation | **manual lens** (`gradle pitest`) | baseline 2026-08-27: 34.2% overall kill, ~82% within covered code; weakest gates: PathingBehavior 36 survivors, MineProcess 31, BasicMoves 14 |
 
 Deliberate deferrals recorded in the configs themselves: import ORDER
-is whatever the formatter emits (single source of truth), JavadocMethod
-tag completeness is deferred (75 live gaps; presence still enforced by
-Missing*), and identity-comparison checks are absent from both PMD and
-Error Prone sets (see BytecodeArchitectureGateTest sibling comments).
+is whatever the formatter emits (single source of truth), and
+identity-comparison checks are absent from both PMD and Error Prone
+sets (see BytecodeArchitectureGateTest sibling comments). JavadocMethod
+tag completeness left its deferral on 2026-08-27 - all 35 live gaps
+fixed at root and the rule now runs with the rest of checkstyle.
+
+God-class paydown progress (PMD dashboard): 31 -> 17 findings after the
+first extraction pass (`BindingActor.flush` per-channel appliers,
+`BindingMenu.roleOf` per-kind mappers; BindingMenu WMC 63->54,
+TCC 0%->28%). The remaining 17 are design work, not mechanical splits:
+MenuPlanner's four planner methods (CC 13-23), BotController.runPipeline
+CC=23 behind ADR-0005 invariants, AStar compute CC=19, plus GodClass x3.
 
 Bytecode purity + dependency direction are plain JUnit gates under
 `architecture/` (run by `test`): see `BytecodeArchitectureGateTest`.

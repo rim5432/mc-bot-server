@@ -3,6 +3,8 @@ plugins {
     id 'java-library'
     id 'checkstyle'
     id 'pmd'
+    id 'jacoco'
+    id 'info.solidsoft.pitest' version '1.15.0'
     id 'com.github.spotbugs' version '6.5.11'
     id 'net.ltgt.errorprone' version '5.1.0'
     id 'com.diffplug.spotless' version '8.10.0'
@@ -166,11 +168,8 @@ pmd {
 }
 tasks.withType(Pmd).configureEach {
     enabled = project.hasProperty('lint')
-    // dashboard mode for the transition: god-class metrics (MenuPlanner
-    // WMC=110, BotController.runPipeline CC=23 at install time) must
-    // report on every lint run without blocking; flip to failing once
-    // the paydown round lands (doc/guide/build-and-run.md tracks it)
-    ignoreFailures = true
+    // RED WALL since the 2026-08-27 paydown: zero findings held, so a
+    // regression now breaks the lint run instead of just reporting it.
 }
 
 // SpotBugs analyzes only api/ + core/: their closure references no MC
@@ -197,6 +196,27 @@ tasks.withType(JavaCompile).configureEach {
         // that dropped CompareObjectsWithEquals from the PMD set
         check('ReferenceEquality', net.ltgt.gradle.errorprone.CheckSeverity.OFF)
     }
+}
+
+// ===== Test-quality lenses (manual runs only; never part of a gate) =====
+// JaCoCo answers "what do the offline tests touch"; PIT answers "what do
+// they actually kill". Coverage/mutation numbers drive the weakest-gate
+// review, they are not thresholds.
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true   // machine-readable for gate analysis
+        html.required = true
+    }
+}
+
+pitest {
+    targetClasses = ['com.mcbot.mcbotserver.*']
+    excludedTestClasses = ['com.mcbot.mcbotserver.gametest.*']
+    junit5PluginVersion = '1.2.1'
+    threads = 4
+    outputFormats = ['HTML', 'XML']
+    timestampedReports = false
 }
 
 spotless {
