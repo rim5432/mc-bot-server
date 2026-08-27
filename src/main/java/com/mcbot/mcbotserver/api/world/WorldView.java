@@ -83,6 +83,23 @@ public interface WorldView {
     List<EntitySnapshot> getEntities(CellPos center, double radius, ViewMode mode);
 
     /**
+     * Fishing bobbers within a spherical range of a cell center.
+     * Projectiles are invisible to {@link #getEntities} (living
+     * entities only), so the bobber carries its own query; bite timing
+     * is deliberately NOT carried - vanilla keeps the nibble state
+     * private, and a bite is observable only as a vertical dip across
+     * consecutive snapshots.
+     *
+     * @param center search origin; must not be null
+     * @param radius search radius in blocks; positive
+     * @param mode   consistency requested, per decision 17b
+     * @return matching snapshots, unordered; never null, possibly empty
+     */
+    default List<BobberSnapshot> getBobbers(CellPos center, double radius, ViewMode mode) {
+        return List.of();
+    }
+
+    /**
      * Whether the chunk containing the cell is loaded — the first-class
      * "do I know this?" query (decision 17a).
      *

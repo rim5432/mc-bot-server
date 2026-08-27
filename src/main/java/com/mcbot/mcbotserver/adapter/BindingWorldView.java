@@ -5,6 +5,7 @@ import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.BlockSnapshot;
 import com.mcbot.mcbotserver.api.world.BlockTraits;
 import com.mcbot.mcbotserver.api.world.BlockTraitsRegistry;
+import com.mcbot.mcbotserver.api.world.BobberSnapshot;
 import com.mcbot.mcbotserver.api.world.CollisionShape;
 import com.mcbot.mcbotserver.api.world.EntitySnapshot;
 import com.mcbot.mcbotserver.api.world.ViewMode;
@@ -162,6 +163,28 @@ public final class BindingWorldView implements WorldView {
                     new CellPos(e.getBlockX(), e.getBlockY(), e.getBlockZ()),
                     e.getHealth(),
                     e.getMaxHealth()));
+        }
+        return out;
+    }
+
+    @Override
+    public List<BobberSnapshot> getBobbers(CellPos center, double radius, ViewMode mode) {
+        AABB box = new AABB(
+                center.x() + 0.5 - radius,
+                center.y() + 0.5 - radius,
+                center.z() + 0.5 - radius,
+                center.x() + 0.5 + radius,
+                center.y() + 0.5 + radius,
+                center.z() + 0.5 + radius);
+        List<BobberSnapshot> out = new ArrayList<>();
+        for (net.minecraft.world.entity.projectile.FishingHook hook :
+                level.getEntitiesOfClass(net.minecraft.world.entity.projectile.FishingHook.class, box)) {
+            double dist = hook.blockPosition().distSqr(toMc(center));
+            if (dist > radius * radius) {
+                continue;
+            }
+            out.add(new BobberSnapshot(
+                    new CellPos(hook.getBlockX(), hook.getBlockY(), hook.getBlockZ()), hook.getHookedIn() != null));
         }
         return out;
     }
