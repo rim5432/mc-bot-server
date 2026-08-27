@@ -139,13 +139,16 @@ landed (archive). Remaining:
            Offline: EatWhenHungryRuleTest + gate updates; gametests
            eatsWhenHungry + food-driven regen rewrite staged pending
            engine (live server holds run/world).
-  - [ ] L  HungryProcess acquisition per 0010 sections 4-5 (forage
-           -> hunt -> fish with failure budgets,
-           FOOD_STRATEGY_EXHAUSTED escalation). Ground work landed:
-           the Player-shaped ground-item pickup scan into the
-           container (0010 section 7's open dependency; gametest
-           picksUpGroundItemsByTouch staged pending engine).
-                                                        [dep: none]
+  - [ ] L  HungryProcess acquisition per 0010 sections 4-5. Landed
+           2026-08-27: ground pickup (GroundPickup, gametest staged),
+           ForageSensor (once-per-mission berry-bush scan), and
+           HungryProcess v1 (SEEK -> DIG via DigMission claims ->
+           FOOD_ACQUIRED; FOOD_STRATEGY_EXHAUSTED one-shot budget;
+           HungryProcessTest x6) - offline-gated, unwired. The
+           trigger is the THIRD reflex-owned seat: the promotion
+           point the arch-drift no-generalization ruling reserved
+           (generalize seat dispatch when it lands). Hunt/fish
+           strategies follow.                      [dep: none]
   - [ ] M  Loop acceptance: unattended mine -> craft -> equip ->
            fight -> eat driven through boundary-D verbs only,
            recorded verdict in tool/sessions/ (wait exit codes
