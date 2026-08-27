@@ -176,43 +176,13 @@ public final class BindingMenu {
      */
     private SlotRole roleOf(int index, int size) {
         if (menu instanceof CraftingMenu) {
-            if (index == 0) {
-                return SlotRole.RESULT;
-            }
-            if (index <= 9) {
-                return SlotRole.GRID;
-            }
-            return index <= size - 9 ? SlotRole.MAIN : SlotRole.HOTBAR;
+            return MenuSlotLayouts.craftingRole(index, size);
         }
         if (menu instanceof InventoryMenu) {
-            if (index == 0) {
-                return SlotRole.RESULT;
-            }
-            if (index <= 4) {
-                return SlotRole.GRID;
-            }
-            if (index <= 8) {
-                return SlotRole.ARMOR;
-            }
-            if (index == size - 1) {
-                return SlotRole.OFFHAND;
-            }
-            return index <= 35 ? SlotRole.MAIN : SlotRole.HOTBAR;
+            return MenuSlotLayouts.inventoryRole(index, size);
         }
-        // Furnace family (furnace / blast_furnace / smoker): vanilla
-        // AbstractFurnaceMenu adds slot 0 = input, 1 = fuel, 2 =
-        // result, then the standard 27 main + 9 hotbar player region.
         if (menu instanceof AbstractFurnaceMenu) {
-            if (index == 0) {
-                return SlotRole.INPUT;
-            }
-            if (index == 1) {
-                return SlotRole.FUEL;
-            }
-            if (index == 2) {
-                return SlotRole.OUTPUT;
-            }
-            return index <= size - 10 ? SlotRole.MAIN : SlotRole.HOTBAR;
+            return MenuSlotLayouts.furnaceRole(index, size);
         }
         // Container menus (chest, and unknown kinds as fallback):
         // leading container slots, then main 27, then hotbar 9.

@@ -88,8 +88,16 @@ public final class BindingActor implements Actor, MenuTransactions {
     @Override
     public Map<Channel, Claim> flush() {
         Map<Channel, Claim> winners = delegate.flush();
+        applyMove(winners.get(Channel.MOVE));
+        applyRot(winners.get(Channel.ROT));
+        applyUse(winners.get(Channel.USE));
+        applySlot(winners.get(Channel.SLOT));
+        applyInteract(winners.get(Channel.INTERACT));
+        presence.tickWalkFidget(winners, winners.get(Channel.MOVE), winners.get(Channel.ROT));
+        return winners;
+    }
 
-        Claim move = winners.get(Channel.MOVE);
+    private void applyMove(Claim move) {
         if (move != null && move.intent() instanceof Intent.Move m) {
             body.setDrive((float) clamp(m.forward()), (float) clamp(m.strafe()), m.jump());
             // Sprint gait (issue 0005 P1.1, issue 0004 F6(3) ruling
@@ -103,8 +111,9 @@ public final class BindingActor implements Actor, MenuTransactions {
             body.setDrive(0f, 0f, false);
             body.setSprinting(false);
         }
+    }
 
-        Claim rot = winners.get(Channel.ROT);
+    private void applyRot(Claim rot) {
         if (rot != null && rot.intent() instanceof Intent.Look l) {
             body.setTargetRotation(l.yawDeg(), l.pitchDeg());
             presence.onRotClaim();
@@ -119,8 +128,9 @@ public final class BindingActor implements Actor, MenuTransactions {
             // tick, that claim wins and this stays silent.
             presence.tickIdleRot();
         }
+    }
 
-        Claim use = winners.get(Channel.USE);
+    private void applyUse(Claim use) {
         if (use != null && use.intent() instanceof Intent.Use u) {
             if (u.pressing() && !lastUsePressing) {
                 melee.onUsePress();
@@ -129,8 +139,9 @@ public final class BindingActor implements Actor, MenuTransactions {
         } else {
             lastUsePressing = false;
         }
+    }
 
-        Claim slot = winners.get(Channel.SLOT);
+    private void applySlot(Claim slot) {
         if (slot != null && slot.intent() instanceof Intent.SelectSlot s) {
             body.selectedSlot = s.slot();
             // Mirror to the inventory binding so perception snapshots
@@ -139,8 +150,9 @@ public final class BindingActor implements Actor, MenuTransactions {
             // inventory is the read side for WorldView.getInventory().
             body.getInventory().setSelectedSlot(s.slot());
         }
+    }
 
-        Claim interact = winners.get(Channel.INTERACT);
+    private void applyInteract(Claim interact) {
         if (interact != null && interact.intent() instanceof Intent.Dig d) {
             dig.dig(d.target());
             lastDropClaimed = false;
@@ -178,9 +190,6 @@ public final class BindingActor implements Actor, MenuTransactions {
             lastDropClaimed = false;
             lastInteractClaimed = false;
         }
-
-        presence.tickWalkFidget(winners, move, rot);
-        return winners;
     }
 
     @Override
