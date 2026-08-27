@@ -1,12 +1,12 @@
 ---
 title: HungryProcess - food acquisition planner with self-contained initial strategies
-last_verified: 2026-08-27
+last_verified: 2026-08-28
 covers:
   - doc/architecture/function-map.md
   - doc/architecture/boundaries.md
   - src/main/java/com/mcbot/mcbotserver/api/reflex/ThreatBlackboard.java
   - src/main/java/com/mcbot/mcbotserver/core/process/
-status: open (forage + hunt COMPLETE 2026-08-27: HungryProcess is the full section-4.2 state machine - ASSESS picks forage-then-hunt, hunt engages passive food mobs with the DefendProcess directive vocabulary, vanished prey walks its last cell for pickup; ledgers 34/35. REMAINING: fish only (rod-cast timing, section 7))
+status: open (forage + hunt + fish COMPLETE 2026-08-27: ASSESS orders forage > fish > hunt - fish via FishBehavior over WorldView.getBobbers with the dip-not-nibble bite watch, section 7's use-item dependency answered by the BotPlayerFacade use chain; ledgers 34/35/37. REMAINING: engine verification of the fish pair (cast + bobber spawn) rides the staged gametest batch)
 related:
   - doc/architecture/issues/0008-extreme-scenario-survival-framework.md
   - doc/architecture/issues/0007-player-parity-interaction.md
@@ -390,11 +390,11 @@ reactive. The bot fights its way out, then eats.
 |---|---|---|
 | Player carrier (FoodData exists) | 0007 Phase 1 | blocked |
 | Inventory read (food in inventory?) | 0007 Phase 1 | blocked |
-| UseItem behavior (eat, fish) | 0007 Phase 3 | blocked |
+| UseItem behavior (eat, fish) | 0007 Phase 3 | exists (facade use chain, 2026-08-27) |
 | Passive mob target classification | combat subsystem (0009?) | design needed |
 | Ground item collection | WorldView entity scan + Goto | design needed |
 | Berry bush block detection | WorldView block scan | exists (block trait system) |
-| Fishing rod detection | inventory read | blocked on 0007 |
+| Fishing rod detection | inventory read | exists (InventoryView hotbar scan) |
 
 Minimum viable slice (after 0007 Phase 1): forage only. No combat,
 no fishing — just scan for berry bushes, walk to them, break them,

@@ -154,14 +154,26 @@ landed (archive). Remaining:
            vanished prey walks its last cell for pickup (GroundPickup)
            and the inventory check closes the loop; no-bush-no-prey
            is FOOD_STRATEGY_EXHAUSTED.   [dep: none]
-  - [ ] M  Fish strategy: rod-cast timing behavior (0010 section 7
-           open dependency).                          [dep: none]
+  - [x] M  Fish strategy COMPLETE (2026-08-27, external capability
+           review queued it; the dip-not-nibble bite watch rides
+           FishBehavior + WorldView.getBobbers; HungryProcess grows
+           the FISH phase between forage and hunt - forage > fish >
+           hunt by 0010 section 4.3 as implemented). Offline:
+           FishBehaviorGateTest 5 cases + the fish-vocabulary transit
+           pin; the engine pair (cast + bobber spawn) rides the
+           staged gametest batch.   [dep: none]
   - [ ] M  Loop acceptance: unattended mine -> craft -> equip ->
            fight -> eat driven through boundary-D verbs only,
            recorded verdict in tool/sessions/ (wait exit codes
            landed; the 0015 live chain-halt check rides here).
                                     [dep: equip, loadout, HungryProcess]
-  - XP sense, offhand, bow/drink/place Use variants, remaining menu
+  - [x] M  Bow / ranged combat COMPLETE (2026-08-27: the user
+           sequenced it past this review gate by accepting the
+           capability plan; ledger 37 amends decision 14 - a held
+           USE draw charges and the falling edge releases). Offline:
+           CombatRangedGateTest 5 cases; draw-release onto a live
+           target rides the staged gametest batch.
+  - XP sense, offhand, drink/place Use variants, remaining menu
     kinds (enchanting, anvil, loom, villager): stay 0007 6.1
     backlog until the review sequences them.
 

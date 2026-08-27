@@ -1,6 +1,6 @@
 ---
 title: Code Health Ledger
-last_verified: 2026-08-27
+last_verified: 2026-08-28
 covers:
   - build.gradle
   - config/checkstyle/checkstyle.xml

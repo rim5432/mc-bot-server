@@ -1,6 +1,6 @@
 ---
 title: Player parity - inventory, menus, crafting, and the interaction surface
-last_verified: 2026-08-27
+last_verified: 2026-08-28
 covers:
   - doc/architecture/function-map.md
   - src/main/java/com/mcbot/mcbotserver/adapter/BindingActor.java
@@ -187,6 +187,21 @@ state) turns out to be facade-hostile.
    gate: `placesBlockOnInteract` gametest (dirt target south of bot,
    16 stone in slot 0 → claim UP face → stone block appears above dirt
    → stack shrinks to 15).
+   Progress 2026-08-27 (Phase 2 use chain landed): the executor runs
+   the vanilla non-sneak right-click order through `BotPlayerFacade` -
+   `BlockState.use` first, then the held stack's `useOn` when the block
+   passed - so direction-aware placement, replaceable cells, and
+   use-block interactions (doors, buttons, levers, hoe, flint) now ride
+   `BlockItem.place`'s own state machine; the `setBlock` replica and
+   its manual survival/obstruction/sound/shrink steps retired. Two
+   recorded deviations: the Forge RightClickBlock event is not
+   consulted, and `MenuProvider` blocks stay menu-verb territory (a
+   second open path would fight the MenuOpener's transaction state).
+   New sync verb `/bot use x y z face` (0013 write-path table row);
+   the executor's consumed verdict is the receipt - a pressed button
+   springs back, so no post-state read exists. `placesBlockOnInteract`
+   keeps its premise (vanilla place still shrinks and fills the UP
+   cell); the use-block scenarios ride the staged gametest batch.
    Progress 2026-08-25 (DigExecutor tool supplier landed): the dig
    executor now reads the selected hotbar ItemStack every tick and
    computes `toolSpeed = stack.getDestroySpeed(state)` and
