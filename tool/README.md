@@ -31,6 +31,9 @@ python tool/mcbot_tool.py build runClient
 # Run tests
 python tool/mcbot_tool.py test
 
+# Full static-analysis dashboard round (PMD/CPD/SpotBugs + EP compiles)
+python tool/mcbot_tool.py lint
+
 # Pass through gradle flags
 python tool/mcbot_tool.py build compile -- --info --stacktrace
 ```

@@ -76,6 +76,13 @@ RUN_SERVER = ["runServer"]
 RUN_DATA = ["runData"]
 RUN_GAMETEST = ["runGameTestServer"]
 
+# canonical -Plint dashboard round; mirrors the invocation documented
+# in doc/guide/build-and-run.md - change both in the same commit
+LINT_TASKS = [
+    "pmdMain", "pmdTest", "cpdCheck", "spotbugsMain", "spotbugsTest",
+    "compileJava", "compileTestJava", "-Plint", "--continue",
+]
+
 # 这些 task 跑时强制 --no-daemon（防 daemon 残留 / 锁冲突）
 NEEDS_NO_DAEMON = {
     tuple(COMPILE_JAVA), tuple(JAR_TASK), tuple(BUILD_TASK), tuple(CLEAN_TASK),
@@ -620,6 +627,18 @@ def cmd_gradle(args) -> int:
         if not lock.acquire(command):
             return _print_busy()
         return run_gradle(g, args.gradle_args, no_daemon=args.no_daemon, with_cc=with_cc)
+
+
+def cmd_lint(args) -> int:
+    g = _resolve_gradle()
+    if not g:
+        return 2
+    gradle_args = LINT_TASKS + list(args.passthrough or [])
+    with_cc = args.cc or os.environ.get("MCBOT_CC") == "1"
+    with BuildLock() as lock:
+        if not lock.acquire("lint"):
+            return _print_busy()
+        return run_gradle(g, gradle_args, no_daemon=args.no_daemon, with_cc=with_cc, log_name="lint")
 
 
 def cmd_passthrough_no_lock(args) -> int:
@@ -1284,6 +1303,16 @@ def main() -> int:
     p_gradle.add_argument("--cc", action="store_true")
     p_gradle.add_argument("gradle_args", nargs=argparse.REMAINDER)
     p_gradle.set_defaults(func=cmd_gradle)
+
+    # lint: canonical -Plint dashboard round (see build-and-run.md)
+    p_lint = sub.add_parser(
+        "lint",
+        help="full static-analysis round: pmd/cpd/spotbugs dashboards + EP compiles (-Plint)",
+    )
+    p_lint.add_argument("--no-daemon", action="store_true")
+    p_lint.add_argument("--cc", action="store_true")
+    p_lint.add_argument("passthrough", nargs=argparse.REMAINDER)
+    p_lint.set_defaults(func=cmd_lint)
 
     # status / log / lock / proc
     p_status = sub.add_parser("status", help="one-page status: lock, last log, processes")
