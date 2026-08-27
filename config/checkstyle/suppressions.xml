@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<!DOCTYPE suppressions PUBLIC
+        "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+        "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+<!--
+  Scoped relaxations for the checkstyle config in this directory.
+  Every entry needs a reason line; grow this file only when a rule
+  systematically fights legitimate structure (never to silence one
+  offending file - fix that file instead).
+-->
+<suppressions>
+    <!-- Test classes carry pragmatic coverage: Javadoc presence and tag
+         completeness are production-API requirements (AGENTS.md 1.4.2),
+         not test requirements. Naming, imports, whitespace stay active. -->
+    <suppress checks="MissingJavadocType"
+              files="[\\/]src[\\/]test[\\/]"/>
+    <suppress checks="MissingJavadocMethod"
+              files="[\\/]src[\\/]test[\\/]"/>
+    <suppress checks="JavadocMethod"
+              files="[\\/]src[\\/]test[\\/]"/>
+</suppressions>

@@ -1,6 +1,6 @@
 ---
 title: Toolchain Reference
-last_verified: 2026-08-22
+last_verified: 2026-08-27
 covers:
   - gradle.properties
   - build.gradle
@@ -22,8 +22,30 @@ Facts about this repo's build toolchain. This document **covers**
 | Forge | see `forge_version` |
 | Gradle wrapper | see `gradle/wrapper/gradle-wrapper.properties` |
 | Java toolchain (compile) | 17 (`build.gradle`) |
+| Checkstyle | 12.3.1 (`build.gradle`) — last version shipping Java-17 bytecode; all of 13.x+ are Java-21 (probed class-major straight from maven jars, 2026-08-27) |
+| PMD / CPD | 7.26.0 (`build.gradle`) — PMD 7 needs Gradle >= 8.6; Gradle 8.8 supports it via explicit `pmd.toolVersion` (default stays 6.55.0) |
+| Spotless / formatter | plugin 8.10.0 + palantir-java-format 2.97.0 (both Java-11 bytecode) — formatter output IS the ecosystem standard: Sun-style 4-space indent, K&R braces, 120 columns |
+| Error Prone | plugin 5.1.0 + core 2.42.0 — 2.42.0 is the last core that runs on a JDK 17 toolchain; verified working on the moddev compile chain unmodified, flags must go through `options.errorprone.check(...)` (raw `-Xep:` compilerArgs are rejected by plain javac when disabled) |
+| SpotBugs | plugin 6.5.11 + tool 4.10.4 — scoped to api/core packages via `onlyAnalyze`, which removes the MC auxclasspath problem entirely |
 
 Do not hardcode versions into new docs; link here instead.
+
+## Static analysis tooling notes (2026-08-27)
+
+- Checkstyle config lives at `config/checkstyle/checkstyle.xml` with
+  `suppressions.xml` beside it; PMD ruleset at `config/pmd/ruleset.xml`.
+  The plugin's default config/pmd path is NOT honored on the PMD-7
+  route: `ruleSetFiles` must stay wired explicitly in `build.gradle`,
+  otherwise the built-in ruleset runs silently instead.
+- The custom `cpdCheck` JavaExec task invokes
+  `net.sourceforge.pmd.cli.PmdCli cpd`; since PMD 7, CPD is a
+  subcommand of the unified CLI launcher.
+- Gradle's Checkstyle task exposes no forked-JVM knob (`jvmArgs`
+  unavailable), so violation messages render in the daemon JVM locale;
+  known cosmetic issue.
+- Lint invocation goes through the locked gradle passthrough with the
+  opt-in `-Plint` flag; postures and deferral rationale live in
+  [Build & Run Guide](../guide/build-and-run.md#static-analysis--plint).
 
 ## Verified working state (2026-08-21)
 

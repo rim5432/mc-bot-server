@@ -1,0 +1,65 @@
+<?xml version="1.0"?>
+<ruleset name="mcbotserver-curated"
+        xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0
+                            https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+    <description>
+        Curated PMD starter set for mc-bot-server (2026-08-27 round).
+        Bias: bug-shaped findings and god-class metrics only; style and
+        formatting live in checkstyle, contract markers live in the
+        src/test gates. Grow rule by rule with evidence, never by whole
+        category - a flood of findings gets the config loosened, not the
+        code fixed.
+    </description>
+
+    <!-- ===== errorprone: real-bug shapes ===== -->
+    <rule ref="category/java/errorprone.xml/EmptyCatchBlock">
+        <properties>
+            <property name="allowCommentedBlocks" value="true"/>
+            <property name="allowExceptionNameRegex"
+                      value="^(ignored|expected)$"/>
+        </properties>
+    </rule>
+    <!-- CompareObjectsWithEquals is intentionally absent: identity
+         comparisons are pervasive and deliberate here (arbiter seat
+         checks, entity bindings, menu references - see the comment in
+         EngageReflexGateTest). Swapping them to equals() would weaken
+         exactly the guarantee they assert. -->
+    <rule ref="category/java/errorprone.xml/SuspiciousEqualsMethodName"/>
+    <rule ref="category/java/errorprone.xml/SuspiciousHashcodeMethodName"/>
+    <rule ref="category/java/errorprone.xml/AvoidDecimalLiteralsInBigDecimalConstructor"/>
+
+    <!-- ===== bestpractices: dead code that hides intent ===== -->
+    <rule ref="category/java/bestpractices.xml/UnusedFormalParameter"/>
+    <rule ref="category/java/bestpractices.xml/UnusedPrivateMethod"/>
+    <!-- lives in bestpractices since PMD 7 -->
+    <rule ref="category/java/bestpractices.xml/UnusedLocalVariable"/>
+
+    <!-- ===== design: god-class metrics =====
+         The code-health ledger grades classes manually today; these give
+         every commit an automatic number to argue from. Thresholds sit
+         above current maxima so only true offenders fire; tighten after
+         a quarter of data. ExcessiveClassLength died in PMD 7 - NcssCount
+         is its size successor. -->
+    <rule ref="category/java/design.xml/GodClass"/>
+    <rule ref="category/java/design.xml/CyclomaticComplexity">
+        <properties>
+            <property name="methodReportLevel" value="12"/>
+        </properties>
+    </rule>
+    <rule ref="category/java/design.xml/NcssCount">
+        <properties>
+            <property name="classReportLevel" value="1500"/>
+        </properties>
+    </rule>
+    <rule ref="category/java/design.xml/TooManyMethods">
+        <properties>
+            <property name="maxmethods" value="20"/>
+        </properties>
+    </rule>
+
+    <!-- ===== performance: cheap string wins ===== -->
+    <rule ref="category/java/performance.xml/StringToString"/>
+    <rule ref="category/java/performance.xml/ConsecutiveAppendsShouldReuse"/>
+</ruleset>

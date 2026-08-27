@@ -23,6 +23,40 @@ python tool/mcbot_tool.py test            # JUnit tests
 python tool/mcbot_tool.py status          # lock + processes + last log
 ```
 
+## Static analysis (`-Plint`)
+
+Checkstyle, PMD, CPD, SpotBugs and Spotless-check form one opt-in
+suite (Error Prone additionally rides the `-Plint` compiles). It writes
+`build/reports/*`, so it runs under the build lock via the generic
+gradle passthrough:
+
+```bash
+python tool/mcbot_tool.py gradle \
+    checkstyleMain checkstyleTest pmdMain pmdTest cpdCheck \
+    spotlessCheck spotbugsMain spotbugsTest compileJava compileTestJava \
+    -Plint --continue
+```
+
+Postures after the 2026-08-27 second round:
+
+| Suite | Posture | Notes |
+|---|---|---|
+| Checkstyle | **fails on violation** | semantic/style rules only; layout ownership moved to Spotless |
+| Spotless check | **fails on violation** | `palantirJavaFormat` output == ecosystem standard (4-space / 120 cols / K&R); `spotlessApply` runs ungated any time |
+| PMD main + test | **advisory dashboard** (`ignoreFailures`) | god-class metrics each run - MenuPlanner WMC=110, BotController.runPipeline CC=23 at install time; flip to failing after paydown |
+| CPD | advisory, never fails | duplicate blocks >=100 tokens for dedup rounds |
+| SpotBugs (api+core scope only) | **advisory dashboard** (`ignoreFailures`) | `onlyAnalyze` limits to engine-free packages, which need no MC auxclasspath; first pass flagged ThreatBlackboard dead fields, EI2 exposures |
+| Error Prone (on `-Plint` compiles) | **warnings, compiles on** | core pinned 2.42.0 (last JDK17 runtime); ReferenceEquality OFF project-wide (identity-intent ruling); ~20 install-round findings fixed at root |
+
+Deliberate deferrals recorded in the configs themselves: import ORDER
+is whatever the formatter emits (single source of truth), JavadocMethod
+tag completeness is deferred (75 live gaps; presence still enforced by
+Missing*), and identity-comparison checks are absent from both PMD and
+Error Prone sets (see BytecodeArchitectureGateTest sibling comments).
+
+Bytecode purity + dependency direction are plain JUnit gates under
+`architecture/` (run by `test`): see `BytecodeArchitectureGateTest`.
+
 ## When a build fails
 
 ```bash

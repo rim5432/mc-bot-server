@@ -1,0 +1,94 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+        "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+        "https://checkstyle.org/dtds/configuration_1_3.dtd">
+<!--
+  Encodes the machine-checkable subset of AGENTS.md section 1 (code style)
+  as checkstyle rules. Introduced 2026-08-27 alongside PMD; runs advisory
+  via -Plint until promoted to a gate (doc/guide/build-and-run.md).
+
+  Deliberately NOT encoded here, each owned elsewhere:
+  - final-everywhere (section 1.6): FinalParameters/FinalLocalVariable are
+    too noisy at this codebase size; stays review-enforced.
+  - CJK ban in Java sources: hygiene/EnglishOnlyScan.java already gates it.
+  - Contract markers and wire vocabulary: BoundaryContractMarkerTest and
+    the other src/test gates own those project-specific invariants.
+  - Record/trailing-comma layout: no reliable AST mapping; review-enforced.
+-->
+<module name="Checker">
+    <property name="charset" value="UTF-8"/>
+    <property name="severity" value="error"/>
+
+    <!-- Layout (indentation, brace presence, tab characters) is owned
+         by Spotless + palantir-java-format since the 2026-08-27
+         adoption; checking it here too would only re-litigate the
+         formatter's output. This module still validates width. -->
+    <module name="LineLength">
+        <property name="max" value="120"/>
+        <property name="ignorePattern" value="// width-120:"/>
+    </module>
+
+    <module name="TreeWalker">
+        <!-- ===== naming (section 1.2 / 1.1) ===== -->
+        <!-- modules are one lower-case word: com.mcbot.mcbotserver.<module>
+             with no nesting of one module under another at the name level -->
+        <module name="PackageName">
+            <property name="format"
+                      value="^com\.mcbot\.mcbotserver(\.[a-z][a-z0-9]*)*$"/>
+        </module>
+        <module name="TypeName"/>
+        <module name="MethodName">
+            <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
+        </module>
+        <module name="ConstantName"/>
+        <module name="MemberName"/>
+        <module name="ParameterName"/>
+        <module name="LocalVariableName"/>
+        <module name="RecordComponentName"/>
+
+        <!-- ===== imports (section 1.3) =====
+             Star imports forbidden; dead/self imports fail. Import ORDER
+             is intentionally not checked in v1: the written rule ("IDE
+             default alphabetical sort") and repo practice (blank-line
+             grouped blocks) contradict each other; promoting an order
+             gate needs a spec ruling first (doc/guide/build-and-run.md
+             carries the follow-up note). -->
+        <module name="AvoidStarImport"/>
+        <module name="UnusedImports"/>
+        <module name="RedundantImport"/>
+
+        <!-- ===== javadoc presence + tags (section 1.4.2) =====
+             public/protected types and members need Javadoc; non-void
+             needs @return; every object param needs @param. Overridden
+             methods are exempt by design. src/test/** is suppressed in
+             suppressions.xml (test classes carry pragmatic coverage). -->
+        <module name="JavadocStyle"/>
+        <module name="MissingJavadocType">
+            <property name="scope" value="public"/>
+        </module>
+        <module name="MissingJavadocMethod">
+            <property name="scope" value="public"/>
+            <property name="allowMissingPropertyJavadoc" value="true"/>
+        </module>
+        <!-- JavadocMethod (@param/@return tag completeness) intentionally
+             deferred: 75 live tag gaps across public API would force the
+             first gate red; presence via Missing* above is enforced now,
+             tag completeness returns as a follow-up (see build-and-run). -->
+
+        <!-- Layout mechanics retired to Spotless (see header comment at
+             this file's top); what remains here are presence rules the
+             formatter cannot own. -->
+        <module name="ModifierOrder"/>
+        <module name="SimplifyBooleanExpression"/>
+        <module name="StringLiteralEquality"/>
+        <module name="EqualsHashCode"/>
+        <module name="EmptyBlock">
+            <property name="option" value="text"/>
+        </module>
+    </module>
+
+    <module name="SuppressionFilter">
+        <property name="file" value="${config_loc}/suppressions.xml"/>
+        <property name="optional" value="false"/>
+    </module>
+</module>

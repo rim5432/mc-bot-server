@@ -1,6 +1,11 @@
 plugins {
     id 'idea'
     id 'java-library'
+    id 'checkstyle'
+    id 'pmd'
+    id 'com.github.spotbugs' version '6.5.11'
+    id 'net.ltgt.errorprone' version '5.1.0'
+    id 'com.diffplug.spotless' version '8.10.0'
 
     id 'maven-publish'
     id 'net.neoforged.moddev.legacyforge' version '2.0.144'
@@ -67,6 +72,9 @@ sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 configurations {
     runtimeClasspath.extendsFrom localRuntime
+    // isolated classpath for the CPD JavaExec task below; must not leak
+    // into compile/test classpaths
+    cpdTool
 }
 obfuscation {
     createRemappingConfiguration(configurations.localRuntime)
@@ -76,7 +84,15 @@ dependencies {
     testImplementation platform('org.junit:junit-bom:5.10.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testImplementation 'com.google.code.gson:gson:2.10.1'
+    // bytecode-level architecture gates; see BytecodeArchitectureGateTest
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.5.0'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // last Error Prone core that RUNS on a JDK 17 toolchain
+    errorprone 'com.google.errorprone:error_prone_core:2.42.0'
+
+    cpdTool 'net.sourceforge.pmd:pmd-cli:7.26.0'
+    cpdTool 'net.sourceforge.pmd:pmd-java:7.26.0'
 }
 
 tasks.named('test', Test).configure {
@@ -124,6 +140,99 @@ publishing {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+}
+
+// ===== Static analysis (advisory until promoted to a gate) =====
+// Runs only with -Plint (python tool/mcbot_tool.py gradle -Plint
+// checkstyleMain pmdMain pmdTest cpdCheck); the plain compile/test flows
+// stay inert. Promotion to always-on happens via doc/guide/build-and-run.md
+// once configs hold zero violations on the current tree.
+checkstyle {
+    // All of 13.x and 14.x ship Java-21 bytecode (probed 2026-08-27);
+    // the dev toolchain locks Java 17, so pin the last 17-runnable line
+    toolVersion = '12.3.1'
+}
+pmd {
+    // PMD 7 needs Gradle >= 8.6; the built-in plugin defaults to 6.55.0
+    toolVersion = '7.26.0'
+    consoleOutput = true
+    // explicit wiring required: leaving it to the config/pmd default path
+    // silently runs the plugin's built-in ruleset instead (observed)
+    ruleSetFiles = files('config/pmd/ruleset.xml')
+}
+tasks.withType(Checkstyle).configureEach {
+    enabled = project.hasProperty('lint')
+}
+tasks.withType(Pmd).configureEach {
+    enabled = project.hasProperty('lint')
+    // dashboard mode for the transition: god-class metrics (MenuPlanner
+    // WMC=110, BotController.runPipeline CC=23 at install time) must
+    // report on every lint run without blocking; flip to failing once
+    // the paydown round lands (doc/guide/build-and-run.md tracks it)
+    ignoreFailures = true
+}
+
+// SpotBugs analyzes only api/ + core/: their closure references no MC
+// types by contract (boundary A), so no auxclasspath to moddev's jars is
+// needed - anywhere else the analyzer would drown in missing-class noise.
+spotbugs {
+    toolVersion = '4.10.4'
+}
+tasks.withType(com.github.spotbugs.snom.SpotBugsTask).configureEach {
+    enabled = project.hasProperty('lint')
+    // dashboard like pmd until first triage pass assigns severities
+    ignoreFailures = true
+    onlyAnalyze = ['com.mcbot.mcbotserver.api.-', 'com.mcbot.mcbotserver.core.-']
+}
+
+// Error Prone rides compilation itself, so it must be off in every plain
+// compile flow other agents run; -Plint turns it into a diagnostic pass.
+tasks.withType(JavaCompile).configureEach {
+    options.errorprone {
+        enabled = project.hasProperty('lint')
+        disableWarningsInGeneratedCode = true
+        // ReferenceEquality OFF: identity comparisons are pervasive and
+        // deliberate here (arbiter seats, entity bindings) - same ruling
+        // that dropped CompareObjectsWithEquals from the PMD set
+        check('ReferenceEquality', net.ltgt.gradle.errorprone.CheckSeverity.OFF)
+    }
+}
+
+spotless {
+    java {
+        target 'src/main/java/**/*.java', 'src/test/java/**/*.java'
+        // palantir-java-format was picked because its output IS the
+        // MC-ecosystem convention: Sun/Oracle-style 4-space indent,
+        // K&R braces, 120 columns - same axes Mojang sources and the
+        // NeoForge guidelines mandate. Version ships Java-11 bytecode
+        // and runs on the JDK 17 daemon.
+        palantirJavaFormat('2.97.0')
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+tasks.matching { it.name.startsWith('spotless') }.configureEach {
+    // apply tasks stay runnable at any time; only check joins the
+    // gated lint suite (-Plint). Layout ownership moves from
+    // checkstyle's Indentation module to the formatter once the
+    // reformat lands.
+    if (it.name.toLowerCase().endsWith('check')) {
+        it.enabled = project.hasProperty('lint')
+    }
+}
+tasks.register('cpdCheck', JavaExec) {
+    group = 'verification'
+    description = 'Copy-paste detection over src/main/java and src/test/java (PMD CPD).'
+    classpath = configurations.cpdTool
+    mainClass = 'net.sourceforge.pmd.cli.PmdCli'
+    args 'cpd',
+         '--language', 'java',
+         '--dir', layout.projectDirectory.dir('src/main/java').asFile.absolutePath,
+         '--dir', layout.projectDirectory.dir('src/test/java').asFile.absolutePath,
+         '--minimum-tokens', '100',
+         '--format', 'text'
+    ignoreExitValue = true   // advisory: findings print, no failure
+    enabled = project.hasProperty('lint')
 }
 
 idea {
