@@ -71,10 +71,15 @@
             <property name="scope" value="public"/>
             <property name="allowMissingPropertyJavadoc" value="true"/>
         </module>
-        <!-- JavadocMethod (@param/@return tag completeness) intentionally
-             deferred: 75 live tag gaps across public API would force the
-             first gate red; presence via Missing* above is enforced now,
-             tag completeness returns as a follow-up (see build-and-run). -->
+        <!-- @param/@return tag completeness: was deferred at install
+             (75 live gaps); cleared in the 2026-08-27 paydown round,
+             enforced ever since. src/test/** stays exempt via
+             suppressions.xml (pragmatic test coverage). -->
+        <module name="JavadocMethod">
+            <property name="accessModifiers" value="public"/>
+            <property name="allowMissingParamTags" value="false"/>
+            <property name="allowMissingReturnTag" value="false"/>
+        </module>
 
         <!-- Layout mechanics retired to Spotless (see header comment at
              this file's top); what remains here are presence rules the

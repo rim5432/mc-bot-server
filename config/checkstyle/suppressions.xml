@@ -18,4 +18,9 @@
               files="[\\/]src[\\/]test[\\/]"/>
     <suppress checks="JavadocMethod"
               files="[\\/]src[\\/]test[\\/]"/>
+    <!-- gametest scenarios are tests too - they execute on the engine's
+         gameTestServer and only live under src/main because Forge ships
+         them inside the mod jar; same exemption rationale as src/test. -->
+    <suppress checks="MissingJavadocType|MissingJavadocMethod|JavadocMethod"
+              files="[\\/]com[\\/]mcbot[\\/]mcbotserver[\\/]gametest[\\/]"/>
 </suppressions>
