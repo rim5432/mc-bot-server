@@ -29,8 +29,8 @@ class ReflexHysteresisGateTest {
         return layer;
     }
 
-    private static SurvivalReflexLayer.ReflexDecision tick(SurvivalReflexLayer layer, long t, float health) {
-        return layer.tick(WORLD, t, 0L, 0L, POS, health);
+    private static SurvivalReflexLayer.ReflexDecision tick(SurvivalReflexLayer layer, float health) {
+        return layer.tick(WORLD, health);
     }
 
     @Test
@@ -41,7 +41,7 @@ class ReflexHysteresisGateTest {
         boolean prevFiring = false;
         for (int i = 0; i < 100; i++) {
             health[0] = (i % 2 == 0) ? 9f : 11f;
-            var d = tick(layer, i, health[0]);
+            var d = tick(layer, health[0]);
             boolean firing = d != null;
             if (firing != prevFiring) {
                 transitions++;
@@ -56,15 +56,13 @@ class ReflexHysteresisGateTest {
         float[] health = {4f};
         SurvivalReflexLayer layer = layerWith(health);
         health[0] = 4f;
-        assertNotNull(tick(layer, 1L, health[0]), "low health must fire");
+        assertNotNull(tick(layer, health[0]), "low health must fire");
         for (int i = 0; i < FreezeOnLowHealthRule.FREEZE_HOLD_TICKS; i++) {
             health[0] = 20f;
-            assertNotNull(tick(layer, 2L + i, health[0]), "hold must keep the rule firing for FREEZE_HOLD_TICKS");
+            assertNotNull(tick(layer, health[0]), "hold must keep the rule firing for FREEZE_HOLD_TICKS");
         }
         health[0] = 20f;
-        assertNull(
-                tick(layer, 2L + FreezeOnLowHealthRule.FREEZE_HOLD_TICKS, health[0]),
-                "after the hold the rule must release");
+        assertNull(tick(layer, health[0]), "after the hold the rule must release");
     }
 
     @Test
@@ -84,7 +82,7 @@ class ReflexHysteresisGateTest {
         layer.addRule(always);
 
         for (int i = 0; i < 5; i++) {
-            var d = layer.tick(WORLD, i, 0L, 0L, POS, 20f);
+            var d = layer.tick(WORLD, 20f);
             assertNotNull(d);
             assertEquals("ALWAYS", d.ruleName());
         }
@@ -95,11 +93,11 @@ class ReflexHysteresisGateTest {
         float[] health = {4f};
         SurvivalReflexLayer layer = layerWith(health);
         health[0] = 4f;
-        assertNotNull(tick(layer, 1L, health[0]));
+        assertNotNull(tick(layer, health[0]));
 
         layer.replaceRules(List.of(new FreezeOnLowHealthRule(1f, 100)));
         health[0] = 4f;
-        assertNull(tick(layer, 2L, health[0]), "reload must reset hysteresis state so the new rule starts clean");
+        assertNull(tick(layer, health[0]), "reload must reset hysteresis state so the new rule starts clean");
     }
 
     @Test
@@ -124,7 +122,7 @@ class ReflexHysteresisGateTest {
     void signalExactlyAtTriggerActivates() {
         float[] health = {FreezeOnLowHealthRule.FREEZE_THRESHOLD};
         SurvivalReflexLayer layer = layerWith(health);
-        var d = tick(layer, 1L, health[0]);
+        var d = tick(layer, health[0]);
         assertNotNull(d, "the boundary value itself must fire");
     }
 
@@ -133,12 +131,12 @@ class ReflexHysteresisGateTest {
         float[] health = {4f};
         SurvivalReflexLayer layer = layerWith(health);
         health[0] = 4f;
-        var first = tick(layer, 1L, health[0]);
+        var first = tick(layer, health[0]);
         assertNotNull(first);
         assertEquals(FreezeOnLowHealthRule.FREEZE_PRIORITY, first.priority());
 
         health[0] = 20f;
-        var held = tick(layer, 2L, health[0]);
+        var held = tick(layer, health[0]);
         assertNotNull(held, "held tick still reports firing");
         assertEquals(
                 FreezeOnLowHealthRule.FREEZE_PRIORITY, held.priority(), "held phase reuses the last positive priority");

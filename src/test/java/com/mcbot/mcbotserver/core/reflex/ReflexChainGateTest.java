@@ -100,7 +100,7 @@ class ReflexChainGateTest {
 
         // Bleed: reflex must fire and park the mission this tick.
         health[0] = 4f;
-        SurvivalReflexLayer.ReflexDecision decision = layer.tick(WORLD, 11L, 3L, 8000L, POS, health[0]);
+        SurvivalReflexLayer.ReflexDecision decision = layer.tick(WORLD, health[0]);
         assertNotNull(decision, "low health must fire FREEZE_ON_LOW_HEALTH");
         assertEquals("FREEZE_ON_LOW_HEALTH", decision.ruleName());
         assertEquals(FreezeOnLowHealthRule.FREEZE_PRIORITY, decision.priority());
@@ -123,13 +123,9 @@ class ReflexChainGateTest {
         // is allowed to flip silent.
         health[0] = 20f;
         for (int i = 0; i < FreezeOnLowHealthRule.FREEZE_HOLD_TICKS; i++) {
-            assertNotNull(
-                    layer.tick(WORLD, 12L + i, 3L, 8100L, POS, health[0]),
-                    "hold must keep the rule firing for FREEZE_HOLD_TICKS");
+            assertNotNull(layer.tick(WORLD, health[0]), "hold must keep the rule firing for FREEZE_HOLD_TICKS");
         }
-        assertNull(
-                layer.tick(WORLD, 12L + FreezeOnLowHealthRule.FREEZE_HOLD_TICKS, 3L, 8100L, POS, health[0]),
-                "after the hold the rule must release");
+        assertNull(layer.tick(WORLD, health[0]), "after the hold the rule must release");
         assertTrue(arbiter.tryResume());
         assertSame(mission, arbiter.current());
         arbiter.tick(WORLD);
@@ -151,7 +147,7 @@ class ReflexChainGateTest {
         arbiter.requestControl(mission);
         arbiter.tick(WORLD);
 
-        var decision = layer.tick(WORLD, 1L, 1L, 0L, POS, 20f);
+        var decision = layer.tick(WORLD, 20f);
         assertNull(decision, "healthy bot must not trigger any reflex");
 
         // Force the preemption path directly (any reflex cause).
@@ -185,7 +181,7 @@ class ReflexChainGateTest {
         };
         SurvivalReflexLayer swapped = new SurvivalReflexLayer((world, board) -> {});
         swapped.addRule(alwaysFire);
-        var decision = swapped.tick(WORLD, 1L, 1L, 0L, POS, 20f);
+        var decision = swapped.tick(WORLD, 20f);
         assertNotNull(decision);
         assertEquals("ALWAYS_FIRE", decision.ruleName());
         assertEquals(7, decision.priority());

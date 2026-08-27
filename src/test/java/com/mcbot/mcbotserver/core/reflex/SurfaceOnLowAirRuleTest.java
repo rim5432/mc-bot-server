@@ -28,7 +28,7 @@ class SurfaceOnLowAirRuleTest {
 
     private static ThreatBlackboard boardAt(int air) {
         var board = new ThreatBlackboard();
-        board.beginTick(0L, 0L, 0L, POS, 20f);
+        board.beginTick(20f);
         board.airSupply = air;
         return board;
     }
@@ -49,7 +49,7 @@ class SurfaceOnLowAirRuleTest {
     @Test
     void unSensedAirDefaultsToFullAndNeverFires() {
         ThreatBlackboard board = new ThreatBlackboard();
-        board.beginTick(0L, 0L, 0L, POS, 20f);
+        board.beginTick(20f);
         assertEquals(ThreatBlackboard.MAX_AIR_SUPPLY, board.airSupply, "beginTick resets air to full");
         assertEquals(
                 -1,
@@ -79,7 +79,7 @@ class SurfaceOnLowAirRuleTest {
         SurvivalReflexLayer layer = new SurvivalReflexLayer((world, board) -> board.airSupply = 50);
         layer.addRule(new FreezeOnLowHealthRule());
         layer.addRule(new SurfaceOnLowAirRule());
-        var decision = layer.tick(WORLD, 1L, 0L, 0L, POS, 4f);
+        var decision = layer.tick(WORLD, 4f);
         assertNotNull(decision);
         assertEquals("SURFACE_ON_LOW_AIR", decision.ruleName());
         assertEquals(ReflexAction.ASCEND, decision.action());
@@ -95,18 +95,16 @@ class SurfaceOnLowAirRuleTest {
         int[] air = {50};
         SurvivalReflexLayer layer = new SurvivalReflexLayer((world, board) -> board.airSupply = air[0]);
         layer.addRule(new SurfaceOnLowAirRule());
-        assertNotNull(layer.tick(WORLD, 1L, 0L, 0L, POS, 20f));
+        assertNotNull(layer.tick(WORLD, 20f));
         // Regen climbs into the deadband: still held.
         air[0] = 150;
-        assertNotNull(layer.tick(WORLD, 2L, 0L, 0L, POS, 20f), "air between trigger and release keeps the ascend held");
+        assertNotNull(layer.tick(WORLD, 20f), "air between trigger and release keeps the ascend held");
         // Full air for the whole hold window: releases afterwards.
         for (int i = 0; i < SurfaceOnLowAirRule.SURFACE_HOLD_TICKS; i++) {
             air[0] = 300;
-            assertNotNull(layer.tick(WORLD, 3L + i, 0L, 0L, POS, 20f));
+            assertNotNull(layer.tick(WORLD, 20f));
         }
         air[0] = 300;
-        assertNull(
-                layer.tick(WORLD, 3L + SurfaceOnLowAirRule.SURFACE_HOLD_TICKS, 0L, 0L, POS, 20f),
-                "recovered air releases the ascend");
+        assertNull(layer.tick(WORLD, 20f), "recovered air releases the ascend");
     }
 }

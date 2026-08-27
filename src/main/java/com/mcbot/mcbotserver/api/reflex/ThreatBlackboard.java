@@ -2,6 +2,7 @@ package com.mcbot.mcbotserver.api.reflex;
 
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.EntitySnapshot;
+import javax.annotation.Nullable;
 
 /**
  * Per-tick scratchpad between sensors and reflex rules: sensors write,
@@ -15,20 +16,13 @@ import com.mcbot.mcbotserver.api.world.EntitySnapshot;
  *
  * <p>Implementation note: written and read on the server tick thread
  * only; no synchronization by design.
+ *
+ * <p>Field hygiene: every field here is read by at least one shipped
+ * reflex rule; day/tick/botPos were removed in 2026-08-27 after a
+ * SpotBugs UrF pass confirmed zero reads across main and test (they
+ * were premature API for time-based rules not yet designed).
  */
 public final class ThreatBlackboard {
-
-    /** Game day at sensing time; stamped by the sensor. */
-    public long day;
-
-    /** Time-of-day ticks at sensing time; stamped by the sensor. */
-    public long t;
-
-    /** Server tick counter at sensing time. */
-    public long tick;
-
-    /** Body position at sensing time; never null after sensing. */
-    public CellPos botPos = new CellPos(0, 0, 0);
 
     /** Body health at sensing time; vanilla scale 0..20. */
     public float botHealth = 20f;
@@ -51,6 +45,7 @@ public final class ThreatBlackboard {
      * Nearest threatening entity within sensor range; null when none
      * was sensed this tick.
      */
+    @Nullable
     public EntitySnapshot nearestThreat;
 
     /** Distance in blocks to {@link #nearestThreat}; meaningless when null. */
@@ -89,22 +84,15 @@ public final class ThreatBlackboard {
      * without a position reads as targetless: the DIG action then
      * degrades to the freeze hold instead of digging at a guess.
      */
+    @Nullable
     public CellPos suffocationBlock;
 
     /**
      * Reset all fields to a fresh-tick baseline before sensing.
      *
-     * @param tickCounter    absolute server tick stamp; monotonic
-     * @param gameDay        current day number
-     * @param timeOfDayTicks ticks elapsed within the current day
-     * @param position       body cell at sensing time; never null
-     * @param health         body health at sensing time, 0..max
+     * @param health body health at sensing time, 0..max
      */
-    public void beginTick(long tickCounter, long gameDay, long timeOfDayTicks, CellPos position, float health) {
-        this.tick = tickCounter;
-        this.day = gameDay;
-        this.t = timeOfDayTicks;
-        this.botPos = position;
+    public void beginTick(float health) {
         this.botHealth = health;
         this.airSupply = MAX_AIR_SUPPLY;
         this.nearestThreat = null;

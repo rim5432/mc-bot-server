@@ -33,7 +33,7 @@ class DigOnSuffocationRuleTest {
 
     private static ThreatBlackboard boardAt(boolean inWall, CellPos eyeBlock) {
         var board = new ThreatBlackboard();
-        board.beginTick(0L, 0L, 0L, POS, 20f);
+        board.beginTick(20f);
         board.inWall = inWall;
         board.suffocationBlock = eyeBlock;
         return board;
@@ -69,7 +69,7 @@ class DigOnSuffocationRuleTest {
     @Test
     void unSensedWallDefaultsToFalseAndNeverFires() {
         ThreatBlackboard board = new ThreatBlackboard();
-        board.beginTick(0L, 0L, 0L, POS, 20f);
+        board.beginTick(20f);
         assertEquals(false, board.inWall, "beginTick resets inWall to safe");
         assertEquals(null, board.suffocationBlock, "beginTick resets the rescue target to none");
         assertEquals(-1, new DigOnSuffocationRule().computePriority(board));
@@ -99,13 +99,13 @@ class DigOnSuffocationRuleTest {
         layer.addRule(new SurfaceOnLowAirRule());
         layer.addRule(new DigOnSuffocationRule());
         layer.addRule(new EscapeLavaRule());
-        var d = layer.tick(WORLD, 1L, 0L, 0L, POS, 20f);
+        var d = layer.tick(WORLD, 20f);
         assertEquals("DIG_ON_SUFFOCATION", d.ruleName());
         assertEquals(ReflexAction.DIG, d.action());
         assertEquals(EYE_BLOCK, d.target(), "the decision carries the dig geometry");
 
         inLava[0] = true;
-        d = layer.tick(WORLD, 2L, 0L, 0L, POS, 20f);
+        d = layer.tick(WORLD, 20f);
         assertEquals("ESCAPE_ON_LAVA", d.ruleName(), "lava does not negotiate with anything");
     }
 
@@ -122,16 +122,14 @@ class DigOnSuffocationRuleTest {
             board.suffocationBlock = inWall[0] ? EYE_BLOCK : null;
         });
         layer.addRule(new DigOnSuffocationRule());
-        assertNotNull(layer.tick(WORLD, 1L, 0L, 0L, POS, 20f));
+        assertNotNull(layer.tick(WORLD, 20f));
         for (int i = 0; i < DigOnSuffocationRule.SUFFOCATION_HOLD_TICKS; i++) {
             inWall[0] = false;
-            var held = layer.tick(WORLD, 2L + i, 0L, 0L, POS, 20f);
+            var held = layer.tick(WORLD, 20f);
             assertNotNull(held, "hold keeps the rule through the boundary flap");
             assertEquals(null, held.target(), "a clear eye carries no dig target");
         }
         inWall[0] = false;
-        assertNull(
-                layer.tick(WORLD, 2L + DigOnSuffocationRule.SUFFOCATION_HOLD_TICKS, 0L, 0L, POS, 20f),
-                "clear geometry releases the rule");
+        assertNull(layer.tick(WORLD, 20f), "clear geometry releases the rule");
     }
 }

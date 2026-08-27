@@ -86,7 +86,7 @@ class RuleTableGateTest {
 
         // Fires on a sensed threat under the trigger, silent without.
         var board = new ThreatBlackboard();
-        board.beginTick(0L, 0L, 0L, new com.mcbot.mcbotserver.api.types.CellPos(0, 64, 0), 20f);
+        board.beginTick(20f);
         board.nearestThreat = new com.mcbot.mcbotserver.api.world.EntitySnapshot(
                 "z-1", "minecraft:zombie", new com.mcbot.mcbotserver.api.types.CellPos(4, 64, 0), 20f, 20f);
         board.nearestThreatDistance = 4.0;
@@ -218,20 +218,15 @@ class RuleTableGateTest {
     void wholeTableSwapIsInvisibleToHolders() {
         SurvivalReflexLayer layer = new SurvivalReflexLayer((world, board) -> board.botHealth = 4f);
         layer.addRule(new FreezeOnLowHealthRule());
-        assertEquals(
-                "FREEZE_ON_LOW_HEALTH",
-                layer.tick(mockWorld(), 1L, 0L, 0L, pos(), 4f).ruleName());
+        assertEquals("FREEZE_ON_LOW_HEALTH", layer.tick(mockWorld(), 4f).ruleName());
 
         // Reload installs an impossible threshold: same layer object,
         // different behavior - and nothing else changed.
         layer.replaceRules(List.of(new FreezeOnLowHealthRule(1f, 100)));
-        assertEquals(
-                null,
-                layer.tick(mockWorld(), 2L, 0L, 0L, pos(), 4f),
-                "health 4 must stay silent under a threshold of 1");
+        assertEquals(null, layer.tick(mockWorld(), 4f), "health 4 must stay silent under a threshold of 1");
 
         layer.replaceRules(List.of());
-        assertEquals(null, layer.tick(mockWorld(), 3L, 0L, 0L, pos(), 0.1f));
+        assertEquals(null, layer.tick(mockWorld(), 0.1f));
     }
 
     @Test
@@ -251,11 +246,7 @@ class RuleTableGateTest {
 
     private ThreatBlackboard boardAt(float health) {
         var board = new ThreatBlackboard();
-        board.beginTick(0L, 0L, 0L, new com.mcbot.mcbotserver.api.types.CellPos(0, 64, 0), health);
+        board.beginTick(health);
         return board;
-    }
-
-    private com.mcbot.mcbotserver.api.types.CellPos pos() {
-        return new com.mcbot.mcbotserver.api.types.CellPos(0, 64, 0);
     }
 }

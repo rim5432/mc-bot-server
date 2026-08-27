@@ -31,7 +31,7 @@ class ClimbOutOfPowderSnowRuleTest {
 
     private static ThreatBlackboard boardAt(int freezeTicks) {
         var board = new ThreatBlackboard();
-        board.beginTick(0L, 0L, 0L, POS, 20f);
+        board.beginTick(20f);
         board.freezeTicks = freezeTicks;
         return board;
     }
@@ -53,7 +53,7 @@ class ClimbOutOfPowderSnowRuleTest {
     @Test
     void unSensedFreezeDefaultsToZeroAndNeverFires() {
         ThreatBlackboard board = new ThreatBlackboard();
-        board.beginTick(0L, 0L, 0L, POS, 20f);
+        board.beginTick(20f);
         assertEquals(0, board.freezeTicks, "beginTick resets freezeTicks to 0");
         assertEquals(
                 -1,
@@ -88,7 +88,7 @@ class ClimbOutOfPowderSnowRuleTest {
         });
         layer.addRule(new EngageOnHostileProximityRule());
         layer.addRule(new ClimbOutOfPowderSnowRule());
-        var decision = layer.tick(WORLD, 1L, 0L, 0L, POS, 20f);
+        var decision = layer.tick(WORLD, 20f);
         assertNotNull(decision);
         assertEquals("CLIMB_OUT_OF_POWDER_SNOW", decision.ruleName());
         assertEquals(ReflexAction.ASCEND, decision.action());
@@ -105,7 +105,7 @@ class ClimbOutOfPowderSnowRuleTest {
         SurvivalReflexLayer layer = new SurvivalReflexLayer((world, board) -> board.freezeTicks = 120);
         layer.addRule(new FreezeOnLowHealthRule());
         layer.addRule(new ClimbOutOfPowderSnowRule());
-        var decision = layer.tick(WORLD, 1L, 0L, 0L, POS, 4f);
+        var decision = layer.tick(WORLD, 4f);
         assertNotNull(decision);
         assertEquals("FREEZE_ON_LOW_HEALTH", decision.ruleName());
     }
@@ -120,7 +120,7 @@ class ClimbOutOfPowderSnowRuleTest {
         SurvivalReflexLayer layer = new SurvivalReflexLayer((world, board) -> board.freezeTicks = 120);
         layer.addRule(new FreezeOnLowHealthRule());
         layer.addRule(new ClimbOutOfPowderSnowRule());
-        var decision = layer.tick(WORLD, 1L, 0L, 0L, POS, 20f);
+        var decision = layer.tick(WORLD, 20f);
         assertNotNull(decision);
         assertEquals("CLIMB_OUT_OF_POWDER_SNOW", decision.ruleName());
     }
@@ -136,9 +136,8 @@ class ClimbOutOfPowderSnowRuleTest {
         int[] freeze = {120};
         SurvivalReflexLayer layer = new SurvivalReflexLayer((world, board) -> board.freezeTicks = freeze[0]);
         layer.addRule(new ClimbOutOfPowderSnowRule());
-        assertNotNull(layer.tick(WORLD, 1L, 0L, 0L, POS, 20f), "freeze above trigger fires");
+        assertNotNull(layer.tick(WORLD, 20f), "freeze above trigger fires");
         freeze[0] = 50;
-        assertNull(
-                layer.tick(WORLD, 2L, 0L, 0L, POS, 20f), "freeze below trigger releases immediately (no hysteresis)");
+        assertNull(layer.tick(WORLD, 20f), "freeze below trigger releases immediately (no hysteresis)");
     }
 }

@@ -469,6 +469,7 @@ public final class BotController {
      * a latched controller runs MinimalReflex only and never
      * reaches this pipeline.
      */
+    // invariant: see ADR-0005 D1 (called from onTick inside the single catch frame)
     private void runPipeline(WorldView world) {
         CellPos position = positionSource.get();
         float health = healthSource.get();
@@ -482,7 +483,7 @@ public final class BotController {
         // preemption and then runs the fight through the mission stage
         // (a fight is multi-tick state; a held-body reflex cannot carry
         // target tracking, leash and grace - ReflexAction#ENGAGE).
-        var decision = reflex.tick(world, tickCounter, day, tod, position, health);
+        var decision = reflex.tick(world, health);
         if (decision != null && routeReflexDecision(decision, day, tod)) {
             return;
         }

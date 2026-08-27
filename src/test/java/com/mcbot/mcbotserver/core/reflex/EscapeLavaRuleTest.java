@@ -35,14 +35,14 @@ class EscapeLavaRuleTest {
 
     private static ThreatBlackboard boardAt(boolean inLava) {
         var board = new ThreatBlackboard();
-        board.beginTick(0L, 0L, 0L, POS, 20f);
+        board.beginTick(20f);
         board.inLethalFluid = inLava;
         return board;
     }
 
     private static ThreatBlackboard boardAtFire(int fireTicks, float health) {
         var board = new ThreatBlackboard();
-        board.beginTick(0L, 0L, 0L, POS, health);
+        board.beginTick(health);
         board.fireTicks = fireTicks;
         return board;
     }
@@ -64,7 +64,7 @@ class EscapeLavaRuleTest {
     @Test
     void unSensedLavaDefaultsToFalseAndNeverFires() {
         ThreatBlackboard board = new ThreatBlackboard();
-        board.beginTick(0L, 0L, 0L, POS, 20f);
+        board.beginTick(20f);
         assertEquals(false, board.inLethalFluid, "beginTick resets inLethalFluid to false");
         assertEquals(
                 -1, new EscapeLavaRule().computePriority(board), "a rig whose sensor never stamps lava must not flap");
@@ -90,7 +90,7 @@ class EscapeLavaRuleTest {
         layer.addRule(new FreezeOnLowHealthRule());
         layer.addRule(new SurfaceOnLowAirRule());
         layer.addRule(new EscapeLavaRule());
-        var decision = layer.tick(WORLD, 1L, 0L, 0L, POS, 4f);
+        var decision = layer.tick(WORLD, 4f);
         assertNotNull(decision);
         assertEquals("ESCAPE_ON_LAVA", decision.ruleName());
         assertEquals(ReflexAction.ESCAPE, decision.action());
@@ -101,15 +101,12 @@ class EscapeLavaRuleTest {
         boolean[] inLava = {true};
         SurvivalReflexLayer layer = new SurvivalReflexLayer((world, board) -> board.inLethalFluid = inLava[0]);
         layer.addRule(new EscapeLavaRule());
-        assertNotNull(layer.tick(WORLD, 1L, 0L, 0L, POS, 20f), "in lava fires");
+        assertNotNull(layer.tick(WORLD, 20f), "in lava fires");
         inLava[0] = false;
         for (int i = 0; i < EscapeLavaRule.LAVA_ESCAPE_HOLD_TICKS; i++) {
-            assertNotNull(
-                    layer.tick(WORLD, 2L + i, 0L, 0L, POS, 20f), "hold tick " + i + " keeps escape to clear edge");
+            assertNotNull(layer.tick(WORLD, 20f), "hold tick " + i + " keeps escape to clear edge");
         }
-        assertNull(
-                layer.tick(WORLD, 2L + EscapeLavaRule.LAVA_ESCAPE_HOLD_TICKS, 0L, 0L, POS, 20f),
-                "hold expired + stable dry land releases");
+        assertNull(layer.tick(WORLD, 20f), "hold expired + stable dry land releases");
     }
 
     // ---- ExtinguishFireRule ----
@@ -149,7 +146,7 @@ class EscapeLavaRuleTest {
         layer.addRule(new FreezeOnLowHealthRule()); // 100
         layer.addRule(new SurfaceOnLowAirRule()); // 110, won't fire
         layer.addRule(new ExtinguishFireRule()); // 105
-        var decision = layer.tick(WORLD, 1L, 0L, 0L, POS, 10f);
+        var decision = layer.tick(WORLD, 10f);
         assertNotNull(decision);
         assertEquals("EXTINGUISH_FIRE", decision.ruleName(), "fire escape (105) outranks freeze (100)");
     }

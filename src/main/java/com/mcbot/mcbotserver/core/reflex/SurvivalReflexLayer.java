@@ -130,24 +130,13 @@ public final class SurvivalReflexLayer {
      * computed priority among positive results.
      *
      * @param world        read-only perception; never null
-     * @param tickCounter  current pipeline tick stamp
-     * @param gameDay      game day for the board stamp
-     * @param timeOfDayTicks time-of-day ticks for the board stamp
-     * @param botPos       body cell for the board stamp; never null
      * @param botHealth    body health for the board stamp
      * @return the winning decision, or null when no rule fired and the
      *         mission stage may proceed
      */
-    public ReflexDecision tick(
-            WorldView world,
-            long tickCounter,
-            long gameDay,
-            long timeOfDayTicks,
-            com.mcbot.mcbotserver.api.types.CellPos botPos,
-            float botHealth) {
+    public ReflexDecision tick(WorldView world, float botHealth) {
         Objects.requireNonNull(world, "world");
-        Objects.requireNonNull(botPos, "botPos");
-        blackboard.beginTick(tickCounter, gameDay, timeOfDayTicks, botPos, botHealth);
+        blackboard.beginTick(botHealth);
         sensor.sense(world, blackboard);
 
         ReflexDecision winner = null;
