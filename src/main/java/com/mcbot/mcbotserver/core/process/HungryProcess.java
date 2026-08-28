@@ -1,7 +1,6 @@
 package com.mcbot.mcbotserver.core.process;
 
 import com.mcbot.mcbotserver.api.goal.GoalNear;
-import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
 import com.mcbot.mcbotserver.api.inventory.FoodCatalog;
 import com.mcbot.mcbotserver.api.inventory.InventoryView;
 import com.mcbot.mcbotserver.api.inventory.ItemView;
@@ -9,6 +8,7 @@ import com.mcbot.mcbotserver.api.process.Attack;
 import com.mcbot.mcbotserver.api.process.DigMission;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.Fish;
+import com.mcbot.mcbotserver.api.process.InterruptionContext;
 import com.mcbot.mcbotserver.api.process.Overrides;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.BlockSnapshot;

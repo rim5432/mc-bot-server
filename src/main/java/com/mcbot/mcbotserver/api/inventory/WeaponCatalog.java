@@ -1,4 +1,4 @@
-package com.mcbot.mcbotserver.api.combat;
+package com.mcbot.mcbotserver.api.inventory;
 
 /**
  * Weapon classification seam: the per-hit melee damage a registry id

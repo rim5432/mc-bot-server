@@ -1,10 +1,10 @@
 package com.mcbot.mcbotserver.core.process;
 
 import com.mcbot.mcbotserver.api.goal.GoalNear;
-import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
 import com.mcbot.mcbotserver.api.process.DigMission;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.ExecutionReport;
+import com.mcbot.mcbotserver.api.process.InterruptionContext;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.BlockSnapshot;
 import com.mcbot.mcbotserver.api.world.ViewMode;

@@ -1,8 +1,8 @@
 package com.mcbot.mcbotserver.core.process;
 
-import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
 import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.api.process.Directive;
+import com.mcbot.mcbotserver.api.process.InterruptionContext;
 import com.mcbot.mcbotserver.api.process.PriorityBands;
 import com.mcbot.mcbotserver.api.world.WorldView;
 import java.util.ArrayDeque;

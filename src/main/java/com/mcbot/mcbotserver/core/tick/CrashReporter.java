@@ -1,6 +1,6 @@
 package com.mcbot.mcbotserver.core.tick;
 
-import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
+import com.mcbot.mcbotserver.api.process.InterruptionContext;
 
 /**
  * Crash reporting surface for ADR-0005 D4's dual-channel rule.

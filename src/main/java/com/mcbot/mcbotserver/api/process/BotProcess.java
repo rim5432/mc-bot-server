@@ -1,6 +1,5 @@
 package com.mcbot.mcbotserver.api.process;
 
-import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
 import com.mcbot.mcbotserver.api.world.WorldView;
 
 /**

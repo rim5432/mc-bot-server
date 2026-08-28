@@ -88,7 +88,7 @@ class TickMissionHandoffGateTest {
         TaskArbiter arbiter = new TaskArbiter();
         CountingMission mission = new CountingMission() {
             @Override
-            public boolean resume(com.mcbot.mcbotserver.api.interrupt.InterruptionContext c) {
+            public boolean resume(com.mcbot.mcbotserver.api.process.InterruptionContext c) {
                 return false;
             }
         };

@@ -4,7 +4,7 @@ import com.mcbot.mcbotserver.api.actor.Actor;
 import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.event.EventQueue;
-import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
+import com.mcbot.mcbotserver.api.process.InterruptionContext;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import java.io.PrintWriter;
 import java.io.StringWriter;

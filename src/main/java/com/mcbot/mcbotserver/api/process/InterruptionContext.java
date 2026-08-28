@@ -1,4 +1,4 @@
-package com.mcbot.mcbotserver.api.interrupt;
+package com.mcbot.mcbotserver.api.process;
 
 import com.mcbot.mcbotserver.api.types.CellPos;
 

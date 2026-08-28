@@ -1,6 +1,6 @@
 package com.mcbot.mcbotserver.adapter;
 
-import com.mcbot.mcbotserver.api.combat.WeaponCatalog;
+import com.mcbot.mcbotserver.api.inventory.WeaponCatalog;
 import java.util.HashMap;
 import java.util.Map;
 import net.minecraft.world.entity.EquipmentSlot;

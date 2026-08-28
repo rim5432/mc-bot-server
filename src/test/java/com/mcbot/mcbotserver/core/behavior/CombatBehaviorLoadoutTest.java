@@ -5,10 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Intent;
-import com.mcbot.mcbotserver.api.combat.WeaponCatalog;
 import com.mcbot.mcbotserver.api.goal.GoalNear;
 import com.mcbot.mcbotserver.api.inventory.InventoryView;
 import com.mcbot.mcbotserver.api.inventory.ItemView;
+import com.mcbot.mcbotserver.api.inventory.WeaponCatalog;
 import com.mcbot.mcbotserver.api.process.Attack;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.Overrides;
