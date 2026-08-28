@@ -243,7 +243,17 @@ final class MenuVerbs {
         boolean brewingFamily = type.equals("brewing_stand");
         boolean grindstoneFamily = type.equals("grindstone");
         boolean stonecutterFamily = type.equals("stonecutter");
-        if (furnaceFamily || anvilFamily || brewingFamily || grindstoneFamily || stonecutterFamily) {
+        boolean cartographyFamily = type.equals("cartography_table");
+        boolean smithingFamily = type.equals("smithing_table");
+        boolean loomFamily = type.equals("loom");
+        if (furnaceFamily
+                || anvilFamily
+                || brewingFamily
+                || grindstoneFamily
+                || stonecutterFamily
+                || cartographyFamily
+                || smithingFamily
+                || loomFamily) {
             return role;
         }
         return SlotRole.CONTAINER;

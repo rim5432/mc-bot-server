@@ -221,4 +221,69 @@ class MenuPlannerCountedRoleTest {
                 List.of(new MenuPlanner.Step(1, 0, MenuClick.QUICK_MOVE)),
                 MenuPlanner.planTakeRole(menu, SlotRole.OUTPUT, 0));
     }
+
+    @Test
+    void cartographyDepositInputFillsFirstEmptySlot() {
+        MenuView menu =
+                MenuFixtures.cartographyTable(MenuFixtures.builder().put(SlotRole.HOTBAR, 38, "minecraft:map", 1));
+        List<MenuPlanner.Step> plan = MenuPlanner.planDepositCounted(menu, SlotRole.INPUT, "minecraft:map", 1);
+        assertEquals(
+                List.of(
+                        new MenuPlanner.Step(38, 0, MenuClick.PICKUP),
+                        new MenuPlanner.Step(0, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(38, 0, MenuClick.PICKUP)),
+                plan);
+    }
+
+    @Test
+    void cartographyTakeOutputQuickMovesResult() {
+        MenuView menu =
+                MenuFixtures.cartographyTable(MenuFixtures.builder().put(SlotRole.OUTPUT, 2, "minecraft:map", 1));
+        assertEquals(
+                List.of(new MenuPlanner.Step(2, 0, MenuClick.QUICK_MOVE)),
+                MenuPlanner.planTakeRole(menu, SlotRole.OUTPUT, 0));
+    }
+
+    @Test
+    void smithingDepositInputFillsFirstEmptySlot() {
+        MenuView menu = MenuFixtures.smithingTable(
+                MenuFixtures.builder().put(SlotRole.HOTBAR, 39, "minecraft:netherite_ingot", 1));
+        List<MenuPlanner.Step> plan =
+                MenuPlanner.planDepositCounted(menu, SlotRole.INPUT, "minecraft:netherite_ingot", 1);
+        assertEquals(
+                List.of(
+                        new MenuPlanner.Step(39, 0, MenuClick.PICKUP),
+                        new MenuPlanner.Step(0, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(39, 0, MenuClick.PICKUP)),
+                plan);
+    }
+
+    @Test
+    void smithingTakeOutputQuickMovesResult() {
+        MenuView menu = MenuFixtures.smithingTable(
+                MenuFixtures.builder().put(SlotRole.OUTPUT, 3, "minecraft:netherite_pickaxe", 1));
+        assertEquals(
+                List.of(new MenuPlanner.Step(3, 0, MenuClick.QUICK_MOVE)),
+                MenuPlanner.planTakeRole(menu, SlotRole.OUTPUT, 0));
+    }
+
+    @Test
+    void loomDepositInputFillsFirstEmptySlot() {
+        MenuView menu = MenuFixtures.loom(MenuFixtures.builder().put(SlotRole.HOTBAR, 39, "minecraft:white_banner", 1));
+        List<MenuPlanner.Step> plan = MenuPlanner.planDepositCounted(menu, SlotRole.INPUT, "minecraft:white_banner", 1);
+        assertEquals(
+                List.of(
+                        new MenuPlanner.Step(39, 0, MenuClick.PICKUP),
+                        new MenuPlanner.Step(0, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(39, 0, MenuClick.PICKUP)),
+                plan);
+    }
+
+    @Test
+    void loomTakeOutputQuickMovesResult() {
+        MenuView menu = MenuFixtures.loom(MenuFixtures.builder().put(SlotRole.OUTPUT, 3, "minecraft:white_banner", 1));
+        assertEquals(
+                List.of(new MenuPlanner.Step(3, 0, MenuClick.QUICK_MOVE)),
+                MenuPlanner.planTakeRole(menu, SlotRole.OUTPUT, 0));
+    }
 }

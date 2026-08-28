@@ -251,6 +251,66 @@ final class MenuFixtures {
         return new MenuView("stonecutter", null, ItemView.EMPTY, 38, slots);
     }
 
+    /** Cartography-table-shaped snapshot: INPUT 0 and 1, OUTPUT 2,
+     * MAIN 3..29, HOTBAR 30..38 - same 3-slot layout as anvil. */
+    static MenuView cartographyTable(Builder b) {
+        b.roles.putIfAbsent(0, SlotRole.INPUT);
+        b.roles.putIfAbsent(1, SlotRole.INPUT);
+        b.roles.putIfAbsent(2, SlotRole.OUTPUT);
+        for (int i = 3; i <= 29; i++) {
+            b.roles.putIfAbsent(i, SlotRole.MAIN);
+        }
+        for (int i = 30; i <= 38; i++) {
+            b.roles.putIfAbsent(i, SlotRole.HOTBAR);
+        }
+        List<SlotView> slots = new ArrayList<>(39);
+        for (int i = 0; i < 39; i++) {
+            slots.add(new SlotView(i, b.items.getOrDefault(i, ItemView.EMPTY), b.roles.get(i)));
+        }
+        return new MenuView("cartography_table", null, ItemView.EMPTY, 39, slots);
+    }
+
+    /** Smithing-table-shaped snapshot: INPUT 0/1/2 (template/base/
+     * additional), OUTPUT 3, MAIN 4..30, HOTBAR 31..39 - 40 slots. */
+    static MenuView smithingTable(Builder b) {
+        for (int i = 0; i <= 2; i++) {
+            b.roles.putIfAbsent(i, SlotRole.INPUT);
+        }
+        b.roles.putIfAbsent(3, SlotRole.OUTPUT);
+        for (int i = 4; i <= 30; i++) {
+            b.roles.putIfAbsent(i, SlotRole.MAIN);
+        }
+        for (int i = 31; i <= 39; i++) {
+            b.roles.putIfAbsent(i, SlotRole.HOTBAR);
+        }
+        List<SlotView> slots = new ArrayList<>(40);
+        for (int i = 0; i < 40; i++) {
+            slots.add(new SlotView(i, b.items.getOrDefault(i, ItemView.EMPTY), b.roles.get(i)));
+        }
+        return new MenuView("smithing_table", null, ItemView.EMPTY, 40, slots);
+    }
+
+    /** Loom-shaped snapshot: INPUT 0/1/2 (banner/dye/pattern),
+     * OUTPUT 3, MAIN 4..30, HOTBAR 31..39 - same 4-slot layout as
+     * smithing table (40 slots). */
+    static MenuView loom(Builder b) {
+        for (int i = 0; i <= 2; i++) {
+            b.roles.putIfAbsent(i, SlotRole.INPUT);
+        }
+        b.roles.putIfAbsent(3, SlotRole.OUTPUT);
+        for (int i = 4; i <= 30; i++) {
+            b.roles.putIfAbsent(i, SlotRole.MAIN);
+        }
+        for (int i = 31; i <= 39; i++) {
+            b.roles.putIfAbsent(i, SlotRole.HOTBAR);
+        }
+        List<SlotView> slots = new ArrayList<>(40);
+        for (int i = 0; i < 40; i++) {
+            slots.add(new SlotView(i, b.items.getOrDefault(i, ItemView.EMPTY), b.roles.get(i)));
+        }
+        return new MenuView("loom", null, ItemView.EMPTY, 40, slots);
+    }
+
     /** Own-inventory fake: result 0, grid 1..4, ARMOR 5..8 (head
      * first), MAIN 9..35, HOTBAR 36..44, OFFHAND 45 - the
      * MenuSlotLayouts survival layout mirrored. */

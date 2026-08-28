@@ -114,4 +114,20 @@ final class MenuSlotLayouts {
         }
         return index <= size - 10 ? SlotRole.MAIN : SlotRole.HOTBAR;
     }
+
+    /**
+     * Three-input-one-output layout shared by SmithingMenu (template,
+     * base, additional -> result) and LoomMenu (banner, dye, pattern
+     * -> result). Slots 0-2 = INPUT, slot 3 = OUTPUT, then the
+     * standard 27 main + 9 hotbar.
+     */
+    public static SlotRole threeInputRole(int index, int size) {
+        if (index <= 2) {
+            return SlotRole.INPUT;
+        }
+        if (index == 3) {
+            return SlotRole.OUTPUT;
+        }
+        return index <= size - 10 ? SlotRole.MAIN : SlotRole.HOTBAR;
+    }
 }

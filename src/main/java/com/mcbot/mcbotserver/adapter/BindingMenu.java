@@ -194,6 +194,14 @@ public final class BindingMenu {
         if (menu instanceof net.minecraft.world.inventory.StonecutterMenu) {
             return MenuSlotLayouts.stonecutterRole(index, size);
         }
+        if (menu instanceof net.minecraft.world.inventory.CartographyTableMenu) {
+            // Same 3-slot layout as anvil (0/1 input, 2 output) - reuse.
+            return MenuSlotLayouts.anvilRole(index, size);
+        }
+        if (menu instanceof net.minecraft.world.inventory.SmithingMenu
+                || menu instanceof net.minecraft.world.inventory.LoomMenu) {
+            return MenuSlotLayouts.threeInputRole(index, size);
+        }
         // Container menus (chest, and unknown kinds as fallback):
         // leading container slots, then main 27, then hotbar 9.
         if (index <= size - 37) {
