@@ -113,17 +113,11 @@ public final class BindingInventory {
     }
 
     /**
-     * Converts one engine ItemStack into the api's read-only shape. Empty
-     * stacks normalize to {@link ItemView#EMPTY}; the registry key is the
-     * canonical id style ({@code minecraft:diamond}).
-     *
-     * @param stack the engine stack; never null
-     * @return read-only view; never null
-     */
-    /**
      * Converts one engine ItemStack into the api's read-only shape.
      * Shared with {@link BindingMenu} so inventory and menu snapshots
-     * stay consistent by construction.
+     * stay consistent by construction. Empty stacks normalize to
+     * {@link ItemView#EMPTY}; the registry key is the canonical id
+     * style ({@code minecraft:diamond}).
      *
      * @param stack the engine stack; never null
      * @return read-only view; never null

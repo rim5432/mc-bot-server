@@ -375,16 +375,6 @@ public final class BotBodyEntity extends PathfinderMob {
     }
 
     /**
-     * One tick of the hunger lifecycle - a verbatim clone of
-     * {@code FoodData.tick(Player)} (decompiled 1.20.1, dossier
-     * 2026-08-27) with {@code this} in the player's seat: the
-     * exhaustion drain, the saturated fast regen (heal saturation/6
-     * every 10 ticks, paying back what it healed), the foodLevel>=18
-     * slow regen (1 HP per 80 ticks at 6.0 exhaustion), and the
-     * foodLevel<=0 starvation branch, all gated on the level's
-     * natural-regeneration gamerule and difficulty exactly as vanilla.
-     */
-    /**
      * Eat the held stack's top item (Phase 4 eat slice): the vanilla
      * mob-safe chain - {@code finishUsingItem} plays the eat sound,
      * rolls probability effects (rotten flesh, golden apples), shrinks
