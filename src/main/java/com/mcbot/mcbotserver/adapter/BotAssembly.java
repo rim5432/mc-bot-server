@@ -5,7 +5,6 @@ import com.mcbot.mcbotserver.adapter.rescue.RescueMissionFactory;
 import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
 import com.mcbot.mcbotserver.api.behavior.Behavior;
 import com.mcbot.mcbotserver.api.process.PriorityBands;
-import com.mcbot.mcbotserver.api.state.BotState;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.BlockTraits;
 import com.mcbot.mcbotserver.api.world.BlockTraitsRegistry;
@@ -32,14 +31,10 @@ import com.mcbot.mcbotserver.core.state.ChangeDetectingStateChannel;
 import com.mcbot.mcbotserver.core.tick.BotController;
 import com.mcbot.mcbotserver.core.tick.CrashReporter;
 import com.mcbot.mcbotserver.core.world.MapBlockTraitsRegistry;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.effect.MobEffectInstance;
 
 /**
  * The single assembly point for one bot's full pipeline: perception,
@@ -139,111 +134,13 @@ public final class BotAssembly {
         // ties keep the lower hotbar slot - cooked beats raw, raw
         // still beats starving.
         var foodCatalog = new VanillaFoodCatalog();
-        java.util.function.IntSupplier bestFoodSlot = () -> {
-            var container = body.getInventory().container();
-            int best = -1;
-            int bestNutrition = -1;
-            for (int slot = 0; slot < com.mcbot.mcbotserver.api.inventory.InventoryView.HOTBAR_SIZE; slot++) {
-                var stack = container.getItem(slot);
-                if (stack.isEmpty()) {
-                    continue;
-                }
-                var facts = foodCatalog.facts(net.minecraftforge.registries.ForgeRegistries.ITEMS
-                        .getKey(stack.getItem())
-                        .toString());
-                if (facts != null && facts.nutrition() > bestNutrition) {
-                    best = slot;
-                    bestNutrition = facts.nutrition();
-                }
-            }
-            return best;
-        };
+        java.util.function.IntSupplier bestFoodSlot = bestFoodSlotOf(body, foodCatalog);
 
         // Water-bucket slot + MLG rule: the supplier is shared by the
         // sensor stamp and the controller's injector feed - one source
         // of truth for both ends (the eat-slot pattern).
-        java.util.function.IntSupplier waterBucketSlot = () -> {
-            var container = body.getInventory().container();
-            for (int i = 0; i < 9; i++) {
-                var stack = container.getItem(i);
-                if (stack.is(net.minecraft.world.item.Items.WATER_BUCKET)) {
-                    return i;
-                }
-            }
-            return -1;
-        };
-        SurvivalReflexLayer reflex = new SurvivalReflexLayer(new LevelThreatSensor(
-                () -> poseOf(body),
-                body::getAirSupply,
-                body::isInLava,
-                body::getRemainingFireTicks,
-                body::getTicksFrozen,
-                body::isInWall,
-                () -> suffocationBlockOf(body),
-                body.getFoodData()::getFoodLevel,
-                body.getFoodData()::getSaturationLevel,
-                bestFoodSlot,
-                () -> body.getDeltaMovement().y < -0.25,
-                () -> mlgGroundCellOf(level, body),
-                waterBucketSlot));
-        reflex.addRule(new FreezeOnLowHealthRule());
-        // Air reflex outranks the freeze rule by default (SURFACE
-        // _PRIORITY 110 vs FREEZE 100): freezing underwater converts
-        // one lethal condition into two.
-        reflex.addRule(new SurfaceOnLowAirRule());
-        // Lava escape outranks air (LAVA_ESCAPE_PRIORITY 130 vs 110):
-        // lava is 4 HP/tick with no interval vs drowning's 2 HP/tick
-        // after air exhaustion. ESCAPE handoff (not pure ASCEND): the
-        // reflex submits a rescue GotoProcess to the nearest shore
-        // cell; the pathing behavior handles ascent + horizontal swim.
-        // Replaces the earlier AscendInLethalFluidRule (ASCEND-only
-        // floated the body to the surface but never reached shore).
-        reflex.addRule(new EscapeLavaRule());
-        // Suffocation self-rescue dig (issue 0008 D3, upgraded by
-        // issue 0009): 1 HP/tick instant-class, but with dig
-        // capability the rescue direction is KNOWN - the eye block -
-        // so the rule digs it out instead of freezing (the stopgap
-        // FREEZE was superseded). 115 keeps its slot between SURFACE
-        // and LAVA per the 0008 F9 triage table. The TASK_PAUSED
-        // preemption is still the siren for the unbreakable-wall case
-        // the dig cannot answer.
-        reflex.addRule(new DigOnSuffocationRule());
-        // MLG water bucket (the coverage-review P0 slice): while
-        // descending over sensed ground with a water bucket in the
-        // hotbar, place the water before impact. Priority 120 sits
-        // between DIG_ON_SUFFOCATION (115) and LAVA_ESCAPE (130):
-        // falling damage is deferred but certain, and the placement
-        // window is a handful of ticks. Self-limiting after one
-        // placement (the bucket empties, the slot read turns -1).
-        reflex.addRule(new com.mcbot.mcbotserver.core.reflex.WaterBucketOnFallRule());
-        // Fire find-water (issue 0008 D5-revised): fires only when
-        // remaining fire damage >= current health (burn-to-death
-        // band). Non-lethal fire is left to the route and natural
-        // expiry, exactly as the original D5 "sense-only" ruling
-        // intended. Priority 105 sits between SURFACE (110) and
-        // FREEZE (100): burning to death outranks low-health freeze
-        // because freezing does not stop the burn.
-        reflex.addRule(new ExtinguishFireRule());
-        // Powder-snow freeze climb (issue 0008 F3): the least urgent
-        // vital (140-tick freeze budget, 1 HP/40t after). ASCEND holds
-        // jump; powder snow is climbable (Entity.isStateClimbable) so
-        // the same intent that surfaces a drowning body climbs a
-        // freezing one out. Priority 95 sits below FREEZE (100): a
-        // low-health freezing body parks for harness triage (47s
-        // budget is ample response time); above ENGAGE (90) so a
-        // freezing bot climbs instead of continuing a fight.
-        reflex.addRule(new ClimbOutOfPowderSnowRule());
-        // Idle-combat reflex (2026-08-24 night-cave death): engages a
-        // hostile that closes to melee range even when no mission is
-        // running. Sits BELOW the survival holds: at three health
-        // points the right reflex is to stop, not to start a fight.
-        reflex.addRule(new EngageOnHostileProximityRule());
-        // Eat reflex sits below ENGAGE (0010 D6: combat first) and
-        // only fires while the sensor sees both hunger and food.
-        reflex.addRule(new com.mcbot.mcbotserver.core.reflex.EatWhenHungryRule());
-        // Acquisition is the eat rule's complement (0010): fires only
-        // hungry-without-food, hands off to the forage seat.
-        reflex.addRule(new com.mcbot.mcbotserver.core.reflex.AcquireFoodWhenHungryRule());
+        java.util.function.IntSupplier waterBucketSlot = waterBucketSlotOf(body);
+        SurvivalReflexLayer reflex = reflexLayer(level, body, bestFoodSlot, waterBucketSlot);
 
         Behavior mover = new PathingBehavior(
                 "mover",
@@ -341,7 +238,7 @@ public final class BotAssembly {
         });
 
         ChangeDetectingStateChannel state = new ChangeDetectingStateChannel(
-                () -> snapshotOf(body, gotoHandler, level),
+                () -> BotStateSnapshots.of(body, gotoHandler, level),
                 events,
                 () -> level.getDayTime() / 24000L,
                 () -> level.getDayTime() % 24000L);
@@ -392,48 +289,133 @@ public final class BotAssembly {
     }
 
     /**
-     * Captures the boundary-D state snapshot from the live body.
-     *
-     * @param body        the spawned body; never null
-     * @param gotoHandler workload owner for the task summary; never
-     *                    null
-     * @param level       the body's level; never null
-     * @return fresh snapshot; never null
+     * The production reflex layer: the full threat sensor over the
+     * live body plus the rule set with its priority reasoning. One
+     * rule = one comment = one addRule, so the ladder stays auditable
+     * against ReflexPriorityOrderGateTest.
      */
-    private static BotState snapshotOf(BotBodyEntity body, GotoCommandHandler gotoHandler, ServerLevel level) {
-        // Item summary from the live inventory binding (issue 0007 Phase
-        // 1): aggregate main-slot counts by item id. Armor and offhand
-        // are excluded from the summary map — they are equipment, not
-        // transferable stack count.
-        var inv = body.getInventory().snapshot();
-        Map<String, Integer> items = new LinkedHashMap<>();
-        int freeSlots = 0;
-        for (var slot : inv.main()) {
-            if (!slot.isEmpty()) {
-                items.merge(slot.itemId(), slot.count(), Integer::sum);
-            } else {
-                freeSlots++;
+    private static SurvivalReflexLayer reflexLayer(
+            ServerLevel level,
+            BotBodyEntity body,
+            java.util.function.IntSupplier bestFoodSlot,
+            java.util.function.IntSupplier waterBucketSlot) {
+        SurvivalReflexLayer reflex = new SurvivalReflexLayer(new LevelThreatSensor(
+                () -> poseOf(body),
+                body::getAirSupply,
+                body::isInLava,
+                body::getRemainingFireTicks,
+                body::getTicksFrozen,
+                body::isInWall,
+                () -> suffocationBlockOf(body),
+                body.getFoodData()::getFoodLevel,
+                body.getFoodData()::getSaturationLevel,
+                bestFoodSlot,
+                () -> body.getDeltaMovement().y < -0.25,
+                () -> mlgGroundCellOf(level, body),
+                waterBucketSlot));
+        reflex.addRule(new FreezeOnLowHealthRule());
+        // Air reflex outranks the freeze rule by default (SURFACE
+        // _PRIORITY 110 vs FREEZE 100): freezing underwater converts
+        // one lethal condition into two.
+        reflex.addRule(new SurfaceOnLowAirRule());
+        // Lava escape outranks air (LAVA_ESCAPE_PRIORITY 130 vs 110):
+        // lava is 4 HP/tick with no interval vs drowning's 2 HP/tick
+        // after air exhaustion. ESCAPE handoff (not pure ASCEND): the
+        // reflex submits a rescue GotoProcess to the nearest shore
+        // cell; the pathing behavior handles ascent + horizontal swim.
+        // Replaces the earlier AscendInLethalFluidRule (ASCEND-only
+        // floated the body to the surface but never reached shore).
+        reflex.addRule(new EscapeLavaRule());
+        // Suffocation self-rescue dig (issue 0008 D3, upgraded by
+        // issue 0009): 1 HP/tick instant-class, but with dig
+        // capability the rescue direction is KNOWN - the eye block -
+        // so the rule digs it out instead of freezing (the stopgap
+        // FREEZE was superseded). 115 keeps its slot between SURFACE
+        // and LAVA per the 0008 F9 triage table. The TASK_PAUSED
+        // preemption is still the siren for the unbreakable-wall case
+        // the dig cannot answer.
+        reflex.addRule(new DigOnSuffocationRule());
+        // MLG water bucket (the coverage-review P0 slice): while
+        // descending over sensed ground with a water bucket in the
+        // hotbar, place the water before impact. Priority 120 sits
+        // between DIG_ON_SUFFOCATION (115) and LAVA_ESCAPE (130):
+        // falling damage is deferred but certain, and the placement
+        // window is a handful of ticks. Self-limiting after one
+        // placement (the bucket empties, the slot read turns -1).
+        reflex.addRule(new com.mcbot.mcbotserver.core.reflex.WaterBucketOnFallRule());
+        // Fire find-water (issue 0008 D5-revised): fires only when
+        // remaining fire damage >= current health (burn-to-death
+        // band). Non-lethal fire is left to the route and natural
+        // expiry, exactly as the original D5 "sense-only" ruling
+        // intended. Priority 105 sits between SURFACE (110) and
+        // FREEZE (100): burning to death outranks low-health freeze
+        // because freezing does not stop the burn.
+        reflex.addRule(new ExtinguishFireRule());
+        // Powder-snow freeze climb (issue 0008 F3): the least urgent
+        // vital (140-tick freeze budget, 1 HP/40t after). ASCEND holds
+        // jump; powder snow is climbable (Entity.isStateClimbable) so
+        // the same intent that surfaces a drowning body climbs a
+        // freezing one out. Priority 95 sits below FREEZE (100): a
+        // low-health freezing body parks for harness triage (47s
+        // budget is ample response time); above ENGAGE (90) so a
+        // freezing bot climbs instead of continuing a fight.
+        reflex.addRule(new ClimbOutOfPowderSnowRule());
+        // Idle-combat reflex (2026-08-24 night-cave death): engages a
+        // hostile that closes to melee range even when no mission is
+        // running. Sits BELOW the survival holds: at three health
+        // points the right reflex is to stop, not to start a fight.
+        reflex.addRule(new EngageOnHostileProximityRule());
+        // Eat reflex sits below ENGAGE (0010 D6: combat first) and
+        // only fires while the sensor sees both hunger and food.
+        reflex.addRule(new com.mcbot.mcbotserver.core.reflex.EatWhenHungryRule());
+        // Acquisition is the eat rule's complement (0010): fires only
+        // hungry-without-food, hands off to the forage seat.
+        reflex.addRule(new com.mcbot.mcbotserver.core.reflex.AcquireFoodWhenHungryRule());
+        return reflex;
+    }
+
+    /**
+     * Best-food hotbar scan (issue 0010 D5): highest nutrition wins,
+     * ties keep the lower hotbar slot - cooked beats raw, raw still
+     * beats starving.
+     */
+    private static java.util.function.IntSupplier bestFoodSlotOf(BotBodyEntity body, VanillaFoodCatalog foodCatalog) {
+        return () -> {
+            var container = body.getInventory().container();
+            int best = -1;
+            int bestNutrition = -1;
+            for (int slot = 0; slot < com.mcbot.mcbotserver.api.inventory.InventoryView.HOTBAR_SIZE; slot++) {
+                var stack = container.getItem(slot);
+                if (stack.isEmpty()) {
+                    continue;
+                }
+                var facts = foodCatalog.facts(net.minecraftforge.registries.ForgeRegistries.ITEMS
+                        .getKey(stack.getItem())
+                        .toString());
+                if (facts != null && facts.nutrition() > bestNutrition) {
+                    best = slot;
+                    bestNutrition = facts.nutrition();
+                }
             }
-        }
-        Map<String, Integer> effects = new LinkedHashMap<>();
-        for (MobEffectInstance instance : body.getActiveEffects()) {
-            effects.put(
-                    BuiltInRegistries.MOB_EFFECT.getKey(instance.getEffect()).toString(), instance.getAmplifier());
-        }
-        // Health bucketed to whole hearts: 1 heart = 2 half-heart
-        // units, rounding half up so a fresh bot reads 20.
-        return new BotState(
-                poseOf(body),
-                body.getYRot(),
-                body.getXRot(),
-                level.dimension().location().getPath(),
-                items,
-                inv.selectedSlot(),
-                effects,
-                gotoHandler.activeTaskSummary(),
-                Math.round(body.getHealth() / 2.0f),
-                freeSlots,
-                body.getFoodData().getFoodLevel());
+            return best;
+        };
+    }
+
+    /**
+     * Water-bucket hotbar scan: the MLG rule's slot feed, -1 when
+     * none (which silences the rule - no phantom placements).
+     */
+    private static java.util.function.IntSupplier waterBucketSlotOf(BotBodyEntity body) {
+        return () -> {
+            var container = body.getInventory().container();
+            for (int i = 0; i < 9; i++) {
+                var stack = container.getItem(i);
+                if (stack.is(net.minecraft.world.item.Items.WATER_BUCKET)) {
+                    return i;
+                }
+            }
+            return -1;
+        };
     }
 
     private static CellPos poseOf(BotBodyEntity body) {
