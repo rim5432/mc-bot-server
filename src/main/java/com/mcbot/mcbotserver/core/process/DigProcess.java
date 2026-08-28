@@ -142,7 +142,7 @@ public final class DigProcess implements BotProcess, TerminalMission, DigMission
     }
 
     @Override
-    public void onExecutionReport(com.mcbot.mcbotserver.api.behavior.ExecutionReport report) {
+    public void onExecutionReport(com.mcbot.mcbotserver.api.process.ExecutionReport report) {
         if (!active) {
             // Terminal state is sticky: a late report from the same
             // tick's pipeline must never flip a terminal state.
@@ -212,7 +212,7 @@ public final class DigProcess implements BotProcess, TerminalMission, DigMission
         return Directive.of(new GoalNear(target, 2));
     }
 
-    private static String reasonOrUnknown(com.mcbot.mcbotserver.api.behavior.ExecutionReport report) {
+    private static String reasonOrUnknown(com.mcbot.mcbotserver.api.process.ExecutionReport report) {
         return report.reason() != null ? report.reason() : "UNKNOWN";
     }
 }

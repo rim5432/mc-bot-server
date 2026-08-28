@@ -2,6 +2,7 @@ package com.mcbot.mcbotserver.api.behavior;
 
 import com.mcbot.mcbotserver.api.actor.Actor;
 import com.mcbot.mcbotserver.api.process.Directive;
+import com.mcbot.mcbotserver.api.process.ExecutionReport;
 import com.mcbot.mcbotserver.api.world.WorldView;
 import javax.annotation.Nullable;
 

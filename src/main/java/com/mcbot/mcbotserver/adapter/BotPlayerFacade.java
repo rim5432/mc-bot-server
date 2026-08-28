@@ -1,6 +1,7 @@
 package com.mcbot.mcbotserver.adapter;
 
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
+import com.mcbot.mcbotserver.adapter.inventory.BindingInventory;
 import com.mojang.authlib.GameProfile;
 import java.util.UUID;
 import net.minecraft.world.entity.player.Inventory;

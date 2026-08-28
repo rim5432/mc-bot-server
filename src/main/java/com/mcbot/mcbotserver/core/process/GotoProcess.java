@@ -1,10 +1,10 @@
 package com.mcbot.mcbotserver.core.process;
 
-import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
 import com.mcbot.mcbotserver.api.goal.Goal;
 import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
 import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.api.process.Directive;
+import com.mcbot.mcbotserver.api.process.ExecutionReport;
 import com.mcbot.mcbotserver.api.world.WorldView;
 
 /**

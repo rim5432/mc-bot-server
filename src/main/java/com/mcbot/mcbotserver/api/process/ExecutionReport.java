@@ -1,4 +1,4 @@
-package com.mcbot.mcbotserver.api.behavior;
+package com.mcbot.mcbotserver.api.process;
 
 import javax.annotation.Nullable;
 

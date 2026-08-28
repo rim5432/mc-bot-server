@@ -7,8 +7,8 @@ import static com.mcbot.mcbotserver.gametest.GametestRig.driveUntil;
 import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
 
 import com.mcbot.mcbotserver.McBotServer;
-import com.mcbot.mcbotserver.adapter.BindingInventory;
 import com.mcbot.mcbotserver.adapter.BotAssembly;
+import com.mcbot.mcbotserver.adapter.inventory.BindingInventory;
 import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
 import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;

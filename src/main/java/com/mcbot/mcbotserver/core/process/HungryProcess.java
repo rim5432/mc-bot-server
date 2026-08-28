@@ -313,7 +313,7 @@ public final class HungryProcess implements BotProcess, TerminalMission, DigMiss
     }
 
     @Override
-    public void onExecutionReport(com.mcbot.mcbotserver.api.behavior.ExecutionReport report) {
+    public void onExecutionReport(com.mcbot.mcbotserver.api.process.ExecutionReport report) {
         // Walk weather never decides the forage: the food check and
         // the tick budget own the verdict.
     }

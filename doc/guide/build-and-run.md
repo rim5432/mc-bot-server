@@ -81,20 +81,14 @@ both pinned-list with anchors.
 
 Top-level module acyclicity is an ArchUnit slice rule
 (`NO_MODULE_CYCLES` in `BytecodeArchitectureGateTest`): api, core,
-adapter, client, gametest must not form cycles. Two known subpackage
-cycles are deliberately below its resolution and documented here:
-
-- `api.behavior ↔ api.process` — contract-endemic. `Behavior.tick()`
-  consumes `Directive` (api.process); `BotProcess.onExecutionReport()`
-  consumes `ExecutionReport` (api.behavior). This is boundary B's
-  feedback loop by design; breaking it requires extracting both DTOs
-  to a shared contract package, a refactoring decision not a defect.
-- `adapter.rescue ↔ adapter ↔ adapter.entity` — parent-child smell.
-  The root `adapter` package holds both wiring (`BotAssembly`, depends
-  on subpackages) and shared types (`BindingInventory`, depended on by
-  subpackages). Clean fix is extracting `BindingInventory` to
-  `adapter.inventory`; filed for a future refactoring round, not a
-  static-check task.
+adapter, client, gametest must not form cycles. Subpackage cycles
+inside a module are gated too (`NO_SUBPACKAGE_CYCLES`, same class).
+Both rules used to carry documented exceptions that have since been
+paid off: `api.behavior ↔ api.process` dissolved when `ExecutionReport`
+moved to `api.process` (produce where consumed), and the
+`adapter ↔ adapter.entity ↔ adapter.rescue` parent-child smell dissolved
+when `BindingInventory` moved to `adapter.inventory`. There are no
+cycle exceptions left; a new one is a design regression.
 
 ## When a build fails
 

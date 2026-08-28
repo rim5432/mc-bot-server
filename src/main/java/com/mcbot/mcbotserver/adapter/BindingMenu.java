@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.adapter;
 
+import com.mcbot.mcbotserver.adapter.inventory.BindingInventory;
 import com.mcbot.mcbotserver.api.menu.MenuClick;
 import com.mcbot.mcbotserver.api.menu.MenuView;
 import com.mcbot.mcbotserver.api.menu.SlotRole;

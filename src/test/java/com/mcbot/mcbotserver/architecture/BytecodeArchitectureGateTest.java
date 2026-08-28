@@ -57,13 +57,22 @@ class BytecodeArchitectureGateTest {
     /**
      * Top-level modules are acyclic: api, core, adapter, client,
      * gametest form a strict layering. A cycle at this granularity means
-     * a boundary has been inverted. Subpackage cycles within a module
-     * are documented separately (build-and-run.md): api.behavior ↔
-     * api.process is the boundary B feedback loop (contract-endemic);
-     * adapter.rescue ↔ adapter ↔ adapter.entity is a known parent-child
-     * smell filed for refactoring.
+     * a boundary has been inverted.
      */
     @ArchTest
     static final ArchRule NO_MODULE_CYCLES =
             slices().matching("com.mcbot.mcbotserver.(*)..").should().beFreeOfCycles();
+
+    /**
+     * Subpackages inside every module are acyclic too. This rule
+     * replaced the two documented exceptions below it once their last
+     * real edges were removed: api.behavior ↔ api.process (dissolved by
+     * moving ExecutionReport to api.process) and
+     * adapter ↔ adapter.entity ↔ adapter.rescue (dissolved by moving
+     * BindingInventory to adapter.inventory). A new subpackage cycle is
+     * a design regression, not a documented exception.
+     */
+    @ArchTest
+    static final ArchRule NO_SUBPACKAGE_CYCLES =
+            slices().matching("com.mcbot.mcbotserver.(*).(*)..").should().beFreeOfCycles();
 }

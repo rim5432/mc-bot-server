@@ -5,9 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.process.Directive;
+import com.mcbot.mcbotserver.api.process.ExecutionReport;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;

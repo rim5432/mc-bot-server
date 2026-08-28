@@ -6,9 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
 import com.mcbot.mcbotserver.api.inventory.InventoryView;
 import com.mcbot.mcbotserver.api.inventory.ItemView;
+import com.mcbot.mcbotserver.api.process.ExecutionReport;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.BlockSnapshot;
 import com.mcbot.mcbotserver.core.world.MockWorldView;

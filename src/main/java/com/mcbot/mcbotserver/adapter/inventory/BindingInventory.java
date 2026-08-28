@@ -1,4 +1,4 @@
-package com.mcbot.mcbotserver.adapter;
+package com.mcbot.mcbotserver.adapter.inventory;
 
 import com.mcbot.mcbotserver.api.inventory.InventoryView;
 import com.mcbot.mcbotserver.api.inventory.ItemView;
@@ -137,7 +137,7 @@ public final class BindingInventory {
      * @param stack the engine stack; never null
      * @return read-only view; never null
      */
-    static ItemView toView(ItemStack stack) {
+    public static ItemView toView(ItemStack stack) {
         Objects.requireNonNull(stack, "stack");
         if (stack.isEmpty()) {
             return ItemView.EMPTY;

@@ -2,10 +2,10 @@ package com.mcbot.mcbotserver.core.tick;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.mcbot.mcbotserver.api.behavior.ExecutionReport;
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.pathing.Movement;
 import com.mcbot.mcbotserver.api.process.Directive;
+import com.mcbot.mcbotserver.api.process.ExecutionReport;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.api.world.WorldView;

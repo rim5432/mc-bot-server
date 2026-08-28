@@ -1,6 +1,6 @@
 package com.mcbot.mcbotserver.adapter.entity;
 
-import com.mcbot.mcbotserver.adapter.BindingInventory;
+import com.mcbot.mcbotserver.adapter.inventory.BindingInventory;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.Pose;
