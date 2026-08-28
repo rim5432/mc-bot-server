@@ -52,7 +52,7 @@ class BoundaryContractMarkerTest {
             "WorldView", "core/world/SnapshotWorldView.java",
             "EventQueue", "core/event/InMemoryEventQueue.java",
             "CommandChannel", "core/command/CommandBus.java",
-            "MenuTransactions", "adapter/BindingActor.java");
+            "MenuTransactions", "adapter/ActorMenuTransactions.java");
 
     /**
      * Marker shapes: the inline form and the Javadoc form. The

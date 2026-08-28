@@ -5,14 +5,11 @@ import com.mcbot.mcbotserver.api.actor.Actor;
 import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
-import com.mcbot.mcbotserver.api.menu.MenuClick;
 import com.mcbot.mcbotserver.api.menu.MenuTransactions;
-import com.mcbot.mcbotserver.api.menu.MenuView;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.actor.ChannelArbiter;
 import java.util.Map;
 import java.util.Objects;
-import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.BowItem;
 import net.minecraft.world.item.BucketItem;
@@ -33,16 +30,16 @@ import net.minecraft.world.phys.Vec3;
  * MOVE channel means halt — a body with no client must be told to
  * stand still every tick (numen-notes.md section 4). USE swings on the
  * rising press edge; SLOT writes the hotbar selection directly.
- * Menu transactions (issue 0007 §6.2, ledger 29) ride the same write
- * surface as imperative request-response methods — the facade and
- * opener live here so every mutation stays behind one boundary-A
- * implementer.
+ * Menu transactions (issue 0007 §6.2, ledger 29) ride the same
+ * binding as imperative request-response methods, composed inside
+ * this actor as {@link ActorMenuTransactions} — still one boundary-A
+ * implementer aggregate per body.
  *
  * <p>Implementation note: server tick thread only; flush is called
  * exactly once per tick by the pipeline's stage 4.
  */
 // contract: see ADR-0004 D2 (four channels, per-tick expiring claims)
-public final class BindingActor implements Actor, MenuTransactions {
+public final class BindingActor implements Actor {
 
     private final ChannelArbiter delegate = new ChannelArbiter();
     private final BotBodyEntity body;
@@ -82,7 +79,7 @@ public final class BindingActor implements Actor, MenuTransactions {
      * @param target the bed cell to sleep at; never null
      * @return null on success, or the machine-readable refusal reason
      */
-    public String sleepAt(com.mcbot.mcbotserver.api.types.CellPos target) {
+    public String sleepAt(CellPos target) {
         net.minecraft.server.level.ServerLevel level = (net.minecraft.server.level.ServerLevel) body.level();
         net.minecraft.core.BlockPos pos = new net.minecraft.core.BlockPos(target.x(), target.y(), target.z());
         if (!level.isLoaded(pos)) {
@@ -144,8 +141,8 @@ public final class BindingActor implements Actor, MenuTransactions {
         }
         return false;
     }
-    /** Menu transactions: one facade+opener pair per body (0007 A1). */
-    private final MenuOpener menus;
+    /** The menu-transaction aggregate over the shared facade (ledger 29). */
+    private final ActorMenuTransactions menuTx;
 
     /** The one Player-typed acting surface (use chain, use loop, menus). */
     private final BotPlayerFacade facade;
@@ -169,7 +166,17 @@ public final class BindingActor implements Actor, MenuTransactions {
         // the containerMenu state the MenuOpener owns.
         this.facade = new BotPlayerFacade(body);
         this.interact = new InteractBlockExecutor(body, facade);
-        this.menus = new MenuOpener(facade);
+        this.menuTx = new ActorMenuTransactions(facade);
+    }
+
+    /**
+     * The binding's menu-transaction surface (boundary-A ledger 29).
+     *
+     * @return the imperative menu surface sharing this actor's
+     *         facade; never null
+     */
+    public MenuTransactions menuTransactions() {
+        return menuTx;
     }
 
     @Override
@@ -236,37 +243,7 @@ public final class BindingActor implements Actor, MenuTransactions {
     private void applyUse(Claim use) {
         if (use != null && use.intent() instanceof Intent.Use u) {
             if (u.pressing() && !lastUsePressing) {
-                // USE = act with the main hand (decision 14, amended
-                // ledger 37 for held items): an edible held item means
-                // eat, not swing - vanilla right-click semantics. One
-                // item per rising edge; the eat plays its own sound and
-                // never melees. A bow starts its draw - the charge
-                // accumulates through the held ticks and the falling
-                // edge releases the shot. A shield raises on the BODY
-                // (never the facade): isDamageSourceBlocked reads the
-                // hurt entity's own blocking stack, and the body is
-                // what takes the hit.
-                if (!body.eatHeldItem()) {
-                    Item held = body.getInventory()
-                            .container()
-                            .getItem(body.selectedSlot)
-                            .getItem();
-                    if (held instanceof BowItem) {
-                        facade.startUsingItem(InteractionHand.MAIN_HAND);
-                    } else if (held instanceof ShieldItem) {
-                        body.startUsingItem(InteractionHand.MAIN_HAND);
-                    } else if (held instanceof BucketItem || held instanceof FishingRodItem) {
-                        // Air-use items: vanilla resolves them through
-                        // Item.use against a POV raycast from the
-                        // actor's eyes (the bucket fills/empties at the
-                        // ray hit, the rod casts or reels).
-                        // useHeldAirStack syncs the facade pose first -
-                        // the ray must not fire from a stale position.
-                        useHeldAirStack();
-                    } else {
-                        melee.onUsePress();
-                    }
-                }
+                onUsePressEdge();
             }
             if (facade.isUsingItem()) {
                 // The draw charge advances only when pumped - the facade
@@ -274,25 +251,56 @@ public final class BindingActor implements Actor, MenuTransactions {
                 facade.tickUseLoop();
             }
             if (!u.pressing() && lastUsePressing) {
-                if (facade.isUsingItem()) {
-                    facade.releaseUsingItem();
-                }
-                if (body.isUsingItem()) {
-                    body.releaseUsingItem();
-                }
+                releaseUseHolds();
             }
             lastUsePressing = u.pressing();
         } else {
-            if (facade.isUsingItem()) {
-                // The USE claim vanished mid-draw (reflex preemption) -
-                // release now; an orphaned charge would keep the loop
-                // running with nobody watching it.
-                facade.releaseUsingItem();
-            }
-            if (body.isUsingItem()) {
-                body.releaseUsingItem();
-            }
+            // The USE claim vanished mid-draw (reflex preemption) -
+            // release now; an orphaned charge would keep the loop
+            // running with nobody watching it.
+            releaseUseHolds();
             lastUsePressing = false;
+        }
+    }
+
+    /**
+     * One rising USE edge (decision 14, amended ledger 37 for held
+     * items): an edible held item means eat, not swing - vanilla
+     * right-click semantics. One item per rising edge; the eat plays
+     * its own sound and never melees. A bow starts its draw - the
+     * charge accumulates through the held ticks and the falling edge
+     * releases the shot. A shield raises on the BODY (never the
+     * facade): isDamageSourceBlocked reads the hurt entity's own
+     * blocking stack, and the body is what takes the hit.
+     */
+    private void onUsePressEdge() {
+        if (body.eatHeldItem()) {
+            return;
+        }
+        Item held = body.getInventory().container().getItem(body.selectedSlot).getItem();
+        if (held instanceof BowItem) {
+            facade.startUsingItem(InteractionHand.MAIN_HAND);
+        } else if (held instanceof ShieldItem) {
+            body.startUsingItem(InteractionHand.MAIN_HAND);
+        } else if (held instanceof BucketItem || held instanceof FishingRodItem) {
+            // Air-use items: vanilla resolves them through Item.use
+            // against a POV raycast from the actor's eyes (the bucket
+            // fills/empties at the ray hit, the rod casts or reels).
+            // useHeldAirStack syncs the facade pose first - the ray
+            // must not fire from a stale position.
+            useHeldAirStack();
+        } else {
+            melee.onUsePress();
+        }
+    }
+
+    /** Releases every in-progress hold (facade draw, body shield). */
+    private void releaseUseHolds() {
+        if (facade.isUsingItem()) {
+            facade.releaseUsingItem();
+        }
+        if (body.isUsingItem()) {
+            body.releaseUsingItem();
         }
     }
 
@@ -355,74 +363,6 @@ public final class BindingActor implements Actor, MenuTransactions {
         dig.release();
         lastDropClaimed = false;
         lastInteractClaimed = false;
-    }
-
-    // ===== Menu transactions (issue 0007 §6.2, ledger 29) =====
-    // Imperative request-response methods, NOT per-tick claims. They
-    // run between ticks on the server thread; the claim machinery
-    // above is untouched. The facade and opener live in this actor so
-    // every boundary-A mutation stays behind one implementer.
-
-    // contract: see boundaries.md §A (menu transaction surface, ledger 29)
-    @Override
-    public MenuView openMenu(CellPos target) {
-        return menus.open(new BlockPos(target.x(), target.y(), target.z()))
-                .map(BindingMenu::snapshot)
-                .orElse(null);
-    }
-
-    @Override
-    public MenuView openInventoryMenu() {
-        return menus.openInventory().snapshot();
-    }
-
-    @Override
-    public MenuView menuSnapshot() {
-        BindingMenu current = menus.currentMenu();
-        return current == null ? null : current.snapshot();
-    }
-
-    @Override
-    public MenuView menuClick(int slot, int button, MenuClick type) {
-        BindingMenu current = menus.currentMenu();
-        if (current == null) {
-            throw new IllegalStateException("no menu is open");
-        }
-        current.click(slot, button, type);
-        return current.snapshot();
-    }
-
-    @Override
-    public void closeMenu() {
-        BindingMenu current = menus.currentMenu();
-        if (current != null) {
-            current.close();
-        }
-    }
-
-    @Override
-    public MenuView menuButtonClick(int id) {
-        BindingMenu current = menus.currentMenu();
-        if (current == null) {
-            throw new IllegalStateException("no menu is open");
-        }
-        current.clickButton(id);
-        return current.snapshot();
-    }
-
-    @Override
-    public MenuView openEntityMenu(int entityId) {
-        return menus.openEntity(entityId).map(BindingMenu::snapshot).orElse(null);
-    }
-
-    @Override
-    public MenuView setBeaconEffects(String primaryKey, String secondaryKey) {
-        BindingMenu current = menus.currentMenu();
-        if (current == null) {
-            throw new IllegalStateException("no menu is open");
-        }
-        current.setBeaconEffects(primaryKey, secondaryKey);
-        return current.snapshot();
     }
 
     /**

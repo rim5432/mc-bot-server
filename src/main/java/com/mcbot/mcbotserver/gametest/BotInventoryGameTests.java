@@ -397,7 +397,7 @@ public final class BotInventoryGameTests {
                         != ChestType.SINGLE,
                 "setup: the left half must stay a double-chest half");
 
-        var actor = rig.actor();
+        var actor = rig.actor().menuTransactions();
         BlockPos leftAbs = helper.absolutePos(leftLocal);
         var view = actor.openMenu(
                 new com.mcbot.mcbotserver.api.types.CellPos(leftAbs.getX(), leftAbs.getY(), leftAbs.getZ()));
@@ -428,7 +428,7 @@ public final class BotInventoryGameTests {
 
         rig.body().getInventory().container().setItem(0, new ItemStack(Items.DIAMOND, 32));
 
-        var actor = rig.actor();
+        var actor = rig.actor().menuTransactions();
         var view = actor.openMenu(cellOf(chestAbs));
         check(view != null, "the chest must open");
         checkEquals(27, containerSlotsOf(view), "a single chest exposes 27 container slots");
@@ -541,32 +541,14 @@ public final class BotInventoryGameTests {
         var opener = new com.mcbot.mcbotserver.adapter.MenuOpener(facade);
         var menu = opener.openInventory();
         var preSnap = menu.snapshot();
-        System.out.println(
-                "[DEBUG wear] snapshot slots count=" + preSnap.slots().size());
-        for (int i = 0; i < Math.min(10, preSnap.slots().size()); i++) {
-            var s = preSnap.slots().get(i);
-            System.out.println(
-                    "[DEBUG wear] slot " + i + ": index=" + s.index() + " role=" + s.role() + " item=" + s.item());
-        }
         var catalog = new com.mcbot.mcbotserver.adapter.VanillaArmorCatalog();
-        System.out.println("[DEBUG wear] diamond_helmet classify=" + catalog.classify("minecraft:diamond_helmet"));
-        System.out.println("[DEBUG wear] iron_helmet classify=" + catalog.classify("minecraft:iron_helmet"));
         var steps = com.mcbot.mcbotserver.core.menu.MenuPlanner.planWear(preSnap, catalog);
-        System.out.println("[DEBUG wear] steps count=" + steps.size());
         for (var step : steps) {
-            System.out.println(
-                    "[DEBUG wear] step: slot=" + step.slot() + " button=" + step.button() + " kind=" + step.kind());
             menu.click(step.slot(), step.button(), step.kind());
-            var snap = menu.snapshot();
-            System.out.println("[DEBUG wear] after click: carried=" + snap.carried() + " armor0="
-                    + (snap.slots().size() > 5 ? snap.slots().get(5) : "n/a"));
         }
         check(menu.snapshot().carried().isEmpty(), "wear must leave nothing on the cursor");
 
         var view = rig.body().getInventory().snapshot();
-        System.out.println("[DEBUG wear] final armor0=" + view.armor().get(0).itemId() + " armor3="
-                + view.armor().get(3).itemId());
-        System.out.println("[DEBUG wear] slot0=" + container.getItem(0).getItem());
         checkEquals(
                 "minecraft:diamond_helmet",
                 view.armor().get(0).itemId(),

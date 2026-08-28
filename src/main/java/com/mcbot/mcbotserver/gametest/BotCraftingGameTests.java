@@ -381,7 +381,7 @@ public final class BotCraftingGameTests {
         // 9 diamonds in hotbar 0; they reach the grid through clicks.
         rig.body().getInventory().container().setItem(0, new ItemStack(Items.DIAMOND, 9));
 
-        var actor = rig.actor();
+        var actor = rig.actor().menuTransactions();
         var view = actor.openMenu(new CellPos(tableAbs.getX(), tableAbs.getY(), tableAbs.getZ()));
         check(view != null, "openMenu must succeed at the table");
         checkEquals("crafting_table", view.type(), "the opened menu must be the crafting table");
@@ -450,7 +450,7 @@ public final class BotCraftingGameTests {
                     check(!mission.isActive(), "the goto mission must retire on arrival");
                     check(mission.missionSucceeded(), "the walk must be a success");
 
-                    var actor = rig.actor();
+                    var actor = rig.actor().menuTransactions();
                     var view = actor.openMenu(new CellPos(tableAbs.getX(), tableAbs.getY(), tableAbs.getZ()));
                     check(view != null, "openMenu must succeed after walking there");
                     CraftingView craft = CraftingView.of(view);
@@ -668,7 +668,7 @@ public final class BotCraftingGameTests {
         var stickRecipe = catalog.byId("minecraft:stick").orElse(null);
         check(stickRecipe != null, "the stick recipe must be cataloged");
 
-        var actor = rig.actor();
+        var actor = rig.actor().menuTransactions();
         GotoProcess[] mission = {null};
         var chestCell = new CellPos(chestAbs.getX(), chestAbs.getY(), chestAbs.getZ());
         var tableCell = new CellPos(tableAbs.getX(), tableAbs.getY(), tableAbs.getZ());

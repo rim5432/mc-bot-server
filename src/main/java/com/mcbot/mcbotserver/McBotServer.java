@@ -322,7 +322,7 @@ public class McBotServer {
         }
         var a = active.pipeline();
         return new MenuCommands.Live(
-                a.actor(),
+                a.actor().menuTransactions(),
                 active.catalog(),
                 new VanillaArmorCatalog(),
                 (ServerLevel) a.body().level(),
