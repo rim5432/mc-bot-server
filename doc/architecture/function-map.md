@@ -76,8 +76,10 @@ reopened on demand — **[DEFERRED]** outside v1.
   and escalates stalled budget-cut partial searches to NO_PATH
   instead of burning the mission timeout (decision 21; live
   verification queued in workplan follow-up 6).
-- **[GAP]** Parkour jumps, pillar-up, door handling, sneak-walk along
-  1-wide edges.
+- **[GAP]** Parkour jumps, pillar-up, auto 1-wide-edge traversal
+  (sneak verb and door handling are shipped — `/bot sneak on|off`
+  latches the modifier and `/bot use` opens doors — but the pathing
+  layer does not yet plan sneaked edge walks or parkour sequences).
 - **[DEFERRED]** Climb (ladders / vines) — trait exists, no move yet.
 - **[DEFERRED]** Deliberate underwater depth control (Shift = dive
   on the reserved `yya` axis; v1 ships ascent only — issue 0004 D3).
@@ -200,9 +202,17 @@ reopened on demand — **[DEFERRED]** outside v1.
   facade.startUsingItem on the rising edge, pumps tickUseLoop every
   held tick (the facade is never player-ticked), and releases on the
   falling edge or on USE claim loss (orphaned-charge guard).
-- **[GAP]** Shield block, weapon auto-selection (dig tool
-  auto-selection is shipped; picking the best sword for the current
-  target is not), multi-target, retreat choreography.
+- **[SHIPPED]** Shield block: a held ShieldItem on the USE channel
+  raises on the BODY (not the facade — `isDamageSourceBlocked` reads
+  the hurt entity's own blocking stack, and the body is what takes the
+  hit); `startUsingItem` on the rising edge, `releaseUsingItem` on the
+  falling edge or USE claim loss (orphaned-guard parity with the bow).
+  CombatBehavior does not yet auto-raise against projectiles — the
+  shield is a held-item capability the harness or a future reflex can
+  drive.
+- **[GAP]** Weapon auto-selection (dig tool auto-selection is shipped;
+  picking the best sword for the current target is not), multi-target,
+  retreat choreography.
 - **[DEFERRED]** PvP, aggression toward non-hostile entities.
 
 ### 5. Take orders
@@ -216,7 +226,9 @@ reopened on demand — **[DEFERRED]** outside v1.
   process kind, decided in the shipping issue. **Defend is not a
   harness verb** — the ENGAGE_ON_HOSTILE_PROXIMITY reflex creates
   internal DefendProcess instances (engage radius 8, leash 12, ranged
-  types refused) when hostiles close to melee range; the harness
+  types engaged at bow standoff when the hotbar carries bow+arrows —
+  otherwise refused with the threat type) when hostiles close to melee
+  range; the harness
   observes them as TASK_* events but cannot submit one.
 - **[SHIPPED]** Console verbs on `/bot`: goto / dig / mine / cancel /
   stop / status / events / reset. The original six (issue 0011) are
@@ -232,8 +244,15 @@ reopened on demand — **[DEFERRED]** outside v1.
   `/entities`, `/place x y z face` (one-shot block placement with
   post-state read), `/use x y z face` (one-shot vanilla right-click
   chain — block.use first, then item.useOn on PASS; returns
-  `used:true/false` + target block id; P1), `/equip slot` (hotbar
-  select 0..8).
+  `used:true/false` + target block id; P1), `/use-item` (vanilla
+  air-use for the held item — bucket fill/empty, rod cast/reel;
+  rejects bow/shield/food which ride the USE channel), `/sleep x y z`
+  (verify-and-skip: real BedBlock + in-reach + nighttime, then
+  device-side clock advance to morning — the engine cannot see a
+  PathfinderMob in the all-sleepers table), `/sneak on|off` (latches
+  the sneak modifier across ticks; Intent.Move.sneak is the per-tick
+  channel, this verb is the harness-facing toggle), `/equip slot`
+  (hotbar select 0..8).
 - **[SHIPPED]** Inspection verbs: `/recipes list [offset] [limit]`
   paginates the full recipe catalog (RCON payload cap forces paging),
   `/recipes <itemId>` looks up recipes by result id.
@@ -352,8 +371,9 @@ reopened on demand — **[DEFERRED]** outside v1.
   harness driving (ROT aim is the caller's precondition). Eating food
   is shipped (EAT reflex + USE press consumes the held item via
   finishUsingItem + FoodData.eat; issue 0010 consumption half). Bows
-  are shipped (section 4 ranged combat). Use-block interactions are
-  shipped (section 7 vanilla chain above).
+  are shipped (section 4 ranged combat). Shields are shipped (section
+  4 shield block). Use-block interactions are shipped (section 7
+  vanilla chain above).
 - **[DEFERRED]** Enchantment-aware dig speed, match_tool loot
   fidelity, weapon auto-selection.
 
@@ -363,7 +383,7 @@ reopened on demand — **[DEFERRED]** outside v1.
 |---|---|
 | Melee (zombie, spider) | Standoff → kill |
 | Explosive (creeper) | Standoff → trades hits (accepted risk) |
-| Ranged (skeleton, witch, pillager) | Refuses engagement, reports threat type |
+| Ranged (skeleton, witch, pillager) | Engages at bow standoff when armed (bow+arrows); otherwise refuses and reports threat type |
 | Any hostile (unarmed) | Times out — pre-check belongs to the driver |
 
 Escaped-target semantics: a target that leaves the engaged tracking
