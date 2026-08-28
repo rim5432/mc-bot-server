@@ -511,9 +511,26 @@ public final class BotCraftingGameTests {
                     "cell " + pos + " accepts exactly diamond");
         }
 
+        // Shapeless translation: ingredient-index encoding, compact
+        // 0..n-1, tag-expanded, 2x2-fit by the count rule.
+        var stewOpt = catalog.byId("minecraft:mushroom_stew");
+        check(stewOpt.isPresent(), "mushroom_stew (shapeless) must be cataloged");
+        RecipeView stew = stewOpt.get();
+        check(stew.shapeless(), "mushroom_stew must carry the shapeless flag");
         check(
-                catalog.byId("minecraft:mushroom_stew").isEmpty(),
-                "shapeless recipes are not representable - empty, not " + "garbage");
+                stew.placements().keySet().equals(java.util.Set.of(0, 1, 2)),
+                "stew ingredients are compact indices 0..2, got "
+                        + stew.placements().keySet());
+        check(
+                stew.placements().values().stream().anyMatch(ids -> ids.contains("minecraft:bowl")),
+                "the bowl must be among the stew ingredients");
+        check(stew.fitsInventoryGrid(), "3 ingredients fit the 2x2 under the count rule");
+        var planksOpt = catalog.byId("minecraft:oak_planks");
+        check(planksOpt.isPresent() && planksOpt.get().shapeless(), "oak_planks must catalog as shapeless");
+        check(
+                planksOpt.get().placements().get(0).stream().anyMatch(id -> id.endsWith("log")),
+                "the planks ingredient must accept logs, got "
+                        + planksOpt.get().placements().get(0));
         check(catalog.byId("minecraft:no_such_recipe").isEmpty(), "unknown ids resolve empty");
 
         var stickRecipes = catalog.byResult("minecraft:stick");
@@ -527,21 +544,20 @@ public final class BotCraftingGameTests {
     /**
      * Scenario: the recipes-list wire verb's backend - {@link
      * RecipeCatalog#list} - paginates a stable, recipeId-sorted view
-     * of the shaped catalog: windows are slices of one order,
+     * of the translatable catalog: windows are slices of one order,
      * offset clamps to [0,total], limit clamps to [1,200], and
-     * shapeless recipes never appear (they are not representable as
-     * {@link com.mcbot.mcbotserver.api.menu.RecipeView}s).
+     * shapeless recipes ride the same pages as shaped ones.
      *
      * <p>Coverage ruling (round-3 recon): the catalog reads the live
      * RecipeManager, so this contract is engine-only - no offline
      * layer-1 test can instantiate the adapter honestly.
      */
     @GameTest(template = "empty16x8x16", timeoutTicks = 100)
-    public static void paginatesRecipesSortedWithoutShapeless(GameTestHelper helper) {
+    public static void paginatesRecipesSorted(GameTestHelper helper) {
         var catalog = new RecipeCatalog(helper.getLevel());
 
         var full = catalog.list(0, 200);
-        check(full.total() > 0, "the server datapack must translate at least one shaped " + "recipe");
+        check(full.total() > 0, "the server datapack must translate at least one " + "recipe");
         checkEquals(
                 (long) Math.min(full.total(), 200),
                 (long) full.recipes().size(),
@@ -559,8 +575,8 @@ public final class BotCraftingGameTests {
                             + full.recipes().get(i).recipeId());
         }
         check(
-                full.recipes().stream().noneMatch(r -> r.recipeId().equals("minecraft:mushroom_stew")),
-                "shapeless recipes must never appear in a page");
+                full.recipes().stream().anyMatch(r -> r.recipeId().equals("minecraft:mushroom_stew")),
+                "shapeless recipes must appear in pages alongside shaped ones");
 
         var head = catalog.list(0, 2);
         checkEquals(2, head.recipes().size(), "a small limit must truncate the page");
@@ -571,6 +587,53 @@ public final class BotCraftingGameTests {
 
         var tail = catalog.list(full.total(), 10);
         check(tail.recipes().isEmpty(), "an offset at total must yield an empty page, not throw");
+
+        helper.succeed();
+    }
+
+    /**
+     * Scenario: shapeless translation end-to-end - the catalog emits
+     * the ingredient-index encoding for {@code minecraft:oak_planks},
+     * {@code planRecipe} fills the first flat grid cell with a log,
+     * and the server's arrangement-agnostic matcher resolves the
+     * result slot. One log becomes four planks: the offline count
+     * rule meets the live RecipeManager.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void craftsShapelessPlanksFromLogs(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+
+        BlockPos tableLocal = new BlockPos(7, GametestRig.WALK_Y, 8);
+        helper.setBlock(tableLocal, Blocks.CRAFTING_TABLE);
+        BlockPos tableAbs = helper.absolutePos(tableLocal);
+
+        rig.body().getInventory().container().setItem(0, new ItemStack(Items.OAK_LOG, 3));
+
+        var catalog = new RecipeCatalog(helper.getLevel());
+        var planksOpt = catalog.byId("minecraft:oak_planks");
+        check(planksOpt.isPresent(), "oak_planks must be cataloged");
+        RecipeView planks = planksOpt.get();
+        check(planks.shapeless(), "oak_planks must translate as shapeless");
+        checkEquals(4, planks.resultCount(), "oak_planks yields 4 per craft");
+
+        var facade = new BotPlayerFacade(rig.body());
+        var menuOpt = new MenuOpener(facade).open(tableAbs);
+        check(menuOpt.isPresent(), "crafting table must open a menu");
+        var menu = menuOpt.get();
+
+        CraftingView craft = CraftingView.of(menu.snapshot());
+        for (var step : MenuPlanner.planRecipe(craft, planks)) {
+            menu.click(step.slot(), step.button(), step.kind());
+        }
+        checkEquals(
+                "minecraft:oak_planks",
+                menu.snapshot().slot(craft.result().index()).item().itemId(),
+                "the shapeless grid must resolve planks");
+        for (var step : MenuPlanner.planTakeResult(CraftingView.of(menu.snapshot()))) {
+            menu.click(step.slot(), step.button(), step.kind());
+        }
+        checkEquals(4, countItems(rig, Items.OAK_PLANKS), "one craft must yield 4 planks");
+        checkEquals(2, countItems(rig, Items.OAK_LOG), "one log must be consumed");
 
         helper.succeed();
     }

@@ -22,6 +22,8 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
@@ -461,34 +463,61 @@ public final class BotHazardReflexGameTests {
     @GameTest(template = "empty16x8x16", timeoutTicks = 400)
     public static void regeneratesHealthWhenBelowMax(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
-        float startHealth = 5.0f;
-        float maxHealth = rig.body().getMaxHealth();
+        // Food-driven regen (Phase 4 eat slice, ledger 34): the free
+        // peaceful floor is retired; healing needs foodLevel >= 18
+        // and lands 1 HP per 80 ticks, so this pins ONE regen tick,
+        // not a full recovery.
+        var food = rig.body().getFoodData();
+        food.setFoodLevel(20);
+        float startHealth = rig.body().getMaxHealth() - 1.0f;
         rig.body().setHealth(startHealth);
 
         helper.startSequence()
-                // First gate: health must rise above the start value.
                 .thenWaitUntil(driveUntil(
                         rig,
                         () -> check(
                                 rig.body().getHealth() > startHealth,
-                                "waiting for regen to start (current="
+                                "waiting for the food-driven regen tick (current="
                                         + String.format("%.1f", rig.body().getHealth())
                                         + ")")))
-                // Second gate: health must reach max.
+                .thenExecuteAfter(0, () -> {
+                    check(
+                            rig.body().getHealth() >= startHealth + 1.0f,
+                            "one regen tick heals 1.0 at foodLevel 20; got "
+                                    + rig.body().getHealth());
+                    rig.body().discard();
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Scenario: the eat reflex (Stage 3 Phase 4 eat slice, issue
+     * 0010 consumption half). Food dropped to 10 (trigger 16) with
+     * bread in the hotbar: the reflex selects the bread slot, one
+     * rising USE edge consumes exactly one item through the vanilla
+     * eat chain, and the restored food level releases the rule.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 200)
+    public static void eatsWhenHungry(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+        var container = rig.body().getInventory().container();
+        container.setItem(0, new ItemStack(Items.BREAD, 1));
+        rig.body().getFoodData().setFoodLevel(10);
+
+        helper.startSequence()
                 .thenWaitUntil(driveUntil(
                         rig,
                         () -> check(
-                                rig.body().getHealth() >= maxHealth,
-                                "waiting for full regen (current="
-                                        + String.format("%.1f", rig.body().getHealth())
-                                        + ", max=" + maxHealth + ")")))
-                .thenExecuteFor(5, driveOnly(rig))
+                                rig.body().getFoodData().getFoodLevel() > 10,
+                                "waiting for the reflex to eat (food="
+                                        + rig.body().getFoodData().getFoodLevel()
+                                        + ")")))
                 .thenExecuteAfter(0, () -> {
-                    check(rig.body().isAlive(), "the body must be alive after regen");
+                    check(container.getItem(0).isEmpty(), "exactly one bread must be consumed from the sensed slot");
                     check(
-                            rig.body().getHealth() >= maxHealth,
-                            "health must be at or above max after regen; got "
-                                    + rig.body().getHealth());
+                            rig.body().getFoodData().getFoodLevel() == 15,
+                            "bread nutrition is 5: 10 + 5 = 15; got "
+                                    + rig.body().getFoodData().getFoodLevel());
                     rig.body().discard();
                 })
                 .thenSucceed();

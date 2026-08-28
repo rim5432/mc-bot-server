@@ -7,6 +7,7 @@ import static com.mcbot.mcbotserver.gametest.GametestRig.driveUntil;
 import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
 
 import com.mcbot.mcbotserver.McBotServer;
+import com.mcbot.mcbotserver.adapter.BindingInventory;
 import com.mcbot.mcbotserver.adapter.BotAssembly;
 import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
 import com.mcbot.mcbotserver.api.event.BotEvent;
@@ -18,8 +19,12 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.Skeleton;
 import net.minecraft.world.entity.monster.Zombie;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
@@ -49,6 +54,44 @@ public final class BotCombatGameTests {
     private static final int REFUSAL_WINDOW_TICKS = 15;
 
     private BotCombatGameTests() {}
+
+    /**
+     * Scenario: the equipment mirror feeds the vanilla attribute
+     * machinery (Phase 4 combat slice). A diamond sword held in the
+     * selected hotbar slot raises ATTACK_DAMAGE to the zombie-scale
+     * base (3.0) plus the sword modifier (7.0), and a worn helmet
+     * raises ARMOR: LivingEntity.detectEquipmentUpdates applies item
+     * modifiers for exactly this mirror view one tick after the
+     * container changes, so melee damage and armor reduction ride
+     * vanilla with no wiring beyond the mirror itself.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void equipmentMirrorFeedsAttributes(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
+        var body = rig.body();
+        var container = body.getInventory().container();
+
+        container.setItem(0, new ItemStack(Items.DIAMOND_SWORD));
+        container.setItem(BindingInventory.ARMOR_START, new ItemStack(Items.DIAMOND_HELMET));
+
+        helper.startSequence()
+                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    check(
+                            Items.DIAMOND_SWORD.equals(
+                                    body.getItemBySlot(EquipmentSlot.MAINHAND).getItem()),
+                            "the equipment mirror must see the selected hotbar stack as mainhand");
+                    checkEquals(
+                            10.0,
+                            body.getAttributeValue(Attributes.ATTACK_DAMAGE),
+                            "ATTACK_DAMAGE must be base 3.0 + diamond sword 7.0");
+                    checkEquals(
+                            3.0,
+                            body.getAttributeValue(Attributes.ARMOR),
+                            "a worn diamond helmet must raise ARMOR through the mirror");
+                })
+                .thenSucceed();
+    }
 
     /**
      * Scenario 5: a ranged hostile is REFUSED, not chased. The planner

@@ -517,8 +517,85 @@ public final class BotInventoryGameTests {
         helper.succeed();
     }
 
+    /**
+     * Scenario: the wear planner (Stage 3 Phase 4 wear slice) picks
+     * the best piece per armor slot over the REAL registry
+     * classification and executes through the menu transactions. Iron
+     * helmet pre-worn, diamond helmet and boots in the hotbar: the
+     * strictly better helmet swaps in (the iron one returns to its
+     * source slot), the boots fill the empty feet slot, and nothing
+     * stays on the cursor.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void wearsBestArmorThroughPlanner(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+        var container = rig.body().getInventory().container();
+        // Binding flat storage: 0..8 hotbar, 36 head armor. Iron on
+        // the head, diamond helmet (defense 3 > iron 2) and boots one
+        // slot deeper in the hotbar.
+        container.setItem(36, new ItemStack(Items.IRON_HELMET));
+        container.setItem(0, new ItemStack(Items.DIAMOND_HELMET));
+        container.setItem(2, new ItemStack(Items.DIAMOND_BOOTS));
+
+        var facade = new BotPlayerFacade(rig.body());
+        var opener = new com.mcbot.mcbotserver.adapter.MenuOpener(facade);
+        var menu = opener.openInventory();
+
+        var steps = com.mcbot.mcbotserver.core.menu.MenuPlanner.planWear(
+                menu.snapshot(), new com.mcbot.mcbotserver.adapter.VanillaArmorCatalog());
+        for (var step : steps) {
+            menu.click(step.slot(), step.button(), step.kind());
+        }
+        check(menu.snapshot().carried().isEmpty(), "wear must leave nothing on the cursor");
+
+        var view = rig.body().getInventory().snapshot();
+        checkEquals(
+                "minecraft:diamond_helmet",
+                view.armor().get(0).itemId(),
+                "the diamond helmet must replace the worn iron one");
+        checkEquals("minecraft:diamond_boots", view.armor().get(3).itemId(), "the boots must fill the empty feet slot");
+        check(
+                Items.IRON_HELMET.equals(container.getItem(0).getItem()),
+                "the displaced iron helmet must return to its source slot");
+
+        menu.close();
+        rig.body().discard();
+        helper.succeed();
+    }
+
     private static com.mcbot.mcbotserver.api.types.CellPos cellOf(BlockPos abs) {
         return new com.mcbot.mcbotserver.api.types.CellPos(abs.getX(), abs.getY(), abs.getZ());
+    }
+
+    /**
+     * Scenario: ground-item pickup (issue 0010 section 7 dependency,
+     * Phase 4 acquisition ground work): an ItemEntity spawned on the
+     * body rides the touch hook into the binding container; a fully
+     * taken stack discards the entity.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void picksUpGroundItemsByTouch(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+        var body = rig.body();
+        var at = helper.absolutePos(new BlockPos(7, GametestRig.WALK_Y, 7));
+        var drop = new ItemEntity(
+                body.level(), at.getX() + 0.5, at.getY(), at.getZ() + 0.5, new ItemStack(Items.BREAD, 3));
+        body.level().addFreshEntity(drop);
+
+        helper.startSequence()
+                .thenWaitUntil(driveUntil(rig, () -> check(!drop.isAlive(), "waiting for the pickup")))
+                .thenExecuteAfter(0, () -> {
+                    var container = body.getInventory().container();
+                    int bread = 0;
+                    for (int i = 0; i < container.getContainerSize(); i++) {
+                        if (container.getItem(i).is(Items.BREAD)) {
+                            bread += container.getItem(i).getCount();
+                        }
+                    }
+                    checkEquals(3, bread, "the whole dropped stack must land in the container");
+                    rig.body().discard();
+                })
+                .thenSucceed();
     }
 
     /** Count of CONTAINER-role slots in a menu snapshot (the opened

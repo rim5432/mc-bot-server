@@ -52,7 +52,8 @@ class GametestInventoryCheck {
                             "defendsByKillingZombie",
                             "survivesRetaliatingZombie",
                             "holdsFireWhenSightBlocked",
-                            "hostilesAggroOnSight"),
+                            "hostilesAggroOnSight",
+                            "equipmentMirrorFeedsAttributes"),
             "BotHazardReflexGameTests",
                     Set.of(
                             "surfacesWhenAirRunsLow",
@@ -60,7 +61,8 @@ class GametestInventoryCheck {
                             "findsWaterWhenBurning",
                             "climbsOutOfPowderSnow",
                             "digsFreeWhenSuffocating",
-                            "regeneratesHealthWhenBelowMax"),
+                            "regeneratesHealthWhenBelowMax",
+                            "eatsWhenHungry"),
             "BotInventoryGameTests",
                     Set.of(
                             "dropsSelectedItem",
@@ -71,7 +73,9 @@ class GametestInventoryCheck {
                             "openingNewMenuClosesPrevious",
                             "opensDoubleChestFullWidth",
                             "storesAndRetrievesFromChest",
-                            "equipsArmorThroughMenuClicks"),
+                            "equipsArmorThroughMenuClicks",
+                            "wearsBestArmorThroughPlanner",
+                            "picksUpGroundItemsByTouch"),
             "BotCraftingGameTests",
                     Set.of(
                             "craftsDiamondBlockAtTable",
@@ -83,7 +87,8 @@ class GametestInventoryCheck {
                             "walksToTableAndCrafts",
                             "catalogsShapedRecipes",
                             "pullsCraftsAndBanksByRecipeId",
-                            "paginatesRecipesSortedWithoutShapeless"),
+                            "paginatesRecipesSorted",
+                            "craftsShapelessPlanksFromLogs"),
             "GauntletGameTests", Set.of("gauntletEndToEnd", "routesThroughFenceGap"),
             "CrashRecoveryGameTests", Set.of("latchesAndRecoversAfterCrash"),
             "ProductionWiringGameTests", Set.of("walksViaCommandAndServerTick"));
