@@ -177,4 +177,48 @@ class MenuPlannerCountedRoleTest {
                 List.of(new MenuPlanner.Step(0, 0, MenuClick.QUICK_MOVE)),
                 MenuPlanner.planTakeRole(menu, SlotRole.BOTTLE, 0));
     }
+
+    @Test
+    void grindstoneDepositInputFillsFirstEmptySlot() {
+        MenuView menu =
+                MenuFixtures.grindstone(MenuFixtures.builder().put(SlotRole.HOTBAR, 38, "minecraft:iron_pickaxe", 1));
+        List<MenuPlanner.Step> plan = MenuPlanner.planDepositCounted(menu, SlotRole.INPUT, "minecraft:iron_pickaxe", 1);
+        assertEquals(
+                List.of(
+                        new MenuPlanner.Step(38, 0, MenuClick.PICKUP),
+                        new MenuPlanner.Step(0, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(38, 0, MenuClick.PICKUP)),
+                plan);
+    }
+
+    @Test
+    void grindstoneTakeOutputQuickMovesResult() {
+        MenuView menu =
+                MenuFixtures.grindstone(MenuFixtures.builder().put(SlotRole.OUTPUT, 2, "minecraft:iron_pickaxe", 1));
+        assertEquals(
+                List.of(new MenuPlanner.Step(2, 0, MenuClick.QUICK_MOVE)),
+                MenuPlanner.planTakeRole(menu, SlotRole.OUTPUT, 0));
+    }
+
+    @Test
+    void stonecutterDepositInputGoesToSlot0() {
+        MenuView menu =
+                MenuFixtures.stonecutter(MenuFixtures.builder().put(SlotRole.HOTBAR, 37, "minecraft:stone", 16));
+        List<MenuPlanner.Step> plan = MenuPlanner.planDepositCounted(menu, SlotRole.INPUT, "minecraft:stone", 1);
+        assertEquals(
+                List.of(
+                        new MenuPlanner.Step(37, 0, MenuClick.PICKUP),
+                        new MenuPlanner.Step(0, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(37, 0, MenuClick.PICKUP)),
+                plan);
+    }
+
+    @Test
+    void stonecutterTakeOutputQuickMovesResult() {
+        MenuView menu =
+                MenuFixtures.stonecutter(MenuFixtures.builder().put(SlotRole.OUTPUT, 1, "minecraft:stone_bricks", 1));
+        assertEquals(
+                List.of(new MenuPlanner.Step(1, 0, MenuClick.QUICK_MOVE)),
+                MenuPlanner.planTakeRole(menu, SlotRole.OUTPUT, 0));
+    }
 }

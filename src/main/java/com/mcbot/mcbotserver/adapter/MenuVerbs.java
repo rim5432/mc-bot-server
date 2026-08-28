@@ -241,7 +241,9 @@ final class MenuVerbs {
         boolean furnaceFamily = type.equals("furnace") || type.equals("blast_furnace") || type.equals("smoker");
         boolean anvilFamily = type.equals("anvil");
         boolean brewingFamily = type.equals("brewing_stand");
-        if (furnaceFamily || anvilFamily || brewingFamily) {
+        boolean grindstoneFamily = type.equals("grindstone");
+        boolean stonecutterFamily = type.equals("stonecutter");
+        if (furnaceFamily || anvilFamily || brewingFamily || grindstoneFamily || stonecutterFamily) {
             return role;
         }
         return SlotRole.CONTAINER;

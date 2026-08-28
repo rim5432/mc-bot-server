@@ -97,4 +97,21 @@ final class MenuSlotLayouts {
         }
         return index <= size - 10 ? SlotRole.MAIN : SlotRole.HOTBAR;
     }
+
+    /**
+     * Stonecutter layout: vanilla StonecutterMenu adds slot 0 = input
+     * (stone material), slot 1 = result (cut block), then the standard
+     * 27 main + 9 hotbar. The recipe list is a UI-side selection, not
+     * a slot — the harness picks the recipe by clicking the result after
+     * the input is placed.
+     */
+    public static SlotRole stonecutterRole(int index, int size) {
+        if (index == 0) {
+            return SlotRole.INPUT;
+        }
+        if (index == 1) {
+            return SlotRole.OUTPUT;
+        }
+        return index <= size - 10 ? SlotRole.MAIN : SlotRole.HOTBAR;
+    }
 }

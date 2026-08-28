@@ -214,6 +214,43 @@ final class MenuFixtures {
         return new MenuView("brewing_stand", null, ItemView.EMPTY, 41, slots);
     }
 
+    /** Grindstone-shaped snapshot: INPUT 0 and 1, OUTPUT 2, MAIN
+     * 3..29, HOTBAR 30..38 - same 3-slot layout as anvil. */
+    static MenuView grindstone(Builder b) {
+        b.roles.putIfAbsent(0, SlotRole.INPUT);
+        b.roles.putIfAbsent(1, SlotRole.INPUT);
+        b.roles.putIfAbsent(2, SlotRole.OUTPUT);
+        for (int i = 3; i <= 29; i++) {
+            b.roles.putIfAbsent(i, SlotRole.MAIN);
+        }
+        for (int i = 30; i <= 38; i++) {
+            b.roles.putIfAbsent(i, SlotRole.HOTBAR);
+        }
+        List<SlotView> slots = new ArrayList<>(39);
+        for (int i = 0; i < 39; i++) {
+            slots.add(new SlotView(i, b.items.getOrDefault(i, ItemView.EMPTY), b.roles.get(i)));
+        }
+        return new MenuView("grindstone", null, ItemView.EMPTY, 39, slots);
+    }
+
+    /** Stonecutter-shaped snapshot: INPUT 0, OUTPUT 1, MAIN 2..28,
+     * HOTBAR 29..37 - vanilla StonecutterMenu mirrored (38 slots). */
+    static MenuView stonecutter(Builder b) {
+        b.roles.putIfAbsent(0, SlotRole.INPUT);
+        b.roles.putIfAbsent(1, SlotRole.OUTPUT);
+        for (int i = 2; i <= 28; i++) {
+            b.roles.putIfAbsent(i, SlotRole.MAIN);
+        }
+        for (int i = 29; i <= 37; i++) {
+            b.roles.putIfAbsent(i, SlotRole.HOTBAR);
+        }
+        List<SlotView> slots = new ArrayList<>(38);
+        for (int i = 0; i < 38; i++) {
+            slots.add(new SlotView(i, b.items.getOrDefault(i, ItemView.EMPTY), b.roles.get(i)));
+        }
+        return new MenuView("stonecutter", null, ItemView.EMPTY, 38, slots);
+    }
+
     /** Own-inventory fake: result 0, grid 1..4, ARMOR 5..8 (head
      * first), MAIN 9..35, HOTBAR 36..44, OFFHAND 45 - the
      * MenuSlotLayouts survival layout mirrored. */
