@@ -1,6 +1,6 @@
 ---
 title: Decision Ledger (append-only)
-last_verified: 2026-08-27
+last_verified: 2026-08-28
 covers:
   - doc/architecture/boundaries.md
   - doc/architecture/function-map.md

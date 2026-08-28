@@ -509,6 +509,19 @@ def cmd_write(path: str, value: str, tol: int | None = None,
         resp = wire(f"use {x} {y} {z} {face.lower()}")
         emit_json(resp)
         return 0 if resp.get("ok") and resp.get("used") else 1
+    if path == "/actions/sneak":
+        # value "on"|"off" - persistent body-state latch (the equip
+        # precedent): survives idle ticks until cleared. Edge-guard is
+        # NOT included (vanilla clips edges in Player movement code
+        # only); what ships is the crouch pose + trigger courtesies.
+        word = value.strip().lower()
+        if word not in ("on", "off"):
+            print("write /actions/sneak: value must be 'on' or 'off'",
+                  file=sys.stderr)
+            return 1
+        resp = wire(f"sneak {word}")
+        emit_json(resp)
+        return 0 if resp.get("ok") else 1
     if path == "/actions/equip":
         # value is a hotbar slot index 0..8. Synchronous selection;
         # the wire updates both body.selectedSlot and the inventory

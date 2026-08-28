@@ -3,6 +3,7 @@ package com.mcbot.mcbotserver.adapter.entity;
 import com.mcbot.mcbotserver.adapter.BindingInventory;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.ai.control.MoveControl;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
@@ -62,6 +63,7 @@ public final class BotBodyEntity extends PathfinderMob {
     private float driveForward;
     private float driveStrafe;
     private boolean driveJump;
+    private boolean sneakLatch;
     private boolean hasPendingRotation;
     private float targetYaw;
     private float targetPitch;
@@ -230,12 +232,66 @@ public final class BotBodyEntity extends PathfinderMob {
      *                water or lava (issue 0004 F2 + lava branch)
      */
     public void setDrive(float forward, float strafe, boolean jump) {
+        setDrive(forward, strafe, jump, false);
+    }
+
+    /**
+     * Queue the drive for the next physics step, with the sneak
+     * modifier. Sneak is dual-application: the shift flag drives
+     * detection-radius reduction and vanilla mob AI courtesies, while
+     * {@code setStayingOnGroundSurface} engages {@code Entity.move}'s
+     * {@code maybeBackOffFromEdge} clip so a sneaking walk cannot step
+     * off a ledge. The harness latch ({@link #setSneakLatched})
+     * survives idle ticks where no MOVE claim wins; a per-tick
+     * {@code Move.sneak} only ever widens it.
+     *
+     * @param forward -1..1 forward drive
+     * @param strafe  -1..1 strafe drive
+     * @param jump    true to request upward thrust this tick - a
+     *                ground jump on land, buoyant ascent while in
+     *                water or lava (issue 0004 F2 + lava branch)
+     * @param sneak   true to hold the sneak modifier this tick (issue
+     *                0004 F1 seed; Intent.Move.sneak finally consumed)
+     */
+    public void setDrive(float forward, float strafe, boolean jump, boolean sneak) {
         this.driveForward = forward;
         this.driveStrafe = strafe;
         this.driveJump = jump;
+        boolean sneakOn = sneak || sneakLatch;
+        applySneak(sneakOn);
         if (!jump) {
             setJumping(false);
         }
+    }
+
+    /**
+     * Harness-latched sneak: survives idle ticks (no MOVE claim) until
+     * explicitly cleared - the /bot sneak verb's write site. Applies
+     * immediately so an idle body still holds the edge guard.
+     *
+     * @param latched true to hold sneak across ticks; false to release
+     */
+    public void setSneakLatched(boolean latched) {
+        this.sneakLatch = latched;
+        applySneak(latched);
+    }
+
+    /**
+     * Apply the sneak pose pair: the shift flag drives vanilla's
+     * pressure-plate/trigger courtesies, and CROUCHING pose gives the
+     * 1.5-block height (gap crawl + {@code isCrouching} visibility
+     * reduction) - both entity-level, no player required. Deliberate
+     * omission: vanilla's walk-off-the-edge clip lives only in
+     * {@code Player.maybeBackOffFromEdge} (the base Entity method is a
+     * stub), so a sneaking body CAN still step off a ledge - porting
+     * that guard is its own item with its own gametest, not free
+     * rider behavior here.
+     *
+     * @param sneakOn true to crouch, false to stand back up
+     */
+    private void applySneak(boolean sneakOn) {
+        setShiftKeyDown(sneakOn);
+        setPose(sneakOn ? Pose.CROUCHING : Pose.STANDING);
     }
 
     /**

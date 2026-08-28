@@ -15,6 +15,8 @@ import java.util.Objects;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.BowItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ShieldItem;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
@@ -108,7 +110,7 @@ public final class BindingActor implements Actor, MenuTransactions {
 
     private void applyMove(Claim move) {
         if (move != null && move.intent() instanceof Intent.Move m) {
-            body.setDrive((float) clamp(m.forward()), (float) clamp(m.strafe()), m.jump());
+            body.setDrive((float) clamp(m.forward()), (float) clamp(m.strafe()), m.jump(), m.sneak());
             // Sprint gait (issue 0005 P1.1, issue 0004 F6(3) ruling
             // D4): adapter-local policy, no Intent field. Forward
             // stride plus straight clearance ahead. Suppress in fluid
@@ -143,30 +145,41 @@ public final class BindingActor implements Actor, MenuTransactions {
         if (use != null && use.intent() instanceof Intent.Use u) {
             if (u.pressing() && !lastUsePressing) {
                 // USE = act with the main hand (decision 14, amended
-                // ledger 36 for held items): an edible held item means
+                // ledger 37 for held items): an edible held item means
                 // eat, not swing - vanilla right-click semantics. One
                 // item per rising edge; the eat plays its own sound and
                 // never melees. A bow starts its draw - the charge
                 // accumulates through the held ticks and the falling
-                // edge releases the shot.
+                // edge releases the shot. A shield raises on the BODY
+                // (never the facade): isDamageSourceBlocked reads the
+                // hurt entity's own blocking stack, and the body is
+                // what takes the hit.
                 if (!body.eatHeldItem()) {
-                    if (body.getInventory()
-                                    .container()
-                                    .getItem(body.selectedSlot)
-                                    .getItem()
-                            instanceof BowItem) {
+                    Item held = body.getInventory()
+                            .container()
+                            .getItem(body.selectedSlot)
+                            .getItem();
+                    if (held instanceof BowItem) {
                         facade.startUsingItem(InteractionHand.MAIN_HAND);
+                    } else if (held instanceof ShieldItem) {
+                        body.startUsingItem(InteractionHand.MAIN_HAND);
                     } else {
                         melee.onUsePress();
                     }
                 }
-            } else if (!u.pressing() && lastUsePressing && facade.isUsingItem()) {
-                facade.releaseUsingItem();
             }
             if (facade.isUsingItem()) {
                 // The draw charge advances only when pumped - the facade
                 // is never player-ticked.
                 facade.tickUseLoop();
+            }
+            if (!u.pressing() && lastUsePressing) {
+                if (facade.isUsingItem()) {
+                    facade.releaseUsingItem();
+                }
+                if (body.isUsingItem()) {
+                    body.releaseUsingItem();
+                }
             }
             lastUsePressing = u.pressing();
         } else {
@@ -175,6 +188,9 @@ public final class BindingActor implements Actor, MenuTransactions {
                 // release now; an orphaned charge would keep the loop
                 // running with nobody watching it.
                 facade.releaseUsingItem();
+            }
+            if (body.isUsingItem()) {
+                body.releaseUsingItem();
             }
             lastUsePressing = false;
         }

@@ -1,6 +1,6 @@
 ---
 title: Block capability axis - dig first, pulled forward by the suffocation escape
-last_verified: 2026-08-27
+last_verified: 2026-08-28
 covers:
   - doc/architecture/function-map.md
   - doc/architecture/boundaries.md

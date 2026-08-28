@@ -60,7 +60,8 @@ public final class WorldCommands {
             Supplier<CellPos> botPos,
             Supplier<String> botId,
             InteractBlockExecutor interact,
-            IntConsumer equip) {}
+            IntConsumer equip,
+            java.util.function.Consumer<Boolean> sneak) {}
 
     /**
      * Register the block / blocks / entities subtrees.
@@ -108,6 +109,10 @@ public final class WorldCommands {
                 .requires(src -> src.hasPermission(2))
                 .then(Commands.argument("slot", IntegerArgumentType.integer(0, 8))
                         .executes(ctx -> runEquip(ctx, live)));
+        var sneak = Commands.literal("sneak")
+                .requires(src -> src.hasPermission(2))
+                .then(Commands.argument("state", com.mojang.brigadier.arguments.StringArgumentType.word())
+                        .executes(ctx -> runSneak(ctx, live)));
         var use = Commands.literal("use")
                 .requires(src -> src.hasPermission(2))
                 .then(Commands.argument("x", IntegerArgumentType.integer())
@@ -123,6 +128,7 @@ public final class WorldCommands {
         dispatcher.register(place);
         dispatcher.register(equip);
         dispatcher.register(use);
+        dispatcher.register(sneak);
     }
 
     /**
@@ -226,6 +232,31 @@ public final class WorldCommands {
                     "reason",
                     "no action (out of reach, container block, block and item" + " both passed, or empty hand)");
         }
+        return CommandResponse.answer(ctx.getSource(), root);
+    }
+
+    /**
+     * Synchronous body-state write (issue 0013, sneak row): latch the
+     * sneak modifier across ticks. Persists through idle ticks until
+     * cleared - the equip precedent for persistent state written
+     * synchronously. The reply echoes the latched state so the caller
+     * confirms the word parsed.
+     */
+    private static int runSneak(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
+        Live l = live.get();
+        if (l == null) {
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
+        }
+        String word = com.mojang.brigadier.arguments.StringArgumentType.getString(ctx, "state")
+                .toLowerCase(java.util.Locale.ROOT);
+        if (!word.equals("on") && !word.equals("off")) {
+            return CommandResponse.answer(
+                    ctx.getSource(), CommandResponse.err("unknown state: " + word + " (on, off)"));
+        }
+        boolean enable = word.equals("on");
+        l.sneak().accept(enable);
+        JsonObject root = CommandResponse.ok();
+        root.addProperty("sneak", enable);
         return CommandResponse.answer(ctx.getSource(), root);
     }
 
