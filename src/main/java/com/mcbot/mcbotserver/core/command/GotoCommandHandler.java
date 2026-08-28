@@ -112,7 +112,7 @@ public final class GotoCommandHandler {
             if (m.isActive()) {
                 return false;
             }
-            bus.retire(m.taskId());
+            bus.retire(m.missionTaskId());
             return true;
         });
     }
@@ -171,7 +171,7 @@ public final class GotoCommandHandler {
                     false,
                     Map.of(
                             "task", mission.displayName(),
-                            "taskId", mission.taskId()),
+                            "taskId", mission.missionTaskId()),
                     mission.displayName() + ": cancelled by harness"));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down with it.

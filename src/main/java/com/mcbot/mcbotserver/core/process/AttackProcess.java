@@ -3,7 +3,6 @@ package com.mcbot.mcbotserver.core.process;
 import com.mcbot.mcbotserver.api.goal.GoalNear;
 import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
 import com.mcbot.mcbotserver.api.process.Attack;
-import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.ExecutionReport;
 import com.mcbot.mcbotserver.api.process.Overrides;
@@ -46,7 +45,7 @@ import java.util.function.Supplier;
  * <p>Implementation note: runs on the server tick thread only.
  */
 // contract: see boundaries.md decision 11 (light planner output)
-public final class AttackProcess implements BotProcess, TerminalMission {
+public final class AttackProcess extends MissionShell {
 
     /**
      * Entity scan radius. Matches DefendProcess.DETECTION_RADIUS:
@@ -90,19 +89,14 @@ public final class AttackProcess implements BotProcess, TerminalMission {
      */
     public static final String REASON_ESCAPED = "TARGET_ESCAPED";
 
-    private final String taskId;
     private final String targetId;
-    private final int priority;
-    private final long timeoutTicks;
     private final Supplier<CellPos> positionSource;
 
-    private boolean active = true;
     private boolean succeeded;
     private String failure;
     private boolean engaged;
     private CellPos targetCell;
     private int ticksSinceSeen;
-    private long ticksInMission;
     private Directive lastDirective;
 
     /**
@@ -118,19 +112,11 @@ public final class AttackProcess implements BotProcess, TerminalMission {
      */
     public AttackProcess(
             String taskId, String targetId, int priority, long timeoutTicks, Supplier<CellPos> positionSource) {
-        if (taskId == null || taskId.isBlank()) {
-            throw new IllegalArgumentException("taskId must not be blank");
-        }
+        super(taskId, priority, timeoutTicks);
         if (targetId == null || targetId.isBlank()) {
             throw new IllegalArgumentException("targetId must not be blank");
         }
-        if (timeoutTicks <= 0) {
-            throw new IllegalArgumentException("timeoutTicks must be positive");
-        }
-        this.taskId = taskId;
         this.targetId = targetId;
-        this.priority = priority;
-        this.timeoutTicks = timeoutTicks;
         this.positionSource = Objects.requireNonNull(positionSource, "positionSource");
     }
 
@@ -145,11 +131,10 @@ public final class AttackProcess implements BotProcess, TerminalMission {
 
     @Override
     public Directive onTick(WorldView world) {
-        if (!active) {
+        if (!live()) {
             return lastDirective;
         }
-        ticksInMission++;
-        if (ticksInMission >= timeoutTicks) {
+        if (budgetExpired()) {
             fail(REASON_TIMEOUT);
             return lastDirective;
         }
@@ -213,7 +198,7 @@ public final class AttackProcess implements BotProcess, TerminalMission {
     }
 
     private void succeed() {
-        active = false;
+        deactivate();
         succeeded = true;
     }
 
@@ -225,8 +210,8 @@ public final class AttackProcess implements BotProcess, TerminalMission {
      * @param reason the machine-readable failure reason
      */
     private void fail(String reason) {
-        if (active) {
-            active = false;
+        if (live()) {
+            deactivate();
             succeeded = false;
             failure = reason;
         }
@@ -248,7 +233,7 @@ public final class AttackProcess implements BotProcess, TerminalMission {
 
     @Override
     public boolean resume(InterruptionContext c) {
-        if (!active) {
+        if (!live()) {
             return false;
         }
         // Blind-trust guard, the defend trick: spend all grace
@@ -264,23 +249,14 @@ public final class AttackProcess implements BotProcess, TerminalMission {
     }
 
     /** Abort hook for harness cancellation; terminal state is sticky. */
+    @Override
     public void abort() {
         fail("CANCELLED");
     }
 
     @Override
-    public boolean isActive() {
-        return active;
-    }
-
-    @Override
     public String displayName() {
-        return "attack:" + taskId;
-    }
-
-    @Override
-    public int priority() {
-        return priority;
+        return "attack:" + taskId();
     }
 
     @Override
@@ -290,12 +266,7 @@ public final class AttackProcess implements BotProcess, TerminalMission {
 
     @Override
     public String failureReasonOrNull() {
-        return active ? null : failure;
-    }
-
-    @Override
-    public String missionTaskId() {
-        return taskId;
+        return live() ? null : failure;
     }
 
     @Override

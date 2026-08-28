@@ -2,7 +2,6 @@ package com.mcbot.mcbotserver.core.process;
 
 import com.mcbot.mcbotserver.api.goal.Goal;
 import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
-import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.ExecutionReport;
 import com.mcbot.mcbotserver.api.world.WorldView;
@@ -22,7 +21,7 @@ import com.mcbot.mcbotserver.api.world.WorldView;
  * <p>Implementation note: runs on the server tick thread only.
  */
 // contract: see boundaries.md decision 18 (GotoCommand minimal semantics)
-public final class GotoProcess implements BotProcess, TerminalMission {
+public final class GotoProcess extends MissionShell {
 
     /** Failure reason: mover fuse tripped with no recovery route. */
     public static final String REASON_STUCK = "STUCK";
@@ -33,12 +32,7 @@ public final class GotoProcess implements BotProcess, TerminalMission {
     /** Failure reason: planner found no route to the goal. */
     public static final String REASON_NO_PATH = "NO_PATH";
 
-    private final String taskId;
     private final Goal goal;
-    private final int priority;
-    private final long timeoutTicks;
-    private long ticksInMission;
-    private boolean active = true;
     private boolean succeeded;
     private String failure;
 
@@ -51,44 +45,24 @@ public final class GotoProcess implements BotProcess, TerminalMission {
      * @param timeoutTicks tick budget; positive
      */
     public GotoProcess(String taskId, Goal goal, int priority, long timeoutTicks) {
-        if (taskId == null || taskId.isBlank()) {
-            throw new IllegalArgumentException("taskId must not be blank");
-        }
+        super(taskId, priority, timeoutTicks);
         if (goal == null) {
             throw new IllegalArgumentException("goal must not be null");
         }
-        if (timeoutTicks <= 0) {
-            throw new IllegalArgumentException("timeoutTicks must be positive");
-        }
-        this.taskId = taskId;
         this.goal = goal;
-        this.priority = priority;
-        this.timeoutTicks = timeoutTicks;
-    }
-
-    @Override
-    public boolean isActive() {
-        return active;
-    }
-
-    @Override
-    public int priority() {
-        return priority;
     }
 
     @Override
     public Directive onTick(WorldView world) {
-        ticksInMission++;
-        if (ticksInMission >= timeoutTicks) {
+        if (budgetExpired()) {
             fail(REASON_TIMEOUT);
-            return Directive.of(goal);
         }
         return Directive.of(goal);
     }
 
     @Override
     public void onExecutionReport(ExecutionReport report) {
-        if (!active) {
+        if (!live()) {
             // Terminal state is sticky: a late report from the same
             // tick's pipeline must never flip SUCCEEDED into FAILED or
             // vice versa.
@@ -97,7 +71,7 @@ public final class GotoProcess implements BotProcess, TerminalMission {
         switch (report.status()) {
             case SUCCESS -> {
                 succeeded = true;
-                active = false;
+                deactivate();
             }
             case STUCK -> fail(REASON_STUCK);
             case FAILED -> fail(reasonOrUnknown(report));
@@ -116,7 +90,7 @@ public final class GotoProcess implements BotProcess, TerminalMission {
     public boolean resume(InterruptionContext context) {
         // A walk-to goal has no perishable world assumptions beyond the
         // goal cell existing; Stage 1 keeps this trivially true.
-        return active;
+        return live();
     }
 
     @Override
@@ -126,55 +100,19 @@ public final class GotoProcess implements BotProcess, TerminalMission {
 
     @Override
     public String displayName() {
-        return "goto:" + taskId;
-    }
-
-    /**
-     * Returns the boundary-D task id passed at construction, for the
-     * command layer's lifecycle sweep.
-     *
-     * @return the task id; never null
-     */
-    public String taskId() {
-        return taskId;
-    }
-
-    /**
-     * Terminal state query for the command layer's completion events.
-     *
-     * @return true when the goal predicate passed before any failure
-     */
-    public boolean isSucceeded() {
-        return succeeded;
-    }
-
-    private static String reasonOrUnknown(ExecutionReport report) {
-        return report.reason() != null ? report.reason() : "UNKNOWN";
+        return "goto:" + taskId();
     }
 
     private void fail(String reason) {
-        if (active) {
+        if (live()) {
             failure = reason;
-            active = false;
+            deactivate();
         }
-    }
-
-    /**
-     * Silent termination for harness cancellation: deactivates without
-     * recording a failure, so completion events stay truthful.
-     */
-    public void abort() {
-        active = false;
     }
 
     @Override
     public boolean missionSucceeded() {
         return succeeded;
-    }
-
-    @Override
-    public String missionTaskId() {
-        return taskId;
     }
 
     @Override

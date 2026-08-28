@@ -1,9 +1,10 @@
 package com.mcbot.mcbotserver.core.process;
 
 import com.mcbot.mcbotserver.api.goal.GoalNear;
-import com.mcbot.mcbotserver.api.process.BotProcess;
+import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
 import com.mcbot.mcbotserver.api.process.DigMission;
 import com.mcbot.mcbotserver.api.process.Directive;
+import com.mcbot.mcbotserver.api.process.ExecutionReport;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.BlockSnapshot;
 import com.mcbot.mcbotserver.api.world.ViewMode;
@@ -29,17 +30,12 @@ import com.mcbot.mcbotserver.api.world.WorldView;
  */
 // contract: see boundaries.md section B (process tier is
 //            side-effect-free) + issue 0013 R1 (dig is a task)
-public final class DigProcess implements BotProcess, TerminalMission, DigMission {
+public final class DigProcess extends MissionShell implements DigMission {
 
-    private final String taskId;
     private final CellPos target;
-    private final int priority;
-    private final long timeoutTicks;
-    private long ticksInMission;
-    private boolean active = true;
+    private String initialBlockId;
     private boolean succeeded;
     private String failure;
-    private String initialBlockId;
 
     /**
      * Creates a dig mission.
@@ -50,24 +46,16 @@ public final class DigProcess implements BotProcess, TerminalMission, DigMission
      * @param timeoutTicks mission budget; positive
      */
     public DigProcess(String taskId, CellPos target, int priority, long timeoutTicks) {
-        if (taskId == null || taskId.isBlank()) {
-            throw new IllegalArgumentException("taskId must not be null or blank");
-        }
+        super(taskId, priority, timeoutTicks);
         if (target == null) {
             throw new IllegalArgumentException("target must not be null");
         }
-        if (timeoutTicks <= 0) {
-            throw new IllegalArgumentException("timeoutTicks must be positive");
-        }
-        this.taskId = taskId;
         this.target = target;
-        this.priority = priority;
-        this.timeoutTicks = timeoutTicks;
     }
 
     @Override
     public String displayName() {
-        return "dig:" + taskId;
+        return "dig:" + taskId();
     }
 
     /**
@@ -79,12 +67,6 @@ public final class DigProcess implements BotProcess, TerminalMission, DigMission
         return target;
     }
 
-    /** Arbiter seat priority for the mission-dig claim path. */
-    @Override
-    public int priority() {
-        return priority;
-    }
-
     @Override
     public CellPos digTarget() {
         return target;
@@ -94,7 +76,7 @@ public final class DigProcess implements BotProcess, TerminalMission, DigMission
     public boolean isDigging() {
         // DigProcess is always digging while active: the GoalNear directive
         // holds the bot in range and the controller injects dig claims.
-        return active;
+        return live();
     }
 
     /**
@@ -107,13 +89,8 @@ public final class DigProcess implements BotProcess, TerminalMission, DigMission
     }
 
     @Override
-    public boolean isActive() {
-        return active;
-    }
-
-    @Override
     public Directive onTick(WorldView world) {
-        if (!active) {
+        if (!live()) {
             // Terminal hold: the arbiter retires us on the next lap.
             return Directive.of(new GoalNear(target, 2));
         }
@@ -127,7 +104,7 @@ public final class DigProcess implements BotProcess, TerminalMission, DigMission
                 return fail("target is " + initialBlockId);
             }
         }
-        if (++ticksInMission >= timeoutTicks) {
+        if (budgetExpired()) {
             return fail("TIMEOUT");
         }
         BlockSnapshot now = world.getBlock(target, ViewMode.LIVE);
@@ -136,14 +113,14 @@ public final class DigProcess implements BotProcess, TerminalMission, DigMission
             // BLOCK_BROKEN; MissionReporter announces TASK_COMPLETED
             // through the generic TerminalMission path.
             succeeded = true;
-            active = false;
+            deactivate();
         }
         return Directive.of(new GoalNear(target, 2));
     }
 
     @Override
-    public void onExecutionReport(com.mcbot.mcbotserver.api.process.ExecutionReport report) {
-        if (!active) {
+    public void onExecutionReport(ExecutionReport report) {
+        if (!live()) {
             // Terminal state is sticky: a late report from the same
             // tick's pipeline must never flip a terminal state.
             return;
@@ -164,7 +141,7 @@ public final class DigProcess implements BotProcess, TerminalMission, DigMission
     }
 
     @Override
-    public void onLostControl(com.mcbot.mcbotserver.api.interrupt.InterruptionContext ctx) {
+    public void onLostControl(InterruptionContext ctx) {
         // Keep every logical field intact (boundary B resume
         // contract): the interruption is recorded by the reflex
         // paths; the mission revalidates nothing that a fresh tick
@@ -172,13 +149,13 @@ public final class DigProcess implements BotProcess, TerminalMission, DigMission
     }
 
     @Override
-    public boolean resume(com.mcbot.mcbotserver.api.interrupt.InterruptionContext ctx) {
+    public boolean resume(InterruptionContext ctx) {
         // A single-block dig has no perishable world assumptions
         // beyond the target cell; onTick re-reads it every tick and
         // fails honestly if it turned to air meanwhile. Break
         // progress resetting on eviction is vanilla-parity (release()
         // on claim loss).
-        return active;
+        return live();
     }
 
     @Override
@@ -186,9 +163,10 @@ public final class DigProcess implements BotProcess, TerminalMission, DigMission
         fail("STUCK");
     }
 
-    /** Silent termination for harness cancellation. */
-    public void abort() {
-        active = false;
+    private Directive fail(String reason) {
+        failure = reason;
+        deactivate();
+        return Directive.of(new GoalNear(target, 2));
     }
 
     @Override
@@ -197,22 +175,7 @@ public final class DigProcess implements BotProcess, TerminalMission, DigMission
     }
 
     @Override
-    public String missionTaskId() {
-        return taskId;
-    }
-
-    @Override
     public String failureReasonOrNull() {
         return failure;
-    }
-
-    private Directive fail(String reason) {
-        failure = reason;
-        active = false;
-        return Directive.of(new GoalNear(target, 2));
-    }
-
-    private static String reasonOrUnknown(com.mcbot.mcbotserver.api.process.ExecutionReport report) {
-        return report.reason() != null ? report.reason() : "UNKNOWN";
     }
 }

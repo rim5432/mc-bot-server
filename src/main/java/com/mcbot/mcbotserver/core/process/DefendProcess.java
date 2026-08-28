@@ -3,7 +3,6 @@ package com.mcbot.mcbotserver.core.process;
 import com.mcbot.mcbotserver.api.goal.GoalNear;
 import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
 import com.mcbot.mcbotserver.api.process.Attack;
-import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.ExecutionReport;
 import com.mcbot.mcbotserver.api.process.Overrides;
@@ -44,7 +43,7 @@ import java.util.function.Supplier;
  * <p>Implementation note: runs on the server tick thread only.
  */
 // contract: see boundaries.md decision 11 (light planner output)
-public final class DefendProcess implements BotProcess, TerminalMission {
+public final class DefendProcess extends MissionShell {
 
     /** Hostiles closer than this many blocks get engaged. */
     public static final double ENGAGE_RADIUS = 8.0;
@@ -125,22 +124,17 @@ public final class DefendProcess implements BotProcess, TerminalMission {
      */
     public static final String REASON_ESCAPED = "TARGET_ESCAPED";
 
-    private final String taskId;
-    private final int priority;
-    private final long timeoutTicks;
     private final Supplier<CellPos> positionSource;
     private final Set<String> hostileTypes;
     private final Set<String> rangedTypes;
     private String lastRefusedType;
 
-    private boolean active = true;
     private boolean succeeded;
     private String failure;
     private String targetId;
     private CellPos targetCell;
     private boolean targetRanged;
     private int ticksSinceSeen;
-    private long ticksInMission;
     private Directive lastDirective;
 
     /**
@@ -182,37 +176,18 @@ public final class DefendProcess implements BotProcess, TerminalMission {
             Supplier<CellPos> positionSource,
             Set<String> hostileTypes,
             Set<String> rangedTypes) {
-        if (taskId == null || taskId.isBlank()) {
-            throw new IllegalArgumentException("taskId must not be blank");
-        }
-        if (timeoutTicks <= 0) {
-            throw new IllegalArgumentException("timeoutTicks must be positive");
-        }
-        this.taskId = taskId;
-        this.priority = priority;
-        this.timeoutTicks = timeoutTicks;
+        super(taskId, priority, timeoutTicks);
         this.positionSource = Objects.requireNonNull(positionSource, "positionSource");
         this.hostileTypes = Set.copyOf(Objects.requireNonNull(hostileTypes, "hostileTypes"));
         this.rangedTypes = Set.copyOf(Objects.requireNonNull(rangedTypes, "rangedTypes"));
     }
 
     @Override
-    public boolean isActive() {
-        return active;
-    }
-
-    @Override
-    public int priority() {
-        return priority;
-    }
-
-    @Override
     public Directive onTick(WorldView world) {
-        if (!active) {
+        if (!live()) {
             return lastDirective;
         }
-        ticksInMission++;
-        if (ticksInMission >= timeoutTicks) {
+        if (budgetExpired()) {
             fail(REASON_TIMEOUT);
             return lastDirective;
         }
@@ -293,7 +268,7 @@ public final class DefendProcess implements BotProcess, TerminalMission {
 
     @Override
     public void onExecutionReport(ExecutionReport report) {
-        if (!active) {
+        if (!live()) {
             // Terminal state is sticky, mirroring GotoProcess: late
             // reports must never flip a decided outcome.
             return;
@@ -321,7 +296,7 @@ public final class DefendProcess implements BotProcess, TerminalMission {
 
     @Override
     public boolean resume(InterruptionContext c) {
-        if (!active) {
+        if (!live()) {
             return false;
         }
         // Blind-trust guard: resume() has no world access, so instead
@@ -341,15 +316,7 @@ public final class DefendProcess implements BotProcess, TerminalMission {
 
     @Override
     public String displayName() {
-        return "defend:" + taskId;
-    }
-
-    /**
-     * Silent termination for harness cancellation: deactivates without
-     * recording a failure, so completion events stay truthful.
-     */
-    public void abort() {
-        active = false;
+        return "defend:" + taskId();
     }
 
     @Override
@@ -368,11 +335,6 @@ public final class DefendProcess implements BotProcess, TerminalMission {
             return Map.of("threatType", lastRefusedType);
         }
         return Map.of();
-    }
-
-    @Override
-    public String missionTaskId() {
-        return taskId;
     }
 
     private boolean engaged() {
@@ -466,13 +428,13 @@ public final class DefendProcess implements BotProcess, TerminalMission {
 
     private void succeed() {
         succeeded = true;
-        active = false;
+        deactivate();
     }
 
     private void fail(String reason) {
-        if (active) {
+        if (live()) {
             failure = reason;
-            active = false;
+            deactivate();
         }
     }
 }

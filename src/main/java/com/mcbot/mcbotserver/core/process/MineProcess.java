@@ -2,7 +2,6 @@ package com.mcbot.mcbotserver.core.process;
 
 import com.mcbot.mcbotserver.api.goal.GoalNear;
 import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
-import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.api.process.DigMission;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.ExecutionReport;
@@ -56,7 +55,7 @@ import java.util.function.Supplier;
 // contract surface (interrupt quintet) plus per-field observability
 // getters consumed by the gate tests; both belong here.
 @SuppressWarnings("PMD.TooManyMethods")
-public final class MineProcess implements BotProcess, TerminalMission, DigMission {
+public final class MineProcess extends MissionShell implements DigMission {
 
     /** One completed break, drained by the handler for BLOCK_BROKEN. */
     public record BlockBreak(CellPos pos, String blockId) {}
@@ -77,11 +76,8 @@ public final class MineProcess implements BotProcess, TerminalMission, DigMissio
     private static final int DEFAULT_PER_TARGET_DIG_BUDGET = 400;
     private static final int DEFAULT_PICKUP_WINDOW = 20;
 
-    private final String taskId;
     private final String blockType;
     private final int targetCount;
-    private final int priority;
-    private final long timeoutTicks;
     private final int searchRadius;
     private final int perTargetMoveBudget;
     private final int perTargetDigBudget;
@@ -95,9 +91,7 @@ public final class MineProcess implements BotProcess, TerminalMission, DigMissio
     private Phase phase = Phase.IDLE;
     private CellPos currentTarget;
     private int brokenCount;
-    private long ticksInMission;
     private long ticksInCurrentPhase;
-    private boolean active = true;
     private boolean succeeded;
     private String failure;
     private final Set<CellPos> skipSet = new HashSet<>();
@@ -122,12 +116,10 @@ public final class MineProcess implements BotProcess, TerminalMission, DigMissio
             int priority,
             long timeoutTicks,
             Supplier<CellPos> botPosition) {
-        requireValid(taskId, blockType, targetCount, timeoutTicks, botPosition);
-        this.taskId = taskId;
+        super(taskId, priority, timeoutTicks);
+        requireValid(blockType, targetCount, botPosition);
         this.blockType = blockType;
         this.targetCount = targetCount;
-        this.priority = priority;
-        this.timeoutTicks = timeoutTicks;
         this.searchRadius = DEFAULT_SEARCH_RADIUS;
         this.perTargetMoveBudget = DEFAULT_PER_TARGET_MOVE_BUDGET;
         this.perTargetDigBudget = DEFAULT_PER_TARGET_DIG_BUDGET;
@@ -137,12 +129,9 @@ public final class MineProcess implements BotProcess, TerminalMission, DigMissio
     }
 
     /** Rejects constructor arguments before any field is assigned. */
-    private static void requireValid(
-            String taskId, String blockType, int targetCount, long timeoutTicks, Supplier<CellPos> botPosition) {
-        requireText(taskId, "taskId");
+    private static void requireValid(String blockType, int targetCount, Supplier<CellPos> botPosition) {
         requireText(blockType, "blockType");
         requirePositive(targetCount, "targetCount");
-        requirePositive(timeoutTicks, "timeoutTicks");
         requireNonNullPosition(botPosition);
     }
 
@@ -169,21 +158,16 @@ public final class MineProcess implements BotProcess, TerminalMission, DigMissio
 
     @Override
     public String displayName() {
-        return "mine:" + taskId;
-    }
-
-    @Override
-    public boolean isActive() {
-        return active;
+        return "mine:" + taskId();
     }
 
     @Override
     public Directive onTick(WorldView world) {
-        if (!active) {
+        if (!live()) {
             // Terminal hold: the arbiter retires us on the next lap.
             return holdDirective();
         }
-        if (++ticksInMission >= timeoutTicks) {
+        if (budgetExpired()) {
             return fail("TIMEOUT");
         }
         ticksInCurrentPhase++;
@@ -300,7 +284,7 @@ public final class MineProcess implements BotProcess, TerminalMission, DigMissio
         }
         if (brokenCount >= targetCount) {
             succeeded = true;
-            active = false;
+            deactivate();
             phase = Phase.DONE;
             return holdDirective();
         }
@@ -313,7 +297,7 @@ public final class MineProcess implements BotProcess, TerminalMission, DigMissio
 
     @Override
     public void onExecutionReport(ExecutionReport report) {
-        if (!active) {
+        if (!live()) {
             return;
         }
         switch (report.status()) {
@@ -355,7 +339,7 @@ public final class MineProcess implements BotProcess, TerminalMission, DigMissio
         // Break progress resetting on eviction is vanilla-parity; the
         // target cell is re-read every tick, so a mid-dig world change
         // is caught by the DIGGING poll rather than by resume.
-        return active;
+        return live();
     }
 
     @Override
@@ -363,19 +347,9 @@ public final class MineProcess implements BotProcess, TerminalMission, DigMissio
         fail("STUCK");
     }
 
-    /** Silent termination for harness cancellation. */
-    public void abort() {
-        active = false;
-    }
-
     @Override
     public boolean missionSucceeded() {
         return succeeded;
-    }
-
-    @Override
-    public String missionTaskId() {
-        return taskId;
     }
 
     @Override
@@ -392,12 +366,7 @@ public final class MineProcess implements BotProcess, TerminalMission, DigMissio
 
     @Override
     public boolean isDigging() {
-        return phase == Phase.DIGGING && active;
-    }
-
-    @Override
-    public int priority() {
-        return priority;
+        return phase == Phase.DIGGING && live();
     }
 
     // ===== Accessors for testing/observability =====
@@ -448,7 +417,7 @@ public final class MineProcess implements BotProcess, TerminalMission, DigMissio
 
     private Directive fail(String reason) {
         failure = reason;
-        active = false;
+        deactivate();
         phase = Phase.FAILED;
         return holdDirective();
     }

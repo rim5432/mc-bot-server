@@ -6,7 +6,6 @@ import com.mcbot.mcbotserver.api.inventory.FoodCatalog;
 import com.mcbot.mcbotserver.api.inventory.InventoryView;
 import com.mcbot.mcbotserver.api.inventory.ItemView;
 import com.mcbot.mcbotserver.api.process.Attack;
-import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.api.process.DigMission;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.Fish;
@@ -39,7 +38,7 @@ import java.util.function.Supplier;
  * side-effect-free) and issue 0010. Runs on the server tick thread
  * only.
  */
-public final class HungryProcess implements BotProcess, TerminalMission, DigMission {
+public final class HungryProcess extends MissionShell implements DigMission {
 
     /** Failure when no strategy was viable or the budget burned (0010 section 5). */
     public static final String REASON_EXHAUSTED = "FOOD_STRATEGY_EXHAUSTED";
@@ -63,16 +62,11 @@ public final class HungryProcess implements BotProcess, TerminalMission, DigMiss
 
     private static final String ROD_ID = "minecraft:fishing_rod";
 
-    private final String taskId;
-    private final int priority;
-    private final long timeoutTicks;
     private final Supplier<CellPos> positionSource;
     private final Supplier<CellPos> forageTarget;
     private final FoodCatalog catalog;
     private final Set<String> foodTypes;
 
-    private long ticksUsed;
-    private boolean active = true;
     private boolean succeeded;
     private String failure;
     private boolean digging;
@@ -114,15 +108,7 @@ public final class HungryProcess implements BotProcess, TerminalMission, DigMiss
             Supplier<CellPos> forageTarget,
             FoodCatalog catalog,
             Set<String> foodTypes) {
-        if (taskId == null || taskId.isBlank()) {
-            throw new IllegalArgumentException("taskId must not be blank");
-        }
-        if (timeoutTicks <= 0) {
-            throw new IllegalArgumentException("timeoutTicks must be positive");
-        }
-        this.taskId = taskId;
-        this.priority = priority;
-        this.timeoutTicks = timeoutTicks;
+        super(taskId, priority, timeoutTicks);
         this.positionSource = Objects.requireNonNull(positionSource, "positionSource");
         this.forageTarget = Objects.requireNonNull(forageTarget, "forageTarget");
         this.catalog = Objects.requireNonNull(catalog, "catalog");
@@ -130,21 +116,10 @@ public final class HungryProcess implements BotProcess, TerminalMission, DigMiss
     }
 
     @Override
-    public boolean isActive() {
-        return active;
-    }
-
-    @Override
-    public int priority() {
-        return priority;
-    }
-
-    @Override
     public Directive onTick(WorldView world) {
-        if (!active) {
+        if (!live()) {
             return lastDirective;
         }
-        ticksUsed++;
         InventoryView inventory = world.getInventory();
         for (ItemView item : inventory.main()) {
             if (!item.isEmpty() && catalog.facts(item.itemId()) != null) {
@@ -152,7 +127,7 @@ public final class HungryProcess implements BotProcess, TerminalMission, DigMiss
                 return lastDirective;
             }
         }
-        if (ticksUsed >= timeoutTicks) {
+        if (budgetExpired()) {
             fail(REASON_TIMEOUT);
             return lastDirective;
         }
@@ -320,12 +295,7 @@ public final class HungryProcess implements BotProcess, TerminalMission, DigMiss
 
     @Override
     public String displayName() {
-        return "hungry:" + taskId;
-    }
-
-    @Override
-    public String missionTaskId() {
-        return taskId;
+        return "hungry:" + taskId();
     }
 
     @Override
@@ -388,13 +358,13 @@ public final class HungryProcess implements BotProcess, TerminalMission, DigMiss
     }
 
     private void succeed() {
-        active = false;
+        deactivate();
         succeeded = true;
         digging = false;
     }
 
     private void fail(String reason) {
-        active = false;
+        deactivate();
         failure = reason;
         digging = false;
     }

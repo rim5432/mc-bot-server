@@ -48,7 +48,7 @@ class BoundaryContractMarkerTest {
     private static final Map<String, String> ANCHORS = Map.of(
             "Actor", "core/actor/ChannelArbiter.java",
             "Behavior", "core/behavior/PathingBehavior.java",
-            "BotProcess", "core/process/GotoProcess.java",
+            "BotProcess", "core/process/MissionShell.java",
             "WorldView", "core/world/SnapshotWorldView.java",
             "EventQueue", "core/event/InMemoryEventQueue.java",
             "CommandChannel", "core/command/CommandBus.java",
