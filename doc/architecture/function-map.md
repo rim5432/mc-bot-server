@@ -163,10 +163,15 @@ reopened on demand — **[DEFERRED]** outside v1.
   Every tick checks inventory first — food landed means FOOD_ACQUIRED
   and the EAT reflex owns chewing. No viable strategy or burned budget
   is FOOD_STRATEGY_EXHAUSTED (structured failure to the harness).
-- **[GAP]** Fall protection, projectile dodge, ranged
-  idle threats (a skeleton kiting at standoff never trips the melee
-  engage trigger — responding needs ranged tactics or retreat policy),
-  fighting while at low health (the freeze hold currently wins that
+- **[SHIPPED]** Ranged defense when triggered: DefendProcess engages
+  a kiting skeleton at RANGED_STANDOFF with the bow loadout (ledger
+  37) instead of refusing; unarmed it still refuses with the threat
+  type.
+- **[GAP]** Fall protection, projectile dodge, ranged idle threats
+  (a skeleton kiting at standoff beyond the melee engage radius never
+  trips the proximity trigger - the armed ranged defense answers once
+  a combat order exists, but the idle-trigger gap remains), fighting
+  while at low health (the freeze hold currently wins that
   arbitration).
 - **[DEFERRED]** Process-suppressed reflexes (a mission pauses a reflex).
 
@@ -337,11 +342,14 @@ reopened on demand — **[DEFERRED]** outside v1.
 - **[GAP]** Shapeless recipes (no fixed grid cells to describe) and
   multi-step crafting chains (e.g. log → planks → sticks as one
   request).
-- **[GAP]** Use-item verbs — buckets — both ride the facade's
-  Player-typed surface. Eating food is shipped (EAT reflex + USE
-  press consumes the held item via finishUsingItem + FoodData.eat;
-  issue 0010 consumption half). Bows are shipped (§4 ranged combat).
-  Use-block interactions are shipped (§7 vanilla chain above).
+- **[SHIPPED]** Use-item verbs - bucket fill/empty and rod cast/reel
+  ride the USE channel via vanilla Item.use against a POV raycast from
+  the synced facade pose, plus the sync `/bot use-item` verb for
+  harness driving (ROT aim is the caller's precondition). Eating food
+  is shipped (EAT reflex + USE press consumes the held item via
+  finishUsingItem + FoodData.eat; issue 0010 consumption half). Bows
+  are shipped (section 4 ranged combat). Use-block interactions are
+  shipped (section 7 vanilla chain above).
 - **[DEFERRED]** Enchantment-aware dig speed, match_tool loot
   fidelity, weapon auto-selection.
 

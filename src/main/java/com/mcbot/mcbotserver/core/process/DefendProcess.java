@@ -36,7 +36,10 @@ import java.util.function.Supplier;
  * carries no death flag), so the conservative failure verdict is
  * reported; the harness re-scans to confirm. Leaving the leash or the
  * tick budget fails the mission with LOST_TARGET or TIMEOUT; a
- * melee-incompatible hostile is refused with ENGAGEMENT_REFUSED.
+ * melee-incompatible hostile is refused with ENGAGEMENT_REFUSED -
+ * unless the inventory carries a ranged loadout (bow + arrows), in
+ * which case the fight is engaged at RANGED_STANDOFF and answered
+ * with the bow (ledger 37's USE hold-draw).
  *
  * <p>Implementation note: runs on the server tick thread only.
  */
@@ -85,6 +88,15 @@ public final class DefendProcess implements BotProcess, TerminalMission {
      */
     public static final int GOAL_RANGE = 2;
 
+    /**
+     * Standoff range for RANGED targets engaged with a bow loadout:
+     * inside the bow band (CombatBehavior.BOW_RANGE = 15) so the body
+     * can answer, beyond ATTACK_REACH so the fight does not collapse
+     * into a sword chase of a kiting target. The mover closes to this
+     * rim and holds; the combat behavior's draw pacing does the rest.
+     */
+    public static final int RANGED_STANDOFF = 10;
+
     /** Failure reason: engaged target left the leash radius. */
     public static final String REASON_LOST = "LOST_TARGET";
 
@@ -126,6 +138,7 @@ public final class DefendProcess implements BotProcess, TerminalMission {
     private String failure;
     private String targetId;
     private CellPos targetCell;
+    private boolean targetRanged;
     private int ticksSinceSeen;
     private long ticksInMission;
     private Directive lastDirective;
@@ -214,13 +227,20 @@ public final class DefendProcess implements BotProcess, TerminalMission {
                 return lastDirective;
             }
             if (rangedTypes.contains(nearest.type())) {
-                // Structural mismatch: melee-only cannot answer kite-
-                // and-shoot. Refusing NOW beats bleeding to leash or
-                // timeout - the harness sees the refusal and decides
-                // (retreat, reroute, or accept the exposure).
-                lastRefusedType = nearest.type();
-                fail(REASON_REFUSED);
-                return lastDirective;
+                // A kiting skeleton is only unwinnable WITHOUT a bow:
+                // armed, the fight is answered at standoff - the mover
+                // closes to RANGED_STANDOFF, the combat behavior draws
+                // inside the bow band, and melee still takes over if
+                // the target closes in. Unarmed, refusing NOW beats
+                // bleeding to leash or timeout - the harness sees the
+                // refusal (with the threat type) and decides.
+                if (com.mcbot.mcbotserver.core.behavior.CombatBehavior.rangedLoadoutSlot(world) < 0) {
+                    lastRefusedType = nearest.type();
+                    fail(REASON_REFUSED);
+                    return lastDirective;
+                }
+                engageRanged(nearest);
+                return directiveFor();
             }
             engage(nearest);
             return directiveFor();
@@ -362,11 +382,21 @@ public final class DefendProcess implements BotProcess, TerminalMission {
     private void engage(EntitySnapshot target) {
         targetId = target.id();
         targetCell = target.pos();
+        targetRanged = false;
         ticksSinceSeen = 0;
     }
 
+    private void engageRanged(EntitySnapshot target) {
+        engage(target);
+        targetRanged = true;
+    }
+
     private Directive directiveFor() {
-        lastDirective = new Directive(new GoalNear(targetCell, GOAL_RANGE), new Overrides(new Attack(targetId)));
+        // Ranged targets hold the standoff rim instead of the swing-
+        // adjacent chase rim: closing to 2 hands the initiative to a
+        // kiter that backs away shooting.
+        int range = targetRanged ? RANGED_STANDOFF : GOAL_RANGE;
+        lastDirective = new Directive(new GoalNear(targetCell, range), new Overrides(new Attack(targetId)));
         return lastDirective;
     }
 

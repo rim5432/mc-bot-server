@@ -250,6 +250,20 @@ public final class CombatBehavior implements Behavior {
         if (reach <= ATTACK_REACH || reach > BOW_RANGE) {
             return -1;
         }
+        return rangedLoadoutSlot(world);
+    }
+
+    /**
+     * The hotbar bow slot when a ranged loadout exists: a bow carried
+     * in the hotbar and arrows anywhere in the inventory. Process-tier
+     * combat planning (DefendProcess) reads this to decide whether a
+     * ranged hostile can be engaged at all, so it deliberately knows
+     * nothing about reach or band - distance gates are the caller's.
+     *
+     * @param world read surface for the inventory; never null
+     * @return the bow's hotbar slot, or -1 when the loadout is missing
+     */
+    public static int rangedLoadoutSlot(WorldView world) {
         InventoryView inventory = world.getInventory();
         int bow = -1;
         for (int slot = 0; slot < InventoryView.HOTBAR_SIZE; slot++) {

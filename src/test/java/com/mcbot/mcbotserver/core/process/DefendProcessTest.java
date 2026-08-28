@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
+import com.mcbot.mcbotserver.api.inventory.InventoryView;
+import com.mcbot.mcbotserver.api.inventory.ItemView;
 import com.mcbot.mcbotserver.api.process.Attack;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.PriorityBands;
@@ -277,6 +279,60 @@ class DefendProcessTest {
         assertFalse(m.isActive());
         assertFalse(m.missionSucceeded());
         assertEquals("ENGAGEMENT_REFUSED", m.failureReasonOrNull());
+    }
+
+    /**
+     * A ranged hostile is ENGAGED at the standoff rim when the
+     * inventory carries a bow + arrows: no refusal, the directive
+     * targets the skeleton, and the chase goal is RANGED_STANDOFF (10)
+     * - the mover holds inside the bow band instead of closing to the
+     * melee rim (ledger 37 answered the kite-and-shoot mismatch).
+     */
+    @Test
+    void rangedHostileWithBowLoadoutEngagesAtStandoff() {
+        MockWorldView world = new MockWorldView();
+        DefendProcess m = new DefendProcess(
+                "t1", PriorityBands.DEFEND_PRIORITY, 1000L, () -> BOT, Set.of(ZOMBIE, SKELETON), Set.of(SKELETON));
+        world.setInventory(inventoryWithBow());
+
+        world.addEntity(new EntitySnapshot("S1", SKELETON, new CellPos(6, 64, 0), 20f, 20f));
+
+        Directive directive = m.onTick(world);
+        assertTrue(m.isActive(), "armed means the fight is taken, not refused");
+        assertEquals("S1", directive.overrides().combat().targetId());
+        com.mcbot.mcbotserver.api.goal.GoalNear goal = (com.mcbot.mcbotserver.api.goal.GoalNear) directive.goal();
+        assertEquals(DefendProcess.RANGED_STANDOFF, goal.range(), "the chase holds the standoff rim");
+    }
+
+    @Test
+    void rangedHostileWithoutLoadoutStillRefuses() {
+        MockWorldView world = new MockWorldView();
+        DefendProcess m = new DefendProcess(
+                "t1", PriorityBands.DEFEND_PRIORITY, 1000L, () -> BOT, Set.of(ZOMBIE, SKELETON), Set.of(SKELETON));
+
+        world.addEntity(new EntitySnapshot("S1", SKELETON, new CellPos(6, 64, 0), 20f, 20f));
+
+        m.onTick(world);
+        assertFalse(m.isActive());
+        assertEquals("ENGAGEMENT_REFUSED", m.failureReasonOrNull());
+    }
+
+    /**
+     * An own-inventory snapshot carrying a bow in slot 0 and arrows in
+     * the backpack - the minimal ranged loadout.
+     *
+     * @return the inventory view; never null
+     */
+    private static InventoryView inventoryWithBow() {
+        java.util.List<ItemView> main =
+                new java.util.ArrayList<>(java.util.Collections.nCopies(InventoryView.MAIN_SIZE, ItemView.EMPTY));
+        main.set(0, new ItemView("minecraft:bow", 1));
+        main.set(InventoryView.HOTBAR_SIZE, new ItemView("minecraft:arrow", 32));
+        return new InventoryView(
+                main,
+                0,
+                java.util.List.copyOf(java.util.Collections.nCopies(InventoryView.ARMOR_SIZE, ItemView.EMPTY)),
+                ItemView.EMPTY);
     }
 
     /**
