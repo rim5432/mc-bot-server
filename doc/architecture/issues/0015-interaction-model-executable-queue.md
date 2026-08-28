@@ -1,6 +1,6 @@
 ---
 title: Interaction model executable queue - the composition primitives the canonical doc promises
-last_verified: 2026-08-28
+last_verified: 2026-08-29
 covers:
   - doc/architecture/harness-interaction.md
   - doc/architecture/boundaries.md

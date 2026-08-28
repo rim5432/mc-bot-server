@@ -1,6 +1,6 @@
 ---
 title: Onboarding Guide
-last_verified: 2026-08-28
+last_verified: 2026-08-29
 covers:
   - doc/architecture/overview.md
   - doc/architecture/boundaries.md

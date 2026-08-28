@@ -112,7 +112,6 @@ public final class BotCombatGameTests {
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void refusesRangedItCannotAnswer(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
-        var level = helper.getLevel();
         Skeleton skeleton = spawnHostile(helper, EntityType.SKELETON, new BlockPos(11, GametestRig.WALK_Y, 8));
         skeleton.setNoAi(true);
 
@@ -178,7 +177,6 @@ public final class BotCombatGameTests {
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void defendsByKillingZombie(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
-        var level = helper.getLevel();
         Zombie zombie = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(7, GametestRig.WALK_Y, 8));
         zombie.setNoAi(true);
 
@@ -256,7 +254,6 @@ public final class BotCombatGameTests {
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void survivesRetaliatingZombie(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
-        var level = helper.getLevel();
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y + 7, z), Blocks.SMOOTH_STONE);
@@ -310,7 +307,6 @@ public final class BotCombatGameTests {
     @GameTest(template = "empty16x8x16", timeoutTicks = (int) BotAssembly.ENGAGE_MISSION_TIMEOUT_TICKS + 100)
     public static void holdsFireWhenSightBlocked(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(4, GametestRig.WALK_Y, 8));
-        var level = helper.getLevel();
         for (int z = 0; z < 16; z++) {
             for (int y = 1; y <= 3; y++) {
                 helper.setBlock(new BlockPos(8, GametestRig.FLOOR_Y + y, z), Blocks.SMOOTH_STONE);
@@ -359,7 +355,6 @@ public final class BotCombatGameTests {
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void hostilesAggroOnSight(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
-        var level = helper.getLevel();
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y + 7, z), Blocks.SMOOTH_STONE);

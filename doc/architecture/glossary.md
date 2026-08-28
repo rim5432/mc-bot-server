@@ -1,6 +1,6 @@
 ---
 title: Glossary - the loaded terms, pinned before they mislead
-last_verified: 2026-08-28
+last_verified: 2026-08-29
 covers:
   - doc/architecture/boundaries.md
   - doc/architecture/overview.md
