@@ -1,6 +1,6 @@
 ---
 title: Decision Ledger (append-only)
-last_verified: 2026-08-28
+last_verified: 2026-08-29
 covers:
   - doc/architecture/boundaries.md
   - doc/architecture/function-map.md
@@ -679,3 +679,23 @@ Amendment chains recorded so far (both sides annotated):
     TARGET_ESCAPED (exit 1), forcing a harness re-scan the snapshot
     had already answered. The absent-past-grace ESCAPED verdict, the
     fast NO_SUCH_ENTITY, leash and timeout are unchanged.
+    41. 2026-08-28 architecture wave (audit-driven paydown): the two
+    documented package cycles are dissolved and gated
+    (NO_SUBPACKAGE_CYCLES: ExecutionReport now lives in api.process
+    with its consumer BotProcess; the adapter entity cycle ended by
+    moving the container constants into adapter.entity). Tick order
+    owns ONE home: BotAssembly.tickOnce, driven by both the server
+    listener and the gametest rig - the rig's subset-tick copy that
+    could read green where production would not is gone. Menu kind
+    knowledge (engine class, wire kind aliases, slot roles) lives in
+    ONE table: adapter MenuSlotLayouts.KindRow; BindingMenu and
+    MenuVerbs resolve through it. Sanctioned exemptions: MenuVerbs /
+    WorldCommands / HungryProcess / MenuFixtures /
+    MenuPlannerCountedRoleTest / BotBodyEntity carry inline
+    GodClass or TooManyMethods rulings (flat verb tables and the
+    vanilla entity shape); splitting remains the move if any accretes
+    a second shape. -Plint is fully green (PMD wall 0, CPD wall 0,
+    EP + NullAway clean) for the first time since the slot-role
+    series. Engine-backed verification of the touched gametest
+    surface (rig tickOnce + spawnHostile) rides the pooled
+    runGameTest batch, not this entry.

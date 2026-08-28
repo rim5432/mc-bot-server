@@ -1,6 +1,6 @@
 ---
 title: Code Health Ledger
-last_verified: 2026-08-28
+last_verified: 2026-08-29
 covers:
   - build.gradle
   - config/checkstyle/checkstyle.xml
@@ -9,7 +9,7 @@ covers:
   - .git-blame-ignore-revs
   - src/main/java/com/mcbot/mcbotserver/core/tick/BotController.java
   - src/main/java/com/mcbot/mcbotserver/core/tick/MissionReporter.java
-  - src/main/java/com/mcbot/mcbotserver/core/tick/ReflexEngageSeat.java
+  - src/main/java/com/mcbot/mcbotserver/core/tick/ReflexMissionSeat.java
   - src/main/java/com/mcbot/mcbotserver/adapter/BindingActor.java
   - src/main/java/com/mcbot/mcbotserver/adapter/MeleeResolver.java
   - src/main/java/com/mcbot/mcbotserver/adapter/PresenceLayer.java

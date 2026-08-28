@@ -1,6 +1,6 @@
 ---
 title: Functional Convergence Map (device-layer capability envelope)
-last_verified: 2026-08-28
+last_verified: 2026-08-29
 covers:
   - doc/guide/workplan.md
   - doc/architecture/boundaries.md
@@ -238,8 +238,14 @@ reopened on demand — **[DEFERRED]** outside v1.
 - **[SHIPPED]** Menu verbs on `/menu`: open (container at x y z),
   open-inventory, wear (equip best available armor), snapshot, close,
   deposit (slotRole item count), take (slotRole [count]), craft
-  (recipeId). All drive the vanilla click machinery through the Player
-  facade (issue 0007 Phase 2 + wear slice).
+  (recipeId; comma-separated ids batch inside one menu session),
+  button (non-slot button click - enchanting options), open-entity
+  (villager trading / horse inventory by entity id), beacon-effects
+  (primary+secondary effect keys via updateEffects). All drive the
+  vanilla click machinery through the Player facade (issue 0007
+  Phase 2 + wear slice + the 2026-08-28 slot-role series); the
+  engine-class / wire-kind / slot-role vocabulary lives in ONE table
+  (adapter MenuSlotLayouts.KindRow).
 - **[SHIPPED]** World verbs: `/block`, `/blocks` (volume read),
   `/entities`, `/place x y z face` (one-shot block placement with
   post-state read), `/use x y z face` (one-shot vanilla right-click

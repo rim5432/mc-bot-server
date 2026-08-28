@@ -1,6 +1,6 @@
 ---
 title: Sneak pose and edge walk - pose-aware collision, SNEAK channel, shield block
-last_verified: 2026-08-28
+last_verified: 2026-08-29
 covers:
   - src/main/java/com/mcbot/mcbotserver/api/actor/Channel.java
   - src/main/java/com/mcbot/mcbotserver/api/world/CollisionShape.java

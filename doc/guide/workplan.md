@@ -1,6 +1,6 @@
 ---
 title: Work Plan (effort-sized checklist)
-last_verified: 2026-08-28
+last_verified: 2026-08-29
 covers:
   - doc/architecture/boundaries.md
   - doc/decisions/0004-tick-pipeline-actor-channels.md
@@ -173,8 +173,14 @@ landed (archive). Remaining:
            USE draw charges and the falling edge releases). Offline:
            CombatRangedGateTest 5 cases; draw-release onto a live
            target rides the staged gametest batch.
-  - XP sense, offhand, drink/place Use variants, remaining menu
-    kinds (enchanting, anvil, loom, villager): stay 0007 6.1
+  - [x] M  Remaining menu kinds SHIPPED (2026-08-28: the slot-role
+           series f708335..88009fb landed anvil, brewing stand,
+           grindstone, stonecutter, loom, cartography, smithing,
+           enchanting + button clicks, beacon effects, merchant
+           (villager) and horse inventory via entity-backed opening).
+           Offline: MenuPlannerCountedRoleTest family + wire gates;
+           engine scenarios ride the pooled gametest batch.
+  - XP sense, offhand, drink/place Use variants: stay 0007 6.1
     backlog until the review sequences them.
 
   Stage 3 review agenda (the freeze-lifting sitting, 0007 + 0010):
