@@ -75,6 +75,22 @@ final class MenuVerbs {
         return MenuReply.answer(ctx.getSource(), root);
     }
 
+    static int runBeaconEffects(CommandContext<CommandSourceStack> ctx, Supplier<MenuCommands.Live> live) {
+        MenuCommands.Live l = live.get();
+        if (l == null) {
+            return MenuReply.answer(ctx.getSource(), MenuReply.err("no active bot"));
+        }
+        String primary = StringArgumentType.getString(ctx, "primary");
+        String secondary = StringArgumentType.getString(ctx, "secondary");
+        MenuView after = l.tx().setBeaconEffects(primary, secondary);
+        if (after == null) {
+            return MenuReply.answer(ctx.getSource(), MenuReply.err("beacon effects not supported"));
+        }
+        JsonObject root = MenuReply.ok();
+        root.add("menu", MenuViewJson.toJsonObject(after));
+        return MenuReply.answer(ctx.getSource(), root);
+    }
+
     static int runSnapshot(Supplier<MenuCommands.Live> live, CommandSourceStack src) {
         MenuCommands.Live l = live.get();
         if (l == null) {

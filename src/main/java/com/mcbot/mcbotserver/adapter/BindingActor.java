@@ -395,6 +395,16 @@ public final class BindingActor implements Actor, MenuTransactions {
         return menus.openEntity(entityId).map(BindingMenu::snapshot).orElse(null);
     }
 
+    @Override
+    public MenuView setBeaconEffects(String primaryKey, String secondaryKey) {
+        BindingMenu current = menus.currentMenu();
+        if (current == null) {
+            throw new IllegalStateException("no menu is open");
+        }
+        current.setBeaconEffects(primaryKey, secondaryKey);
+        return current.snapshot();
+    }
+
     /**
      * Straight clearance required ahead before the sprint gait
      * engages, in blocks (issue 0005 P1.1). Issue 0004 F6(3): a mob

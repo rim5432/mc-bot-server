@@ -66,7 +66,8 @@ public final class MenuCommands {
                 .then(takeBranch(live))
                 .then(craftBranch(live))
                 .then(buttonBranch(live))
-                .then(openEntityBranch(live));
+                .then(openEntityBranch(live))
+                .then(beaconEffectsBranch(live));
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> openBranch(Supplier<Live> live) {
@@ -109,6 +110,13 @@ public final class MenuCommands {
         return Commands.literal("open-entity")
                 .then(Commands.argument("entityId", IntegerArgumentType.integer(0))
                         .executes(ctx -> MenuVerbs.runOpenEntity(ctx, live)));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> beaconEffectsBranch(Supplier<Live> live) {
+        return Commands.literal("beacon-effects")
+                .then(Commands.argument("primary", StringArgumentType.string())
+                        .then(Commands.argument("secondary", StringArgumentType.string())
+                                .executes(ctx -> MenuVerbs.runBeaconEffects(ctx, live))));
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> scanTree(Supplier<Live> live) {

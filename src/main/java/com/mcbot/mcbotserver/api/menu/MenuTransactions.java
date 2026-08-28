@@ -111,4 +111,23 @@ public interface MenuTransactions {
     default MenuView openEntityMenu(int entityId) {
         return null;
     }
+
+    /**
+     * Set a beacon menu's primary and secondary effects. BeaconMenu does
+     * not use button clicks — effects are applied directly, consuming one
+     * payment item. Default implementation is a no-op — claim-only actors
+     * and test recordings legitimately have no beacon surface.
+     *
+     * @param primaryKey   the primary effect registry key (e.g.
+     *                     "minecraft:speed"), or null for none
+     * @param secondaryKey the secondary effect registry key, or null for
+     *                     none
+     * @return the post-update snapshot, or null for the default no-op
+     *         implementation
+     * @throws IllegalStateException when no menu is open or the open menu
+     *         is not a beacon
+     */
+    default MenuView setBeaconEffects(String primaryKey, String secondaryKey) {
+        return null;
+    }
 }

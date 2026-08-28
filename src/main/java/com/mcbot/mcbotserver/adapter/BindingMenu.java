@@ -8,10 +8,15 @@ import com.mcbot.mcbotserver.api.types.CellPos;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import net.minecraft.core.NonNullList;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.AbstractFurnaceMenu;
+import net.minecraft.world.inventory.BeaconMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.ContainerSynchronizer;
 import net.minecraft.world.inventory.CraftingMenu;
@@ -162,6 +167,38 @@ public final class BindingMenu {
         ensureOpen();
         ensureStillValid();
         return menu.clickMenuButton(player, id);
+    }
+
+    /**
+     * Set the beacon's primary and secondary effects. BeaconMenu does not
+     * override clickMenuButton — effects are applied directly via
+     * {@code updateEffects}, which consumes one item from the payment slot
+     * and sets the beacon's effect levels. Pass null for an effect to leave
+     * it unchanged (empty Optional).
+     *
+     * @param primaryKey   the primary effect registry key (e.g.
+     *                     "minecraft:speed"), or null for none
+     * @param secondaryKey the secondary effect registry key (e.g.
+     *                     "minecraft:regeneration"), or null for none
+     * @throws IllegalStateException when the open menu is not a beacon menu
+     */
+    public void setBeaconEffects(String primaryKey, String secondaryKey) {
+        ensureOpen();
+        ensureStillValid();
+        if (!(menu instanceof BeaconMenu beacon)) {
+            throw new IllegalStateException("setBeaconEffects requires an open beacon menu");
+        }
+        Optional<MobEffect> primary = resolveEffect(primaryKey);
+        Optional<MobEffect> secondary = resolveEffect(secondaryKey);
+        beacon.updateEffects(primary, secondary);
+    }
+
+    private static Optional<MobEffect> resolveEffect(String key) {
+        if (key == null || key.isBlank()) {
+            return Optional.empty();
+        }
+        MobEffect effect = BuiltInRegistries.MOB_EFFECT.get(ResourceLocation.parse(key));
+        return Optional.ofNullable(effect);
     }
 
     /**
