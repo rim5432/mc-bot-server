@@ -31,170 +31,173 @@ final class MenuVerbs {
     static int runOpen(CommandContext<CommandSourceStack> ctx, Supplier<MenuCommands.Live> live) {
         MenuCommands.Live l = live.get();
         if (l == null) {
-            return MenuReply.answer(ctx.getSource(), MenuReply.err("no active bot"));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
         }
         MenuView view = l.tx().openMenu(new CellPos(
                 IntegerArgumentType.getInteger(ctx, "x"),
                 IntegerArgumentType.getInteger(ctx, "y"),
                 IntegerArgumentType.getInteger(ctx, "z")));
         if (view == null) {
-            return MenuReply.answer(
+            return CommandResponse.answer(
                     ctx.getSource(),
-                    MenuReply.err("open rejected: out of reach, unsupported kind, " + "missing container, or blocked"));
+                    CommandResponse.err(
+                            "open rejected: out of reach, unsupported kind, " + "missing container, or blocked"));
         }
-        JsonObject root = MenuReply.ok();
+        JsonObject root = CommandResponse.ok();
         root.add("menu", MenuViewJson.toJsonObject(view));
-        return MenuReply.answer(ctx.getSource(), root);
+        return CommandResponse.answer(ctx.getSource(), root);
     }
 
     static int runOpenInventory(Supplier<MenuCommands.Live> live, CommandSourceStack src) {
         MenuCommands.Live l = live.get();
         if (l == null) {
-            return MenuReply.answer(src, MenuReply.err("no active bot"));
+            return CommandResponse.noActiveBot(src);
         }
-        JsonObject root = MenuReply.ok();
+        JsonObject root = CommandResponse.ok();
         root.add("menu", MenuViewJson.toJsonObject(l.tx().openInventoryMenu()));
-        return MenuReply.answer(src, root);
+        return CommandResponse.answer(src, root);
     }
 
     static int runOpenEntity(CommandContext<CommandSourceStack> ctx, Supplier<MenuCommands.Live> live) {
         MenuCommands.Live l = live.get();
         if (l == null) {
-            return MenuReply.answer(ctx.getSource(), MenuReply.err("no active bot"));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
         }
         int entityId = IntegerArgumentType.getInteger(ctx, "entityId");
         MenuView view = l.tx().openEntityMenu(entityId);
         if (view == null) {
-            return MenuReply.answer(
+            return CommandResponse.answer(
                     ctx.getSource(),
-                    MenuReply.err("open-entity rejected: entity not found, out of reach, "
+                    CommandResponse.err("open-entity rejected: entity not found, out of reach, "
                             + "untamed horse, or unsupported kind"));
         }
-        JsonObject root = MenuReply.ok();
+        JsonObject root = CommandResponse.ok();
         root.add("menu", MenuViewJson.toJsonObject(view));
-        return MenuReply.answer(ctx.getSource(), root);
+        return CommandResponse.answer(ctx.getSource(), root);
     }
 
     static int runBeaconEffects(CommandContext<CommandSourceStack> ctx, Supplier<MenuCommands.Live> live) {
         MenuCommands.Live l = live.get();
         if (l == null) {
-            return MenuReply.answer(ctx.getSource(), MenuReply.err("no active bot"));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
         }
         String primary = StringArgumentType.getString(ctx, "primary");
         String secondary = StringArgumentType.getString(ctx, "secondary");
         MenuView after = l.tx().setBeaconEffects(primary, secondary);
         if (after == null) {
-            return MenuReply.answer(ctx.getSource(), MenuReply.err("beacon effects not supported"));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("beacon effects not supported"));
         }
-        JsonObject root = MenuReply.ok();
+        JsonObject root = CommandResponse.ok();
         root.add("menu", MenuViewJson.toJsonObject(after));
-        return MenuReply.answer(ctx.getSource(), root);
+        return CommandResponse.answer(ctx.getSource(), root);
     }
 
     static int runSnapshot(Supplier<MenuCommands.Live> live, CommandSourceStack src) {
         MenuCommands.Live l = live.get();
         if (l == null) {
-            return MenuReply.answer(src, MenuReply.err("no active bot"));
+            return CommandResponse.noActiveBot(src);
         }
         MenuView view = l.tx().menuSnapshot();
         if (view == null) {
-            return MenuReply.answer(src, MenuReply.err("no menu open"));
+            return CommandResponse.answer(src, CommandResponse.err("no menu open"));
         }
-        JsonObject root = MenuReply.ok();
+        JsonObject root = CommandResponse.ok();
         root.add("menu", MenuViewJson.toJsonObject(view));
-        return MenuReply.answer(src, root);
+        return CommandResponse.answer(src, root);
     }
 
     static int runClose(Supplier<MenuCommands.Live> live, CommandSourceStack src) {
         MenuCommands.Live l = live.get();
         if (l == null) {
-            return MenuReply.answer(src, MenuReply.err("no active bot"));
+            return CommandResponse.noActiveBot(src);
         }
         // Idempotent by contract: an at-least-once retry cannot
         // double-run the close.
         l.tx().closeMenu();
-        return MenuReply.answer(src, MenuReply.ok());
+        return CommandResponse.answer(src, CommandResponse.ok());
     }
 
     static int runButton(CommandContext<CommandSourceStack> ctx, Supplier<MenuCommands.Live> live) {
         MenuCommands.Live l = live.get();
         if (l == null) {
-            return MenuReply.answer(ctx.getSource(), MenuReply.err("no active bot"));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
         }
         int id = IntegerArgumentType.getInteger(ctx, "id");
         MenuView after = l.tx().menuButtonClick(id);
         if (after == null) {
-            return MenuReply.answer(ctx.getSource(), MenuReply.err("menu does not support button clicks"));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("menu does not support button clicks"));
         }
-        JsonObject root = MenuReply.ok();
+        JsonObject root = CommandResponse.ok();
         root.add("menu", MenuViewJson.toJsonObject(after));
-        return MenuReply.answer(ctx.getSource(), root);
+        return CommandResponse.answer(ctx.getSource(), root);
     }
 
     static int runDeposit(CommandContext<CommandSourceStack> ctx, Supplier<MenuCommands.Live> live) {
         MenuCommands.Live l = live.get();
         if (l == null) {
-            return MenuReply.answer(ctx.getSource(), MenuReply.err("no active bot"));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
         }
         String roleWord = StringArgumentType.getString(ctx, "slotRole");
         String item = StringArgumentType.getString(ctx, "item");
         int count = IntegerArgumentType.getInteger(ctx, "count");
         SlotRole role = parseRole(roleWord);
         if (role == null) {
-            return MenuReply.answer(
-                    ctx.getSource(), MenuReply.err("unknown role: " + roleWord + " (INPUT, FUEL, OUTPUT, CONTAINER)"));
+            return CommandResponse.answer(
+                    ctx.getSource(),
+                    CommandResponse.err("unknown role: " + roleWord + " (INPUT, FUEL, OUTPUT, CONTAINER)"));
         }
         MenuView before = l.tx().menuSnapshot();
         if (before == null) {
-            return MenuReply.answer(ctx.getSource(), MenuReply.err("no menu open"));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no menu open"));
         }
         SlotRole resolved = resolveRole(before, role);
         List<MenuPlanner.Step> steps;
         try {
             steps = MenuPlanner.planDepositCounted(before, resolved, item, count);
         } catch (RuntimeException e) {
-            return MenuReply.answer(ctx.getSource(), MenuReply.err(e.getMessage()));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err(e.getMessage()));
         }
         MenuView after = executeSteps(l.tx(), steps, before);
-        JsonObject root = MenuReply.ok();
+        JsonObject root = CommandResponse.ok();
         root.addProperty("placed", roleCount(after, resolved) - roleCount(before, resolved));
         root.add("menu", MenuViewJson.toJsonObject(after));
-        return MenuReply.answer(ctx.getSource(), root);
+        return CommandResponse.answer(ctx.getSource(), root);
     }
 
     static int runTake(CommandContext<CommandSourceStack> ctx, Supplier<MenuCommands.Live> live, int count) {
         MenuCommands.Live l = live.get();
         if (l == null) {
-            return MenuReply.answer(ctx.getSource(), MenuReply.err("no active bot"));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
         }
         String roleWord = StringArgumentType.getString(ctx, "slotRole");
         SlotRole role = parseRole(roleWord);
         if (role == null) {
-            return MenuReply.answer(
-                    ctx.getSource(), MenuReply.err("unknown role: " + roleWord + " (INPUT, FUEL, OUTPUT, CONTAINER)"));
+            return CommandResponse.answer(
+                    ctx.getSource(),
+                    CommandResponse.err("unknown role: " + roleWord + " (INPUT, FUEL, OUTPUT, CONTAINER)"));
         }
         MenuView before = l.tx().menuSnapshot();
         if (before == null) {
-            return MenuReply.answer(ctx.getSource(), MenuReply.err("no menu open"));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no menu open"));
         }
         SlotRole resolved = resolveRole(before, role);
         List<MenuPlanner.Step> steps;
         try {
             steps = MenuPlanner.planTakeRole(before, resolved, count);
         } catch (RuntimeException e) {
-            return MenuReply.answer(ctx.getSource(), MenuReply.err(e.getMessage()));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err(e.getMessage()));
         }
         MenuView after = executeSteps(l.tx(), steps, before);
-        JsonObject root = MenuReply.ok();
+        JsonObject root = CommandResponse.ok();
         root.addProperty("taken", roleCount(before, resolved) - roleCount(after, resolved));
         root.add("menu", MenuViewJson.toJsonObject(after));
-        return MenuReply.answer(ctx.getSource(), root);
+        return CommandResponse.answer(ctx.getSource(), root);
     }
 
     static int runCraft(CommandContext<CommandSourceStack> ctx, Supplier<MenuCommands.Live> live) {
         MenuCommands.Live l = live.get();
         if (l == null) {
-            return MenuReply.answer(ctx.getSource(), MenuReply.err("no active bot"));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
         }
         // The batch chain (ledger 39): one or more comma-separated
         // recipe ids, executed IN THE GIVEN ORDER inside the one
@@ -207,7 +210,8 @@ final class MenuVerbs {
                 .splitToList(StringArgumentType.getString(ctx, "recipeId"));
         MenuView opened = l.tx().menuSnapshot();
         if (opened == null) {
-            return MenuReply.answer(ctx.getSource(), MenuReply.err("no menu open - open a crafting surface first"));
+            return CommandResponse.answer(
+                    ctx.getSource(), CommandResponse.err("no menu open - open a crafting surface first"));
         }
         JsonArray results = new JsonArray();
         try {
@@ -231,15 +235,15 @@ final class MenuVerbs {
             // need, wrong surface, unknown id); IllegalStateException
             // = result empty after fill. Both are sync errors: the
             // batch stops here with everything already crafted kept.
-            JsonObject root = MenuReply.err(e.getMessage());
+            JsonObject root = CommandResponse.err(e.getMessage());
             root.add("crafted", results);
             root.addProperty("failedAfter", results.size());
-            return MenuReply.answer(ctx.getSource(), root);
+            return CommandResponse.answer(ctx.getSource(), root);
         }
-        JsonObject root = MenuReply.ok();
+        JsonObject root = CommandResponse.ok();
         root.add("crafted", results);
         root.add("menu", MenuViewJson.toJsonObject(opened));
-        return MenuReply.answer(ctx.getSource(), root);
+        return CommandResponse.answer(ctx.getSource(), root);
     }
 
     /**

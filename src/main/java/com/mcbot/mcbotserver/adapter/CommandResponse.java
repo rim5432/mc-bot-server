@@ -42,6 +42,19 @@ public final class CommandResponse {
     }
 
     /**
+     * The standard refusal for every command executed before
+     * {@code /botspawn} (or after despawn): the uniform envelope with
+     * the machine-readable "no active bot" reason. The literal is
+     * wire vocabulary - the harness keys its retry pacing on it.
+     *
+     * @param src command source to answer; never null
+     * @return 0 (brigadier failure code)
+     */
+    public static int noActiveBot(CommandSourceStack src) {
+        return answer(src, err("no active bot"));
+    }
+
+    /**
      * Sends the JSON line to the command source: success path uses
      * sendSuccess, failure path uses sendFailure. Return code matches
      * the ok flag (1 on success, 0 on failure) so brigadier sees the

@@ -32,7 +32,7 @@ final class WearVerbs {
     static int runWear(Supplier<MenuCommands.Live> live, CommandSourceStack src) {
         MenuCommands.Live l = live.get();
         if (l == null) {
-            return MenuReply.answer(src, MenuReply.err("no active bot"));
+            return CommandResponse.noActiveBot(src);
         }
         MenuView menu = l.tx().menuSnapshot();
         if (menu == null || !"inventory".equals(menu.type())) {
@@ -42,13 +42,13 @@ final class WearVerbs {
         try {
             steps = MenuPlanner.planWear(menu, l.armor());
         } catch (RuntimeException e) {
-            return MenuReply.answer(src, MenuReply.err(e.getMessage()));
+            return CommandResponse.answer(src, CommandResponse.err(e.getMessage()));
         }
         MenuView after = MenuVerbs.executeSteps(l.tx(), steps, menu);
-        JsonObject root = MenuReply.ok();
+        JsonObject root = CommandResponse.ok();
         root.addProperty("worn", wornCount(menu, after));
         root.add("menu", MenuViewJson.toJsonObject(after));
-        return MenuReply.answer(src, root);
+        return CommandResponse.answer(src, root);
     }
 
     /** Armor slots whose content changed between two snapshots. */

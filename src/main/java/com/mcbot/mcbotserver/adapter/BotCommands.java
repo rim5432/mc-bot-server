@@ -93,7 +93,7 @@ public final class BotCommands {
         return Commands.literal("status").executes(ctx -> {
             Channels ch = live.get();
             if (ch == null) {
-                return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
+                return CommandResponse.noActiveBot(ctx.getSource());
             }
             var snap = ch.state().current();
             // Human line first - the JSON block is contract surface
@@ -227,7 +227,7 @@ public final class BotCommands {
                 .then(Commands.argument("taskId", StringArgumentType.word()).executes(ctx -> {
                     Channels ch = live.get();
                     if (ch == null) {
-                        return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
+                        return CommandResponse.noActiveBot(ctx.getSource());
                     }
                     String taskId = StringArgumentType.getString(ctx, "taskId");
                     boolean removed = ch.bus().cancel(taskId);
@@ -242,7 +242,7 @@ public final class BotCommands {
         return Commands.literal("stop").executes(ctx -> {
             Channels ch = live.get();
             if (ch == null) {
-                return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
+                return CommandResponse.noActiveBot(ctx.getSource());
             }
             int cancelled = ch.stopAllTasks().getAsInt();
             ctx.getSource()
@@ -278,7 +278,7 @@ public final class BotCommands {
             CommandContext<CommandSourceStack> ctx, Supplier<Channels> live, long since, String onlyPrefix) {
         Channels ch = live.get();
         if (ch == null) {
-            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
+            return CommandResponse.noActiveBot(ctx.getSource());
         }
         JsonObject root = CommandResponse.ok();
         root.add(
@@ -299,7 +299,7 @@ public final class BotCommands {
         return Commands.literal("reset").executes(ctx -> {
             Channels ch = live.get();
             if (ch == null) {
-                return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
+                return CommandResponse.noActiveBot(ctx.getSource());
             }
             boolean wasCrashed = ch.resetCrashLatch().getAsBoolean();
             JsonObject root = CommandResponse.ok();
@@ -329,7 +329,7 @@ public final class BotCommands {
             String key) {
         Channels ch = live.get();
         if (ch == null) {
-            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
+            return CommandResponse.noActiveBot(ctx.getSource());
         }
         SubmitResult result = ch.bus().submit(new BotCommand(command, args), key);
         JsonObject root = new JsonObject();

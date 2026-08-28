@@ -17,7 +17,7 @@ import net.minecraft.server.level.ServerLevel;
  * {@code /recipes} subtrees. Wiring only: verb behavior lives in
  * {@link MenuVerbs} (menu mutation/read verbs) and
  * {@link MenuInspectOps} (world and catalog inspection); reply
- * plumbing in {@link MenuReply}.
+ * plumbing in {@link CommandResponse}.
  */
 public final class MenuCommands {
 

@@ -156,7 +156,7 @@ public final class WorldCommands {
     private static int runPlace(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
         Live l = live.get();
         if (l == null) {
-            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
+            return CommandResponse.noActiveBot(ctx.getSource());
         }
         String faceWord = com.mojang.brigadier.arguments.StringArgumentType.getString(ctx, "face")
                 .toUpperCase(java.util.Locale.ROOT);
@@ -213,7 +213,7 @@ public final class WorldCommands {
     private static int runUse(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
         Live l = live.get();
         if (l == null) {
-            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
+            return CommandResponse.noActiveBot(ctx.getSource());
         }
         Direction face;
         try {
@@ -261,7 +261,7 @@ public final class WorldCommands {
     private static int runBag(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
         Live l = live.get();
         if (l == null) {
-            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
+            return CommandResponse.noActiveBot(ctx.getSource());
         }
         var bag = l.view().getInventory();
         JsonObject root = CommandResponse.ok();
@@ -312,7 +312,7 @@ public final class WorldCommands {
     private static int runSleep(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
         Live l = live.get();
         if (l == null) {
-            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
+            return CommandResponse.noActiveBot(ctx.getSource());
         }
         CellPos target = new CellPos(
                 IntegerArgumentType.getInteger(ctx, "x"),
@@ -337,7 +337,7 @@ public final class WorldCommands {
     private static int runUseItem(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
         Live l = live.get();
         if (l == null) {
-            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
+            return CommandResponse.noActiveBot(ctx.getSource());
         }
         boolean used = l.useItemAir().getAsBoolean();
         JsonObject root = CommandResponse.ok();
@@ -361,7 +361,7 @@ public final class WorldCommands {
     private static int runSneak(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
         Live l = live.get();
         if (l == null) {
-            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
+            return CommandResponse.noActiveBot(ctx.getSource());
         }
         String word = com.mojang.brigadier.arguments.StringArgumentType.getString(ctx, "state")
                 .toLowerCase(java.util.Locale.ROOT);
@@ -387,7 +387,7 @@ public final class WorldCommands {
     private static int runEquip(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
         Live l = live.get();
         if (l == null) {
-            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
+            return CommandResponse.noActiveBot(ctx.getSource());
         }
         int slot = IntegerArgumentType.getInteger(ctx, "slot");
         l.equip().accept(slot);
@@ -422,7 +422,7 @@ public final class WorldCommands {
     private static int runBlock(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
         Live l = live.get();
         if (l == null) {
-            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
+            return CommandResponse.noActiveBot(ctx.getSource());
         }
         CellPos pos = new CellPos(
                 IntegerArgumentType.getInteger(ctx, "x"),
@@ -445,7 +445,7 @@ public final class WorldCommands {
     private static int runBlocks(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
         Live l = live.get();
         if (l == null) {
-            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
+            return CommandResponse.noActiveBot(ctx.getSource());
         }
         int x = IntegerArgumentType.getInteger(ctx, "x");
         int y = IntegerArgumentType.getInteger(ctx, "y");
@@ -478,7 +478,7 @@ public final class WorldCommands {
     private static int runEntities(Supplier<Live> live, CommandSourceStack src, int radius, int limit) {
         Live l = live.get();
         if (l == null) {
-            return CommandResponse.answer(src, CommandResponse.err("no active bot"));
+            return CommandResponse.noActiveBot(src);
         }
         CellPos center = l.botPos().get();
         String selfId = l.botId().get();

@@ -26,7 +26,7 @@ final class MenuInspectOps {
     static int runScan(Supplier<MenuCommands.Live> live, CommandSourceStack src, int radius, int limit) {
         MenuCommands.Live l = live.get();
         if (l == null) {
-            return MenuReply.answer(src, MenuReply.err("no active bot"));
+            return CommandResponse.noActiveBot(src);
         }
         BlockPos center = l.botPos().get();
         List<JsonObject> found = new ArrayList<>();
@@ -64,25 +64,25 @@ final class MenuInspectOps {
         boolean truncated = found.size() > limit;
         JsonArray containers = new JsonArray();
         found.stream().limit(limit).forEach(containers::add);
-        JsonObject root = MenuReply.ok();
+        JsonObject root = CommandResponse.ok();
         root.addProperty("count", found.size());
         root.addProperty("truncated", truncated);
         root.add("containers", containers);
-        return MenuReply.answer(src, root);
+        return CommandResponse.answer(src, root);
     }
 
     static int runRecipes(Supplier<MenuCommands.Live> live, CommandSourceStack src, String itemId) {
         MenuCommands.Live l = live.get();
         if (l == null) {
-            return MenuReply.answer(src, MenuReply.err("no active bot"));
+            return CommandResponse.noActiveBot(src);
         }
         JsonArray recipes = new JsonArray();
         for (RecipeView recipe : l.catalog().byResult(itemId)) {
             recipes.add(MenuViewJson.toJsonObject(recipe));
         }
-        JsonObject root = MenuReply.ok();
+        JsonObject root = CommandResponse.ok();
         root.add("recipes", recipes);
-        return MenuReply.answer(src, root);
+        return CommandResponse.answer(src, root);
     }
 
     /**
@@ -93,19 +93,19 @@ final class MenuInspectOps {
     static int runRecipeList(Supplier<MenuCommands.Live> live, CommandSourceStack src, int offset, int limit) {
         MenuCommands.Live l = live.get();
         if (l == null) {
-            return MenuReply.answer(src, MenuReply.err("no active bot"));
+            return CommandResponse.noActiveBot(src);
         }
         RecipeCatalog.RecipePage page = l.catalog().list(offset, limit);
         JsonArray recipes = new JsonArray();
         for (RecipeView recipe : page.recipes()) {
             recipes.add(MenuViewJson.toJsonObject(recipe));
         }
-        JsonObject root = MenuReply.ok();
+        JsonObject root = CommandResponse.ok();
         root.add("recipes", recipes);
         root.addProperty("total", page.total());
         root.addProperty("offset", page.offset());
         root.addProperty("limit", page.limit());
         root.addProperty("truncated", page.offset() + page.limit() < page.total());
-        return MenuReply.answer(src, root);
+        return CommandResponse.answer(src, root);
     }
 }
