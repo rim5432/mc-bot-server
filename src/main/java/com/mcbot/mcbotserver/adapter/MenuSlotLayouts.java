@@ -156,4 +156,25 @@ final class MenuSlotLayouts {
         }
         return index <= size - 10 ? SlotRole.MAIN : SlotRole.HOTBAR;
     }
+
+    /**
+     * Horse inventory layout: vanilla HorseInventoryMenu adds the
+     * horse's own slots first (slot 0 = armor, slot 1 = carpet/saddle
+     * or empty, slots 2+ = chest slots for donkeys/mules/llamas with
+     * chests), then the standard 27 main + 9 hotbar. The horse slot
+     * count = size - 36, so chest slots run from index 2 to size-37
+     * (empty for plain horses).
+     */
+    public static SlotRole horseRole(int index, int size) {
+        if (index == 0) {
+            return SlotRole.ARMOR;
+        }
+        if (index == 1) {
+            return SlotRole.CONTAINER;
+        }
+        if (index <= size - 37) {
+            return SlotRole.CONTAINER;
+        }
+        return index <= size - 10 ? SlotRole.MAIN : SlotRole.HOTBAR;
+    }
 }

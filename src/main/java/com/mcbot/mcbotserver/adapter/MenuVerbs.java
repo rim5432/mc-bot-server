@@ -235,7 +235,7 @@ final class MenuVerbs {
      */
     private static SlotRole parseRole(String word) {
         return switch (word) {
-            case "INPUT", "FUEL", "OUTPUT", "CONTAINER", "BOTTLE", "INGREDIENT" -> SlotRole.valueOf(word);
+            case "INPUT", "FUEL", "OUTPUT", "CONTAINER", "BOTTLE", "INGREDIENT", "ARMOR" -> SlotRole.valueOf(word);
             default -> null;
         };
     }
@@ -263,6 +263,8 @@ final class MenuVerbs {
         boolean loomFamily = type.equals("loom");
         boolean enchantingFamily = type.equals("enchanting_table");
         boolean beaconFamily = type.equals("beacon");
+        boolean merchantFamily = type.equals("merchant");
+        boolean horseFamily = type.equals("horse");
         if (furnaceFamily
                 || anvilFamily
                 || brewingFamily
@@ -272,7 +274,9 @@ final class MenuVerbs {
                 || smithingFamily
                 || loomFamily
                 || enchantingFamily
-                || beaconFamily) {
+                || beaconFamily
+                || merchantFamily
+                || horseFamily) {
             return role;
         }
         return SlotRole.CONTAINER;

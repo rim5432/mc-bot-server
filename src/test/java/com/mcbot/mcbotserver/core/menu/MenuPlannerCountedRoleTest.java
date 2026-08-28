@@ -312,4 +312,50 @@ class MenuPlannerCountedRoleTest {
                         new MenuPlanner.Step(36, 0, MenuClick.PICKUP)),
                 plan);
     }
+
+    @Test
+    void merchantDepositInputFillsFirstEmptySlot() {
+        MenuView menu = MenuFixtures.merchant(MenuFixtures.builder().put(SlotRole.HOTBAR, 38, "minecraft:emerald", 16));
+        List<MenuPlanner.Step> plan = MenuPlanner.planDepositCounted(menu, SlotRole.INPUT, "minecraft:emerald", 1);
+        assertEquals(
+                List.of(
+                        new MenuPlanner.Step(38, 0, MenuClick.PICKUP),
+                        new MenuPlanner.Step(0, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(38, 0, MenuClick.PICKUP)),
+                plan);
+    }
+
+    @Test
+    void merchantTakeOutputQuickMovesResult() {
+        MenuView menu = MenuFixtures.merchant(MenuFixtures.builder().put(SlotRole.OUTPUT, 2, "minecraft:bread", 1));
+        assertEquals(
+                List.of(new MenuPlanner.Step(2, 0, MenuClick.QUICK_MOVE)),
+                MenuPlanner.planTakeRole(menu, SlotRole.OUTPUT, 0));
+    }
+
+    @Test
+    void horseDepositArmorGoesToSlot0() {
+        MenuView menu =
+                MenuFixtures.horse(MenuFixtures.builder().put(SlotRole.HOTBAR, 37, "minecraft:diamond_horse_armor", 1));
+        List<MenuPlanner.Step> plan =
+                MenuPlanner.planDepositCounted(menu, SlotRole.ARMOR, "minecraft:diamond_horse_armor", 1);
+        assertEquals(
+                List.of(
+                        new MenuPlanner.Step(37, 0, MenuClick.PICKUP),
+                        new MenuPlanner.Step(0, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(37, 0, MenuClick.PICKUP)),
+                plan);
+    }
+
+    @Test
+    void horseDepositContainerGoesToSlot1() {
+        MenuView menu = MenuFixtures.horse(MenuFixtures.builder().put(SlotRole.HOTBAR, 37, "minecraft:saddle", 1));
+        List<MenuPlanner.Step> plan = MenuPlanner.planDepositCounted(menu, SlotRole.CONTAINER, "minecraft:saddle", 1);
+        assertEquals(
+                List.of(
+                        new MenuPlanner.Step(37, 0, MenuClick.PICKUP),
+                        new MenuPlanner.Step(1, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(37, 0, MenuClick.PICKUP)),
+                plan);
+    }
 }
