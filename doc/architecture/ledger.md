@@ -83,6 +83,8 @@ Admission protocol:
 Amendment chains recorded so far (both sides annotated):
 
 - 14 <- 25: INTERACT joins as the fifth channel.
+- 39 <- 40: attack kill-confirmation (health-zero sighting =
+  SUCCESS; absence-past-grace ESCAPED unchanged).
   <- 37: USE hold is first-class (sustained press charges a draw,
   falling edge releases; orphaned charge force-released).
 - 19a <- 19b: shared-constant era settled into two predicates.
@@ -653,7 +655,9 @@ Amendment chains recorded so far (both sides annotated):
     attackable as a zombie. A never-seen id fails fast as
     NO_SUCH_ENTITY; absence past grace fails TARGET_ESCAPED - the
     same conservative death-vs-flight verdict as defend, because a
-    false SUCCESS costs a missed kill and a re-scan is cheap. CLI:
+    false SUCCESS costs a missed kill and a re-scan is cheap.
+    Amendment (ledger 40, same day): death is directly judged - a
+    scan sighting of the target at zero health completes as SUCCESS; CLI:
     `write /entities/<id>/attack`. (b) BATCH CRAFT CHAIN: `menu
     craft` accepts comma-separated recipe ids executed IN THE
     GIVEN ORDER inside the one open menu session - the harness
@@ -665,3 +669,13 @@ Amendment chains recorded so far (both sides annotated):
     sanctioned break recorded here). The chain rides the existing
     `recipe` role path - the value carries the list, no plural
     role minted.
+
+    40. Attack kill-confirmation amends 39 (2026-08-28 code review):
+    the death-unseen fallback stays conservative, but death itself is
+    directly machine-judged - EntitySnapshot carries health and dead
+    entities are not filtered from the scan, so a sighting of the
+    target at zero health completes the attack mission as SUCCESS.
+    Waiting for absence misreported every clean kill as
+    TARGET_ESCAPED (exit 1), forcing a harness re-scan the snapshot
+    had already answered. The absent-past-grace ESCAPED verdict, the
+    fast NO_SUCH_ENTITY, leash and timeout are unchanged.

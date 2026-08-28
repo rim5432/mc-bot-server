@@ -137,6 +137,37 @@ class AttackProcessTest {
     }
 
     @Test
+    void corpseSightingCompletesTheMissionAsAKill() {
+        MockWorldView world = new MockWorldView();
+        AttackProcess m = mission();
+        // The last sighting before death - health zero, still scanned
+        // (the sensor does not filter dead entities).
+        world.addEntity(new EntitySnapshot("cow-7", COW, new CellPos(6, 64, 0), 0f, 10f));
+
+        m.onTick(world);
+
+        assertFalse(m.isActive(), "the kill verdict is terminal");
+        assertTrue(m.missionSucceeded(), "a corpse sighting IS the confirmed kill");
+        assertEquals("cow-7", m.verdictAttrs().get("targetId"));
+    }
+
+    @Test
+    void cancelVerdictSurvivesLaterPreemption() {
+        MockWorldView world = new MockWorldView();
+        AttackProcess m = mission();
+        world.addEntity(cow("cow-7", 6));
+        m.onTick(world);
+
+        m.abort();
+        m.onContextInvalidated();
+
+        assertEquals(
+                "CANCELLED",
+                m.failureReasonOrNull(),
+                "the harness cancel verdict must not be overwritten by preemption");
+    }
+
+    @Test
     void preemptionInvalidationFailsTheMission() {
         AttackProcess m = mission();
         m.onContextInvalidated();

@@ -27,15 +27,17 @@ import java.util.function.Supplier;
  * bow standoff, and swing timing stay the behavior tier's craft
  * (CombatBehavior; ledger 37).
  *
- * <p>Terminal semantics mirror DefendProcess deliberately: a target
- * absent past the grace window fails as TARGET_ESCAPED - the bot
- * cannot distinguish death from out-of-range flight (EntitySnapshot
- * carries no death flag), the conservative verdict costs the
- * harness one re-scan, and a false SUCCESS would cost a missed
- * kill. A target id that never appears in the first scan fails
- * fast as NO_SUCH_ENTITY rather than burning the whole budget
- * staring at empty air. Leash, timeout, and preemption behave as
- * in defend.
+ * <p>Terminal semantics mirror DefendProcess deliberately, with one
+ * sharpening (ledger 40): death is DIRECTLY machine-judged - the
+ * snapshot carries health and dead entities are not filtered from
+ * the scan, so a sighting of the target at zero health completes the
+ * mission as a confirmed kill instead of being inferred from
+ * absence. What remains conservative is the death-UNSEEN case: a
+ * target absent past the grace window fails as TARGET_ESCAPED (dead
+ * or fled, the bot cannot tell which; the harness re-scans). A
+ * target id that never appears in the first scan fails fast as
+ * NO_SUCH_ENTITY rather than burning the whole budget staring at
+ * empty air. Leash, timeout, and preemption behave as in defend.
  *
  * <p>Contract: see boundaries.md decision 10 (no per-mob processes
  * - the target id is injected data) and decision 18's goto shape
@@ -154,6 +156,14 @@ public final class AttackProcess implements BotProcess, TerminalMission {
 
         CellPos position = positionSource.get();
         EntitySnapshot target = findById(world, position);
+        if (target != null && target.health() <= 0f) {
+            // The corpse sighting IS the kill verdict: health rides
+            // the snapshot and dead entities are not filtered, so
+            // waiting for absence would misreport a clean kill as an
+            // escape (ledger 40).
+            succeed();
+            return lastDirective;
+        }
         if (target == null) {
             if (!engaged) {
                 // The id the harness named has never been in the
@@ -202,10 +212,24 @@ public final class AttackProcess implements BotProcess, TerminalMission {
         return null;
     }
 
-    private void fail(String reason) {
+    private void succeed() {
         active = false;
-        succeeded = false;
-        failure = reason;
+        succeeded = true;
+    }
+
+    /**
+     * Sticky termination - the defend guard: once a verdict is
+     * recorded, later lifecycle callbacks (preemption after a
+     * harness cancel) must not overwrite it.
+     *
+     * @param reason the machine-readable failure reason
+     */
+    private void fail(String reason) {
+        if (active) {
+            active = false;
+            succeeded = false;
+            failure = reason;
+        }
     }
 
     @Override

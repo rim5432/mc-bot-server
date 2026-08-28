@@ -140,7 +140,7 @@ spelling.
 | `cat /player/health` | `/bot status` (healthHearts field) | state | live 2026-08-27 (10 hearts = 20 HP full) |
 | `cat /player/inventory/free` | `/bot status` (freeSlots field) | state | live 2026-08-27 |
 | `ls /entities/` | `entities [radius] [limit]` | sync read | live 2026-08-27; lines carry the id= column since ledger 39 |
-| `write /entities/<id>/attack` | `/bot attack <id> [timeoutTicks]` | task | code 2026-08-28 (ledger 39: directed engagement - the harness hands the target, verdict attrs carry targetId, NO_SUCH_ENTITY fails fast, TARGET_ESCAPED is the conservative absent-past-grace verdict). Live pass rides the staged gametest batch |
+| `write /entities/<id>/attack` | `/bot attack <id> [timeoutTicks]` | task | code 2026-08-28 (ledger 39: directed engagement - the harness hands the target, verdict attrs carry targetId, NO_SUCH_ENTITY fails fast, a health-zero sighting completes as SUCCESS (ledger 40), absence past grace is still the conservative TARGET_ESCAPED). Live pass rides the staged gametest batch |
 | `write /stations/crafting@<pos>/recipe "a,b,c"` | `menu craft a,b,c` | sync action | code 2026-08-28 (ledger 39: batch chain in the GIVEN order, one menu session, first failure stops with partial results; reply shape `crafted[]`). Live pass rides the staged gametest batch |
 | `write /blocks/<x,y,z> "air"` | `/bot dig x y z [timeoutTicks]` | task | live 2026-08-27 (TASK_COMPLETED + BLOCK_BROKEN, block gone); CLI path folded from `/tasks/dig` 2026-08-28 (doc 10) |
 | `write /blocks/<x,y,z> "<blockid>[@face]"` | `place x y z face` | sync action | live 2026-08-27 (rejection paths + success path via equip); folded from `/actions/place` 2026-08-28 - the value is a post-state contract (receipt block must match) |
