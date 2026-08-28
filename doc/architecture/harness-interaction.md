@@ -47,9 +47,9 @@ Six verbs plus an admin escape hatch, and nothing else ever:
 
 | Verb | Shape | Notes |
 |---|---|---|
-| `ls` | `ls <path>` | discovery; `ls /` lists the mounted roots |
-| `cat` | `cat <path>` | read one thing; local-first where a materialized copy exists |
-| `read` | `read <path>` | stream read (events); `cat`/`read` mixups get a typed suggestion, never substitution |
+| `ls` | `ls <path>` | discovery; every root answers `ls` or typed-rejects; `ls /` lists the mounted roots |
+| `cat` | `cat <path>` | read one state thing (incl. station snapshots: open, read, close); local-first where a materialized copy exists |
+| `read` | `read <path>` | document read: in-game text content (book pages, item information - `/items`, not yet shipped); typed error until then, never substitution |
 | `write` | `write <path> <value>` | mutate the noun the path names |
 | `wait` | `wait <taskId> [--timeout S]` | join a job; exit code is the verdict |
 | `events` | `events [--since N] [--only PREFIX] [--follow] [--idle S]` | event drain; peeking never advances the cursor |
@@ -61,23 +61,33 @@ superseding decision 28's table-lives-in-the-issue clause):
 
 | Root | Carries | Writer shape |
 |---|---|---|
-| `/tasks/` | job family: `goto` `dig` `mine`, `<id>` (cat), `<id>/cancel` | value encodes args; receipt is a taskId |
-| `/player/` | `health`, `inventory/free`, `menu` (pending 0012 D1) | read-only |
-| `/blocks/<x,y,z>` | one cell; volume reads aggregate nearby | endgame write target (section 10) |
+| `/tasks/` | job family: `goto` `mine`, `<id>` (cat), `<id>/cancel` | value encodes args; receipt is a taskId |
+| `/player/` | `health`, `inventory/free`, `menu` (pending 0012 D1); writable: `sneak` (latch), `hotbar` (selection 0..8), `held/use` (held item against the POV ray) | writes are synchronous; reply is the verdict |
+| `/blocks/<x,y,z>` | one cell; volume reads aggregate nearby | `<blockid>` places (sync receipt; optional `@face` suffix for orientation, default up), `air` digs (job receipt), `/use <face>` runs the block's interaction, `/sleep` bed-rests (device-completed rule the engine cannot see) |
 | `/entities/` | nearby entity list, distance-sorted | read-only |
 | `/nearby/` | nearby entity digest (distance-sorted, self-flagged) | read-only; rides the `entities` wire verb |
-| `/actions/` | one-shot synchronous mutations: `place` (x,y,z,face), `equip` (hotbar slot 0..8) | sync reply is the verdict (0013); not jobs, no taskId |
 | `/recipes/<slug>` | recipe pages, materialized to disk (section 6) | read-only; `dump-recipes` refreshes |
-| `/stations/<type>@<x,y,z>/<role>` | workstation sessions | last segment is always a ROLE, never a verb |
+| `/stations/<type>@<x,y,z>/<role>` | workstation snapshots | last segment is always a ROLE, never a verb |
 | `/events` | the event stream | read via `events` |
+
+Utility-noun orthogonality (executed with section 10): verbs carry
+no per-root special cases. Every root answers `ls` (an enumeration
+or a typed explanation of why not - `/blocks` is address-based, not
+enumerable), every state leaf answers `cat`, and bulk analysis is
+never a query language - it is `admin dump-<noun>` materializing to
+disk once, after which the shell's own grep/awk/jq compose freely.
+The consumer is the grep for small payloads; materialization wins
+exactly when payloads get big.
 
 Wire-side namespace split (recorded wart, owned by 0013): the task
 family registers under `/bot ...` while the synchronous family
 registers at the console root (`block`, `blocks`, `entities`,
-`place`, `equip`, `menu`, `scan`, `recipes`); the operator verbs
-`botspawn`/`botdespawn` also register there, outside the harness
-vocabulary. The CLI hides the split; the wart is repaired only with
-a non-RCON transport that justifies touching the wire.
+`place`, `use`, `sleep`, `use-item`, `sneak`, `equip`, `menu`,
+`scan`, `recipes`); the operator verbs `botspawn`/`botdespawn` also
+register there, outside the harness vocabulary. The CLI hides the
+split entirely - the `/actions/` drawer is retired client-side and
+its members fold into the noun roots above; the wart is repaired
+only with a non-RCON transport that justifies touching the wire.
 
 ## 3. Jobs and verdicts
 
@@ -195,24 +205,34 @@ before the diff:
 7. Querying heavy data over the wire repeatedly instead of
    materializing once.
 
-## 10. Endgame: write addresses the noun it mutates
+## 10. Write addresses the noun it mutates (executed 2026-08-28)
 
-The grammar's one remaining wart is verb-shaped writes:
-`write /tasks/dig "x,y,z"` and `write /actions/place "x,y,z,face"`
-name the action, not the noun. The endgame unifies them under the
-cell path:
+The grammar's last verb-shaped writes are gone. Every mutation now
+addresses the noun it changes; `/actions/` is retired as a path
+root, and the fold landed as one coordinated break (the ruled
+migration window collapsed to zero: the only consumers were the CLI
+and its own tests - verified before the break):
 
 - `write /blocks/<x,y,z> <blockid>` = place (synchronous receipt -
-  placing is a one-tick rising edge).
+  placing is a one-tick rising edge; optional `@face` suffix picks
+  the clicked face for orientation, default up).
 - `write /blocks/<x,y,z> air` = dig (job receipt - breaking is
   multi-tick, so the receipt is a taskId; same noun, honest time
-  shape).
-
-`/tasks/dig` and `/actions/place` become aliases for one migration
-window, then retire. The verb-table rows change in the same commit
-(section 2 table + boundaries state). Execution is queued behind
-issue 0015 with an explicit trigger (the second station-style noun
-rewrite, or user go) - endgames are ruled here, timed by issue.
+  shape). `/tasks/dig` retired with it.
+- `write /blocks/<x,y,z>/use <face>` = the block's own interaction
+  handler (doors, buttons, levers).
+- `write /blocks/<x,y,z>/sleep` = bed rest as a device-completed
+  interaction: the all-sleepers rule the engine cannot see (the
+  body is not in the player list) is why this is not `/use`.
+- `write /player/sneak on|off`, `write /player/hotbar <0..8>`,
+  `write /player/held/use` = player state and held-item use.
+- `read` is re-homed to documents (book pages, item information -
+  `/items`, queued as its own capability slice; until it ships the
+  verb answers a typed error). Station snapshots moved to `cat` as
+  self-contained open-read-close transactions.
+- `ls` is universal: every root answers with an enumeration or a
+  typed explanation (`ls /player` lists the readable fields - the
+  surface is self-describing; `ls /blocks` explains addressing).
 
 ## 11. Living water: how this doc stays true
 

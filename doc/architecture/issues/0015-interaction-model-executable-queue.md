@@ -39,14 +39,21 @@ here.
 
 Each item ships with mock tests; none touches the wire.
 
-## 3. Write nounification endgame (ruled, not yet timed)
+## 3. Write nounification endgame (EXECUTED 2026-08-28)
 
-Ruled in the canonical doc section 10: `write /blocks/<x,y,z>
-<blockid>` = place (sync receipt), `write /blocks/<x,y,z> air` =
-dig (job receipt); `/tasks/dig` and `/actions/place` become aliases
-for one migration window, then retire; path-table rows update in
-the same change. Execution trigger: the second station-style noun
-rewrite lands, or the user releases it. NOT in the near-term queue.
+User released the trigger. Landed beyond the ruled minimum: not
+just `write /blocks/<x,y,z> <blockid>` = place (sync receipt) and
+`write /blocks/<x,y,z> air` = dig (job receipt), but the whole
+`/actions/` drawer retired - `/use` and `/sleep` join the block
+path as sub-resources, `sneak`/`hotbar`/`held/use` move under
+`/player`, `/tasks/dig` retires into `write air`. `read` is
+re-homed to documents (books, item information - `/items`, its own
+future slice) with station snapshots moving to `cat` as complete
+transactions; `ls` is universal (every root answers or
+typed-rejects, `ls /player` self-describes the fields). The ruled
+migration window collapsed to zero: rg-verified the only consumers
+were the CLI and its tests. One coordinated break; canonical doc
+section 2 tables and section 10 record the landed shape.
 
 ## 4. Living-water triggers (standing)
 

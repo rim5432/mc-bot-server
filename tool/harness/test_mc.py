@@ -83,37 +83,34 @@ class McCliTest(unittest.TestCase):
 
 
 class VerbDisciplineTest(McCliTest):
-    """cat/read misselection is a typed error, never substitution."""
+    """read is documents-only until /items ships; typed errors, never
+    substitution. Station snapshots ride cat as complete
+    transactions (the lazy-session wart class stays dead)."""
 
-    def test_cat_station_path_suggests_read(self):
-        code, _, err = self.run_verb(mc.cmd_cat, "/stations/chest@1,2,3/")
-        self.assertEqual(code, 1)
-        self.assertIn("read", err)
-
-    def test_cat_station_prefix_without_coords_suggests_read(self):
-        code, _, err = self.run_verb(mc.cmd_cat, "/stations")
-        self.assertEqual(code, 1)
-        self.assertIn("read", err)
-
-    def test_read_flat_state_suggests_cat(self):
+    def test_read_on_any_path_suggests_cat_and_names_the_future(self):
         code, _, err = self.run_verb(mc.cmd_read, "/player/pos")
         self.assertEqual(code, 1)
         self.assertIn("cat", err)
+        self.assertIn("/items", err)
 
-    def test_read_station_path_does_not_suggest_cat(self):
-        # Station paths are read's correct domain: it must not suggest
-        # cat (that would be a verb-discipline violation). It opens
-        # (snapshot rides the open reply) and closes.
-        self.queue(
-            {"ok": True, "menu": {"type": "chest",
-                                  "sourcePos": [1, 2, 3], "slots": []}},
-            {"ok": True},  # menu close
-        )
-        code, out, err = self.run_verb(mc.cmd_read, "/stations/chest@1,2,3/")
-        self.assertEqual(code, 0)
-        self.assertNotIn("`mc cat", err)
-        self.assertEqual(self.wire_calls,
-                         ["menu open 1 2 3", "menu close"])
+    def test_read_on_station_path_also_suggests_cat(self):
+        code, _, err = self.run_verb(mc.cmd_read, "/stations/chest@1,2,3/")
+        self.assertEqual(code, 1)
+        self.assertIn("cat", err)
+        self.assertEqual(self.wire_calls, [])
+
+    def test_cat_station_prefix_without_coords_is_typed_error(self):
+        code, _, err = self.run_verb(mc.cmd_cat, "/stations")
+        self.assertEqual(code, 1)
+        self.assertIn("invalid station path", err)
+
+    def test_retired_actions_paths_are_typed_errors(self):
+        for old in ("/actions/place", "/actions/use", "/actions/sleep",
+                    "/actions/use-item", "/actions/sneak", "/actions/equip",
+                    "/tasks/dig"):
+            code, _, err = self.run_verb(mc.cmd_write, old, "1,2,3")
+            self.assertEqual(code, 1, old)
+            self.assertEqual(self.wire_calls, [])
 
     def test_cat_player_menu_is_unsupported_not_task_summary(self):
         self.queue({"ok": True, "state": {"task": "goto:t1"}})
@@ -407,86 +404,163 @@ class RecipeMaterializationTest(McCliTest):
         self.assertEqual(self.wire_calls, ['recipes "nothing_here"'])
 
 
-class PlaceActionTest(McCliTest):
-    """0013 slice 4: write /actions/place -> /bot place (sync)."""
+class WriteBlocksPlaceTest(McCliTest):
+    """Doc 10: write /blocks/<x,y,z> <blockid>[@face] -> place (sync).
+    The value is the contract - the receipt's post-state block must
+    match it (the server places the HELD BlockItem)."""
 
-    def test_place_translates_lowercase_face(self):
+    def test_place_defaults_face_up(self):
         self.queue({"ok": True, "placed": True, "at": [1, 61, 2],
                     "block": "minecraft:stone"})
-        code, out, _ = self.run_verb(mc.cmd_write, "/actions/place",
-                                     "1,61,1,south")
+        code, out, _ = self.run_verb(mc.cmd_write, "/blocks/1,61,1",
+                                     "minecraft:stone")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["place 1 61 1 up"])
+        self.assertTrue(json.loads(out)["placed"])
+
+    def test_place_face_suffix_translates_lowercase(self):
+        self.queue({"ok": True, "placed": True, "at": [1, 61, 2],
+                    "block": "minecraft:oak_stairs"})
+        code, _, _ = self.run_verb(mc.cmd_write, "/blocks/1,61,1",
+                                   "minecraft:oak_stairs@SOUTH")
         self.assertEqual(code, 0)
         self.assertEqual(self.wire_calls, ["place 1 61 1 south"])
-        self.assertTrue(json.loads(out)["placed"])
+
+    def test_place_post_state_mismatch_exits_one(self):
+        # Asked for planks but the held item was stone: the value is a
+        # contract, not a suggestion.
+        self.queue({"ok": True, "placed": True, "at": [1, 61, 2],
+                    "block": "minecraft:stone"})
+        code, _, err = self.run_verb(mc.cmd_write, "/blocks/1,61,1",
+                                     "minecraft:oak_planks")
+        self.assertEqual(code, 1)
+        self.assertIn("mismatch", err)
+        self.assertIn("hotbar", err)
 
     def test_place_rejection_exits_one(self):
         self.queue({"ok": False, "placed": False,
                     "reason": "cell not air: minecraft:stone"})
-        code, _, _ = self.run_verb(mc.cmd_write, "/actions/place",
-                                   "1,61,2,up")
+        code, _, _ = self.run_verb(mc.cmd_write, "/blocks/1,61,2", "stone")
         self.assertEqual(code, 1)
 
-    def test_place_malformed_value(self):
-        code, _, err = self.run_verb(mc.cmd_write, "/actions/place",
-                                     "1,2,3")
+    def test_place_bad_face_rejected_before_wire(self):
+        code, _, err = self.run_verb(mc.cmd_write, "/blocks/1,61,2",
+                                     "stone@sideways")
         self.assertEqual(code, 1)
-        self.assertIn("x,y,z,face", err)
+        self.assertIn("face", err)
+        self.assertEqual(self.wire_calls, [])
+
+    def test_place_empty_value_rejected_before_wire(self):
+        code, _, err = self.run_verb(mc.cmd_write, "/blocks/1,61,2", " ")
+        self.assertEqual(code, 1)
+        self.assertIn("blockid", err)
         self.assertEqual(self.wire_calls, [])
 
 
-class EquipActionTest(McCliTest):
-    """0013 deferred: write /actions/equip -> equip (sync hotbar select)."""
+class WriteBlocksInteractTest(McCliTest):
+    """/blocks sub-resources: /use runs the block's interaction,
+    /sleep is the device-completed bed rest."""
 
-    def test_equip_translates_slot(self):
+    def test_use_translates_face_with_default(self):
+        self.queue({"ok": True, "used": True})
+        code, _, _ = self.run_verb(mc.cmd_write, "/blocks/4,60,9/use", "")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["use 4 60 9 up"])
+
+    def test_use_passes_face_lowercase(self):
+        self.queue({"ok": True, "used": True})
+        code, _, _ = self.run_verb(mc.cmd_write, "/blocks/4,60,9/use",
+                                   "NORTH")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["use 4 60 9 north"])
+
+    def test_use_bad_face_rejected_before_wire(self):
+        code, _, err = self.run_verb(mc.cmd_write, "/blocks/4,60,9/use",
+                                     "left")
+        self.assertEqual(code, 1)
+        self.assertEqual(self.wire_calls, [])
+
+    def test_sleep_translates_and_ignores_value(self):
+        self.queue({"ok": True, "slept": True})
+        code, _, _ = self.run_verb(mc.cmd_write, "/blocks/6,61,6/sleep",
+                                   "ignored")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["sleep 6 61 6"])
+
+    def test_use_rejection_exits_one(self):
+        self.queue({"ok": False, "used": False, "reason": "out of reach"})
+        code, _, _ = self.run_verb(mc.cmd_write, "/blocks/4,60,9/use", "up")
+        self.assertEqual(code, 1)
+
+
+class WritePlayerStateTest(McCliTest):
+    """Player mutations address /player: sneak latch, hotbar
+    selection, held-item use against the POV ray."""
+
+    def test_sneak_translates_on_off(self):
+        self.queue({"ok": True})
+        code, _, _ = self.run_verb(mc.cmd_write, "/player/sneak", "on")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["sneak on"])
+
+    def test_sneak_bad_value_rejected_before_wire(self):
+        code, _, err = self.run_verb(mc.cmd_write, "/player/sneak", "maybe")
+        self.assertEqual(code, 1)
+        self.assertIn("on", err)
+        self.assertEqual(self.wire_calls, [])
+
+    def test_hotbar_translates_slot(self):
         self.queue({"ok": True, "selectedSlot": 2,
                     "item": "minecraft:stone", "count": 64})
-        code, out, _ = self.run_verb(mc.cmd_write, "/actions/equip", "2")
+        code, out, _ = self.run_verb(mc.cmd_write, "/player/hotbar", "2")
         self.assertEqual(code, 0)
         self.assertEqual(self.wire_calls, ["equip 2"])
         self.assertEqual(json.loads(out)["selectedSlot"], 2)
 
-    def test_equip_rejection_exits_one(self):
-        self.queue({"ok": False, "reason": "no active bot"})
-        code, _, _ = self.run_verb(mc.cmd_write, "/actions/equip", "0")
-        self.assertEqual(code, 1)
-
-    def test_equip_out_of_range_rejected_before_wire(self):
-        code, _, err = self.run_verb(mc.cmd_write, "/actions/equip", "9")
+    def test_hotbar_out_of_range_rejected_before_wire(self):
+        code, _, err = self.run_verb(mc.cmd_write, "/player/hotbar", "9")
         self.assertEqual(code, 1)
         self.assertIn("0..8", err)
         self.assertEqual(self.wire_calls, [])
 
-    def test_equip_non_integer_rejected_before_wire(self):
-        code, _, _ = self.run_verb(mc.cmd_write, "/actions/equip", "hotbar")
+    def test_hotbar_non_integer_rejected_before_wire(self):
+        code, _, _ = self.run_verb(mc.cmd_write, "/player/hotbar", "first")
         self.assertEqual(code, 1)
         self.assertEqual(self.wire_calls, [])
 
+    def test_held_use_translates_and_ignores_value(self):
+        self.queue({"ok": True, "used": True})
+        code, _, _ = self.run_verb(mc.cmd_write, "/player/held/use", "")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["use-item"])
 
-class DigTaskTest(McCliTest):
-    """0013 slice 3: write /tasks/dig -> /bot dig (task family)."""
+    def test_held_use_rejection_exits_one(self):
+        self.queue({"ok": False, "used": False, "reason": "empty hand"})
+        code, _, _ = self.run_verb(mc.cmd_write, "/player/held/use", "")
+        self.assertEqual(code, 1)
 
-    def test_dig_translates_with_default_timeout(self):
+
+class DigAsBlockWriteTest(McCliTest):
+    """Doc 10: write /blocks/<x,y,z> air -> /bot dig (job family).
+    Breaking is multi-tick, so the receipt is a taskId."""
+
+    def test_air_write_translates_with_default_timeout(self):
         self.queue({"ok": True, "task": "t7", "replay": False})
-        code, _, err = self.run_verb(mc.cmd_write, "/tasks/dig", "3,61,3")
+        code, _, err = self.run_verb(mc.cmd_write, "/blocks/3,61,3", "air")
         self.assertEqual(code, 0)
         self.assertEqual(self.wire_calls, ["/bot dig 3 61 3 1200"])
         self.assertIn("taskId: t7", err)
 
-    def test_dig_passes_explicit_timeout(self):
+    def test_air_write_passes_explicit_timeout(self):
         self.queue({"ok": True, "task": "t8", "replay": False})
-        code, _, _ = self.run_verb(mc.cmd_write, "/tasks/dig", "-3,60,-4",
+        code, _, _ = self.run_verb(mc.cmd_write, "/blocks/-3,60,-4", "air",
                                    timeout=600)
         self.assertEqual(code, 0)
         self.assertEqual(self.wire_calls, ["/bot dig -3 60 -4 600"])
 
-    def test_dig_rejects_malformed_value(self):
-        code, _, err = self.run_verb(mc.cmd_write, "/tasks/dig", "1,2")
-        self.assertEqual(code, 1)
-        self.assertEqual(self.wire_calls, [])
-
-    def test_dig_rejection_exits_one(self):
+    def test_air_write_rejection_exits_one(self):
         self.queue({"ok": False, "reason": "dig wants integer args"})
-        code, _, _ = self.run_verb(mc.cmd_write, "/tasks/dig", "1,2,3")
+        code, _, _ = self.run_verb(mc.cmd_write, "/blocks/1,2,3", "air")
         self.assertEqual(code, 1)
 
 
@@ -848,8 +922,9 @@ class LsStationsTest(McCliTest):
         self.assertIn("scan failed", err)
 
 
-class ReadStationTest(McCliTest):
-    """read /stations/<t>@<pos>/[<role>] -> open + snapshot + close."""
+class CatStationTest(McCliTest):
+    """cat /stations/<t>@<pos>/[<role>] -> open + snapshot + close
+    (complete transaction - doc 10 fold, read is documents-only)."""
 
     def test_full_snapshot_opens_reads_closes(self):
         # Mocks mirror the REAL wire shape: the snapshot nests under
@@ -863,7 +938,7 @@ class ReadStationTest(McCliTest):
                                     "count": 8}}]}},
             {"ok": True},  # close
         )
-        code, out, _ = self.run_verb(mc.cmd_read, "/stations/chest@1,2,3/")
+        code, out, _ = self.run_verb(mc.cmd_cat, "/stations/chest@1,2,3/")
         self.assertEqual(code, 0)
         self.assertEqual(self.wire_calls,
                          ["menu open 1 2 3", "menu close"])
@@ -887,7 +962,7 @@ class ReadStationTest(McCliTest):
             {"ok": True},
         )
         code, out, _ = self.run_verb(
-            mc.cmd_read, "/stations/furnace@1,2,3/output")
+            mc.cmd_cat, "/stations/furnace@1,2,3/output")
         self.assertEqual(code, 0)
         self.assertEqual(self.wire_calls,
                          ["menu open 1 2 3", "menu close"])
@@ -899,7 +974,7 @@ class ReadStationTest(McCliTest):
 
     def test_open_failure_exits_one_without_snapshot_or_close(self):
         self.queue({"ok": False, "reason": "out of reach"})
-        code, _, err = self.run_verb(mc.cmd_read, "/stations/chest@1,2,3/")
+        code, _, err = self.run_verb(mc.cmd_cat, "/stations/chest@1,2,3/")
         self.assertEqual(code, 1)
         self.assertIn("cannot open", err)
         self.assertEqual(self.wire_calls, ["menu open 1 2 3"])
@@ -915,14 +990,14 @@ class ReadStationTest(McCliTest):
             {"ok": True},
         )
         code, out, _ = self.run_verb(
-            mc.cmd_read, "/stations/chest@1,2,3/output")
+            mc.cmd_cat, "/stations/chest@1,2,3/output")
         self.assertEqual(code, 0)
         self.assertEqual(self.wire_calls,
                          ["menu open 1 2 3", "menu close"])
         self.assertEqual(json.loads(out)["slots"], [])
 
     def test_invalid_path_exits_one(self):
-        code, _, err = self.run_verb(mc.cmd_read, "/stations/chest1,2,3/")
+        code, _, err = self.run_verb(mc.cmd_cat, "/stations/chest1,2,3/")
         self.assertEqual(code, 1)
         self.assertIn("invalid station path", err)
         self.assertEqual(self.wire_calls, [])
@@ -1078,9 +1153,9 @@ class ResidueQueueTest(McCliTest):
         code, out, _ = self.run_verb(mc.cmd_ls, "/")
         self.assertEqual(code, 0)
         for root in ("/tasks/", "/player/", "/blocks/", "/entities/",
-                     "/nearby/", "/actions/", "/recipes/", "/stations/",
-                     "/events"):
+                     "/nearby/", "/recipes/", "/stations/", "/events"):
             self.assertIn(root, out)
+        self.assertNotIn("/actions/", out, "the drawer is retired")
 
     def test_help_overview_and_per_verb(self):
         code, out, _ = self.run_verb(mc.cmd_help)
@@ -1098,7 +1173,7 @@ class ResidueQueueTest(McCliTest):
 
     def test_piped_stdout_is_one_line_json(self):
         self.queue({"ok": True, "selectedSlot": 3, "item": "", "count": 0})
-        code, out, _ = self.run_verb(mc.cmd_write, "/actions/equip", "3")
+        code, out, _ = self.run_verb(mc.cmd_write, "/player/hotbar", "3")
         self.assertEqual(code, 0)
         self.assertEqual(out.count(chr(10)), 1,
                          "piped answers are one-line JSON")
@@ -1108,10 +1183,55 @@ class ResidueQueueTest(McCliTest):
         self.queue({"ok": True, "selectedSlot": 3, "item": "", "count": 0})
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             with mock.patch.object(out, "isatty", return_value=True):
-                code = mc.cmd_write("/actions/equip", "3")
+                code = mc.cmd_write("/player/hotbar", "3")
         self.assertEqual(code, 0)
         self.assertGreater(out.getvalue().count(chr(10)), 1,
                            "a tty answer is human-indented")
+
+
+class LsUniversalityTest(McCliTest):
+    """Doc 2 utility-noun orthogonality: every root answers ls with
+    an enumeration or a typed explanation - the conformance gate
+    that keeps the surface self-describing (no per-root verbs)."""
+
+    def test_player_root_lists_fields_zero_wire(self):
+        code, out, _ = self.run_verb(mc.cmd_ls, "/player")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, [])
+        for field in ("inventory", "pos", "health", "sneak", "hotbar",
+                      "held/use"):
+            self.assertIn(field, out)
+
+    def test_recipes_root_lists_dumped_cache(self):
+        mc.RECIPES_DIR.mkdir(parents=True, exist_ok=True)
+        (mc.RECIPES_DIR / "stick").write_text("station: inventory\n",
+                                              encoding="utf-8")
+        (mc.RECIPES_DIR / "oak_planks").write_text("station: inventory\n",
+                                                   encoding="utf-8")
+        code, out, _ = self.run_verb(mc.cmd_ls, "/recipes/")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, [])
+        self.assertIn("stick", out)
+        self.assertIn("oak_planks", out)
+
+    def test_recipes_root_empty_cache_is_typed_hint(self):
+        if mc.RECIPES_DIR.is_dir():
+            for f in mc.RECIPES_DIR.iterdir():
+                f.unlink()
+        code, _, err = self.run_verb(mc.cmd_ls, "/recipes/")
+        self.assertEqual(code, 1)
+        self.assertIn("dump-recipes", err)
+
+    def test_blocks_root_type_rejects_with_addressing_hint(self):
+        code, _, err = self.run_verb(mc.cmd_ls, "/blocks")
+        self.assertEqual(code, 1)
+        self.assertIn("not enumerable", err)
+        self.assertIn("cat /blocks/", err)
+
+    def test_events_root_type_rejects_with_stream_hint(self):
+        code, _, err = self.run_verb(mc.cmd_ls, "/events")
+        self.assertEqual(code, 1)
+        self.assertIn("stream", err)
 
 
 if __name__ == "__main__":

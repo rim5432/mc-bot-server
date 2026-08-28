@@ -2,19 +2,26 @@
 # -*- coding: utf-8 -*-
 """mc - Unix-style CLI for the MC Bot Server boundary-D surface.
 
-Six verbs over a path namespace:
-  mc ls    <path>          discovery (directory listing)
-  mc cat   <path>          flat state read (no session)
-  mc read  <path>          menu snapshot read (lazy session bind)
-  mc write <path> <value>  write operation (deposit / craft / task submit / cancel)
+Six verbs over a path namespace (every mutation addresses the noun
+it changes - no /actions/ drawer, decision 38 / canonical doc 10):
+  mc ls    <path>          discovery (every root answers or typed-rejects)
+  mc cat   <path>          state read (station snapshots: open-read-close)
+  mc read  <path>          document read (books, item info - /items,
+                           its own future slice; typed error until then)
+  mc write <path> <value>  write operation (place/dig/use/sneak/craft/...)
   mc wait  <taskId>        block until task reaches terminal state
   mc events                incremental event drain, cursor on disk
 
 Namespace:
-  /player/<field>          cat only (inventory, pos, health, menu, status)
+  /player/<field>          cat (inventory, pos, health, status; menu
+                           pending 0012 D1) + write (sneak, hotbar,
+                           held/use)
+  /blocks/<x,y,z>          cat (block read) + write (<blockid>[@face]
+                           = place, air = dig job, /use <face>,
+                           /sleep)
   /recipes/<item>          cat only (RecipeManager query)
-  /stations/<type>@<x,y,z>/<role>  ls/read/write (menu domain)
-  /tasks/                  write (submit goto), wait, cancel
+  /stations/<type>@<x,y,z>/<role>  cat/write (menu domain)
+  /tasks/                  write (submit goto/mine), wait, cancel
   /events                  events verb only
 
 Wire mapping:
@@ -29,29 +36,42 @@ Wire mapping:
                               write receipts)
   cat /tasks/<id>          -> /bot events 0, filtered by attrs.taskId
                               (client-side derivation, zero wire change)
-  ls /stations/             -> scan 16 50  (nearby container discovery)
-  read /stations/<t>@<pos>/ -> menu open -> menu snapshot -> menu close
-                              (lazy session bind, stateless per-call)
-  read /stations/<t>@<pos>/<role> -> same + client-side role filter
+  ls /player               -> the readable field list (self-describing)
+  ls /recipes              -> the materialized local cache (dump first)
+  ls /stations/            -> scan 16 50  (nearby container discovery)
+  ls /blocks               -> typed error (address-based, not enumerable)
+  cat /stations/<t>@<pos>/ -> menu open -> snapshot -> menu close
+                              (complete transaction, stateless per-call)
+  cat /stations/<t>@<pos>/<role> -> same + client-side role filter
   write /stations/<t>@<pos>/input "item:count"  -> menu deposit INPUT
   write /stations/<t>@<pos>/fuel "item:count"   -> menu deposit FUEL
   write /stations/<t>@<pos>/output "all"|"N"    -> menu take OUTPUT [N]
   write /stations/crafting@<pos>/recipe "id"     -> menu craft <id>
+  write /blocks/<x,y,z> "oak_planks"       -> place x y z up   (sync)
+  write /blocks/<x,y,z> "oak_stairs@north" -> place x y z north (sync)
+  write /blocks/<x,y,z> "air"              -> /bot dig x y z  (job)
+  write /blocks/<x,y,z>/use "north"        -> use x y z north (sync)
+  write /blocks/<x,y,z>/sleep              -> sleep x y z (device
+                              completes the all-sleepers rule /use cannot)
+  write /player/sneak "on"|"off"  -> sneak on|off  (persistent latch)
+  write /player/hotbar <0..8>      -> equip <n>    (sync selection)
+  write /player/held/use           -> use-item     (held item vs POV ray)
   write /tasks/goto "x,y,z" [--tol N] [--timeout N] [--key K] -> /bot goto
                               (receipt carries the id under the "task" key)
+  write /tasks/mine "block:count" [--timeout N]  -> /bot mine (job)
   write /tasks/<id>/cancel "reason" -> /bot cancel <id>
   wait <taskId> [--timeout N] -> poll /bot events until terminal kind
   events [--since N] -> /bot events <cursor>
-  admin stop|reset -> /bot stop | /bot reset  (operator verbs,
-      deliberately outside the namespace: stop sweeps ALL live
-      missions - CommandBus.submit has no single-task gate - while
-      cancel covers exactly one)
+  admin stop|reset|dump-recipes -> /bot stop | /bot reset | recipes
+      list pagination (operator verbs deliberately outside the
+      namespace: stop sweeps ALL live missions - CommandBus.submit
+      has no single-task gate - while cancel covers exactly one)
 
-Verb discipline: typed errors, never silent substitution. cat on a
-station path errors with the read suggestion; read on a non-station
-path errors with the cat suggestion. cat is the stateless verb and
-must not lazily bind a bot-side menu session as a side effect of a
-read (issue 0012 D4).
+Verb discipline: typed errors, never silent substitution. read is
+reserved for documents and errors with the cat suggestion until
+/items ships; cat covers every state read, station snapshots as
+complete open-read-close transactions (no lazy session - issue
+0012 D4's wart class stays dead).
 
 Translation layer is transparent-first: no default values, no retries,
 no corrections. Parameters pass through to wire verbatim. If behavior
@@ -422,14 +442,43 @@ def cmd_cat(path: str) -> int:
         emit_json(resp)
         return 0 if resp.get("ok") else 1
     if path == "/stations" or path.startswith("/stations/"):
-        # Typed verb error, never silent substitution: cat is the
-        # stateless verb; executing read here would lazily bind a
-        # bot-side menu session as a side effect of a read (0012 D4).
-        print(f"cat: station paths use the session verb - `mc read {path}` "
-              "(menu wire pending)", file=sys.stderr)
-        return 1
-    print(f"cat: unsupported path (v1 supports /player/*, /tasks/current, "
-          f"/tasks/<id>): {path}", file=sys.stderr)
+        # Station snapshots ride cat as complete open-read-close
+        # transactions (stateless per call - the 0012 D4 lazy-session
+        # wart class stays dead). A role segment filters client-side.
+        station = parse_station_path(path)
+        if station is None:
+            print(f"cat: invalid station path "
+                  f"(expected /stations/<type>@<x,y,z>/[<role>]): {path}",
+                  file=sys.stderr)
+            return 1
+        open_reply = station_open(station)
+        if not open_reply.get("ok"):
+            print(f"cat: cannot open {station['type']}@"
+                  f"{station['x']},{station['y']},{station['z']}: "
+                  f"{open_reply.get('reason', 'unknown')}", file=sys.stderr)
+            return 1
+        try:
+            # The open reply already carries the first snapshot - a
+            # separate menu snapshot call would be a redundant round
+            # trip (nothing can change between open and cat on one
+            # wire).
+            menu = open_reply.get("menu", open_reply)
+            if station["role"]:
+                # Client-side filter by role (zero wire change).
+                filtered = [s for s in menu.get("slots", [])
+                            if s.get("role", "").upper() == station["role"]]
+                print(json.dumps({"type": menu.get("type"),
+                                  "sourcePos": menu.get("sourcePos"),
+                                  "role": station["role"].lower(),
+                                  "slots": filtered}, indent=2))
+            else:
+                emit_json(menu)
+            return 0
+        finally:
+            station_close()
+    print(f"cat: unsupported path (v1 supports /player/*, /tasks/*, "
+          f"/blocks/<x,y,z>, /recipes/<item>, /stations/...): {path}",
+          file=sys.stderr)
     return 1
 
 
@@ -462,7 +511,105 @@ def cmd_cat_task(task_id: str) -> int:
 
 def cmd_write(path: str, value: str, tol: int | None = None,
                timeout: int | None = None, key: str | None = None) -> int:
-    """Write operation. v1: task submit (goto) and task cancel."""
+    """Write operation: every mutation addresses the noun it changes
+    (canonical doc section 10 - /blocks cell writes, /player state,
+    /stations roles, /tasks jobs)."""
+    faces = ("north", "south", "east", "west", "up", "down")
+    block_op = re.fullmatch(r"/blocks/(-?\d+),(-?\d+),(-?\d+)(/use|/sleep)?",
+                            path)
+    if block_op:
+        x, y, z, op = block_op.groups()
+        if op == "/use":
+            # The block's own interaction handler (doors, buttons).
+            # Value is the clicked face, defaulting to up.
+            face = value.strip().lower() or "up"
+            if face not in faces:
+                print(f"write {path}: face must be one of {faces}",
+                      file=sys.stderr)
+                return 1
+            resp = wire(f"use {x} {y} {z} {face}")
+            emit_json(resp)
+            return 0 if resp.get("ok") and resp.get("used") else 1
+        if op == "/sleep":
+            # Device-completed bed rest: the all-sleepers rule the
+            # engine cannot see (body is not in the player list) is
+            # why this is a sub-resource and not /use. Path carries
+            # every argument; value is ignored.
+            resp = wire(f"sleep {x} {y} {z}")
+            emit_json(resp)
+            return 0 if resp.get("ok") and resp.get("slept") else 1
+        cell_value = value.strip()
+        if cell_value == "air":
+            # Dig: multi-tick, so the receipt is a job. Wire-required
+            # timeout mirrors DigCommandHandler.DEFAULT_TIMEOUT_TICKS.
+            timeout_val = timeout if timeout is not None else 1200
+            resp = wire(f"/bot dig {x} {y} {z} {timeout_val}")
+            emit_json(resp)
+            if resp.get("ok") and "task" in resp:
+                print(f"taskId: {resp['task']}", file=sys.stderr)
+            return 0 if resp.get("ok") else 1
+        # Place: "<blockid>[@face]". The server places the HELD
+        # BlockItem - the value is the contract, verified against
+        # the receipt's post-state block (0013 R2 discipline).
+        block_id, _, face = cell_value.partition("@")
+        face = (face or "up").lower()
+        if not block_id:
+            print(f"write {path}: value must be '<blockid>[@face]' or 'air'",
+                  file=sys.stderr)
+            return 1
+        if face not in faces:
+            print(f"write {path}: face must be one of {faces}", file=sys.stderr)
+            return 1
+        resp = wire(f"place {x} {y} {z} {face}")
+        emit_json(resp)
+        if not (resp.get("ok") and resp.get("placed")):
+            return 1
+        placed = (resp.get("block") or "").removeprefix("minecraft:")
+        if placed != block_id.removeprefix("minecraft:"):
+            print(f"write {path}: post-state mismatch - asked for "
+                  f"{block_id}, placed {resp.get('block')} "
+                  f"(hold the BlockItem you want, write /player/hotbar first)",
+                  file=sys.stderr)
+            return 1
+        return 0
+    if path == "/player/sneak":
+        # Persistent body-state latch: survives idle ticks until
+        # cleared. Edge-guard is NOT included (vanilla clips edges in
+        # Player movement code only); what ships is the crouch pose +
+        # trigger courtesies.
+        word = value.strip().lower()
+        if word not in ("on", "off"):
+            print("write /player/sneak: value must be 'on' or 'off'",
+                  file=sys.stderr)
+            return 1
+        resp = wire(f"sneak {word}")
+        emit_json(resp)
+        return 0 if resp.get("ok") else 1
+    if path == "/player/hotbar":
+        # Synchronous selection; the wire updates both
+        # body.selectedSlot and the inventory mirror so place/drop
+        # and state disclosure agree (0013).
+        try:
+            slot = int(value.strip())
+        except ValueError:
+            print("write /player/hotbar: value must be an integer 0..8",
+                  file=sys.stderr)
+            return 1
+        if slot < 0 or slot > 8:
+            print("write /player/hotbar: slot must be 0..8",
+                  file=sys.stderr)
+            return 1
+        resp = wire(f"equip {slot}")
+        emit_json(resp)
+        return 0 if resp.get("ok") else 1
+    if path == "/player/held/use":
+        # Held item against the POV ray - the bucket's fill/empty
+        # point is whatever the bot is looking at. ROT-aim first
+        # (look / steer) or the ray fires somewhere else. Path is
+        # complete; value is ignored.
+        resp = wire("use-item")
+        emit_json(resp)
+        return 0 if resp.get("ok") and resp.get("used") else 1
     if path == "/tasks/goto":
         # value is "x,y,z"
         parts = value.split(",")
@@ -481,99 +628,6 @@ def cmd_write(path: str, value: str, tol: int | None = None,
             cmd += f" {key}"
         resp = wire(cmd)
         emit_json(resp)
-        return 0 if resp.get("ok") else 1
-    if path == "/actions/place":
-        # value "x,y,z,face" - synchronous one-shot, post-state
-        # verified on the wire (0013 R2).
-        parts = value.split(",")
-        if len(parts) != 4:
-            print("write /actions/place: value must be 'x,y,z,face'",
-                  file=sys.stderr)
-            return 1
-        x, y, z, face = (pp.strip() for pp in parts)
-        resp = wire(f"place {x} {y} {z} {face.lower()}")
-        emit_json(resp)
-        return 0 if resp.get("ok") and resp.get("placed") else 1
-    if path == "/actions/use":
-        # value "x,y,z,face" - synchronous one-shot right-click chain:
-        # block interaction first, then the held item's use-on
-        # (0007 Phase 2). The executor's consumed verdict is the
-        # receipt (a pressed button springs back, so no post-state
-        # read exists).
-        parts = value.split(",")
-        if len(parts) != 4:
-            print("write /actions/use: value must be 'x,y,z,face'",
-                  file=sys.stderr)
-            return 1
-        x, y, z, face = (pp.strip() for pp in parts)
-        resp = wire(f"use {x} {y} {z} {face.lower()}")
-        emit_json(resp)
-        return 0 if resp.get("ok") and resp.get("used") else 1
-    if path == "/actions/sleep":
-        # value "x,y,z" - verify-and-skip against a real bed: the device
-        # completes the vanilla all-sleepers rule the engine cannot see
-        # (the body is not in the player list). Refusal reasons travel
-        # in the reply ("not a bed", "out of reach", "already daytime").
-        parts = value.split(",")
-        if len(parts) != 3:
-            print("write /actions/sleep: value must be 'x,y,z'",
-                  file=sys.stderr)
-            return 1
-        x, y, z = (pp.strip() for pp in parts)
-        resp = wire(f"sleep {x} {y} {z}")
-        emit_json(resp)
-        return 0 if resp.get("ok") and resp.get("slept") else 1
-    if path == "/actions/use-item":
-        # No argument: vanilla Item.use against the POV raycast - the
-        # bucket's fill/empty point is whatever the bot is looking at.
-        # ROT-aim first (look / steer) or the ray fires somewhere else.
-        resp = wire("use-item")
-        emit_json(resp)
-        return 0 if resp.get("ok") and resp.get("used") else 1
-    if path == "/actions/sneak":
-        # value "on"|"off" - persistent body-state latch (the equip
-        # precedent): survives idle ticks until cleared. Edge-guard is
-        # NOT included (vanilla clips edges in Player movement code
-        # only); what ships is the crouch pose + trigger courtesies.
-        word = value.strip().lower()
-        if word not in ("on", "off"):
-            print("write /actions/sneak: value must be 'on' or 'off'",
-                  file=sys.stderr)
-            return 1
-        resp = wire(f"sneak {word}")
-        emit_json(resp)
-        return 0 if resp.get("ok") else 1
-    if path == "/actions/equip":
-        # value is a hotbar slot index 0..8. Synchronous selection;
-        # the wire updates both body.selectedSlot and the inventory
-        # mirror so place/drop and state disclosure agree (0013).
-        try:
-            slot = int(value.strip())
-        except ValueError:
-            print("write /actions/equip: value must be an integer 0..8",
-                  file=sys.stderr)
-            return 1
-        if slot < 0 or slot > 8:
-            print("write /actions/equip: slot must be 0..8",
-                  file=sys.stderr)
-            return 1
-        resp = wire(f"equip {slot}")
-        emit_json(resp)
-        return 0 if resp.get("ok") else 1
-    if path == "/tasks/dig":
-        # Same shape as goto: value "x,y,z", wire-required timeout
-        # mirrored from DigCommandHandler.DEFAULT_TIMEOUT_TICKS.
-        parts = value.split(",")
-        if len(parts) != 3:
-            print("write /tasks/dig: value must be 'x,y,z'",
-                  file=sys.stderr)
-            return 1
-        x, y, z = (pp.strip() for pp in parts)
-        timeout_val = timeout if timeout is not None else 1200
-        resp = wire(f"/bot dig {x} {y} {z} {timeout_val}")
-        emit_json(resp)
-        if resp.get("ok") and "task" in resp:
-            print(f"taskId: {resp['task']}", file=sys.stderr)
         return 0 if resp.get("ok") else 1
     if path == "/tasks/mine":
         # Composite mining task (issue 0014): value "blockType:count",
@@ -829,9 +883,10 @@ def cmd_events(since: int | None = None, follow: bool = False,
 HELP = {
     "ls": ("ls <path>", "ls /  # list the mounted roots"),
     "cat": ("cat <path>", "cat /tasks/t3  # one task's verdict attrs"),
-    "read": ("read /stations/<type>@<x,y,z>[/<role>]", "read /stations/chest@10,64,20"),
+    "read": ("read /items/<doc>", "read /items/book@4  # document read; "
+             "typed error until /items ships"),
     "write": ("write <path> <value> [--tol --timeout --key]",
-              "write /tasks/goto 100,64,-200 && mc wait $TASK"),
+              "write /blocks/100,64,-200 air && mc wait $TASK"),
     "wait": ("wait <taskId> [--timeout S]", "mc wait task-4; echo $?  # 0 done, 1 failed, 124 timeout"),
     "events": ("events [--since N] [--only PREFIX] [--follow] [--idle S]",
                "events --only TASK --follow"),
@@ -857,7 +912,8 @@ def cmd_help(verb: str | None = None) -> int:
 
 
 def cmd_ls(path: str) -> int:
-    """Discovery. /tasks/ -> current task; /stations/ -> scan nearby."""
+    """Discovery. Every root answers ls or typed-rejects (doc 2:
+    utility-noun orthogonality - the surface is self-describing)."""
     if path == "/tasks/" or path == "/tasks":
         resp = wire("/bot status")
         state = resp.get("state", resp)
@@ -892,59 +948,59 @@ def cmd_ls(path: str) -> int:
         if resp.get("truncated"):
             print("... truncated (limit=50)", file=sys.stderr)
         return 0
+    if path == "/player" or path == "/player/":
+        # Self-describing: the readable fields ARE the listing, so a
+        # caller that forgot the vocabulary asks the surface.
+        for field in ("inventory", "inventory/free", "pos", "health",
+                      "status", "menu (pending, issue 0012 D1)",
+                      "sneak (writable)", "hotbar (writable)",
+                      "held/use (writable)"):
+            print(field)
+        return 0
+    if path == "/recipes" or path == "/recipes/":
+        # The materialized cache listing; dump-recipes fills it.
+        if RECIPES_DIR.is_dir():
+            slugs = sorted(p.name for p in RECIPES_DIR.iterdir())
+        else:
+            slugs = []
+        if not slugs:
+            print("ls /recipes: cache empty - run `mc admin dump-recipes`",
+                  file=sys.stderr)
+            return 1
+        for slug in slugs:
+            print(slug)
+        return 0
+    if path == "/blocks" or path == "/blocks/":
+        print("ls /blocks: address-based, not enumerable - "
+              "cat /blocks/<x,y,z>, write /blocks/<x,y,z> <blockid>|air",
+              file=sys.stderr)
+        return 1
+    if path == "/events":
+        print("ls /events: stream root - use `mc events [--follow]`",
+              file=sys.stderr)
+        return 1
     if path == "/":
         for root in ("/tasks/", "/player/", "/blocks/", "/entities/",
-                     "/nearby/", "/actions/", "/recipes/", "/stations/",
-                     "/events"):
+                     "/nearby/", "/recipes/", "/stations/", "/events"):
             print(root)
         return 0
-    print(f"ls: unsupported path (supports /, /tasks/, /entities/, "
-          f"/stations/): {path}", file=sys.stderr)
+    print(f"ls: unsupported path (supports /, /tasks/, /player/, "
+          f"/entities/, /stations/, /recipes/): {path}", file=sys.stderr)
     return 1
 
 
 def cmd_read(path: str) -> int:
-    """Menu snapshot read. Station paths: open, snapshot, close.
-
-    Non-station paths get a typed cat suggestion, never silent
-    substitution: read is the session verb, flat state is not.
-    A role segment (/input, /fuel, /output) filters the snapshot
-    client-side (zero wire change).
+    """Document read: in-game text content (book pages, item
+    information) under /items - its own capability slice, not yet
+    shipped. Until it exists every path gets the typed cat
+    suggestion, never silent substitution: state reads are cat's
+    job (station snapshots ride cat as complete open-read-close
+    transactions).
     """
-    if not (path == "/stations" or path.startswith("/stations/")):
-        print(f"read: station paths only - {path} is flat state, "
-              f"use `mc cat {path}`", file=sys.stderr)
-        return 1
-    station = parse_station_path(path)
-    if station is None:
-        print(f"read: invalid station path "
-              f"(expected /stations/<type>@<x,y,z>/[<role>]): {path}",
-              file=sys.stderr)
-        return 1
-    open_reply = station_open(station)
-    if not open_reply.get("ok"):
-        print(f"read: cannot open {station['type']}@"
-              f"{station['x']},{station['y']},{station['z']}: "
-              f"{open_reply.get('reason', 'unknown')}", file=sys.stderr)
-        return 1
-    try:
-        # The open reply already carries the first snapshot - a
-        # separate menu snapshot call would be a redundant round trip
-        # (nothing can change between open and read on one wire).
-        menu = open_reply.get("menu", open_reply)
-        if station["role"]:
-            # Client-side filter by role (zero wire change).
-            filtered = [s for s in menu.get("slots", [])
-                        if s.get("role", "").upper() == station["role"]]
-            print(json.dumps({"type": menu.get("type"),
-                               "sourcePos": menu.get("sourcePos"),
-                               "role": station["role"].lower(),
-                               "slots": filtered}, indent=2))
-        else:
-            emit_json(menu)
-        return 0
-    finally:
-        station_close()
+    print(f"read: documents only (books, item information - /items, "
+          f"not yet shipped); state reads use `mc cat {path}`",
+          file=sys.stderr)
+    return 1
 
 
 def cmd_admin(action: str) -> int:

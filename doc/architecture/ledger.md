@@ -618,3 +618,28 @@ Amendment chains recorded so far (both sides annotated):
     constant-velocity parabola fit honest to within a block across
     the bow band. The engine pair (draw-release onto a live target)
     rides the staged gametest batch.
+    38. Grammar fold executed: every write addresses its noun
+    (user release 2026-08-28 of the 0015 section-3 trigger, then
+    extended by user ruling in the same session - utilities must
+    stay orthogonal to nouns, read means documents). The /actions/
+    drawer is RETIRED as a path root and /tasks/dig with it:
+    `write /blocks/<x,y,z> <blockid>[@face]` places (sync receipt,
+    the value is a post-state contract - the receipt's block must
+    match the asked id, because the server places the HELD
+    BlockItem), `write /blocks/<x,y,z> air` digs (job receipt),
+    `/blocks/<pos>/use <face>` runs the block's own interaction,
+    `/blocks/<pos>/sleep` is the device-completed bed rest (the
+    all-sleepers rule the engine cannot see is WHY it is not /use),
+    sneak/hotbar/held-use move under /player. `read` is re-homed
+    to DOCUMENTS (book pages, item information - /items, its own
+    future capability slice; typed error until then); station
+    snapshots ride `cat` as complete open-read-close transactions,
+    killing the 0012 D4 lazy-session wart class. `ls` is universal:
+    every root answers with an enumeration or a typed explanation
+    (ls /player self-describes the fields; ls /blocks explains
+    addressing; ls /recipes lists the materialized cache) - pinned
+    by the LsUniversalityTest conformance gate. The ruled migration
+    window collapsed to zero: rg-verified the only consumers were
+    the CLI and its own tests. Pure client-side translation - zero
+    wire change; canonical doc sections 2/10 and issue 0013's wire
+    table updated in the same change, 0015 section 3 closed.
