@@ -104,8 +104,8 @@ Edit policy by subtree:
   to commits and the ledger. Resolution moves the file to
   `issues/archive/` with `superseded_by:` pointing at the absorbing
   record; an exceptional design outcome promotes to an ADR behind a
-  pointer stub. Each issue cross-references a function-map row or
-  boundary section in `covers:`.
+  pointer stub. Each issue cross-references the boundary sections
+  and source paths it owns in `covers:`.
 
 Workflow: edit covered code -> update the covering doc in the same
 change -> `doc check` -> `doc touch <name>` on what you re-verified.

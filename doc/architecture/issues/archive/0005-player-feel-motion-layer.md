@@ -12,7 +12,6 @@ status: resolved (archived 2026-08-27 - P0-P3 shipped and gate-pinned; the final
 superseded_by: guide/workplan.md
 related:
   - doc/architecture/boundaries.md
-  - doc/architecture/function-map.md
   - doc/architecture/issues/archive/0004-movement-primitive-vocabulary.md
   - doc/architecture/issues/0003-sneak-pose-and-edge-walk.md
 ---

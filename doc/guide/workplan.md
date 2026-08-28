@@ -19,6 +19,21 @@ Stage 3 Phases 1-3 are archived in
 trail, do not edit. This file holds only OPEN / IN_PROGRESS items
 and deferred queues.
 
+## v1 convergence criteria
+
+Inherited from the retired function-map capability envelope
+(2026-08-29); citations of "criterion N" in this file mean these.
+
+1. Every shipped item has offline tests plus in-engine gametests; no
+   red suite at commit time.
+2. A programmatic driver (no LLM) keeps one body alive >= 10 minutes
+   of mixed day/night overworld using only boundary-D verbs,
+   surviving at least one reflex preemption and one failed-task
+   recovery (the survival-gate rehearsal below).
+3. Any capability a harness might assume that is not shipped is
+   answered by a row in the deferred queues or an issue, never by
+   silence.
+
 ## Stage 2 closeout follow-ups
 
 RESOLVED entries (1, 2, 3, 8, 9) moved to archive. Open items:
@@ -259,7 +274,8 @@ its open reserves, none blocking a current stage:
          sub-surface expensive); the surface-lane preference falls
          out of the tiers instead of flat Swim cost. [dep: none]
 - [ ] L  Construction Movements (pillar-up / bridge / tunnel - the
-         function-map GAP rows): ruling D5 sequencing holds -
+         retired map's construction GAP rows): ruling D5 sequencing
+         holds -
          inventory model -> Place/Break intents -> Movements, and
          Movement.isViable never grows a bot-state parameter
          (MoveGraph injection or adoption-time check instead).
@@ -294,3 +310,29 @@ arm. Harness-side only, zero wire change:
          inherited from the retired AGENTS.md open questions -
          `resetAt` epoch honesty is already queued as issue 0015
          section 7.                                         [dep: none]
+
+### Capability gaps (inherited from the retired function map)
+
+The retired capability envelope's open rows, kept so nothing silently
+dies (2026-08-29):
+
+- [ ] M  Follow / escort and harvest-and-place loops - the demand
+         anchors issue 0009 F3/F4 cite.                      [dep: none]
+- [ ] S  Multi-step crafting chains (log -> planks -> sticks as one
+         request) - the device fills one recipe per call; the harness
+         orchestrates chains today.                          [dep: none]
+- [ ] M  Multi-target combat and retreat choreography.       [dep: none]
+- [ ] S  Climb (ladders / vines) - the trait exists, no deliberate
+         move yet.                                           [dep: none]
+- [ ] S  Spatial memory / waypoint persistence across sessions.
+                                                             [dep: none]
+- [ ] M  Transport beyond the RCON console bridge (MCP / HTTP /
+         stdio) - the bot stays blind to the choice.         [dep: none]
+- [ ] S  Dig-fidelity tail: enchantment-aware dig speed and
+         match_tool loot fidelity.                           [dep: none]
+
+Combat envelope honesty (retired map "known limits", unchanged):
+melee standoff-kill; creeper trades hits (accepted risk); ranged
+engages at bow standoff only when armed (bow+arrows), otherwise
+refuses with the threat type; unarmed against any hostile it times
+out - the pre-check belongs to the driver.

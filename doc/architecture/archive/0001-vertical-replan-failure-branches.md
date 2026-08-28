@@ -2,7 +2,6 @@
 title: PathingBehavior has three vertical-displacement failure branches and a fuse measuring the wrong quantity
 last_verified: 2026-08-24
 covers:
-  - doc/architecture/function-map.md
   - src/main/java/com/mcbot/mcbotserver/core/behavior/PathingBehavior.java
   - src/main/java/com/mcbot/mcbotserver/McBotServer.java
   - src/main/java/com/mcbot/mcbotserver/gametest/BotSliceGameTests.java

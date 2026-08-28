@@ -17,7 +17,6 @@ related:
   - doc/architecture/issues/0010-hungryprocess-food-acquisition-planner.md
   - doc/architecture/issues/0013-world-interaction-layer.md
   - doc/architecture/issues/0009-block-capability-dig.md
-  - doc/architecture/function-map.md
 ---
 
 # Issue 0014: MineProcess - composite mining task

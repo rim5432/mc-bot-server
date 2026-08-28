@@ -2,7 +2,6 @@
 title: HungryProcess - food acquisition planner with self-contained initial strategies
 last_verified: 2026-08-29
 covers:
-  - doc/architecture/function-map.md
   - doc/architecture/boundaries.md
   - src/main/java/com/mcbot/mcbotserver/api/reflex/ThreatBlackboard.java
   - src/main/java/com/mcbot/mcbotserver/core/process/

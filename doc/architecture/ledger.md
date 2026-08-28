@@ -3,7 +3,6 @@ title: Decision Ledger (append-only)
 last_verified: 2026-08-29
 covers:
   - doc/architecture/boundaries.md
-  - doc/architecture/function-map.md
   - src/main/resources/data/mcbotserver/reflex_rules.json
 related:
   - doc/architecture/harness-interaction.md

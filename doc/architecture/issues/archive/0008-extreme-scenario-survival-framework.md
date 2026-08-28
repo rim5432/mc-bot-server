@@ -2,7 +2,6 @@
 title: Extreme-scenario survival framework - the vital-sign ladder beyond drowning
 last_verified: 2026-08-25
 covers:
-  - doc/architecture/function-map.md
   - src/main/java/com/mcbot/mcbotserver/api/reflex/ThreatBlackboard.java
   - src/main/java/com/mcbot/mcbotserver/core/reflex/MinimalReflex.java
   - src/main/java/com/mcbot/mcbotserver/api/reflex/ReflexAction.java

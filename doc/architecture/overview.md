@@ -109,9 +109,10 @@ production wiring. Remaining major rows: the Stage 3 review (frozen-
 surface lift for menu planners), HungryProcess food acquisition
 (issue 0010), and the boundary-D transport choice (MCP vs HTTP).
 
-The capability envelope and its convergence criteria live in the
-[Functional Convergence Map](function-map.md); per-issue lifecycle
-rules live in root `AGENTS.md` section 0.3.
+Reverse-engineered vanilla player-behavior truths are collected in
+[Player Behavior RE](player-behavior-RE.md); the v1 convergence
+criteria live in the [work plan](../guide/workplan.md), and
+per-issue lifecycle rules in root `AGENTS.md` section 0.3.
 
 Related: [Boundary Contracts & Ledger](boundaries.md),
 [Work Plan](../guide/workplan.md),

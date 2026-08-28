@@ -17,7 +17,6 @@ superseded_by: architecture/harness-interaction.md
 related:
   - doc/architecture/issues/0007-player-parity-interaction.md
   - doc/architecture/issues/0011-harness-surface-convergence.md
-  - doc/architecture/function-map.md
 ---
 
 # Issue 0012: Work-block usability - vanilla construction delegation and the harness manual menu surface

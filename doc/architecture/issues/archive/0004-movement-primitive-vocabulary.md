@@ -10,7 +10,6 @@ status: resolved (archived 2026-08-27 - D1/D2 shipped and pinned; open reserves 
 superseded_by: guide/workplan.md
 related:
   - doc/architecture/boundaries.md
-  - doc/architecture/function-map.md
   - doc/architecture/issues/0003-sneak-pose-and-edge-walk.md
   - doc/reference/baritone-notes.md
 ---

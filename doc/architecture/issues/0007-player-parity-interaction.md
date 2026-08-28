@@ -2,12 +2,11 @@
 title: Player parity - inventory, menus, crafting, and the interaction surface
 last_verified: 2026-08-29
 covers:
-  - doc/architecture/function-map.md
+  - doc/architecture/boundaries.md
   - src/main/java/com/mcbot/mcbotserver/adapter/BindingActor.java
   - src/main/java/com/mcbot/mcbotserver/adapter/entity/BotBodyEntity.java
 status: open (Stage 3 review agenda; unlocked by the pre-Stage-3 survival gate)
 related:
-  - doc/architecture/boundaries.md
   - doc/decisions/0002-capability-model-task-arbiter.md
   - doc/decisions/0004-tick-pipeline-actor-channels.md
   - doc/architecture/issues/archive/0004-movement-primitive-vocabulary.md
@@ -23,11 +22,12 @@ at the information-interaction level - inventory, container menus,
 the crafting-table disclosure, block/entity interaction - but only
 after the pre-Stage-3 survival gate closes (a body that cannot
 survive a night does not need a crafting table yet). This issue
-reviews the function-map rows it would flip. Already flipped by
-Phases 1-2: inventory management and crafting are now SHIPPED
-rows in the map's "Manipulate the world" section. Still pending
-on the map: the tool-loadout DEFERRED row, the "Take orders"
-harvest-and-place GAP, and the survival "automatic eating" GAP.
+reviews the workplan rows it would flip. Already flipped by
+Phases 1-2: inventory management and crafting. Still pending at
+filing time: the tool-loadout DEFERRED row (loadout landed
+2026-08-27), the "Take orders" harvest-and-place GAP (workplan
+gap inventory), and the survival "automatic eating" GAP (landed:
+EAT reflex + HungryProcess).
 
 Initial analysis 2026-08-24; reviewed and corrected the same day
 (menu transaction semantics, interaction-surface precision, core
@@ -347,9 +347,10 @@ state) turns out to be facade-hostile.
    criterion verbatim: goto mission to the adjacent cell retires as
    a success, then open → planned fill → take → close → exactly one
    product in the binding container. Offline gates: CraftingViewTest
-   (7 tests), MenuPlannerTest (9 tests). Remaining known gaps moved
-   to function-map §7: chest-side planning sequences, use-item/use-
-   block verbs.
+   (7 tests), MenuPlannerTest (9 tests). Remaining known gaps -
+   chest-side planning sequences, use-item/use-block verbs - shipped
+   through later slices; their vanilla truths are recorded in
+   player-behavior-RE.md (menu machinery, use chains).
 3. **Phase 3 (M)** crafting automation - `RecipeManager` query
    service, quick-move sequences.
 4. **Phase 4 (XL)** full parity - remaining menu kinds, `UseItem`

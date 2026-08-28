@@ -9,7 +9,6 @@ covers:
 status: parked (sketch only; not adopted - re-derive at pickup)
 related:
   - doc/architecture/boundaries.md
-  - doc/architecture/function-map.md
   - doc/architecture/issues/0002-world-collision-slab-fence.md
 ---
 
@@ -59,9 +58,9 @@ latch as body state.
 Debt avoidance: parameterizing `passable(Pose)` today would force
 the whole `BasicMoves` chain to thread a Pose that every v1 caller
 hardcodes to STANDING - a pretend-multi-pose API. Defining
-`Channel.SNEAK` with no behavior-layer consumer would put a
-SKELETON row on the function map for code nobody drives. Both are
-vocabulary dishonesty; this issue is the honest placeholder.
+`Channel.SNEAK` with no behavior-layer consumer would have put a
+SKELETON row on the retired capability map for code nobody drives.
+Both are vocabulary dishonesty; this issue is the honest placeholder.
 
 ## 3. Prerequisite
 
@@ -84,6 +83,7 @@ switch and its consumers.
 4. Gate tests: sneak-walk-on-slab-edge-does-not-fall,
    shield-block-reduces-damage-when-sneaking.
 
-Function-map rows already point here: Locomotion [PLANNED]
-SneakWalk, Combat [PLANNED] ShieldBlock, Perception [PLANNED]
-Pose-aware collision.
+The retired capability map's rows pointed here: Locomotion
+[PLANNED] SneakWalk, Combat [PLANNED] ShieldBlock, Perception
+[PLANNED] Pose-aware collision; the open rows now live in the
+workplan gap inventory.
