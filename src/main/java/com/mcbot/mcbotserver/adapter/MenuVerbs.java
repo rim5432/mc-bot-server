@@ -239,7 +239,8 @@ final class MenuVerbs {
     private static SlotRole resolveRole(MenuView view, SlotRole role) {
         String type = view.type();
         boolean furnaceFamily = type.equals("furnace") || type.equals("blast_furnace") || type.equals("smoker");
-        if (furnaceFamily) {
+        boolean anvilFamily = type.equals("anvil");
+        if (furnaceFamily || anvilFamily) {
             return role;
         }
         return SlotRole.CONTAINER;

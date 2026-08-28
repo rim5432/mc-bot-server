@@ -61,4 +61,21 @@ final class MenuSlotLayouts {
         }
         return index <= size - 10 ? SlotRole.MAIN : SlotRole.HOTBAR;
     }
+
+    /**
+     * Anvil layout (ItemCombinerMenu): vanilla slots 0 = left input
+     * (target item), 1 = right input (material / enchantment book),
+     * 2 = result, then the standard 27 main + 9 hotbar. Both inputs
+     * share the INPUT role in v1 — the harness addresses the right
+     * input by flat index when it needs material-specific placement.
+     */
+    public static SlotRole anvilRole(int index, int size) {
+        if (index == 0 || index == 1) {
+            return SlotRole.INPUT;
+        }
+        if (index == 2) {
+            return SlotRole.OUTPUT;
+        }
+        return index <= size - 10 ? SlotRole.MAIN : SlotRole.HOTBAR;
+    }
 }

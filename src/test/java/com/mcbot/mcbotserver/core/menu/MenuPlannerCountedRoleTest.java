@@ -103,4 +103,28 @@ class MenuPlannerCountedRoleTest {
                 IllegalArgumentException.class,
                 () -> MenuPlanner.planTakeRole(MenuFixtures.furnace(b), SlotRole.OUTPUT, 2));
     }
+
+    @Test
+    void anvilDepositInputFillsFirstEmptyInputSlot() {
+        // Anvil has two INPUT slots (0=target, 1=material); deposit
+        // INPUT fills the first empty one (slot 0) in v1. Counted
+        // deposit uses right-click placement + return remainder.
+        MenuView menu =
+                MenuFixtures.anvil(MenuFixtures.builder().put(SlotRole.HOTBAR, 38, "minecraft:iron_pickaxe", 1));
+        List<MenuPlanner.Step> plan = MenuPlanner.planDepositCounted(menu, SlotRole.INPUT, "minecraft:iron_pickaxe", 1);
+        assertEquals(
+                List.of(
+                        new MenuPlanner.Step(38, 0, MenuClick.PICKUP),
+                        new MenuPlanner.Step(0, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(38, 0, MenuClick.PICKUP)),
+                plan);
+    }
+
+    @Test
+    void anvilTakeOutputQuickMovesResult() {
+        MenuView menu = MenuFixtures.anvil(MenuFixtures.builder().put(SlotRole.OUTPUT, 2, "minecraft:iron_pickaxe", 1));
+        assertEquals(
+                List.of(new MenuPlanner.Step(2, 0, MenuClick.QUICK_MOVE)),
+                MenuPlanner.planTakeRole(menu, SlotRole.OUTPUT, 0));
+    }
 }

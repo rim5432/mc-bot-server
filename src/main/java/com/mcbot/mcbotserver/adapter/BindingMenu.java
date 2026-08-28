@@ -181,6 +181,9 @@ public final class BindingMenu {
         if (menu instanceof AbstractFurnaceMenu) {
             return MenuSlotLayouts.furnaceRole(index, size);
         }
+        if (menu instanceof net.minecraft.world.inventory.AnvilMenu) {
+            return MenuSlotLayouts.anvilRole(index, size);
+        }
         // Container menus (chest, and unknown kinds as fallback):
         // leading container slots, then main 27, then hotbar 9.
         if (index <= size - 37) {

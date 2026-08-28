@@ -172,6 +172,26 @@ final class MenuFixtures {
         return new MenuView("furnace", null, ItemView.EMPTY, 39, slots);
     }
 
+    /** Anvil-shaped snapshot: INPUT 0 (target) and 1 (material),
+     * OUTPUT 2, MAIN 3..29, HOTBAR 30..38 - vanilla AnvilMenu
+     * (ItemCombinerMenu) mirrored. Both inputs share INPUT in v1. */
+    static MenuView anvil(Builder b) {
+        b.roles.putIfAbsent(0, SlotRole.INPUT);
+        b.roles.putIfAbsent(1, SlotRole.INPUT);
+        b.roles.putIfAbsent(2, SlotRole.OUTPUT);
+        for (int i = 3; i <= 29; i++) {
+            b.roles.putIfAbsent(i, SlotRole.MAIN);
+        }
+        for (int i = 30; i <= 38; i++) {
+            b.roles.putIfAbsent(i, SlotRole.HOTBAR);
+        }
+        List<SlotView> slots = new ArrayList<>(39);
+        for (int i = 0; i < 39; i++) {
+            slots.add(new SlotView(i, b.items.getOrDefault(i, ItemView.EMPTY), b.roles.get(i)));
+        }
+        return new MenuView("anvil", null, ItemView.EMPTY, 39, slots);
+    }
+
     /** Own-inventory fake: result 0, grid 1..4, ARMOR 5..8 (head
      * first), MAIN 9..35, HOTBAR 36..44, OFFHAND 45 - the
      * MenuSlotLayouts survival layout mirrored. */
