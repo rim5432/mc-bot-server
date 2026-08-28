@@ -82,9 +82,9 @@ public final class BotCombatGameTests {
                                     body.getItemBySlot(EquipmentSlot.MAINHAND).getItem()),
                             "the equipment mirror must see the selected hotbar stack as mainhand");
                     checkEquals(
-                            10.0,
+                            9.0,
                             body.getAttributeValue(Attributes.ATTACK_DAMAGE),
-                            "ATTACK_DAMAGE must be base 3.0 + diamond sword 7.0");
+                            "ATTACK_DAMAGE must be base 3.0 + diamond sword 6.0");
                     checkEquals(
                             3.0,
                             body.getAttributeValue(Attributes.ARMOR),

@@ -192,6 +192,17 @@ public final class BindingActor implements Actor, MenuTransactions {
     private void applyRot(Claim rot) {
         if (rot != null && rot.intent() instanceof Intent.Look l) {
             body.setTargetRotation(l.yawDeg(), l.pitchDeg());
+            // Apply the rotation to the body immediately as well:
+            // setTargetRotation only schedules a smoothed transition via
+            // customServerAiStep, but applyUse calls facade.syncPosition()
+            // in the SAME tick, which reads body.getXRot() (the current,
+            // not target, value). Without the immediate setXRot/setYRot,
+            // the bucket raycast fires from the stale horizontal pitch and
+            // misses the ground — MLG water lands nowhere near the feet.
+            body.setYRot(l.yawDeg());
+            body.setXRot(l.pitchDeg());
+            facade.setYRot(l.yawDeg());
+            facade.setXRot(l.pitchDeg());
             presence.onRotClaim();
         } else if (rot == null) {
             // Idle presence (issue 0005 P0.2/P0.3): no behavior owns
@@ -237,10 +248,14 @@ public final class BindingActor implements Actor, MenuTransactions {
                         // stale position.
                         facade.syncPosition();
                         ItemStack heldStack = body.getInventory().container().getItem(body.selectedSlot);
-                        if (heldStack
-                                .use(body.level(), facade, InteractionHand.MAIN_HAND)
-                                .getResult()
-                                .consumesAction()) {
+                        var useResult = heldStack.use(body.level(), facade, InteractionHand.MAIN_HAND);
+                        if (useResult.getResult().consumesAction()) {
+                            // Write the used item (empty bucket) back to the
+                            // hotbar slot — ItemStack.use returns the mutated
+                            // stack but does not write it through the player
+                            // inventory (the facade has no ServerPlayer
+                            // inventory-write path).
+                            body.getInventory().container().setItem(body.selectedSlot, useResult.getObject());
                             body.swing(InteractionHand.MAIN_HAND);
                         }
                     } else {

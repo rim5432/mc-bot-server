@@ -575,7 +575,7 @@ public final class BotCraftingGameTests {
                             + full.recipes().get(i).recipeId());
         }
         check(
-                full.recipes().stream().anyMatch(r -> r.recipeId().equals("minecraft:mushroom_stew")),
+                full.recipes().stream().anyMatch(RecipeView::shapeless),
                 "shapeless recipes must appear in pages alongside shaped ones");
 
         var head = catalog.list(0, 2);

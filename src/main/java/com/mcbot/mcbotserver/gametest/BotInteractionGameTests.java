@@ -93,10 +93,18 @@ public final class BotInteractionGameTests {
         rig.body().selectedSlot = 0;
         rig.body().getInventory().setSelectedSlot(0);
         rig.body().setYRot(90f);
-        CellPos floor = localToCell(helper, new BlockPos(6, GametestRig.FLOOR_Y, 7));
+        BlockPos floorLocal = new BlockPos(6, GametestRig.FLOOR_Y, 7);
+        helper.setBlock(floorLocal, Blocks.STONE);
+        CellPos floor = localToCell(helper, floorLocal);
 
         helper.startSequence()
                 .thenExecute(() -> {
+                    System.out.println("[DEBUG stairs] body pos=" + rig.body().position() + " yRot="
+                            + rig.body().getYRot());
+                    System.out.println(
+                            "[DEBUG stairs] floor abs=" + floor + " selectedSlot=" + rig.body().selectedSlot);
+                    System.out.println("[DEBUG stairs] held="
+                            + rig.body().getInventory().container().getItem(rig.body().selectedSlot));
                     boolean used = rig.actor()
                             .interactExecutor()
                             .use(new Intent.InteractBlock(
@@ -104,6 +112,12 @@ public final class BotInteractionGameTests {
                                     Direction.UP,
                                     new com.mcbot.mcbotserver.api.types.Vec3(
                                             floor.x() + 0.5, floor.y() + 1.0, floor.z() + 0.5)));
+                    System.out.println("[DEBUG stairs] used=" + used);
+                    BlockPos floorAbs = new BlockPos(floor.x(), floor.y(), floor.z());
+                    System.out.println(
+                            "[DEBUG stairs] floor state=" + rig.body().level().getBlockState(floorAbs));
+                    System.out.println(
+                            "[DEBUG stairs] above state=" + rig.body().level().getBlockState(floorAbs.above()));
                     check(used, "the stair placement must consume the click");
                 })
                 .thenExecute(() -> {

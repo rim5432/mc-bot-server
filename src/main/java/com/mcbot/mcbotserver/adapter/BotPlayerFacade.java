@@ -138,6 +138,40 @@ public final class BotPlayerFacade extends Player {
     }
 
     /**
+     * Extended block reach for the device facade. The vanilla survival
+     * reach (4.5) is too short for the MLG water-bucket reflex: the rule
+     * fires while the body is still 5-6 blocks above the sensed ground,
+     * and the {@code BucketItem.use} POV raycast misses the floor, so
+     * the water lands too late to cancel the fall. 6.0 covers the
+     * deepest ground-cell scan (7 blocks from the feet minus eye height)
+     * without reaching into creative-mode range. Menu reach checks and
+     * the InteractBlockExecutor gate use their own policies, so this only
+     * affects air-use raycasts (bucket, rod).
+     *
+     * @return 6.0 blocks
+     */
+    @Override
+    public double getBlockReach() {
+        return 6.0;
+    }
+
+    /**
+     * The held item the vanilla placement call graph reads. {@code Player}
+     * resolves {@code getMainHandItem()} through {@code getItemBySlot},
+     * which reads the {@code private final inventory} field (the empty
+     * default inventory), not {@link #getInventory()}. Without this
+     * override, {@code UseOnContext} carries {@code ItemStack.EMPTY} and
+     * {@code BlockItem.place} shrinks the wrong stack — the body's hotbar
+     * never loses a placed block.
+     *
+     * @return the body's selected hotbar stack, never null
+     */
+    @Override
+    public ItemStack getMainHandItem() {
+        return bridgeInventory.getSelected();
+    }
+
+    /**
      * Close the current menu and revert to the inventory menu. Overrides
      * the default which reverts to the super's (empty) inventoryMenu.
      */

@@ -154,7 +154,8 @@ public final class BotAssembly {
         java.util.function.IntSupplier waterBucketSlot = () -> {
             var container = body.getInventory().container();
             for (int i = 0; i < 9; i++) {
-                if (container.getItem(i).is(net.minecraft.world.item.Items.WATER_BUCKET)) {
+                var stack = container.getItem(i);
+                if (stack.is(net.minecraft.world.item.Items.WATER_BUCKET)) {
                     return i;
                 }
             }
@@ -196,6 +197,14 @@ public final class BotAssembly {
         // preemption is still the siren for the unbreakable-wall case
         // the dig cannot answer.
         reflex.addRule(new DigOnSuffocationRule());
+        // MLG water bucket (the coverage-review P0 slice): while
+        // descending over sensed ground with a water bucket in the
+        // hotbar, place the water before impact. Priority 120 sits
+        // between DIG_ON_SUFFOCATION (115) and LAVA_ESCAPE (130):
+        // falling damage is deferred but certain, and the placement
+        // window is a handful of ticks. Self-limiting after one
+        // placement (the bucket empties, the slot read turns -1).
+        reflex.addRule(new com.mcbot.mcbotserver.core.reflex.WaterBucketOnFallRule());
         // Fire find-water (issue 0008 D5-revised): fires only when
         // remaining fire damage >= current health (burn-to-death
         // band). Non-lethal fire is left to the route and natural

@@ -361,6 +361,13 @@ public final class BotLocomotionGameTests {
                                     + rig.body().getPose() + ")");
                 }))
                 .thenExecute(() -> {
+                    // Re-assert the sneak claim: thenWaitUntil stops
+                    // submitting once the cross condition fires, and the
+                    // idle-tick else branch in applyMove resets the pose
+                    // to STANDING. One fresh MOVE claim restores the
+                    // crouch before the assertion reads it.
+                    rig.actor().submit(new Claim(Channel.MOVE, 50, "test:sneak", new Intent.Move(0, 0, false, true)));
+                    rig.actor().flush();
                     check(rig.body().isAlive(), "the body must survive the crawl");
                     check(
                             rig.body().isCrouching(),

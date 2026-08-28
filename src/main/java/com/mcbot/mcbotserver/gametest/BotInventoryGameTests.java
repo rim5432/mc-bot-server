@@ -540,15 +540,33 @@ public final class BotInventoryGameTests {
         var facade = new BotPlayerFacade(rig.body());
         var opener = new com.mcbot.mcbotserver.adapter.MenuOpener(facade);
         var menu = opener.openInventory();
-
-        var steps = com.mcbot.mcbotserver.core.menu.MenuPlanner.planWear(
-                menu.snapshot(), new com.mcbot.mcbotserver.adapter.VanillaArmorCatalog());
+        var preSnap = menu.snapshot();
+        System.out.println(
+                "[DEBUG wear] snapshot slots count=" + preSnap.slots().size());
+        for (int i = 0; i < Math.min(10, preSnap.slots().size()); i++) {
+            var s = preSnap.slots().get(i);
+            System.out.println(
+                    "[DEBUG wear] slot " + i + ": index=" + s.index() + " role=" + s.role() + " item=" + s.item());
+        }
+        var catalog = new com.mcbot.mcbotserver.adapter.VanillaArmorCatalog();
+        System.out.println("[DEBUG wear] diamond_helmet classify=" + catalog.classify("minecraft:diamond_helmet"));
+        System.out.println("[DEBUG wear] iron_helmet classify=" + catalog.classify("minecraft:iron_helmet"));
+        var steps = com.mcbot.mcbotserver.core.menu.MenuPlanner.planWear(preSnap, catalog);
+        System.out.println("[DEBUG wear] steps count=" + steps.size());
         for (var step : steps) {
+            System.out.println(
+                    "[DEBUG wear] step: slot=" + step.slot() + " button=" + step.button() + " kind=" + step.kind());
             menu.click(step.slot(), step.button(), step.kind());
+            var snap = menu.snapshot();
+            System.out.println("[DEBUG wear] after click: carried=" + snap.carried() + " armor0="
+                    + (snap.slots().size() > 5 ? snap.slots().get(5) : "n/a"));
         }
         check(menu.snapshot().carried().isEmpty(), "wear must leave nothing on the cursor");
 
         var view = rig.body().getInventory().snapshot();
+        System.out.println("[DEBUG wear] final armor0=" + view.armor().get(0).itemId() + " armor3="
+                + view.armor().get(3).itemId());
+        System.out.println("[DEBUG wear] slot0=" + container.getItem(0).getItem());
         checkEquals(
                 "minecraft:diamond_helmet",
                 view.armor().get(0).itemId(),

@@ -89,13 +89,17 @@ final class ReflexClaimInjector {
             int bucketSlot = mlgBucketSlot.getAsInt();
             if (bucketSlot >= 0) {
                 String owner = "reflex:" + decision.ruleName();
+                // MLG needs a straight-down look (pitch=90) so the bucket
+                // raycast hits the block directly under the feet. IdleLook.pitchTo
+                // clamps to PITCH_LIMIT_DEG=60 (an idle-glance safeguard), which
+                // would tilt the ray 30 deg off vertical and place the water
+                // several blocks away — the fall damage is then uncanceled.
+                // Yaw is irrelevant for a vertical ray but kept at the target
+                // bearing for presentation consistency.
                 Vec3 from = cellCenter(pose.get());
                 Vec3 to = cellCenter(decision.target());
                 actor.submit(new Claim(
-                        Channel.ROT,
-                        decision.priority(),
-                        owner,
-                        new Intent.Look(IdleLook.yawTo(from, to), IdleLook.pitchTo(from, to))));
+                        Channel.ROT, decision.priority(), owner, new Intent.Look(IdleLook.yawTo(from, to), 90f)));
                 actor.submit(new Claim(Channel.SLOT, decision.priority(), owner, new Intent.SelectSlot(bucketSlot)));
                 // Pulsed press: a rising edge every other tick, so a
                 // placement that missed (pose lag, ray miss) retries

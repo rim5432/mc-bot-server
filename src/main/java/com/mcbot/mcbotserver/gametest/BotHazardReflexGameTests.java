@@ -469,6 +469,10 @@ public final class BotHazardReflexGameTests {
         // not a full recovery.
         var food = rig.body().getFoodData();
         food.setFoodLevel(20);
+        // Saturation zero: the saturated fast-regen path heals
+        // saturation/6 every 10 ticks and would fire before the 80-tick
+        // slow regen this scenario pins. Pin only the foodLevel>=18 path.
+        food.setSaturation(0f);
         float startHealth = rig.body().getMaxHealth() - 1.0f;
         rig.body().setHealth(startHealth);
 

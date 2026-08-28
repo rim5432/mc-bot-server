@@ -46,7 +46,7 @@ public final class VanillaArmorCatalog implements ArmorCatalog {
                             default -> null;
                         };
                 if (flat != null) {
-                    table.put(entry.getKey().toString(), new ArmorPiece(flat, armor.getDefense()));
+                    table.put(entry.getKey().location().toString(), new ArmorPiece(flat, armor.getDefense()));
                 }
             }
         }

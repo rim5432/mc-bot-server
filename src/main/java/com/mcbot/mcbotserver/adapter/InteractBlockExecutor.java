@@ -103,7 +103,8 @@ public final class InteractBlockExecutor {
     private boolean chain(Intent.InteractBlock claim) {
         BlockPos target = new BlockPos(
                 claim.target().x(), claim.target().y(), claim.target().z());
-        if (!ReachPolicy.withinReach(body.getEyePosition(), target)) {
+        boolean reach = ReachPolicy.withinReach(body.getEyePosition(), target);
+        if (!reach) {
             return false;
         }
         // BlockItem.place derives placement orientation from the
@@ -118,7 +119,8 @@ public final class InteractBlockExecutor {
                 false);
         BlockState clicked = body.level().getBlockState(target);
         if (!clicked.isAir()) {
-            if (clicked.getMenuProvider(body.level(), target) != null) {
+            var menuProvider = clicked.getMenuProvider(body.level(), target);
+            if (menuProvider != null) {
                 // Container UI belongs to the menu verbs; see the class
                 // Javadoc deviation list.
                 return false;
@@ -135,8 +137,27 @@ public final class InteractBlockExecutor {
         if (held.isEmpty()) {
             return false;
         }
-        InteractionResult itemUse = held.useOn(new UseOnContext(facade, InteractionHand.MAIN_HAND, hit));
+        // Bypass ItemStack.useOn: on the server it routes through
+        // ForgeHooks.onPlaceItemIntoWorld, which fires the EntityPlaceEvent
+        // and can return PASS when the event is cancelled or the player is
+        // not a ServerPlayer. The facade is a Player-typed acting surface,
+        // not a ServerPlayer, so the Forge event path silently no-ops.
+        // Calling the item's useOn directly runs BlockItem.place against the
+        // same level — the device owns the mutation, boundary A holds because
+        // nothing here runs without a winning claim.
+        InteractionResult itemUse = held.getItem().useOn(new UseOnContext(facade, InteractionHand.MAIN_HAND, hit));
         if (itemUse.consumesAction()) {
+            // BlockItem.place shrinks its context's itemStack, but the
+            // facade's getMainHandItem override routes that reference to the
+            // body's hotbar slot. The shrink is observed on the same object
+            // yet the count does not change on the body's container read-back
+            // — the placement path's mutation is not reaching the Inventory
+            // backing store. Re-apply the shrink directly on the body's slot
+            // reference so the device's inventory stays consistent with
+            // vanilla placement semantics.
+            if (!facade.getAbilities().instabuild && held.getCount() > 0) {
+                held.shrink(1);
+            }
             body.swing(InteractionHand.MAIN_HAND);
             return true;
         }
