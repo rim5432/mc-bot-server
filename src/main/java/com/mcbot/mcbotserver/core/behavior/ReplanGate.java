@@ -19,6 +19,12 @@ package com.mcbot.mcbotserver.core.behavior;
  */
 final class ReplanGate {
 
+    /**
+     * Minimum ticks between deliberate replans. Frame: time (ticks),
+     * no spatial frame.
+     */
+    public static final int REPLAN_COOLDOWN = 10;
+
     // Previous tick's onGround state, used to detect the landing
     // edge (false -> true). Initialised to false so the first
     // grounded tick is correctly classified as a "landing" - the
@@ -26,7 +32,7 @@ final class ReplanGate {
     // the replan gate anyway.
     private boolean wasOnGround;
     private boolean neverPlanned = true;
-    private int ticksSincePlan = PathingBehavior.REPLAN_COOLDOWN;
+    private int ticksSincePlan = REPLAN_COOLDOWN;
 
     /**
      * What this tick's trigger evaluation is allowed to do.
@@ -60,7 +66,7 @@ final class ReplanGate {
      * @return true iff a request would be honoured
      */
     boolean mayRequest(TickWindow window) {
-        return window.landingEdge() || neverPlanned || ticksSincePlan >= PathingBehavior.REPLAN_COOLDOWN;
+        return window.landingEdge() || neverPlanned || ticksSincePlan >= REPLAN_COOLDOWN;
     }
 
     /** Record that a request fired; re-arm the full cooldown. */
@@ -76,7 +82,7 @@ final class ReplanGate {
      * goals.
      */
     void primeLadder() {
-        ticksSincePlan = PathingBehavior.REPLAN_COOLDOWN;
+        ticksSincePlan = REPLAN_COOLDOWN;
     }
 
     /**
@@ -85,7 +91,7 @@ final class ReplanGate {
      */
     void reset() {
         neverPlanned = true;
-        ticksSincePlan = PathingBehavior.REPLAN_COOLDOWN;
+        ticksSincePlan = REPLAN_COOLDOWN;
     }
 
     /**

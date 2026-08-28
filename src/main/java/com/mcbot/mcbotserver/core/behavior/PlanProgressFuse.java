@@ -6,16 +6,16 @@ import com.mcbot.mcbotserver.api.types.Vec3;
 /**
  * The plan-progress fuse (boundaries.md decision ledger 20; landed
  * as issue 0001 Ruling a, Path A): three OR criteria drive one
- * accumulator, and {@link PathingBehavior#STUCK_WINDOW} ticks
+ * accumulator, and {@link PlanProgressFuse#STUCK_WINDOW} ticks
  * without progress fire it.
  *
  * <p>Criteria, evaluated against latched minima:
  * <ol>
  *   <li>waypoint index advanced (discrete, exact)</li>
  *   <li>goal distance closed by more than
- *       {@link PathingBehavior#STUCK_EPSILON}</li>
+ *       {@link PlanProgressFuse#STUCK_EPSILON}</li>
  *   <li>current-waypoint 3D distance dropped by more than
- *       {@link PathingBehavior#STUCK_EPSILON} (latched-min tracked)</li>
+ *       {@link PlanProgressFuse#STUCK_EPSILON} (latched-min tracked)</li>
  * </ol>
  *
  * <p>Invariants (ledger 20 - do not re-litigate here):
@@ -36,6 +36,32 @@ import com.mcbot.mcbotserver.api.types.Vec3;
  * follower state.
  */
 final class PlanProgressFuse {
+
+    /**
+     * Ticks without plan-progress before the progress fuse fires.
+     * Frame: time (ticks), no spatial frame.
+     */
+    public static final int STUCK_WINDOW = 20;
+
+    /**
+     * New-min margin in metres for the plan-progress latched
+     * minimum. A candidate new score (criterion 3 -
+     * currentWaypointDistance3D, or criterion 2 - goalDistance)
+     * must beat the latched value by at least this margin to count
+     * as progress. Frame: 3D distance (metres). The previous
+     * per-tick motion-detector threshold used the same constant
+     * (0.01 m) so PR-2's redefinition of "what 0.01 means" is the
+     * only semantics change; the value carries over.
+     *
+     * <p>Why margin, not equality: without a margin, in-place jitter
+     * micro-noise would mint 0.001 m new minima and the fuse
+     * would never trip on a waterfall column (the latched value
+     * would only decrease by sub-margin amounts per tick). The
+     * waterfall characterization test in
+     * {@code LimboCharacterizationGateTest} exposes this immediately
+     * if the margin is left at zero.
+     */
+    public static final double STUCK_EPSILON = 0.01;
 
     private int ticksSincePlanProgress;
     // Observation latches, initialised to "no prior observation"
@@ -74,7 +100,7 @@ final class PlanProgressFuse {
             lastWaypoint3DDistance = Double.POSITIVE_INFINITY;
         }
 
-        boolean p2 = goalDist < lastGoalDistance - PathingBehavior.STUCK_EPSILON;
+        boolean p2 = goalDist < lastGoalDistance - STUCK_EPSILON;
         if (p2) {
             lastGoalDistance = goalDist;
         }
@@ -86,7 +112,7 @@ final class PlanProgressFuse {
             // capture (ledger 20).
             CellPos wp = cursor.current();
             double wpDist = position.distanceTo(wp.x() + 0.5, wp.y() + 0.5, wp.z() + 0.5);
-            p3 = wpDist < lastWaypoint3DDistance - PathingBehavior.STUCK_EPSILON;
+            p3 = wpDist < lastWaypoint3DDistance - STUCK_EPSILON;
             if (p3) {
                 lastWaypoint3DDistance = wpDist;
             }
@@ -113,7 +139,7 @@ final class PlanProgressFuse {
      * @return true iff a STUCK verdict is due
      */
     boolean shouldFire() {
-        return !stuckLatched && ticksSincePlanProgress >= PathingBehavior.STUCK_WINDOW;
+        return !stuckLatched && ticksSincePlanProgress >= STUCK_WINDOW;
     }
 
     /**

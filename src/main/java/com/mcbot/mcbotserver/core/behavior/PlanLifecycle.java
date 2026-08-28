@@ -35,6 +35,18 @@ import java.util.concurrent.CompletableFuture;
 final class PlanLifecycle {
 
     /**
+     * Freshness tolerance in cells (issue 0001 fix 5 / Ruling (c).
+     * The bot's current cell must be within Chebyshev distance
+     * {@code FRESHNESS_CELLS} of the {@code pendingStart} the
+     * search was launched from for the result to be adopted.
+     * {@code FRESHNESS_CELLS == 1} is the v1 vocabulary's
+     * tightest tolerance: every BasicMoves move is max-Chebyshev
+     * 1, so a 1-cell drift is the maximum the bot can accumulate
+     * in any single tick.
+     */
+    public static final int FRESHNESS_CELLS = 1;
+
+    /**
      * What a finished (or absent) search means for the follower.
      */
     enum Outcome {
@@ -199,8 +211,7 @@ final class PlanLifecycle {
         // Note: 1 cell is the v1 vocabulary's tightest tolerance;
         // future moves that span more cells per step must revisit
         // this constant in lockstep.
-        boolean fresh = currentGoal.equals(pendingGoal)
-                && chebyshevDistance(cell, pendingStart) <= PathingBehavior.FRESHNESS_CELLS;
+        boolean fresh = currentGoal.equals(pendingGoal) && chebyshevDistance(cell, pendingStart) <= FRESHNESS_CELLS;
         pendingGoal = null;
         pendingStart = null;
         if (!fresh) {

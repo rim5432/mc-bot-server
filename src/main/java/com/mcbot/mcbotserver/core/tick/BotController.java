@@ -148,7 +148,7 @@ public final class BotController {
 
     /**
      * How often the keepalive event fires. Matches
-     * {@code PathingBehavior.STUCK_WINDOW} so a keepalive arrives
+     * {@code PlanProgressFuse.STUCK_WINDOW} so a keepalive arrives
      * on the same tick a STUCK would have, were it to fire. Issue
      * 0001 fix 2: not a contract - the S-F verifier ignores unknown
      * kinds, so this can be tuned later without breaking replay.

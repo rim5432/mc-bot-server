@@ -30,7 +30,7 @@ import java.util.Map;
  * a frozen body with a fresh, usable route stays silent and simply waits
  * out the replan cooldown with claims flowing. Replan triggers: plan
  * exhausted, body drifted beyond {@value #REPLAN_DISTANCE} of the active
- * waypoint, or {@value #STUCK_WINDOW} ticks without plan-progress.
+ * waypoint, or {@value PlanProgressFuse#STUCK_WINDOW} ticks without plan-progress.
  *
  * <p>Decomposition: this class is the orchestration shell - it owns the
  * tuning constants, the constructor surface, steering, and the
@@ -60,32 +60,6 @@ import java.util.Map;
 public final class PathingBehavior implements Behavior {
 
     /**
-     * Ticks without plan-progress before the progress fuse fires.
-     * Frame: time (ticks), no spatial frame.
-     */
-    public static final int STUCK_WINDOW = 20;
-
-    /**
-     * New-min margin in metres for the plan-progress latched
-     * minimum. A candidate new score (criterion 3 -
-     * currentWaypointDistance3D, or criterion 2 - goalDistance)
-     * must beat the latched value by at least this margin to count
-     * as progress. Frame: 3D distance (metres). The previous
-     * per-tick motion-detector threshold used the same constant
-     * (0.01 m) so PR-2's redefinition of "what 0.01 means" is the
-     * only semantics change; the value carries over.
-     *
-     * <p>Why margin, not equality: without a margin, in-place jitter
-     * micro-noise would mint 0.001 m new minima and the fuse
-     * would never trip on a waterfall column (the latched value
-     * would only decrease by sub-margin amounts per tick). The
-     * waterfall characterization test in
-     * {@code LimboCharacterizationGateTest} exposes this immediately
-     * if the margin is left at zero.
-     */
-    public static final double STUCK_EPSILON = 0.01;
-
-    /**
      * Horizontal reach that counts as "waypoint touched", in metres.
      * Frame: XZ only (`Math.hypot(dx, dz)` in
      * {@link WaypointCursor#advance} and {@code distanceToSegment}).
@@ -108,12 +82,6 @@ public final class PathingBehavior implements Behavior {
      * {@code PathingBehaviorFrameGateTest.replanDriftIsXZToSegment}.
      */
     public static final double REPLAN_DISTANCE = 3.0;
-
-    /**
-     * Minimum ticks between deliberate replans. Frame: time (ticks),
-     * no spatial frame.
-     */
-    public static final int REPLAN_COOLDOWN = 10;
 
     /**
      * Soft wall-clock cap for one off-thread search. The node budget
@@ -139,18 +107,6 @@ public final class PathingBehavior implements Behavior {
      * degrees, symmetric up/down, engine sign (negative = up).
      */
     public static final float STEER_PITCH_LIMIT_DEG = 60f;
-
-    /**
-     * Freshness tolerance in cells (issue 0001 fix 5 / Ruling (c).
-     * The bot's current cell must be within Chebyshev distance
-     * {@code FRESHNESS_CELLS} of the {@code pendingStart} the
-     * search was launched from for the result to be adopted.
-     * {@code FRESHNESS_CELLS == 1} is the v1 vocabulary's
-     * tightest tolerance: every BasicMoves move is max-Chebyshev
-     * 1, so a 1-cell drift is the maximum the bot can accumulate
-     * in any single tick.
-     */
-    public static final int FRESHNESS_CELLS = 1;
 
     /**
      * Ticks a fresh (or re-targeted) mission holds before the first

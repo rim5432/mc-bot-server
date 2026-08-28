@@ -185,8 +185,9 @@ class PathingBehaviorFrameGateTest {
             mover.tick(world, directive, actor);
         }
         int before = PathingTestAccess.ticksSincePlan(mover);
-        assertTrue(
-                before >= PathingBehavior.REPLAN_COOLDOWN, "cooldown must have expired for a request to be possible");
+        // Literal on purpose: a characterization gate pins the tuning
+        // value so drift is a conscious update (ReplanGate.REPLAN_COOLDOWN = 10).
+        assertTrue(before >= 10, "cooldown must have expired for a request to be possible");
 
         // On the segment, 38 cells from the current waypoint (the
         // goal): not drift under segment semantics; under the old
