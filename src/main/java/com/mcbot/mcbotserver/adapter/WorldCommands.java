@@ -120,6 +120,7 @@ public final class WorldCommands {
         var useItem = Commands.literal("use-item")
                 .requires(src -> src.hasPermission(2))
                 .executes(ctx -> runUseItem(ctx, live));
+        var bag = Commands.literal("bag").requires(src -> src.hasPermission(2)).executes(ctx -> runBag(ctx, live));
         var sneak = Commands.literal("sneak")
                 .requires(src -> src.hasPermission(2))
                 .then(Commands.argument("state", com.mojang.brigadier.arguments.StringArgumentType.word())
@@ -142,6 +143,7 @@ public final class WorldCommands {
         dispatcher.register(sneak);
         dispatcher.register(useItem);
         dispatcher.register(sleep);
+        dispatcher.register(bag);
     }
 
     /**
@@ -244,6 +246,60 @@ public final class WorldCommands {
             root.addProperty(
                     "reason",
                     "no action (out of reach, container block, block and item" + " both passed, or empty hand)");
+        }
+        return CommandResponse.answer(ctx.getSource(), root);
+    }
+
+    /**
+     * Per-slot read of the bot's own inventory (/player/bag): main
+     * 0..35 with only non-empty slots materialized, armor, offhand,
+     * and the current selection. The aggregate item map stays in
+     * {@code /bot status} ({@code /player/inventory}); this answers
+     * with slot-level truth, which drop/equip/wear orchestration
+     * needs.
+     */
+    private static int runBag(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
+        Live l = live.get();
+        if (l == null) {
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
+        }
+        var bag = l.view().getInventory();
+        JsonObject root = CommandResponse.ok();
+        root.addProperty("selected", bag.selectedSlot());
+        JsonArray slots = new JsonArray();
+        int free = 0;
+        for (int i = 0; i < bag.main().size(); i++) {
+            var item = bag.main().get(i);
+            if (item.isEmpty()) {
+                free++;
+                continue;
+            }
+            JsonObject row = new JsonObject();
+            row.addProperty("slot", i);
+            row.addProperty("item", item.itemId());
+            row.addProperty("count", item.count());
+            slots.add(row);
+        }
+        root.add("main", slots);
+        root.addProperty("free", free);
+        JsonArray armor = new JsonArray();
+        for (int i = 0; i < bag.armor().size(); i++) {
+            var item = bag.armor().get(i);
+            if (item.isEmpty()) {
+                continue;
+            }
+            JsonObject row = new JsonObject();
+            row.addProperty("slot", i);
+            row.addProperty("item", item.itemId());
+            row.addProperty("count", item.count());
+            armor.add(row);
+        }
+        root.add("armor", armor);
+        if (!bag.offhand().isEmpty()) {
+            JsonObject off = new JsonObject();
+            off.addProperty("item", bag.offhand().itemId());
+            off.addProperty("count", bag.offhand().count());
+            root.add("offhand", off);
         }
         return CommandResponse.answer(ctx.getSource(), root);
     }

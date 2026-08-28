@@ -21,6 +21,8 @@ Namespace:
                            /sleep)
   /recipes/<item>          cat only (RecipeManager query)
   /stations/<type>@<x,y,z>/<role>  cat/write (menu domain)
+  cat /player/bag             -> bag  (per-slot inventory truth;
+                              /player/inventory stays the aggregate)
   /tasks/                  write (submit goto/mine), wait, cancel
   /events                  events verb only
 
@@ -374,6 +376,13 @@ def cmd_admin_dump_recipes() -> int:
 
 def cmd_cat(path: str) -> int:
     """Flat state read. Maps /player/* and /tasks/current to /bot status."""
+    if path == "/player/bag":
+        # Per-slot truth in one wire call - no status prefetch (the
+        # other /player fields need it; the bag does not).
+        resp = wire("bag")
+        emit_json(resp)
+        return 0 if resp.get("ok") else 1
+
     if path.startswith("/player/") or path == "/player":
         field = path[len("/player/"):] if path.startswith("/player/") else "status"
         resp = wire("/bot status")
@@ -972,7 +981,7 @@ def cmd_ls(path: str) -> int:
     if path == "/player" or path == "/player/":
         # Self-describing: the readable fields ARE the listing, so a
         # caller that forgot the vocabulary asks the surface.
-        for field in ("inventory", "inventory/free", "pos", "health",
+        for field in ("inventory", "inventory/free", "bag", "pos", "health",
                       "status", "menu (pending, issue 0012 D1)",
                       "sneak (writable)", "hotbar (writable)",
                       "held/use (writable)"):

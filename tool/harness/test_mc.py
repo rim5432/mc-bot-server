@@ -544,6 +544,23 @@ class DigAsBlockWriteTest(McCliTest):
     """Doc 10: write /blocks/<x,y,z> air -> /bot dig (job family).
     Breaking is multi-tick, so the receipt is a taskId."""
 
+    def test_player_bag_translates_to_the_bag_verb(self):
+        self.queue({"ok": True, "selected": 0, "free": 35,
+                    "main": [{"slot": 0, "item": "minecraft:water_bucket",
+                              "count": 1}],
+                    "armor": [], "offhand": None})
+        code, out, _ = self.run_verb(mc.cmd_cat, "/player/bag")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["bag"])
+        self.assertIn("water_bucket", out)
+
+    def test_player_bag_reads_clean_when_inventory_is_empty(self):
+        self.queue({"ok": True, "selected": 0, "free": 36,
+                    "main": [], "armor": [], "offhand": None})
+        code, out, _ = self.run_verb(mc.cmd_cat, "/player/bag")
+        self.assertEqual(code, 0)
+        self.assertIn('"free": 36', out)
+
     def test_air_write_translates_with_default_timeout(self):
         self.queue({"ok": True, "task": "t7", "replay": False})
         code, _, err = self.run_verb(mc.cmd_write, "/blocks/3,61,3", "air")
@@ -1198,8 +1215,8 @@ class LsUniversalityTest(McCliTest):
         code, out, _ = self.run_verb(mc.cmd_ls, "/player")
         self.assertEqual(code, 0)
         self.assertEqual(self.wire_calls, [])
-        for field in ("inventory", "pos", "health", "sneak", "hotbar",
-                      "held/use"):
+        for field in ("inventory", "bag", "pos", "health", "sneak",
+                      "hotbar", "held/use"):
             self.assertIn(field, out)
 
     def test_recipes_root_lists_dumped_cache(self):
