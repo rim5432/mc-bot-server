@@ -698,3 +698,5 @@ Amendment chains recorded so far (both sides annotated):
     series. Engine-backed verification of the touched gametest
     surface (rig tickOnce + spawnHostile) rides the pooled
     runGameTest batch, not this entry.
+
+    42. 2026-08-28 audit completion round (amends 41): the audit's second-tier findings landed - Goals.cellOf dedupes the three hand-rolled goal-cell extracts behind one exhaustive api/goal method; RangedLoadouts ends DefendProcess's cross-tier reach into CombatBehavior; TargetTracker owns the Defend/Attack sighted/leash/grace state machine with its load-bearing order in one doc; BotController's telescoping constructors collapsed 4 -> 2; WorldCommands gained posArg/faceArg/posJson; the rescue finders share one scanNearest skeleton; the rig pins SETTLE_TICKS and the hostile-spawn convention. Declined with rationale: a discard finisher and terrain-pit helper (tail shapes vary across 40 sites; unification would churn engine-unverified scenarios), and a shared SourceScan beyond RepoRoot unification (each gate's pinned list is a deliberate review checkpoint). code-health's god-class paydown item closed - PMD-as-yardstick met.

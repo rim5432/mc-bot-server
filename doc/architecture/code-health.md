@@ -259,15 +259,18 @@ without an anchor is a workplan item, not a row here.
   Schedule: before Stage 3 vocabulary lands - pose parameterization
   touches the same collision predicates, and trimming afterwards
   would churn boundary-D consumers twice.
-- **OPEN - god-class paydown round with PMD as the yardstick.** The
-  dashboard's 18 findings at install time are the "before" numbers:
-  MenuPlanner WMC=110 (planGridFill CC=23, planDepositCounted 22,
-  planTakeRole 19), BotController.runPipeline CC=23, MenuCommands
-  WMC=63 + TooManyMethods, ReflexRuleJson WMC=65, MineProcess ctor
-  CC=15, AStarPathFinder.compute CC=19. A round lands when the
-  numbers drop - not when the classes "feel" smaller; PMD flips to
-  failing (ignoreFailures off) the round after the metrics clear
-  the report levels.
+- **CLOSED 2026-08-28 - god-class paydown round with PMD as the
+  yardstick.** The install-time 18 findings cleared across the
+  paydown rounds (MenuVerbs/MenuSlotLayouts/ReflexRuleJsonReader/
+  PlayerRegion/CraftingPlanner/TransferPlanner splits; the 08-28 wave
+  extracted ReflexPreemption, CrashLatch, ActorMenuTransactions,
+  VerbTaskHandler, RangedLoadouts, TargetTracker, Goals.cellOf,
+  BotStateSnapshots and dropped BotController's suppression with the
+  wall passing clean). -Plint is fully green: PMD 0, CPD 0. The
+  remaining inline exemptions (MenuVerbs, WorldCommands, BotBodyEntity,
+  HungryProcess, MenuFixtures, MenuPlannerCountedRoleTest) carry
+  sanctioned rulings - flat tables and engine-shaped entities, not
+  debt.
 - **OPEN - SpotBugs first-triage queue.** api/core-scope first
   pass flagged ThreatBlackboard's six suspected dead fields
   (UrF/UwF), GotoCommandHandler's internal-representation exposure
