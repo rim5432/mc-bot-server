@@ -210,9 +210,9 @@ reopened on demand — **[DEFERRED]** outside v1.
   CombatBehavior does not yet auto-raise against projectiles — the
   shield is a held-item capability the harness or a future reflex can
   drive.
-- **[GAP]** Weapon auto-selection (dig tool auto-selection is shipped;
-  picking the best sword for the current target is not), multi-target,
-  retreat choreography.
+- **[SHIPPED]** Weapon auto-selection (both dig tool and melee weapon
+  selection ship; holdBestWeapon picks the best sword for the current
+  target), multi-target, retreat choreography remain **[GAP]**.
 - **[DEFERRED]** PvP, aggression toward non-hostile entities.
 
 ### 5. Take orders
@@ -362,9 +362,10 @@ reopened on demand — **[DEFERRED]** outside v1.
   selection. Mission path only — the suffocation reflex digs without
   this step so an emergency dig never spends a SLOT claim that could
   collide with the EAT reflex's select-and-use pair.
-- **[GAP]** Shapeless recipes (no fixed grid cells to describe) and
-  multi-step crafting chains (e.g. log → planks → sticks as one
-  request).
+- **[SHIPPED]** Shapeless recipes (ingredient list with no fixed grid
+  cells; emitGridFill accepts any gridPos). **[GAP]** Multi-step crafting
+  chains (e.g. log → planks → sticks as one request) — the device fills
+  one recipe per call, the harness orchestrates the chain.
 - **[SHIPPED]** Use-item verbs - bucket fill/empty and rod cast/reel
   ride the USE channel via vanilla Item.use against a POV raycast from
   the synced facade pose, plus the sync `/bot use-item` verb for
