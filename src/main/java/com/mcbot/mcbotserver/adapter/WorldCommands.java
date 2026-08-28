@@ -163,20 +163,13 @@ public final class WorldCommands {
         if (l == null) {
             return CommandResponse.noActiveBot(ctx.getSource());
         }
-        String faceWord = com.mojang.brigadier.arguments.StringArgumentType.getString(ctx, "face")
-                .toUpperCase(java.util.Locale.ROOT);
         Direction face;
         try {
-            face = Direction.valueOf(faceWord);
+            face = faceArg(ctx);
         } catch (IllegalArgumentException e) {
-            return CommandResponse.answer(
-                    ctx.getSource(),
-                    CommandResponse.err("unknown face: " + faceWord + " (up, down, north, south, east, west)"));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err(e.getMessage()));
         }
-        CellPos target = new CellPos(
-                IntegerArgumentType.getInteger(ctx, "x"),
-                IntegerArgumentType.getInteger(ctx, "y"),
-                IntegerArgumentType.getInteger(ctx, "z"));
+        CellPos target = posArg(ctx);
         CellPos at = face.relative(target);
         BlockSnapshot before = l.view().getBlock(at, ViewMode.LIVE);
         if (before == null) {
@@ -192,11 +185,7 @@ public final class WorldCommands {
         BlockSnapshot after = l.view().getBlock(at, ViewMode.LIVE);
         JsonObject root = CommandResponse.ok();
         root.addProperty("placed", !after.isAir());
-        JsonArray p = new JsonArray();
-        p.add(at.x());
-        p.add(at.y());
-        p.add(at.z());
-        root.add("at", p);
+        root.add("at", posJson(at));
         root.addProperty("block", after.blockId());
         if (after.isAir()) {
             root.addProperty("ok", false);
@@ -222,19 +211,11 @@ public final class WorldCommands {
         }
         Direction face;
         try {
-            face = Direction.valueOf(com.mojang.brigadier.arguments.StringArgumentType.getString(ctx, "face")
-                    .toUpperCase(java.util.Locale.ROOT));
+            face = faceArg(ctx);
         } catch (IllegalArgumentException e) {
-            return CommandResponse.answer(
-                    ctx.getSource(),
-                    CommandResponse.err("unknown face: "
-                            + com.mojang.brigadier.arguments.StringArgumentType.getString(ctx, "face")
-                            + " (up, down, north, south, east, west)"));
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err(e.getMessage()));
         }
-        CellPos target = new CellPos(
-                IntegerArgumentType.getInteger(ctx, "x"),
-                IntegerArgumentType.getInteger(ctx, "y"),
-                IntegerArgumentType.getInteger(ctx, "z"));
+        CellPos target = posArg(ctx);
         BlockSnapshot clicked = l.view().getBlock(target, ViewMode.LIVE);
         if (clicked == null) {
             return CommandResponse.answer(ctx.getSource(), CommandResponse.err("chunk not loaded"));
@@ -319,10 +300,7 @@ public final class WorldCommands {
         if (l == null) {
             return CommandResponse.noActiveBot(ctx.getSource());
         }
-        CellPos target = new CellPos(
-                IntegerArgumentType.getInteger(ctx, "x"),
-                IntegerArgumentType.getInteger(ctx, "y"),
-                IntegerArgumentType.getInteger(ctx, "z"));
+        CellPos target = posArg(ctx);
         String refusal = l.sleep().apply(target);
         JsonObject root = CommandResponse.ok();
         root.addProperty("slept", refusal == null);
@@ -429,20 +407,13 @@ public final class WorldCommands {
         if (l == null) {
             return CommandResponse.noActiveBot(ctx.getSource());
         }
-        CellPos pos = new CellPos(
-                IntegerArgumentType.getInteger(ctx, "x"),
-                IntegerArgumentType.getInteger(ctx, "y"),
-                IntegerArgumentType.getInteger(ctx, "z"));
+        CellPos pos = posArg(ctx);
         BlockSnapshot snap = l.view().getBlock(pos, ViewMode.LIVE);
         if (snap == null) {
             return CommandResponse.answer(ctx.getSource(), CommandResponse.err("chunk not loaded"));
         }
         JsonObject root = CommandResponse.ok();
-        JsonArray p = new JsonArray();
-        p.add(pos.x());
-        p.add(pos.y());
-        p.add(pos.z());
-        root.add("pos", p);
+        root.add("pos", posJson(pos));
         root.addProperty("block", snap.blockId());
         return CommandResponse.answer(ctx.getSource(), root);
     }
@@ -498,11 +469,7 @@ public final class WorldCommands {
             JsonObject node = new JsonObject();
             node.addProperty("id", e.id());
             node.addProperty("type", e.type());
-            JsonArray p = new JsonArray();
-            p.add(e.pos().x());
-            p.add(e.pos().y());
-            p.add(e.pos().z());
-            node.add("pos", p);
+            node.add("pos", posJson(e.pos()));
             node.addProperty("health", e.health());
             node.addProperty("maxHealth", e.maxHealth());
             node.addProperty("dist", dist(center, e));
@@ -514,6 +481,51 @@ public final class WorldCommands {
         root.addProperty("truncated", truncated);
         root.add("entities", entities);
         return CommandResponse.answer(src, root);
+    }
+
+    /**
+     * The x y z brigadier integer args as one cell.
+     *
+     * @param ctx the command context carrying the args; never null
+     * @return the parsed cell; never null
+     */
+    private static CellPos posArg(CommandContext<CommandSourceStack> ctx) {
+        return new CellPos(
+                IntegerArgumentType.getInteger(ctx, "x"),
+                IntegerArgumentType.getInteger(ctx, "y"),
+                IntegerArgumentType.getInteger(ctx, "z"));
+    }
+
+    /**
+     * The face word arg as a Direction.
+     *
+     * @param ctx the command context carrying the face arg; never null
+     * @return the parsed direction; never null
+     * @throws IllegalArgumentException with the wire error text on an
+     *         unknown face word
+     */
+    private static Direction faceArg(CommandContext<CommandSourceStack> ctx) {
+        String faceWord = com.mojang.brigadier.arguments.StringArgumentType.getString(ctx, "face")
+                .toUpperCase(java.util.Locale.ROOT);
+        try {
+            return Direction.valueOf(faceWord);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("unknown face: " + faceWord + " (up, down, north, south, east, west)");
+        }
+    }
+
+    /**
+     * One cell as the x/y/z JSON array the harness reads.
+     *
+     * @param pos the cell; never null
+     * @return the [x, y, z] array; never null
+     */
+    private static JsonArray posJson(CellPos pos) {
+        JsonArray p = new JsonArray();
+        p.add(pos.x());
+        p.add(pos.y());
+        p.add(pos.z());
+        return p;
     }
 
     private static double dist(CellPos center, EntitySnapshot e) {
