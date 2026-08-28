@@ -6,8 +6,7 @@ import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.behavior.Behavior;
 import com.mcbot.mcbotserver.api.goal.Goal;
-import com.mcbot.mcbotserver.api.goal.GoalBlock;
-import com.mcbot.mcbotserver.api.goal.GoalNear;
+import com.mcbot.mcbotserver.api.goal.Goals;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.ExecutionReport;
 import com.mcbot.mcbotserver.api.types.CellPos;
@@ -431,7 +430,7 @@ public final class PathingBehavior implements Behavior {
      * waypoint-progress).
      */
     private void evaluatePlanProgress(Vec3 position, Goal goal) {
-        if (fuse.evaluate(cursor, position, anchorCell(goal))) {
+        if (fuse.evaluate(cursor, position, Goals.cellOf(goal))) {
             fuse.onProgress();
         } else {
             fuse.onStall();
@@ -653,20 +652,4 @@ public final class PathingBehavior implements Behavior {
                 (int) Math.floor(position.x()), (int) Math.floor(position.y()), (int) Math.floor(position.z()));
     }
 
-    /**
-     * The steering anchor of the CURRENT plan's terminal waypoint.
-     * Exhaustive over the sealed goal algebra.
-     *
-     * @param goal the mission goal; never null
-     * @return anchor cell; never null
-     */
-    static CellPos anchorCell(Goal goal) {
-        if (goal instanceof GoalBlock b) {
-            return b.target();
-        }
-        if (goal instanceof GoalNear n) {
-            return n.center();
-        }
-        throw new IllegalStateException("unhandled goal variant: " + goal.getClass());
-    }
 }

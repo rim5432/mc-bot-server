@@ -6,8 +6,7 @@ import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.behavior.Behavior;
 import com.mcbot.mcbotserver.api.goal.Goal;
-import com.mcbot.mcbotserver.api.goal.GoalBlock;
-import com.mcbot.mcbotserver.api.goal.GoalNear;
+import com.mcbot.mcbotserver.api.goal.Goals;
 import com.mcbot.mcbotserver.api.inventory.InventoryView;
 import com.mcbot.mcbotserver.api.inventory.WeaponCatalog;
 import com.mcbot.mcbotserver.api.process.Directive;
@@ -160,7 +159,7 @@ public final class CombatBehavior implements Behavior {
      */
     private AimSolve solveAim(WorldView world, Directive directive) {
         Vec3 position = positionSource.get();
-        CellPos aimCell = aimPointOf(directive.goal());
+        CellPos aimCell = Goals.cellOf(directive.goal());
         double tx = aimCell.x() + 0.5;
         double ty = aimCell.y() + 1.0;
         double tz = aimCell.z() + 0.5;
@@ -342,20 +341,4 @@ public final class CombatBehavior implements Behavior {
         }
     }
 
-    /**
-     * Where to aim for the current directive's target. Exhaustive over
-     * the sealed goal algebra; both goal forms carry the target cell.
-     *
-     * @param goal the directive's locomotion goal; never null
-     * @return the cell whose center the body should face; never null
-     */
-    private static CellPos aimPointOf(Goal goal) {
-        if (goal instanceof GoalBlock b) {
-            return b.target();
-        }
-        if (goal instanceof GoalNear n) {
-            return n.center();
-        }
-        throw new IllegalStateException("unhandled goal variant: " + goal.getClass());
-    }
 }

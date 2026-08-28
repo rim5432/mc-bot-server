@@ -1,6 +1,7 @@
 package com.mcbot.mcbotserver.core.behavior;
 
 import com.mcbot.mcbotserver.api.goal.Goal;
+import com.mcbot.mcbotserver.api.goal.Goals;
 import com.mcbot.mcbotserver.api.pathing.Heuristic;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.WorldView;
@@ -120,7 +121,7 @@ final class PlanLifecycle {
      * @return the verdict for THIS tick (never the pending search)
      */
     Adoption request(WorldView world, CellPos start, Goal goal, int nodeBudget) {
-        CellPos anchor = PathingBehavior.anchorCell(goal);
+        CellPos anchor = Goals.cellOf(goal);
         if (worker == null) {
             var plan = computeSync(world, start, goal, nodeBudget);
             return plan.isPresent() ? new Adoption(Outcome.ADOPTED, plan.get()) : new Adoption(Outcome.NO_ROUTE, null);
@@ -156,7 +157,7 @@ final class PlanLifecycle {
      * @return the waypoint chain, or empty for no route
      */
     java.util.Optional<List<CellPos>> computeSync(WorldView world, CellPos start, Goal goal, int nodeBudget) {
-        CellPos anchor = PathingBehavior.anchorCell(goal);
+        CellPos anchor = Goals.cellOf(goal);
         var finder = new AStarPathFinder(graph, Heuristic.euclideanTo(anchor), nodeBudget);
         var result = finder.compute(world, start, goal, Heuristic.euclideanTo(anchor));
         if (!result.reachedGoal() && result.waypoints().isEmpty()) {

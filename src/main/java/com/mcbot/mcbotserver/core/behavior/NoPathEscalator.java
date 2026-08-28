@@ -1,6 +1,7 @@
 package com.mcbot.mcbotserver.core.behavior;
 
 import com.mcbot.mcbotserver.api.goal.Goal;
+import com.mcbot.mcbotserver.api.goal.Goals;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import java.util.Objects;
 
@@ -93,7 +94,7 @@ final class NoPathEscalator {
             reset();
             this.goal = goal;
         }
-        double distance = PathingBehavior.anchorCell(goal).distanceTo(terminal);
+        double distance = Goals.cellOf(goal).distanceTo(terminal);
         if (distance < bestDistance - IMPROVEMENT_EPSILON) {
             bestDistance = distance;
             witnesses = 0;

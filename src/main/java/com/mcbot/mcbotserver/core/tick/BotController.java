@@ -8,8 +8,7 @@ import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.event.EventQueue;
 import com.mcbot.mcbotserver.api.goal.Goal;
-import com.mcbot.mcbotserver.api.goal.GoalBlock;
-import com.mcbot.mcbotserver.api.goal.GoalNear;
+import com.mcbot.mcbotserver.api.goal.Goals;
 import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.api.process.DigMission;
 import com.mcbot.mcbotserver.api.process.Directive;
@@ -715,17 +714,7 @@ public final class BotController {
      * directive. Sealed over the current goal algebra.
      */
     private static CellPos goalCellOf(Directive directive) {
-        if (directive == null) {
-            return null;
-        }
-        Goal g = directive.goal();
-        if (g instanceof GoalBlock b) {
-            return b.target();
-        }
-        if (g instanceof GoalNear n) {
-            return n.center();
-        }
-        return null;
+        return directive == null ? null : Goals.cellOf(directive.goal());
     }
 
     private String activeName() {
