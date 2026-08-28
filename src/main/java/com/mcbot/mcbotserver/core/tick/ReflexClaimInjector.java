@@ -30,6 +30,12 @@ final class ReflexClaimInjector {
     /** Best-food hotbar slot for the EAT reflex; -1 until wired. */
     private IntSupplier eatSlot = () -> -1;
 
+    /** Water-bucket hotbar slot for the MLG reflex; -1 until wired. */
+    private IntSupplier mlgBucketSlot = () -> -1;
+
+    /** Alternating press/release so a failed placement retries. */
+    private boolean mlgPulse;
+
     /**
      * Creates the injector over one actor and body position.
      *
@@ -54,6 +60,18 @@ final class ReflexClaimInjector {
     }
 
     /**
+     * Feed the MLG reflex's execution slot: the water-bucket hotbar
+     * slot, or -1 when none. Defaults to -1 so an unwired rig
+     * degrades a WATER_BUCKET decision to silence - stale slot data
+     * must not mint a phantom placement.
+     *
+     * @param supplier water-bucket hotbar slot 0..8, or -1; never null
+     */
+    void setMlgBucketSlotSupplier(IntSupplier supplier) {
+        this.mlgBucketSlot = java.util.Objects.requireNonNull(supplier, "supplier");
+    }
+
+    /**
      * Inject the DIG and EAT extra claims for a winning reflex
      * decision: DIG carries its own geometry (ROT aim + INTERACT dig
      * claims, re-issued every firing tick because claims expire per
@@ -66,6 +84,25 @@ final class ReflexClaimInjector {
     void injectAux(SurvivalReflexLayer.ReflexDecision decision) {
         if (decision.action() == ReflexAction.DIG && decision.target() != null) {
             aimAndDig(decision.priority(), "reflex:" + decision.ruleName(), decision.target());
+        }
+        if (decision.action() == ReflexAction.WATER_BUCKET && decision.target() != null) {
+            int bucketSlot = mlgBucketSlot.getAsInt();
+            if (bucketSlot >= 0) {
+                String owner = "reflex:" + decision.ruleName();
+                Vec3 from = cellCenter(pose.get());
+                Vec3 to = cellCenter(decision.target());
+                actor.submit(new Claim(
+                        Channel.ROT,
+                        decision.priority(),
+                        owner,
+                        new Intent.Look(IdleLook.yawTo(from, to), IdleLook.pitchTo(from, to))));
+                actor.submit(new Claim(Channel.SLOT, decision.priority(), owner, new Intent.SelectSlot(bucketSlot)));
+                // Pulsed press: a rising edge every other tick, so a
+                // placement that missed (pose lag, ray miss) retries
+                // instead of hanging on a stuck press.
+                mlgPulse = !mlgPulse;
+                actor.submit(new Claim(Channel.USE, decision.priority(), owner, new Intent.Use(mlgPulse)));
+            }
         }
         int slot = decision.action() == ReflexAction.EAT ? eatSlot.getAsInt() : -1;
         if (slot >= 0) {

@@ -69,7 +69,17 @@ final class ReflexRuleJsonReader {
                     "DIG_ON_SUFFOCATION", ReflexRuleJsonReader::suffocationRule,
                     "CLIMB_OUT_OF_POWDER_SNOW", ReflexRuleJsonReader::climbPowderSnowRule,
                     "EAT_WHEN_HUNGRY", ReflexRuleJsonReader::eatRule,
-                    "ACQUIRE_FOOD_WHEN_HUNGRY", ReflexRuleJsonReader::acquireRule);
+                    "ACQUIRE_FOOD_WHEN_HUNGRY", ReflexRuleJsonReader::acquireRule,
+                    "WATER_BUCKET_ON_FALL", ReflexRuleJsonReader::waterBucketOnFallRule);
+
+    private static ReflexRule waterBucketOnFallRule(JsonObject rule) {
+        int priority = fInt(rule, "priority", WaterBucketOnFallRule.MLG_PRIORITY);
+        try {
+            return new WaterBucketOnFallRule(priority);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("WATER_BUCKET_ON_FALL: " + e.getMessage(), e);
+        }
+    }
 
     private static ReflexRule parseRule(JsonObject rule) {
         if (!rule.has("type")) {

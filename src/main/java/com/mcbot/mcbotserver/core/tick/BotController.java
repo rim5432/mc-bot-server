@@ -395,6 +395,18 @@ public final class BotController {
     }
 
     /**
+     * Feed the MLG reflex's execution slot: the water-bucket hotbar
+     * slot, or -1 when none. Same degradation contract as the eat
+     * slot - an unwired rig stays silent instead of placing phantom
+     * water.
+     *
+     * @param supplier water-bucket hotbar slot 0..8, or -1; never null
+     */
+    public void setMlgBucketSlotSupplier(java.util.function.IntSupplier supplier) {
+        this.claimInjector.setMlgBucketSlotSupplier(supplier);
+    }
+
+    /**
      * Whether the crash latch is currently set.
      *
      * @return true from first caught RuntimeException until a full

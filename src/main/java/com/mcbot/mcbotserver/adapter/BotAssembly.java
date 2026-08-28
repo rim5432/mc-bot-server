@@ -146,6 +146,18 @@ public final class BotAssembly {
             return best;
         };
 
+        // Water-bucket slot + MLG rule: the supplier is shared by the
+        // sensor stamp and the controller's injector feed - one source
+        // of truth for both ends (the eat-slot pattern).
+        java.util.function.IntSupplier waterBucketSlot = () -> {
+            var container = body.getInventory().container();
+            for (int i = 0; i < 9; i++) {
+                if (container.getItem(i).is(net.minecraft.world.item.Items.WATER_BUCKET)) {
+                    return i;
+                }
+            }
+            return -1;
+        };
         SurvivalReflexLayer reflex = new SurvivalReflexLayer(new LevelThreatSensor(
                 () -> poseOf(body),
                 body::getAirSupply,
@@ -156,7 +168,10 @@ public final class BotAssembly {
                 () -> suffocationBlockOf(body),
                 body.getFoodData()::getFoodLevel,
                 body.getFoodData()::getSaturationLevel,
-                bestFoodSlot));
+                bestFoodSlot,
+                () -> body.getDeltaMovement().y < -0.25,
+                () -> mlgGroundCellOf(level, body),
+                waterBucketSlot));
         reflex.addRule(new FreezeOnLowHealthRule());
         // Air reflex outranks the freeze rule by default (SURFACE
         // _PRIORITY 110 vs FREEZE 100): freezing underwater converts
@@ -271,6 +286,7 @@ public final class BotAssembly {
         // The eat reflex executes against the same best-food ranking
         // the sensor stamps (one source of truth for both ends).
         controller.setEatSlotSupplier(bestFoodSlot);
+        controller.setMlgBucketSlotSupplier(waterBucketSlot);
         CommandBus bus = new CommandBus(events);
         GotoCommandHandler gotoHandler = new GotoCommandHandler(
                 arbiter, events, () -> level.getDayTime() / 24000L, () -> level.getDayTime() % 24000L);
@@ -374,6 +390,18 @@ public final class BotAssembly {
      * @param body the live carrier; never null
      * @return the eye's cell, or null when the eye is not in a wall
      */
+    private static com.mcbot.mcbotserver.api.types.CellPos mlgGroundCellOf(ServerLevel lvl, BotBodyEntity body) {
+        var feet = body.blockPosition();
+        for (int i = 0; i <= 6; i++) {
+            var probe = feet.below(i);
+            var state = lvl.getBlockState(probe);
+            if (!state.isAir() && !state.getCollisionShape(lvl, probe).isEmpty()) {
+                return new com.mcbot.mcbotserver.api.types.CellPos(probe.getX(), probe.getY(), probe.getZ());
+            }
+        }
+        return null;
+    }
+
     private static CellPos suffocationBlockOf(BotBodyEntity body) {
         if (!body.isInWall()) {
             return null;

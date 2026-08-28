@@ -16,6 +16,10 @@
       "priority": 130
     },
     {
+      "type": "WATER_BUCKET_ON_FALL",
+      "priority": 120
+    },
+    {
       "type": "DIG_ON_SUFFOCATION",
       "priority": 115
     },

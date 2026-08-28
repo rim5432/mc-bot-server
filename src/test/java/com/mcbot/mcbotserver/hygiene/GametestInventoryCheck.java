@@ -62,7 +62,8 @@ class GametestInventoryCheck {
                             "climbsOutOfPowderSnow",
                             "digsFreeWhenSuffocating",
                             "regeneratesHealthWhenBelowMax",
-                            "eatsWhenHungry"),
+                            "eatsWhenHungry",
+                            "waterBucketBreaksAFall"),
             "BotInventoryGameTests",
                     Set.of(
                             "dropsSelectedItem",

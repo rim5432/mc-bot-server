@@ -82,6 +82,10 @@ public final class LevelThreatSensor implements ThreatSensor {
     /** Best-food hotbar slot or -1, ranked by the assembly's catalog. */
     private final java.util.function.IntSupplier bestFoodSlot;
 
+    private final Supplier<Boolean> falling;
+    private final Supplier<CellPos> mlgGroundCell;
+    private final java.util.function.IntSupplier waterBucketSlot;
+
     /**
      * Creates a sensor scanning around the live body position.
      *
@@ -110,6 +114,12 @@ public final class LevelThreatSensor implements ThreatSensor {
      * @param saturationLevel body saturation supplier; never null
      * @param bestFoodSlot  best-food hotbar slot supplier, -1 when
      *                      the inventory carries no food; never null
+     * @param falling       body descending supplier (real downward
+     *                      motion, standing jitter excluded); never null
+     * @param mlgGroundCell first solid cell below the feet inside the
+     *                      MLG scan depth, null when deeper; never null
+     * @param waterBucketSlot water-bucket hotbar slot supplier, -1
+     *                      when none; never null
      */
     public LevelThreatSensor(
             Supplier<CellPos> bodyPos,
@@ -121,7 +131,10 @@ public final class LevelThreatSensor implements ThreatSensor {
             Supplier<CellPos> suffocationBlock,
             Supplier<Integer> foodLevel,
             Supplier<Float> saturationLevel,
-            java.util.function.IntSupplier bestFoodSlot) {
+            java.util.function.IntSupplier bestFoodSlot,
+            Supplier<Boolean> falling,
+            Supplier<CellPos> mlgGroundCell,
+            java.util.function.IntSupplier waterBucketSlot) {
         for (Object arg : new Object[] {
             bodyPos,
             airSupply,
@@ -132,7 +145,10 @@ public final class LevelThreatSensor implements ThreatSensor {
             suffocationBlock,
             foodLevel,
             saturationLevel,
-            bestFoodSlot
+            bestFoodSlot,
+            falling,
+            mlgGroundCell,
+            waterBucketSlot
         }) {
             if (arg == null) {
                 throw new IllegalArgumentException("arguments must not be null");
@@ -148,6 +164,9 @@ public final class LevelThreatSensor implements ThreatSensor {
         this.foodLevel = foodLevel;
         this.saturationLevel = saturationLevel;
         this.bestFoodSlot = bestFoodSlot;
+        this.falling = falling;
+        this.mlgGroundCell = mlgGroundCell;
+        this.waterBucketSlot = waterBucketSlot;
     }
 
     @Override
@@ -159,6 +178,9 @@ public final class LevelThreatSensor implements ThreatSensor {
         board.foodLevel = foodLevel.get();
         board.saturationLevel = saturationLevel.get();
         board.foodSlot = bestFoodSlot.getAsInt();
+        board.descending = falling.get();
+        board.groundCell = mlgGroundCell.get();
+        board.waterBucketSlot = waterBucketSlot.getAsInt();
         board.inLethalFluid = inLava.get();
         board.fireTicks = fireTicks.get();
         board.freezeTicks = freezeTicks.get();

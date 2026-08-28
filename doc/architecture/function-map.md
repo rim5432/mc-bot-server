@@ -167,12 +167,16 @@ reopened on demand — **[DEFERRED]** outside v1.
   a kiting skeleton at RANGED_STANDOFF with the bow loadout (ledger
   37) instead of refusing; unarmed it still refuses with the threat
   type.
-- **[GAP]** Fall protection, projectile dodge, ranged idle threats
-  (a skeleton kiting at standoff beyond the melee engage radius never
-  trips the proximity trigger - the armed ranged defense answers once
-  a combat order exists, but the idle-trigger gap remains), fighting
-  while at low health (the freeze hold currently wins that
-  arbitration).
+- **[SHIPPED]** Fall protection (the MLG slice): WATER_BUCKET_ON_FALL
+  fires while descending over sensed ground with a water bucket in
+  the hotbar - the injector aims at the ground cell, selects, and
+  pulses the use; vanilla water cancels the damage. Engine pair
+  staged (waterBucketBreaksAFall). Still open: projectile dodge,
+  ranged idle threats (a skeleton kiting at standoff beyond the
+  melee engage radius never trips the proximity trigger - the armed
+  ranged defense answers once a combat order exists, but the
+  idle-trigger gap remains), fighting while at low health (the
+  freeze hold currently wins that arbitration).
 - **[DEFERRED]** Process-suppressed reflexes (a mission pauses a reflex).
 
 ### 4. Fight

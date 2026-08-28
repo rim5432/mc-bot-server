@@ -97,5 +97,19 @@ public enum ReflexAction {
      * factory-less or sensor-empty handoff degrades to the freeze
      * hold (park and escalate per 0010 section 5).
      */
-    FORAGE
+    FORAGE,
+
+    /**
+     * One-shot water-bucket MLG (mine-school landing): the controller
+     * aims at the sensed ground cell (ROT), selects the water-bucket
+     * hotbar slot (SLOT) and pulses the use claim (USE) - vanilla
+     * resolves the empty-through-POV-raycast placement, so the source
+     * lands above whatever the descending body is about to hit and
+     * the water cancels the fall damage. Self-limiting: after the
+     * placement the bucket is empty, the sensor's water-bucket slot
+     * reads -1 and the rule goes silent. Pulsed rather than held: a
+     * failed first placement (pose lag, ray miss) must retry on the
+     * next rising edge instead of hanging on a stuck press.
+     */
+    WATER_BUCKET
 }

@@ -44,6 +44,9 @@ class ReflexPriorityOrderGateTest {
     static {
         // Mapping of ladder rung -> shipped rule type, strict order:
         expect("ESCAPE_ON_LAVA", 130);
+        // MLG sits between lava and suffocation: landing damage is
+        // deferred but certain, and the placement window is short.
+        expect("WATER_BUCKET_ON_FALL", 120);
         expect("DIG_ON_SUFFOCATION", 115);
         expect("SURFACE_ON_LOW_AIR", 110);
         expect("EXTINGUISH_FIRE", 105);

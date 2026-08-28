@@ -109,6 +109,30 @@ public final class ThreatBlackboard {
     public CellPos suffocationBlock;
 
     /**
+     * True while the body moves meaningfully downward through air -
+     * the MLG window open flag. Standing jitter (gravity's small
+     * negative drift) must not read as falling.
+     */
+    public boolean descending;
+
+    /**
+     * First solid cell directly below the feet within the MLG scan
+     * depth, null when the drop is deeper than the scan (or the body
+     * is over the void) - the water-placement aim target. A body
+     * standing on ground still has this stamped (the floor is a
+     * solid below); the {@code descending} flag is what keeps the
+     * rule silent.
+     */
+    public CellPos groundCell;
+
+    /**
+     * Hotbar slot holding a water bucket, or -1 when the inventory
+     * carries none - no MLG loadout must not mint a phantom
+     * placement, same contract as {@link #foodSlot}.
+     */
+    public int waterBucketSlot = -1;
+
+    /**
      * Reset all fields to a fresh-tick baseline before sensing.
      *
      * @param health body health at sensing time, 0..max

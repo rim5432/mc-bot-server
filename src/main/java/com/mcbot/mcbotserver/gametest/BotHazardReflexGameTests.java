@@ -522,4 +522,48 @@ public final class BotHazardReflexGameTests {
                 })
                 .thenSucceed();
     }
+
+    /**
+     * MLG water bucket (the coverage-review P0 slice): a body falling
+     * with a water bucket in the hotbar places the water before
+     * impact and lands undamaged. Proves the whole chain on the
+     * engine - the sensor stamps the ground cell, WATER_BUCKET_ON_FALL
+     * fires, the injector aims down + selects + pulses the use, and
+     * vanilla water cancels the fall damage.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 300)
+    public static void waterBucketBreaksAFall(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+
+        // Stone floor across the cell so there is ground to place onto.
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y - 1, z), Blocks.SMOOTH_STONE);
+            }
+        }
+
+        // Water bucket in hotbar slot 0 (the injector selects it).
+        rig.body().getInventory().container().setItem(0, new ItemStack(Items.WATER_BUCKET));
+
+        // Drop the body from high inside the template: gravity supplies
+        // the descent, the reflex supplies the save.
+        var drop = helper.absolutePos(new BlockPos(7, 7, 7));
+        rig.body().moveTo(drop.getX() + 0.5, drop.getY(), drop.getZ() + 0.5, 0f, 90f);
+
+        helper.startSequence()
+                .thenWaitUntil(driveUntil(
+                        rig,
+                        () -> check(
+                                rig.body().onGround(),
+                                "waiting for the body to land (Y="
+                                        + String.format("%.1f", rig.body().getY()) + ")")))
+                .thenExecute(() -> {
+                    check(rig.body().isAlive(), "the body must survive the fall");
+                    check(
+                            rig.body().getHealth() >= 19.5f,
+                            "the water must cancel the fall damage, health="
+                                    + rig.body().getHealth());
+                })
+                .thenSucceed();
+    }
 }
