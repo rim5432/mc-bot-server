@@ -77,15 +77,6 @@ public final class BindingInventory {
     }
 
     /**
-     * Currently selected hotbar slot.
-     *
-     * @return hotbar index 0-8
-     */
-    public int getSelectedSlot() {
-        return selectedSlot;
-    }
-
-    /**
      * Sets the selected hotbar slot. Mirrors the carrier's
      * {@code selectedSlot} field; the binding is the source of truth for
      * inventory reads.

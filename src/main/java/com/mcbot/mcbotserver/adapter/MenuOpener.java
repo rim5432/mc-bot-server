@@ -1,6 +1,5 @@
 package com.mcbot.mcbotserver.adapter;
 
-import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.core.BlockPos;
@@ -263,15 +262,5 @@ public final class MenuOpener {
      */
     private static com.mcbot.mcbotserver.api.types.CellPos toCellPos(BlockPos pos) {
         return new com.mcbot.mcbotserver.api.types.CellPos(pos.getX(), pos.getY(), pos.getZ());
-    }
-
-    /**
-     * The body this opener's facade is bound to. Exposed for callers that
-     * need to verify reach or position before opening.
-     *
-     * @return the body; never null
-     */
-    public BotBodyEntity body() {
-        return facade.body();
     }
 }

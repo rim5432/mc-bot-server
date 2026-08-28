@@ -40,31 +40,6 @@ public final class BindingWorldView implements WorldView {
     private final Supplier<InventoryView> inventorySupplier;
 
     /**
-     * Creates a view over one level with no trait annotations and an
-     * empty inventory — every cell answers {@link BlockTraits#defaults()}
-     * and {@link #getInventory()} returns {@link InventoryView#empty()}.
-     *
-     * @param level the world to read; never null
-     */
-    public BindingWorldView(ServerLevel level) {
-        this(level, BlockTraitsRegistry.empty(), InventoryView::empty);
-    }
-
-    /**
-     * Creates a view over one level with a trait registry backing
-     * {@link #getBlockTraits} and an empty inventory. The swim
-     * vocabulary needs at least the liquid trait for water; without an
-     * entry every fluid reads as plain passable air and no water move
-     * is ever viable.
-     *
-     * @param level  the world to read; never null
-     * @param traits sealed trait registry; never null
-     */
-    public BindingWorldView(ServerLevel level, BlockTraitsRegistry traits) {
-        this(level, traits, InventoryView::empty);
-    }
-
-    /**
      * Creates a view over one level with a trait registry and an
      * inventory supplier. The supplier is called once per perception
      * tick from {@link #getInventory()}; it must return a fresh

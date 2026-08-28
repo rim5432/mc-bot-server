@@ -7,11 +7,9 @@ import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
 import com.mojang.logging.LogUtils;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.SimpleJsonResourceReloadListener;
 import net.minecraft.util.profiling.ProfilerFiller;
-import net.minecraftforge.event.AddReloadListenerEvent;
 import org.slf4j.Logger;
 
 /**
@@ -78,16 +76,5 @@ public final class ReflexRuleReloader extends SimpleJsonResourceReloadListener {
             // silently strip the bot's survival reflexes.
             LOGGER.error("mcbotserver reflex_rules.json rejected: {}", badTable.getMessage());
         }
-    }
-
-    /**
-     * Registration hook: attaches this reloader to the server's reload
-     * pipeline.
-     *
-     * @param event the Forge reload event; never null
-     */
-    public static void register(AddReloadListenerEvent event) {
-        Objects.requireNonNull(event, "event");
-        event.addListener(new ReflexRuleReloader());
     }
 }

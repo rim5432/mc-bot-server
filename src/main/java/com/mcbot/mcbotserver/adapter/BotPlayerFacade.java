@@ -104,15 +104,6 @@ public final class BotPlayerFacade extends Player {
     }
 
     /**
-     * The bridge inventory backed by the body's BindingInventory.
-     *
-     * @return the bridge; never null
-     */
-    public BridgeInventory bridgeInventory() {
-        return bridgeInventory;
-    }
-
-    /**
      * The facade's inventory menu, backed by the bridge inventory. Use
      * this instead of {@code Player.inventoryMenu} (which is backed by
      * the empty default inventory).
