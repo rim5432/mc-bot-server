@@ -133,7 +133,32 @@ public final class CombatBehavior implements Behavior {
             abortDraw(actor);
             return ExecutionReport.running();
         }
+        AimSolve aim = solveAim(world, directive);
+        actor.submit(new Claim(Channel.ROT, 20, name, new Intent.Look(aim.yaw(), aim.pitch())));
+        if (aim.ranging()) {
+            return tickRanged(world, actor, aim.bowSlot());
+        }
+        return tickMelee(world, actor, aim);
+    }
 
+    /** One tick's aiming solution: target deltas, bearing, ballistics, weapon verdict. */
+    private record AimSolve(double dx, double dy, double dz, float yaw, float pitch, boolean ranging, int bowSlot) {
+
+        double distance() {
+            return Math.sqrt(dx * dx + dy * dy + dz * dz);
+        }
+    }
+
+    /**
+     * Computes the aiming solution: target-center deltas, the yaw
+     * with its degeneracy guard, and the ballistic pitch. Aim
+     * degeneracy guard: when standing on top of the target,
+     * horizontal direction is noise and the computed yaw flips 180
+     * degrees every tick - hold the last bearing instead. Arrow drop
+     * raises the effective aim point on the ranged path; zero on the
+     * melee path where the swing resolves without ballistics.
+     */
+    private AimSolve solveAim(WorldView world, Directive directive) {
         Vec3 position = positionSource.get();
         CellPos aimCell = aimPointOf(directive.goal());
         double tx = aimCell.x() + 0.5;
@@ -144,9 +169,6 @@ public final class CombatBehavior implements Behavior {
         double dy = ty - position.y();
         double dz = tz - position.z();
 
-        // Aim degeneracy guard: when standing on top of the target,
-        // horizontal direction is noise and the computed yaw flips
-        // 180 degrees every tick. Hold the last bearing instead.
         double horizontal = Math.hypot(dx, dz);
         float yaw = lastYaw;
         if (horizontal >= AIM_MIN_HORIZONTAL) {
@@ -154,57 +176,65 @@ public final class CombatBehavior implements Behavior {
             lastYaw = yaw;
         }
 
-        int bowSlot = rangedSlot(world, Math.sqrt(dx * dx + dy * dy + dz * dz));
+        double distSq = dx * dx + dy * dy + dz * dz;
+        int bowSlot = rangedSlot(world, Math.sqrt(distSq));
         boolean ranging = bowSlot >= 0;
-        // Arrow drop raises the effective aim point; zero on the melee
-        // path where the swing resolves without ballistics.
-        double lift = ranging ? ARROW_DROP_PER_BLOCK_SQUARED * (dx * dx + dy * dy + dz * dz) : 0.0;
+        double lift = ranging ? ARROW_DROP_PER_BLOCK_SQUARED * distSq : 0.0;
         float pitch = (float) -Math.toDegrees(Math.atan2(dy + lift, Math.max(horizontal, 0.001)));
-        actor.submit(new Claim(Channel.ROT, 20, name, new Intent.Look(yaw, pitch)));
+        return new AimSolve(dx, dy, dz, yaw, pitch, ranging, bowSlot);
+    }
 
-        if (ranging) {
-            // The bow owns SLOT while ranging: the melee ranking would
-            // switch off a bow every tick (bows carry no attack-damage
-            // modifier), so holdBestWeapon is suppressed, not raced.
-            InventoryView inventory = world.getInventory();
-            if (inventory.selectedSlot() != bowSlot) {
-                actor.submit(new Claim(Channel.SLOT, 20, name, new Intent.SelectSlot(bowSlot)));
-                return ExecutionReport.running();
-            }
-            if (pressLatched) {
-                // A melee swing window was open when ranging began -
-                // close it before the draw, one USE edge per tick.
-                actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(false)));
-                pressLatched = false;
-                return ExecutionReport.running();
-            }
-            // Draw pacing: sustain Use(true) across the charge (a USE
-            // gap reads as a release adapter-side), then one false tick
-            // fires BowItem.releaseUsing with the accumulated charge.
-            if (!drawing) {
-                actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(true)));
-                drawing = true;
-                chargeTicks = 1;
-            } else if (++chargeTicks > BOW_CHARGE_TICKS) {
-                actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(false)));
-                drawing = false;
-                chargeTicks = 0;
-            } else {
-                actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(true)));
-            }
+    /**
+     * The ranged path: switch to the bow, then pace the draw. Draw
+     * pacing sustains Use(true) across the charge (a USE gap reads as
+     * a release adapter-side), then one false tick fires
+     * BowItem.releaseUsing with the accumulated charge.
+     */
+    private ExecutionReport tickRanged(WorldView world, Actor actor, int bowSlot) {
+        // The bow owns SLOT while ranging: the melee ranking would
+        // switch off a bow every tick (bows carry no attack-damage
+        // modifier), so holdBestWeapon is suppressed, not raced.
+        InventoryView inventory = world.getInventory();
+        if (inventory.selectedSlot() != bowSlot) {
+            actor.submit(new Claim(Channel.SLOT, 20, name, new Intent.SelectSlot(bowSlot)));
             return ExecutionReport.running();
         }
+        if (pressLatched) {
+            // A melee swing window was open when ranging began -
+            // close it before the draw, one USE edge per tick.
+            actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(false)));
+            pressLatched = false;
+            return ExecutionReport.running();
+        }
+        if (!drawing) {
+            actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(true)));
+            drawing = true;
+            chargeTicks = 1;
+        } else if (++chargeTicks > BOW_CHARGE_TICKS) {
+            actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(false)));
+            drawing = false;
+            chargeTicks = 0;
+        } else {
+            actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(true)));
+        }
+        return ExecutionReport.running();
+    }
+
+    /**
+     * The melee path: drop any draw, hold the best weapon, and pace
+     * the swing. Swing pacing holds the release until cooldown
+     * expires so the adapter sees exactly one rising edge per attack
+     * window. The reach memory lets the window survive brief
+     * excursions past the gate instead of starving on edge jitter.
+     */
+    private ExecutionReport tickMelee(WorldView world, Actor actor, AimSolve aim) {
         abortDraw(actor);
 
         holdBestWeapon(world, actor);
 
-        // Swing pacing: hold the release until cooldown expires so the
-        // adapter sees exactly one rising edge per attack window. The
-        // reach memory lets the window survive brief excursions past
-        // the gate instead of starving on edge jitter.
         boolean released = !pressLatched;
         ticksSinceSwing++;
-        double reach = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        double reach = aim.distance();
         if (reach <= ATTACK_REACH) {
             ticksSinceInReach = 0;
         } else {

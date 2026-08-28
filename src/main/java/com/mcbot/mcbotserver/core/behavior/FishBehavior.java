@@ -112,9 +112,34 @@ public final class FishBehavior implements Behavior {
         List<BobberSnapshot> bobbers = world.getBobbers(fish.waterCell(), BOBBER_RADIUS, ViewMode.LIVE);
         BobberSnapshot bobber = bobbers.isEmpty() ? null : bobbers.get(0);
 
-        if (bobber == null) {
-            // No bobber out: cast. One rising edge, released next tick
-            // (the rod's cast is a click, not a hold).
+        if (bobber == null || pressPending) {
+            return tickCast(actor, bobber == null);
+        }
+        if (bobber.hookedEntity()) {
+            // Snagged a mob or item: reel to recover the rod, the fish
+            // watch restarts with the next cast.
+            reel(actor);
+            resetWatch();
+            return ExecutionReport.running();
+        }
+        if (!armed) {
+            return tickSettle(bobber.pos().y());
+        }
+        return tickBiteWatch(actor, bobber.pos().y());
+    }
+
+    /**
+     * Cast edges: with no bobber out, one rising press released the
+     * next tick (the rod's cast is a click, not a hold); with a
+     * bobber out but a press still pending, land the release half
+     * first.
+     *
+     * @param actor  claim surface; never null
+     * @param noBobber true when the water holds no bobber this tick
+     * @return the tick report; never null
+     */
+    private ExecutionReport tickCast(Actor actor, boolean noBobber) {
+        if (noBobber) {
             if (!pressPending) {
                 actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(true)));
                 pressPending = true;
@@ -128,41 +153,48 @@ public final class FishBehavior implements Behavior {
             }
             return ExecutionReport.running();
         }
-        if (pressPending) {
-            // Land the release half of the previous edge first.
-            actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(false)));
-            pressPending = false;
-            return ExecutionReport.running();
-        }
-        if (bobber.hookedEntity()) {
-            // Snagged a mob or item: reel to recover the rod, the fish
-            // watch restarts with the next cast.
-            reel(actor);
-            resetWatch();
-            return ExecutionReport.running();
-        }
+        actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(false)));
+        pressPending = false;
+        return ExecutionReport.running();
+    }
 
-        double bobberY = bobber.pos().y();
-        if (!armed) {
-            castAge++;
-            if (castAge > CAST_GRACE_TICKS) {
-                if (lastBobberY != null && Math.abs(lastBobberY - bobberY) <= 0.05) {
-                    settleTicks++;
-                } else {
-                    settleTicks = 0;
-                }
-                if (settleTicks >= SETTLE_TICKS) {
-                    armed = true;
-                    noBiteTicks = 0;
-                }
+    /**
+     * Bobber out, settling phase: after the cast grace, watch the
+     * float come to rest - SETTLE_TICKS of stillness arms the bite
+     * watch.
+     *
+     * @param bobberY the bobber's current y
+     * @return the tick report; never null
+     */
+    private ExecutionReport tickSettle(double bobberY) {
+        castAge++;
+        if (castAge > CAST_GRACE_TICKS) {
+            if (lastBobberY != null && Math.abs(lastBobberY - bobberY) <= 0.05) {
+                settleTicks++;
+            } else {
+                settleTicks = 0;
             }
-            lastBobberY = bobberY;
-            return ExecutionReport.running();
+            if (settleTicks >= SETTLE_TICKS) {
+                armed = true;
+                noBiteTicks = 0;
+            }
         }
+        lastBobberY = bobberY;
+        return ExecutionReport.running();
+    }
 
+    /**
+     * Armed bite watch: a dip past the threshold is the bite (one
+     * reel, then the watch restarts and the food scan takes over);
+     * a spent bite budget reels in and stops - the mission's own
+     * timeout then owns the verdict (0010 section 4.5).
+     *
+     * @param actor  claim surface; never null
+     * @param bobberY the bobber's current y
+     * @return the tick report; never null
+     */
+    private ExecutionReport tickBiteWatch(Actor actor, double bobberY) {
         if (noBiteTicks > BITE_BUDGET_TICKS) {
-            // Budget spent (0010 section 4.5): reel in and stop - the
-            // mission's own timeout then owns the verdict.
             if (!budgetSpent) {
                 reel(actor);
                 budgetSpent = true;
@@ -171,8 +203,6 @@ public final class FishBehavior implements Behavior {
         }
         noBiteTicks++;
         if (lastBobberY != null && lastBobberY - bobberY >= DIP_THRESHOLD) {
-            // The dip is the bite: one reel, then the watch restarts
-            // and the food scan takes over.
             reel(actor);
             resetWatch();
             return ExecutionReport.running();

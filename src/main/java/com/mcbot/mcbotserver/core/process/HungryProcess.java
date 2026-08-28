@@ -38,6 +38,11 @@ import java.util.function.Supplier;
  * side-effect-free) and issue 0010. Runs on the server tick thread
  * only.
  */
+// TooManyMethods exempted: the forage phase machine is deliberately
+// one named method per phase and per transition gate (assess/forage/
+// hunt/collect/fish plus their tick halves) - the split IS the
+// readability fix; merging phases back would reintroduce the CC wall.
+@SuppressWarnings("PMD.TooManyMethods")
 public final class HungryProcess extends MissionShell implements DigMission {
 
     /** Failure when no strategy was viable or the budget burned (0010 section 5). */
@@ -120,17 +125,34 @@ public final class HungryProcess extends MissionShell implements DigMission {
         if (!live()) {
             return lastDirective;
         }
-        InventoryView inventory = world.getInventory();
-        for (ItemView item : inventory.main()) {
-            if (!item.isEmpty() && catalog.facts(item.itemId()) != null) {
-                succeed();
-                return lastDirective;
-            }
+        if (foodNowCarried(world)) {
+            succeed();
+            return lastDirective;
         }
         if (budgetExpired()) {
             fail(REASON_TIMEOUT);
             return lastDirective;
         }
+        tickPhase(world);
+        return lastDirective;
+    }
+
+    /**
+     * The success gate: any edible item anywhere in main inventory
+     * ends the forage - the eat reflex takes over from there.
+     */
+    private boolean foodNowCarried(WorldView world) {
+        InventoryView inventory = world.getInventory();
+        for (ItemView item : inventory.main()) {
+            if (!item.isEmpty() && catalog.facts(item.itemId()) != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Dispatches the phase machine for this tick. */
+    private void tickPhase(WorldView world) {
         CellPos body = positionSource.get();
         switch (phase) {
             case ASSESS -> assess(world, body);
@@ -140,7 +162,6 @@ public final class HungryProcess extends MissionShell implements DigMission {
             case FISH -> fishTick(world);
             default -> throw new IllegalStateException("unhandled phase: " + phase);
         }
-        return lastDirective;
     }
 
     /** ASSESS: forage outranks fish outranks hunt (0010 section 4.3). */
