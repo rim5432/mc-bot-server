@@ -1,12 +1,14 @@
 package com.mcbot.mcbotserver.core.behavior;
 
+import static com.mcbot.mcbotserver.core.behavior.UseClaimTestSupport.inventory;
+import static com.mcbot.mcbotserver.core.behavior.UseClaimTestSupport.pressSequence;
+import static com.mcbot.mcbotserver.core.behavior.UseClaimTestSupport.selectedSlotOf;
+import static com.mcbot.mcbotserver.core.behavior.UseClaimTestSupport.useClaims;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.mcbot.mcbotserver.api.actor.Channel;
-import com.mcbot.mcbotserver.api.actor.Claim;
-import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.goal.GoalNear;
 import com.mcbot.mcbotserver.api.inventory.InventoryView;
 import com.mcbot.mcbotserver.api.inventory.ItemView;
@@ -18,7 +20,6 @@ import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.core.tick.RecordingActor;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -137,51 +138,5 @@ class CombatRangedGateTest {
         }
         world.setInventory(inv);
         return world;
-    }
-
-    private static int selectedSlotOf(RecordingActor actor) {
-        return actor.submitted.stream()
-                .filter(c -> c.channel() == Channel.SLOT)
-                .map(c -> (Intent.SelectSlot) c.intent())
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("expected a SLOT claim"))
-                .slot();
-    }
-
-    private static List<Boolean> pressSequence(RecordingActor actor) {
-        return useClaims(actor).stream().map(Intent.Use::pressing).toList();
-    }
-
-    private static List<Intent.Use> useClaims(RecordingActor actor) {
-        List<Intent.Use> uses = new ArrayList<>();
-        for (Claim c : actor.submitted) {
-            if (c.channel() == Channel.USE && c.intent() instanceof Intent.Use u) {
-                uses.add(u);
-            }
-        }
-        return uses;
-    }
-
-    /**
-     * An own-inventory snapshot with the given hotbar contents: a null
-     * entry (or past the array) means an empty slot.
-     *
-     * @param selected  current hotbar selection 0..8
-     * @param hotbarIds item ids for hotbar slots 0..8 in order; null
-     *                  leaves the slot empty
-     * @return the inventory view; never null
-     */
-    private static InventoryView inventory(int selected, String... hotbarIds) {
-        List<ItemView> main = new ArrayList<>(Collections.nCopies(InventoryView.MAIN_SIZE, ItemView.EMPTY));
-        for (int i = 0; i < Math.min(hotbarIds.length, InventoryView.HOTBAR_SIZE); i++) {
-            if (hotbarIds[i] != null) {
-                main.set(i, new ItemView(hotbarIds[i], 1));
-            }
-        }
-        return new InventoryView(
-                main,
-                selected,
-                List.copyOf(Collections.nCopies(InventoryView.ARMOR_SIZE, ItemView.EMPTY)),
-                ItemView.EMPTY);
     }
 }

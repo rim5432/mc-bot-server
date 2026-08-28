@@ -123,6 +123,7 @@ public final class ThreatBlackboard {
      * solid below); the {@code descending} flag is what keeps the
      * rule silent.
      */
+    @Nullable
     public CellPos groundCell;
 
     /**
