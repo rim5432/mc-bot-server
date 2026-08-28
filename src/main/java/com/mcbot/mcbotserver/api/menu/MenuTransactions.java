@@ -1,6 +1,7 @@
 package com.mcbot.mcbotserver.api.menu;
 
 import com.mcbot.mcbotserver.api.types.CellPos;
+import javax.annotation.Nullable;
 
 /**
  * Menu transactions: the imperative, request-response half of the
@@ -35,6 +36,7 @@ public interface MenuTransactions {
      *         (out of reach, unsupported kind, missing container, or
      *         the container is blocked — a cat on the chest counts)
      */
+    @Nullable
     MenuView openMenu(CellPos target);
 
     /**
@@ -51,6 +53,7 @@ public interface MenuTransactions {
      * @return the current menu's snapshot, or null when no menu is
      *         open
      */
+    @Nullable
     MenuView menuSnapshot();
 
     /**
@@ -90,7 +93,7 @@ public interface MenuTransactions {
      * @throws IllegalStateException when no menu is open or the menu is
      *         closed
      */
-    default MenuView menuButtonClick(int id) {
+    default @Nullable MenuView menuButtonClick(int id) {
         return null;
     }
 
@@ -108,7 +111,7 @@ public interface MenuTransactions {
      *         (entity not found, out of reach, untamed horse, or
      *         unsupported entity kind)
      */
-    default MenuView openEntityMenu(int entityId) {
+    default @Nullable MenuView openEntityMenu(int entityId) {
         return null;
     }
 
@@ -127,7 +130,7 @@ public interface MenuTransactions {
      * @throws IllegalStateException when no menu is open or the open menu
      *         is not a beacon
      */
-    default MenuView setBeaconEffects(String primaryKey, String secondaryKey) {
+    default @Nullable MenuView setBeaconEffects(String primaryKey, String secondaryKey) {
         return null;
     }
 }

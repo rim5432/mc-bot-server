@@ -20,6 +20,10 @@ import org.junit.jupiter.api.Test;
  * <p>Contract: see boundaries.md section A and issue 0012 D1
  * (counted deposit / take-role).
  */
+// TooManyMethods exempted: each verb scenario is one short
+// arrange/act/assert method over shared fixtures; splitting the
+// catalog would scatter one contract across files.
+@SuppressWarnings("PMD.TooManyMethods")
 class MenuPlannerCountedRoleTest {
 
     @Test
