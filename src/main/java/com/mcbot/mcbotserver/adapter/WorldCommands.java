@@ -39,6 +39,11 @@ import net.minecraft.commands.Commands;
  */
 // contract: see boundaries.md section D + issue 0013 R4 (perception
 //            reads are synchronous WorldView calls on the server thread)
+// GodClass exempted: flat verb table for the 0013 world read/write
+// surface - one body per verb, no shared mutable state, so TCC reads
+// 0% while the class stays the single registration + parsing point
+// per verb (one-shape-one-owner).
+@SuppressWarnings("PMD.GodClass")
 public final class WorldCommands {
 
     /**

@@ -24,6 +24,12 @@ import net.minecraft.commands.CommandSourceStack;
  * {@link MenuCommands}; this class holds only the wiring-neutral
  * behavior.
  */
+// GodClass exempted: this is the menu verb table - one private
+// body per wire verb plus the shared step executor, deliberately
+// flat (one-shape-one-owner). Its TCC reads 0% because verb bodies
+// share no mutable state, which is the point; the read half already
+// lives in MenuInspectOps.
+@SuppressWarnings("PMD.GodClass")
 final class MenuVerbs {
 
     private MenuVerbs() {}

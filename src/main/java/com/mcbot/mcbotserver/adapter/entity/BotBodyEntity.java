@@ -58,6 +58,11 @@ import net.minecraft.world.level.Level;
  */
 // contract: see boundaries.md section A (Actor is intents-only) and
 // decision 2 as amended by the entity-binding spike follow-up
+// GodClass exempted: a vanilla entity subclass carries its ticking
+// surfaces (hunger, pose sync, MLG helpers, carrier inventory hooks)
+// as methods by engine shape - splitting them out would put engine
+// lifecycle code outside the entity where it cannot override.
+@SuppressWarnings("PMD.GodClass")
 public final class BotBodyEntity extends PathfinderMob {
 
     private float driveForward;
