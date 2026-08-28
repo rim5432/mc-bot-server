@@ -28,9 +28,10 @@ import org.junit.jupiter.api.Test;
  * {@code shippedDatapackTableCoversEveryCodeRegisteredRuleType}
  * applies to rule registration.
  *
- * <p>Rule: boundaries.md ledger 24/26/27 (triage ladder);
- * doc/architecture/function-map.md prints the same ladder as
- * reader-facing documentation.
+ * <p>Rule: boundaries.md ledger 24/26/27 (triage ladder); the ladder
+ * is prose-free outside this gate and the shipped JSON (the retired
+ * capability map's prose ladder drifted to eight rungs while the
+ * table grew to ten - this gate is the only reader).
  */
 class ReflexPriorityOrderGateTest {
 
