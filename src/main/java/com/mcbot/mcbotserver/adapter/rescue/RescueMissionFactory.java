@@ -109,26 +109,9 @@ public final class RescueMissionFactory implements Supplier<BotProcess> {
                 taskId, new GoalBlock(target), PriorityBands.requireLegal(RESCUE_PRIORITY), RESCUE_TIMEOUT_TICKS);
     }
 
+    /** Nearest lava-adjacent dry cell in the scan cube. */
     private CellPos findNearestShore(CellPos origin) {
-        double[] fwd = forwardVector();
-        CellPos best = null;
-        double bestScore = Double.MAX_VALUE;
-        for (int dx = -SCAN_RADIUS; dx <= SCAN_RADIUS; dx++) {
-            for (int dy = -SCAN_RADIUS; dy <= SCAN_RADIUS; dy++) {
-                for (int dz = -SCAN_RADIUS; dz <= SCAN_RADIUS; dz++) {
-                    CellPos candidate = new CellPos(origin.x() + dx, origin.y() + dy, origin.z() + dz);
-                    if (!isShore(candidate)) {
-                        continue;
-                    }
-                    double score = directionAwareScore(origin, candidate, fwd);
-                    if (score < bestScore) {
-                        bestScore = score;
-                        best = candidate;
-                    }
-                }
-            }
-        }
-        return best;
+        return scanNearest(origin, this::isShore);
     }
 
     /**
@@ -139,6 +122,15 @@ public final class RescueMissionFactory implements Supplier<BotProcess> {
      * dry cell leaves the bot burning.
      */
     private CellPos findNearestWater(CellPos origin) {
+        return scanNearest(origin, this::isWaterCell);
+    }
+
+    /**
+     * The shared scan skeleton the two finders differed only in the
+     * cell predicate of: walk the SCAN_RADIUS cube, keep the
+     * direction-aware best among predicate-passing cells.
+     */
+    private CellPos scanNearest(CellPos origin, java.util.function.Predicate<CellPos> predicate) {
         double[] fwd = forwardVector();
         CellPos best = null;
         double bestScore = Double.MAX_VALUE;
@@ -146,7 +138,7 @@ public final class RescueMissionFactory implements Supplier<BotProcess> {
             for (int dy = -SCAN_RADIUS; dy <= SCAN_RADIUS; dy++) {
                 for (int dz = -SCAN_RADIUS; dz <= SCAN_RADIUS; dz++) {
                     CellPos candidate = new CellPos(origin.x() + dx, origin.y() + dy, origin.z() + dz);
-                    if (!isWaterCell(candidate)) {
+                    if (!predicate.test(candidate)) {
                         continue;
                     }
                     double score = directionAwareScore(origin, candidate, fwd);
