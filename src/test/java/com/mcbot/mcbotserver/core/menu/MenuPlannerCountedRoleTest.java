@@ -286,4 +286,30 @@ class MenuPlannerCountedRoleTest {
                 List.of(new MenuPlanner.Step(3, 0, MenuClick.QUICK_MOVE)),
                 MenuPlanner.planTakeRole(menu, SlotRole.OUTPUT, 0));
     }
+
+    @Test
+    void enchantingDepositInputFillsFirstEmptySlot() {
+        MenuView menu = MenuFixtures.enchantingTable(
+                MenuFixtures.builder().put(SlotRole.HOTBAR, 37, "minecraft:diamond_sword", 1));
+        List<MenuPlanner.Step> plan =
+                MenuPlanner.planDepositCounted(menu, SlotRole.INPUT, "minecraft:diamond_sword", 1);
+        assertEquals(
+                List.of(
+                        new MenuPlanner.Step(37, 0, MenuClick.PICKUP),
+                        new MenuPlanner.Step(0, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(37, 0, MenuClick.PICKUP)),
+                plan);
+    }
+
+    @Test
+    void beaconDepositInputGoesToSlot0() {
+        MenuView menu = MenuFixtures.beacon(MenuFixtures.builder().put(SlotRole.HOTBAR, 36, "minecraft:iron_ingot", 1));
+        List<MenuPlanner.Step> plan = MenuPlanner.planDepositCounted(menu, SlotRole.INPUT, "minecraft:iron_ingot", 1);
+        assertEquals(
+                List.of(
+                        new MenuPlanner.Step(36, 0, MenuClick.PICKUP),
+                        new MenuPlanner.Step(0, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(36, 0, MenuClick.PICKUP)),
+                plan);
+    }
 }

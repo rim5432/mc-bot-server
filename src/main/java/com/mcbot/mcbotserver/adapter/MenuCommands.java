@@ -64,7 +64,8 @@ public final class MenuCommands {
                 .then(Commands.literal("close").executes(ctx -> MenuVerbs.runClose(live, ctx.getSource())))
                 .then(depositBranch(live))
                 .then(takeBranch(live))
-                .then(craftBranch(live));
+                .then(craftBranch(live))
+                .then(buttonBranch(live));
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> openBranch(Supplier<Live> live) {
@@ -95,6 +96,12 @@ public final class MenuCommands {
         return Commands.literal("craft")
                 .then(Commands.argument("recipeId", StringArgumentType.string())
                         .executes(ctx -> MenuVerbs.runCraft(ctx, live)));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buttonBranch(Supplier<Live> live) {
+        return Commands.literal("button")
+                .then(Commands.argument("id", IntegerArgumentType.integer(0))
+                        .executes(ctx -> MenuVerbs.runButton(ctx, live)));
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> scanTree(Supplier<Live> live) {

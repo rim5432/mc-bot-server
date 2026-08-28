@@ -82,6 +82,21 @@ final class MenuVerbs {
         return MenuReply.answer(src, MenuReply.ok());
     }
 
+    static int runButton(CommandContext<CommandSourceStack> ctx, Supplier<MenuCommands.Live> live) {
+        MenuCommands.Live l = live.get();
+        if (l == null) {
+            return MenuReply.answer(ctx.getSource(), MenuReply.err("no active bot"));
+        }
+        int id = IntegerArgumentType.getInteger(ctx, "id");
+        MenuView after = l.tx().menuButtonClick(id);
+        if (after == null) {
+            return MenuReply.answer(ctx.getSource(), MenuReply.err("menu does not support button clicks"));
+        }
+        JsonObject root = MenuReply.ok();
+        root.add("menu", MenuViewJson.toJsonObject(after));
+        return MenuReply.answer(ctx.getSource(), root);
+    }
+
     static int runDeposit(CommandContext<CommandSourceStack> ctx, Supplier<MenuCommands.Live> live) {
         MenuCommands.Live l = live.get();
         if (l == null) {
@@ -246,6 +261,8 @@ final class MenuVerbs {
         boolean cartographyFamily = type.equals("cartography_table");
         boolean smithingFamily = type.equals("smithing_table");
         boolean loomFamily = type.equals("loom");
+        boolean enchantingFamily = type.equals("enchanting_table");
+        boolean beaconFamily = type.equals("beacon");
         if (furnaceFamily
                 || anvilFamily
                 || brewingFamily
@@ -253,7 +270,9 @@ final class MenuVerbs {
                 || stonecutterFamily
                 || cartographyFamily
                 || smithingFamily
-                || loomFamily) {
+                || loomFamily
+                || enchantingFamily
+                || beaconFamily) {
             return role;
         }
         return SlotRole.CONTAINER;

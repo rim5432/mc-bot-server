@@ -148,6 +148,23 @@ public final class BindingMenu {
     }
 
     /**
+     * Click a non-slot button in the open menu (enchantment option,
+     * beacon effect selection, stonecutter recipe list). Delegates to
+     * {@code AbstractContainerMenu.clickMenuButton(player, id)} — menus
+     * that override this method (EnchantmentMenu, StonecutterMenu)
+     * consume the id; menus that don't return false and the click is a
+     * no-op.
+     *
+     * @param id the button id as defined by the menu subclass (0-based)
+     * @return true if the menu consumed the button click
+     */
+    public boolean clickButton(int id) {
+        ensureOpen();
+        ensureStillValid();
+        return menu.clickMenuButton(player, id);
+    }
+
+    /**
      * Engine-click translation for {@link #click}. The two excluded
      * engine kinds (CLONE, QUICK_CRAFT) have no api vocabulary — see
      * the {@link MenuClick} deviation note.
@@ -201,6 +218,12 @@ public final class BindingMenu {
         if (menu instanceof net.minecraft.world.inventory.SmithingMenu
                 || menu instanceof net.minecraft.world.inventory.LoomMenu) {
             return MenuSlotLayouts.threeInputRole(index, size);
+        }
+        if (menu instanceof net.minecraft.world.inventory.EnchantmentMenu) {
+            return MenuSlotLayouts.enchantingRole(index, size);
+        }
+        if (menu instanceof net.minecraft.world.inventory.BeaconMenu) {
+            return MenuSlotLayouts.beaconRole(index, size);
         }
         // Container menus (chest, and unknown kinds as fallback):
         // leading container slots, then main 27, then hotbar 9.

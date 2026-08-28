@@ -130,4 +130,30 @@ final class MenuSlotLayouts {
         }
         return index <= size - 10 ? SlotRole.MAIN : SlotRole.HOTBAR;
     }
+
+    /**
+     * Enchanting table layout: vanilla EnchantmentMenu adds slot 0 =
+     * item (enchant target), slot 1 = lapis lazuli, then the standard
+     * 27 main + 9 hotbar. No output slot — the enchanted item stays in
+     * slot 0 after a button click (enchantment id 0/1/2).
+     */
+    public static SlotRole enchantingRole(int index, int size) {
+        if (index == 0 || index == 1) {
+            return SlotRole.INPUT;
+        }
+        return index <= size - 10 ? SlotRole.MAIN : SlotRole.HOTBAR;
+    }
+
+    /**
+     * Beacon layout: vanilla BeaconMenu adds slot 0 = payment (iron/
+     * gold/diamond/emerald/netherite ingot), then the standard 27 main
+     * + 9 hotbar. No output slot — effects are selected via the beacon
+     * effect UI, not a slot transaction.
+     */
+    public static SlotRole beaconRole(int index, int size) {
+        if (index == 0) {
+            return SlotRole.INPUT;
+        }
+        return index <= size - 10 ? SlotRole.MAIN : SlotRole.HOTBAR;
+    }
 }

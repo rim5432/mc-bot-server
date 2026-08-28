@@ -76,4 +76,21 @@ public interface MenuTransactions {
      * retry cannot double-run the close.
      */
     void closeMenu();
+
+    /**
+     * Click a non-slot button in the open menu (enchantment option,
+     * beacon effect selection). Default implementation returns null —
+     * claim-only actors and test recordings legitimately have no button
+     * surface. The adapter binding delegates to
+     * {@code AbstractContainerMenu.clickMenuButton}.
+     *
+     * @param id the button id as defined by the menu subclass (0-based)
+     * @return the post-click snapshot, or null when the menu does not
+     *         support button clicks (default implementation)
+     * @throws IllegalStateException when no menu is open or the menu is
+     *         closed
+     */
+    default MenuView menuButtonClick(int id) {
+        return null;
+    }
 }

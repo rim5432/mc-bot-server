@@ -311,6 +311,43 @@ final class MenuFixtures {
         return new MenuView("loom", null, ItemView.EMPTY, 40, slots);
     }
 
+    /** Enchanting-table-shaped snapshot: INPUT 0 (item) and 1
+     * (lapis), MAIN 2..28, HOTBAR 29..37 - no OUTPUT slot; the
+     * enchanted item stays in slot 0 after a button click. */
+    static MenuView enchantingTable(Builder b) {
+        b.roles.putIfAbsent(0, SlotRole.INPUT);
+        b.roles.putIfAbsent(1, SlotRole.INPUT);
+        for (int i = 2; i <= 28; i++) {
+            b.roles.putIfAbsent(i, SlotRole.MAIN);
+        }
+        for (int i = 29; i <= 37; i++) {
+            b.roles.putIfAbsent(i, SlotRole.HOTBAR);
+        }
+        List<SlotView> slots = new ArrayList<>(38);
+        for (int i = 0; i < 38; i++) {
+            slots.add(new SlotView(i, b.items.getOrDefault(i, ItemView.EMPTY), b.roles.get(i)));
+        }
+        return new MenuView("enchanting_table", null, ItemView.EMPTY, 38, slots);
+    }
+
+    /** Beacon-shaped snapshot: INPUT 0 (payment ingot), MAIN 1..27,
+     * HOTBAR 28..36 - no OUTPUT slot; effects are selected via the
+     * beacon effect UI, not a slot transaction. */
+    static MenuView beacon(Builder b) {
+        b.roles.putIfAbsent(0, SlotRole.INPUT);
+        for (int i = 1; i <= 27; i++) {
+            b.roles.putIfAbsent(i, SlotRole.MAIN);
+        }
+        for (int i = 28; i <= 36; i++) {
+            b.roles.putIfAbsent(i, SlotRole.HOTBAR);
+        }
+        List<SlotView> slots = new ArrayList<>(37);
+        for (int i = 0; i < 37; i++) {
+            slots.add(new SlotView(i, b.items.getOrDefault(i, ItemView.EMPTY), b.roles.get(i)));
+        }
+        return new MenuView("beacon", null, ItemView.EMPTY, 37, slots);
+    }
+
     /** Own-inventory fake: result 0, grid 1..4, ARMOR 5..8 (head
      * first), MAIN 9..35, HOTBAR 36..44, OFFHAND 45 - the
      * MenuSlotLayouts survival layout mirrored. */
