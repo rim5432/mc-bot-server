@@ -9,7 +9,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
@@ -35,21 +34,19 @@ class InvariantMarkerGateTest {
 
     /**
      * Methods in the onTick call chain that must carry the invariant
-     * marker. Keyed by simple method name; all live in BotController
-     * and are unambiguous at that name.
+     * marker, pinned per file (the 2026-08-28 CrashLatch extraction
+     * moved the crash-latch body out of BotController; the marker
+     * duty moved with it).
      */
-    private static final List<String> TICK_CHAIN_METHODS =
-            List.of("onTick", "runPipeline", "handleCrash", "emergencyLatch");
+    private static final List<PinnedMethod> PINNED_METHODS = List.of(
+            new PinnedMethod("BotController.java", "onTick", "public void onTick(WorldView world)"),
+            new PinnedMethod("BotController.java", "runPipeline", "private void runPipeline(WorldView world)"),
+            new PinnedMethod(
+                    "BotController.java", "emergencyLatch", "public void emergencyLatch(RuntimeException cause)"),
+            new PinnedMethod("CrashLatch.java", "latch", "public void latch(RuntimeException cause, long tick)"));
 
-    /**
-     * One anchor per method — proves the scan finds each declaration.
-     * A silent empty scan must not pass.
-     */
-    private static final Map<String, String> ANCHORS = Map.of(
-            "onTick", "public void onTick(WorldView world)",
-            "runPipeline", "private void runPipeline(WorldView world)",
-            "handleCrash", "private void handleCrash(RuntimeException e)",
-            "emergencyLatch", "public void emergencyLatch(RuntimeException cause)");
+    /** One pinned tick-chain method: owning file plus its anchor. */
+    private record PinnedMethod(String file, String method, String anchor) {}
 
     /**
      * Marker shape: the inline comment form. The ADR subsection is
@@ -65,41 +62,40 @@ class InvariantMarkerGateTest {
      *  marker in the preceding comment block. */
     @Test
     void tickChainMethodsCarryInvariantMarkers() {
-        Path controller = RepoRoot.find()
-                .resolve(Path.of(
-                        "src", "main", "java", "com", "mcbot", "mcbotserver", "core", "tick", "BotController.java"));
-        if (!Files.exists(controller)) {
-            fail("BotController.java not found at " + controller);
-        }
-        List<String> lines;
-        try {
-            lines = Files.readAllLines(controller);
-        } catch (IOException e) {
-            fail("cannot read BotController.java: " + e.getMessage());
-            return;
-        }
-
         List<String> violations = new ArrayList<>();
         List<String> seenAnchors = new ArrayList<>();
 
-        for (String method : TICK_CHAIN_METHODS) {
-            String anchor = ANCHORS.get(method);
-            int declLine = findLineContaining(lines, anchor);
-            if (declLine < 0) {
-                violations.add(method + ": declaration not found (anchor: '" + anchor + "')");
+        for (PinnedMethod pinned : PINNED_METHODS) {
+            Path file = RepoRoot.find()
+                    .resolve(Path.of(
+                            "src", "main", "java", "com", "mcbot", "mcbotserver", "core", "tick", pinned.file()));
+            if (!Files.exists(file)) {
+                violations.add(pinned.method() + ": " + pinned.file() + " not found at " + file);
                 continue;
             }
-            seenAnchors.add(method);
+            List<String> lines;
+            try {
+                lines = Files.readAllLines(file);
+            } catch (IOException e) {
+                fail("cannot read " + pinned.file() + ": " + e.getMessage());
+                return;
+            }
+            int declLine = findLineContaining(lines, pinned.anchor());
+            if (declLine < 0) {
+                violations.add(pinned.method() + ": declaration not found (anchor: '" + pinned.anchor() + "')");
+                continue;
+            }
+            seenAnchors.add(pinned.method());
             if (!hasInvariantMarker(lines, declLine)) {
-                violations.add(method + " (line " + (declLine + 1)
+                violations.add(pinned.method() + " (" + pinned.file() + " line " + (declLine + 1)
                         + "): missing '// invariant: see ADR-0005' in preceding comment block");
             }
         }
 
-        for (var entry : ANCHORS.entrySet()) {
+        for (PinnedMethod pinned : PINNED_METHODS) {
             assertTrue(
-                    seenAnchors.contains(entry.getKey()),
-                    () -> "anchor for " + entry.getKey() + " not matched — expected '" + entry.getValue()
+                    seenAnchors.contains(pinned.method()),
+                    () -> "anchor for " + pinned.method() + " not matched — expected '" + pinned.anchor()
                             + "', the scan came back incomplete.");
         }
         assertTrue(

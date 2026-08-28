@@ -10,7 +10,6 @@ import com.mcbot.mcbotserver.api.event.EventQueue;
 import com.mcbot.mcbotserver.api.goal.Goal;
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.goal.GoalNear;
-import com.mcbot.mcbotserver.api.interrupt.InterruptionContext;
 import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.api.process.DigMission;
 import com.mcbot.mcbotserver.api.process.Directive;
@@ -25,8 +24,6 @@ import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.core.reflex.MinimalReflex;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer.ReflexDecision;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -136,8 +133,7 @@ public final class BotController {
     private final ReflexMissionSeat hungrySeat;
 
     private long tickCounter;
-    private boolean crashed;
-    private int crashCounter;
+    private final CrashLatch crashLatch;
     private boolean inLethalFluid;
     private int airSupply = ThreatBlackboard.MAX_AIR_SUPPLY;
 
@@ -353,6 +349,7 @@ public final class BotController {
                 this.claimInjector,
                 List.of(this.engageSeat, this.rescueSeat, this.hungrySeat),
                 positionSource::get);
+        this.crashLatch = new CrashLatch(events, crashReporter, clock, positionSource, this::activeName, this.actor);
     }
 
     /**
@@ -409,7 +406,7 @@ public final class BotController {
      *         reset or a respawn
      */
     public boolean isCrashed() {
-        return crashed;
+        return crashLatch.isCrashed();
     }
 
     /**
@@ -419,7 +416,7 @@ public final class BotController {
      * @return monotonic within one reset cycle
      */
     public int crashCounter() {
-        return crashCounter;
+        return crashLatch.crashCounter();
     }
 
     /**
@@ -453,7 +450,7 @@ public final class BotController {
     // invariant: see ADR-0005 D2 (latch -> snapshot -> clear -> report)
     public void emergencyLatch(RuntimeException cause) {
         Objects.requireNonNull(cause, "cause");
-        handleCrash(cause);
+        crashLatch.latch(cause, tickCounter);
     }
 
     /**
@@ -461,8 +458,7 @@ public final class BotController {
      * context; next tick runs the full pipeline (ADR-0005 5a).
      */
     public void reset() {
-        crashed = false;
-        crashCounter = 0;
+        crashLatch.reset();
     }
 
     /**
@@ -470,7 +466,7 @@ public final class BotController {
      * the counter — silent recovery hides bugs (ADR-0005 5b).
      */
     public void onRespawned() {
-        crashed = false;
+        crashLatch.onRespawned();
     }
 
     /**
@@ -482,14 +478,14 @@ public final class BotController {
      */
     // invariant: see ADR-0005 D1 (single catch around all four stages)
     public void onTick(WorldView world) {
-        if (crashed) {
+        if (crashLatch.isCrashed()) {
             // invariant: see ADR-0005 D3 (MinimalReflex may throw too;
             // the same latch fires again and both channels re-report)
             try {
                 MinimalReflex.tick(inLethalFluid, airSupply, actor);
                 actor.flush();
             } catch (RuntimeException e) {
-                handleCrash(e);
+                crashLatch.latch(e, tickCounter);
             }
             return;
         }
@@ -497,7 +493,7 @@ public final class BotController {
             tickCounter++;
             runPipeline(world);
         } catch (RuntimeException e) {
-            handleCrash(e);
+            crashLatch.latch(e, tickCounter);
         }
     }
 
@@ -730,58 +726,6 @@ public final class BotController {
             return n.center();
         }
         return null;
-    }
-
-    // invariant: see ADR-0005 D2 (latch -> snapshot -> clear -> report)
-    private void handleCrash(RuntimeException e) {
-        crashed = true;
-        crashCounter++;
-        CellPos position;
-        try {
-            position = positionSource.get();
-        } catch (RuntimeException poseFailure) {
-            position = new CellPos(0, -64, 0);
-        }
-        StringWriter stack = new StringWriter();
-        e.printStackTrace(new PrintWriter(stack));
-        InterruptionContext ctx = new InterruptionContext(
-                tickCounter,
-                position,
-                activeName(),
-                e.getClass().getSimpleName() + ":" + e.getMessage(),
-                stack.toString());
-
-        // Clear BEFORE reporting so even a poisoned outbox cannot leave
-        // stale intents on the body (ADR-0005 D2 step 3).
-        try {
-            actor.clearAllIntents();
-        } catch (RuntimeException ignored) {
-            // The floor is documentation, not perfection.
-        }
-        reportPrimary(ctx);
-        reportFallback(ctx);
-    }
-
-    private void reportPrimary(InterruptionContext ctx) {
-        try {
-            events.push(new BotEvent(
-                    EventKind.BOT_CRASHED,
-                    clock.day(),
-                    clock.timeOfDayTicks(),
-                    true,
-                    Map.of("cause", ctx.causeSummary()),
-                    "bot crashed: " + ctx.causeSummary()));
-        } catch (RuntimeException ignored) {
-            // Best-effort; the fallback channel still fires below.
-        }
-    }
-
-    private void reportFallback(InterruptionContext ctx) {
-        try {
-            crashReporter.report(ctx);
-        } catch (RuntimeException ignored) {
-            // Nothing left to fall back to.
-        }
     }
 
     private String activeName() {

@@ -92,6 +92,7 @@ class WireVocabularyGateTest {
             "core/command/MineCommandHandler.java",
             "core/state/ChangeDetectingStateChannel.java",
             "core/tick/BotController.java",
+            "core/tick/CrashLatch.java",
             "core/tick/MissionReporter.java",
             "core/behavior/PathingBehavior.java");
 
