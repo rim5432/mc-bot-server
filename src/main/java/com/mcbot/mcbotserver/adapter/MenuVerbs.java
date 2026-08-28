@@ -286,34 +286,7 @@ final class MenuVerbs {
      * @return the concrete role to plan against; never null
      */
     private static SlotRole resolveRole(MenuView view, SlotRole role) {
-        String type = view.type();
-        boolean furnaceFamily = type.equals("furnace") || type.equals("blast_furnace") || type.equals("smoker");
-        boolean anvilFamily = type.equals("anvil");
-        boolean brewingFamily = type.equals("brewing_stand");
-        boolean grindstoneFamily = type.equals("grindstone");
-        boolean stonecutterFamily = type.equals("stonecutter");
-        boolean cartographyFamily = type.equals("cartography_table");
-        boolean smithingFamily = type.equals("smithing_table");
-        boolean loomFamily = type.equals("loom");
-        boolean enchantingFamily = type.equals("enchanting_table");
-        boolean beaconFamily = type.equals("beacon");
-        boolean merchantFamily = type.equals("merchant");
-        boolean horseFamily = type.equals("horse");
-        if (furnaceFamily
-                || anvilFamily
-                || brewingFamily
-                || grindstoneFamily
-                || stonecutterFamily
-                || cartographyFamily
-                || smithingFamily
-                || loomFamily
-                || enchantingFamily
-                || beaconFamily
-                || merchantFamily
-                || horseFamily) {
-            return role;
-        }
-        return SlotRole.CONTAINER;
+        return MenuSlotLayouts.hasDifferentiatedRoles(view.type()) ? role : SlotRole.CONTAINER;
     }
 
     private static int roleCount(MenuView view, SlotRole role) {

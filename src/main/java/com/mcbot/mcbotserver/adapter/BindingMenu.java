@@ -16,7 +16,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.AbstractFurnaceMenu;
 import net.minecraft.world.inventory.BeaconMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.ContainerSynchronizer;
@@ -216,66 +215,13 @@ public final class BindingMenu {
     }
 
     /**
-     * The role of one flat slot. This table is where the vanilla
-     * layout knowledge lives — callers address slots by role, never by
-     * per-type flat arithmetic. Layouts: CraftingMenu (45: result,
-     * grid 1-9, main 10-36, hotbar 37-44), InventoryMenu (46: result,
-     * grid 1-4, armor 5-8, main 9-35, hotbar 36-44, offhand 45), and
-     * container menus (chest rows: container block, then the standard
-     * 27 main + 9 hotbar player region — also the fallback for menu
-     * kinds the table does not know yet; each new kind extends this
-     * table in the same change that adds it).
+     * The role of one flat slot - delegated to the menu-kind table.
+     * Callers address slots by role, never by per-type flat
+     * arithmetic; each new kind extends the MenuSlotLayouts table in
+     * the same change that adds it.
      */
     private SlotRole roleOf(int index, int size) {
-        if (menu instanceof CraftingMenu) {
-            return MenuSlotLayouts.craftingRole(index, size);
-        }
-        if (menu instanceof InventoryMenu) {
-            return MenuSlotLayouts.inventoryRole(index, size);
-        }
-        if (menu instanceof AbstractFurnaceMenu) {
-            return MenuSlotLayouts.furnaceRole(index, size);
-        }
-        if (menu instanceof net.minecraft.world.inventory.AnvilMenu) {
-            return MenuSlotLayouts.anvilRole(index, size);
-        }
-        if (menu instanceof net.minecraft.world.inventory.BrewingStandMenu) {
-            return MenuSlotLayouts.brewingRole(index, size);
-        }
-        if (menu instanceof net.minecraft.world.inventory.GrindstoneMenu) {
-            // Same 3-slot layout as anvil (0/1 input, 2 output) - reuse.
-            return MenuSlotLayouts.anvilRole(index, size);
-        }
-        if (menu instanceof net.minecraft.world.inventory.StonecutterMenu) {
-            return MenuSlotLayouts.stonecutterRole(index, size);
-        }
-        if (menu instanceof net.minecraft.world.inventory.CartographyTableMenu) {
-            // Same 3-slot layout as anvil (0/1 input, 2 output) - reuse.
-            return MenuSlotLayouts.anvilRole(index, size);
-        }
-        if (menu instanceof net.minecraft.world.inventory.SmithingMenu
-                || menu instanceof net.minecraft.world.inventory.LoomMenu) {
-            return MenuSlotLayouts.threeInputRole(index, size);
-        }
-        if (menu instanceof net.minecraft.world.inventory.EnchantmentMenu) {
-            return MenuSlotLayouts.enchantingRole(index, size);
-        }
-        if (menu instanceof net.minecraft.world.inventory.BeaconMenu) {
-            return MenuSlotLayouts.beaconRole(index, size);
-        }
-        if (menu instanceof net.minecraft.world.inventory.MerchantMenu) {
-            // Same 3-slot layout as anvil (0/1 buy inputs, 2 result) - reuse.
-            return MenuSlotLayouts.anvilRole(index, size);
-        }
-        if (menu instanceof net.minecraft.world.inventory.HorseInventoryMenu) {
-            return MenuSlotLayouts.horseRole(index, size);
-        }
-        // Container menus (chest, and unknown kinds as fallback):
-        // leading container slots, then main 27, then hotbar 9.
-        if (index <= size - 37) {
-            return SlotRole.CONTAINER;
-        }
-        return index <= size - 10 ? SlotRole.MAIN : SlotRole.HOTBAR;
+        return MenuSlotLayouts.roleOf(menu, index, size);
     }
 
     /**

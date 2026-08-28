@@ -1,13 +1,35 @@
 package com.mcbot.mcbotserver.adapter;
 
 import com.mcbot.mcbotserver.api.menu.SlotRole;
+import java.util.List;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.AbstractFurnaceMenu;
+import net.minecraft.world.inventory.AnvilMenu;
+import net.minecraft.world.inventory.BeaconMenu;
+import net.minecraft.world.inventory.BrewingStandMenu;
+import net.minecraft.world.inventory.CartographyTableMenu;
+import net.minecraft.world.inventory.CraftingMenu;
+import net.minecraft.world.inventory.EnchantmentMenu;
+import net.minecraft.world.inventory.GrindstoneMenu;
+import net.minecraft.world.inventory.HorseInventoryMenu;
+import net.minecraft.world.inventory.InventoryMenu;
+import net.minecraft.world.inventory.LoomMenu;
+import net.minecraft.world.inventory.MerchantMenu;
+import net.minecraft.world.inventory.SmithingMenu;
+import net.minecraft.world.inventory.StonecutterMenu;
 
 /**
- * Slot-role layouts for the vanilla menu kinds the bridge opens:
- * pure index->role arithmetic, no menu instance touched.
+ * THE menu-kind table: one row per vanilla menu kind the bridge
+ * opens, binding the engine menu class, its wire-kind aliases (the
+ * snapshot {@code type()} vocabulary), and the index->role layout.
+ * BindingMenu resolves slots through it and MenuVerbs resolves intent
+ * roles through it, so a new kind extends THIS table in the same
+ * change that adds it - there is no second place to update.
  *
  * <p>Extracted from BindingMenu so the write-half bridge stops
- * carrying layout tables (god-class paydown, 2026-08-27).
+ * carrying layout tables (god-class paydown, 2026-08-27); promoted
+ * to the kind authority 2026-08-28 when the engine-class chain and
+ * the wire-kind chain had drifted into two vocabularies.
  */
 final class MenuSlotLayouts {
 
@@ -176,5 +198,95 @@ final class MenuSlotLayouts {
             return SlotRole.CONTAINER;
         }
         return index <= size - 10 ? SlotRole.MAIN : SlotRole.HOTBAR;
+    }
+
+    /** Container-menu fallback: leading container block, then the
+     *  standard 27 main + 9 hotbar. Also the role table for kinds the
+     *  table does not know yet. */
+    public static SlotRole containerRole(int index, int size) {
+        if (index <= size - 37) {
+            return SlotRole.CONTAINER;
+        }
+        return index <= size - 10 ? SlotRole.MAIN : SlotRole.HOTBAR;
+    }
+
+    /** Role table for one kind: pure index->role arithmetic. */
+    @FunctionalInterface
+    interface RoleTable {
+        SlotRole role(int index, int size);
+    }
+
+    /**
+     * One supported menu kind: the engine dispatch class, the
+     * wire-kind aliases whose snapshots carry differentiated station
+     * roles, and the role table. {@code wireKinds} is EMPTY for kinds
+     * the harness addresses by structural role only (crafting grid,
+     * own inventory) - the alias list is what makes INPUT/FUEL/OUTPUT
+     * intents pass through instead of landing on CONTAINER.
+     *
+     * @param engineMenu menu class this row dispatches on; never null
+     * @param wireKinds  snapshot type() aliases; never null
+     * @param table      index->role arithmetic; never null
+     */
+    record KindRow(Class<?> engineMenu, List<String> wireKinds, RoleTable table) {}
+
+    /**
+     * The rows, superclass before subclass where a hierarchy exists
+     * (blast furnace and smoker menus are AbstractFurnaceMenu
+     * subclasses and share its row). New kinds append here.
+     */
+    private static final List<KindRow> KINDS = List.of(
+            new KindRow(CraftingMenu.class, List.of(), MenuSlotLayouts::craftingRole),
+            new KindRow(InventoryMenu.class, List.of(), MenuSlotLayouts::inventoryRole),
+            new KindRow(
+                    AbstractFurnaceMenu.class,
+                    List.of("furnace", "blast_furnace", "smoker"),
+                    MenuSlotLayouts::furnaceRole),
+            new KindRow(AnvilMenu.class, List.of("anvil"), MenuSlotLayouts::anvilRole),
+            new KindRow(BrewingStandMenu.class, List.of("brewing_stand"), MenuSlotLayouts::brewingRole),
+            new KindRow(GrindstoneMenu.class, List.of("grindstone"), MenuSlotLayouts::anvilRole),
+            new KindRow(StonecutterMenu.class, List.of("stonecutter"), MenuSlotLayouts::stonecutterRole),
+            new KindRow(CartographyTableMenu.class, List.of("cartography_table"), MenuSlotLayouts::anvilRole),
+            new KindRow(SmithingMenu.class, List.of("smithing_table"), MenuSlotLayouts::threeInputRole),
+            new KindRow(LoomMenu.class, List.of("loom"), MenuSlotLayouts::threeInputRole),
+            new KindRow(EnchantmentMenu.class, List.of("enchanting_table"), MenuSlotLayouts::enchantingRole),
+            new KindRow(BeaconMenu.class, List.of("beacon"), MenuSlotLayouts::beaconRole),
+            new KindRow(MerchantMenu.class, List.of("merchant"), MenuSlotLayouts::anvilRole),
+            new KindRow(HorseInventoryMenu.class, List.of("horse"), MenuSlotLayouts::horseRole));
+
+    /**
+     * The role of one flat slot on the given open menu: the kind's own
+     * table row, or the container fallback for chest-like and unknown
+     * menus.
+     *
+     * @param menu  the open engine menu; never null
+     * @param index flat slot index within the menu
+     * @param size  the menu's total slot count
+     * @return the slot's role; never null
+     */
+    public static SlotRole roleOf(AbstractContainerMenu menu, int index, int size) {
+        for (KindRow kind : KINDS) {
+            if (kind.engineMenu().isInstance(menu)) {
+                return kind.table().role(index, size);
+            }
+        }
+        return containerRole(index, size);
+    }
+
+    /**
+     * Whether the wire kind carries differentiated station roles
+     * (INPUT/FUEL/OUTPUT/...), or whether non-CONTAINER intent roles
+     * must land on the undifferentiated CONTAINER region.
+     *
+     * @param wireType the snapshot's type() vocabulary; never null
+     * @return true when intents keep their role for this kind
+     */
+    public static boolean hasDifferentiatedRoles(String wireType) {
+        for (KindRow kind : KINDS) {
+            if (kind.wireKinds().contains(wireType)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
