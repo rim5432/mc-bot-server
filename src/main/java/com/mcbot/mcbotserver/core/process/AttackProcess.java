@@ -55,11 +55,11 @@ public final class AttackProcess extends MissionShell {
      */
     public static final double SCAN_RADIUS = 16.0;
 
-    /** A chased target farther away than this escapes; no world-border chases. */
-    public static final double LEASH_RADIUS = 12.0;
+    /** Shared envelope; canonical doc in {@link TargetTracker}. */
+    public static final double LEASH_RADIUS = TargetTracker.LEASH_RADIUS;
 
-    /** Ticks a missing target gets before the ESCAPED verdict. */
-    public static final int TARGET_GRACE_TICKS = 10;
+    /** Shared envelope; canonical doc in {@link TargetTracker}. */
+    public static final int TARGET_GRACE_TICKS = TargetTracker.TARGET_GRACE_TICKS;
 
     /**
      * Chase-goal range around the target cell. Same value and
@@ -94,9 +94,7 @@ public final class AttackProcess extends MissionShell {
 
     private boolean succeeded;
     private String failure;
-    private boolean engaged;
-    private CellPos targetCell;
-    private int ticksSinceSeen;
+    private final TargetTracker tracker = new TargetTracker();
     private Directive lastDirective;
 
     /**
@@ -150,7 +148,7 @@ public final class AttackProcess extends MissionShell {
             return lastDirective;
         }
         if (target == null) {
-            if (!engaged) {
+            if (!tracker.engaged()) {
                 // The id the harness named has never been in the
                 // scan: refuse NOW instead of budget-staring. A
                 // despawn between ls and submit is
@@ -159,24 +157,22 @@ public final class AttackProcess extends MissionShell {
                 fail(REASON_NO_TARGET);
                 return lastDirective;
             }
-            // ORDER IS LOAD-BEARING, same as defend: a seen target
-            // resets the grace counter above before this branch can
-            // fire, which resume() spends as instant adjudication.
-            ticksSinceSeen++;
-            if (ticksSinceSeen > TARGET_GRACE_TICKS) {
+            // The tracker freezes the sighting-before-absence order
+            // (class doc); resume() spends the grace as instant
+            // adjudication.
+            if (tracker.graceSpent()) {
                 fail(REASON_ESCAPED);
             }
             return lastDirective;
         }
 
-        engaged = true;
-        ticksSinceSeen = 0;
-        targetCell = target.pos();
-        if (position.distanceTo(targetCell) > LEASH_RADIUS) {
+        tracker.sighted(target.pos());
+        if (tracker.leashed(position)) {
             fail(REASON_LOST);
             return lastDirective;
         }
-        lastDirective = new Directive(new GoalNear(targetCell, GOAL_RANGE), new Overrides(new Attack(targetId)));
+        lastDirective =
+                new Directive(new GoalNear(tracker.targetCell(), GOAL_RANGE), new Overrides(new Attack(targetId)));
         return lastDirective;
     }
 
@@ -237,9 +233,8 @@ public final class AttackProcess extends MissionShell {
             return false;
         }
         // Blind-trust guard, the defend trick: spend all grace
-        // credit so the very next scan decides - present target
-        // resets the counter, absent one trips the verdict at once.
-        ticksSinceSeen = TARGET_GRACE_TICKS;
+        // credit so the very next scan decides.
+        tracker.spendAllGrace();
         return true;
     }
 

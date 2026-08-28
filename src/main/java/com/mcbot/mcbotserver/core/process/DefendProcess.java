@@ -62,14 +62,11 @@ public final class DefendProcess extends MissionShell {
      */
     public static final double DETECTION_RADIUS = 16.0;
 
-    /**
-     * An engaged target farther away than this escapes - the fight is
-     * over as a failure, not a chase to the world border.
-     */
-    public static final double LEASH_RADIUS = 12.0;
+    /** Shared envelope; canonical doc in {@link TargetTracker}. */
+    public static final double LEASH_RADIUS = TargetTracker.LEASH_RADIUS;
 
-    /** Ticks a missing target gets before counting as neutralized. */
-    public static final int TARGET_GRACE_TICKS = 10;
+    /** Shared envelope; canonical doc in {@link TargetTracker}. */
+    public static final int TARGET_GRACE_TICKS = TargetTracker.TARGET_GRACE_TICKS;
 
     /**
      * Chase-goal range around the target cell, in blocks. Deliberately
@@ -133,9 +130,8 @@ public final class DefendProcess extends MissionShell {
     private boolean succeeded;
     private String failure;
     private String targetId;
-    private CellPos targetCell;
     private boolean targetRanged;
-    private int ticksSinceSeen;
+    private final TargetTracker tracker = new TargetTracker();
     private Directive lastDirective;
 
     /**
@@ -235,9 +231,8 @@ public final class DefendProcess extends MissionShell {
             // a closer hostile shield an escaping target from the leash
             // break (A at 13 behind B at 7 → old code skipped leash,
             // fell into grace → false SUCCESS).
-            ticksSinceSeen = 0;
-            targetCell = current.pos();
-            if (position.distanceTo(targetCell) > LEASH_RADIUS) {
+            tracker.sighted(current.pos());
+            if (tracker.leashed(position)) {
                 fail(REASON_LOST);
                 return lastDirective;
             }
@@ -250,17 +245,12 @@ public final class DefendProcess extends MissionShell {
         // verdict (issue 0006). The harness re-scans to confirm; a
         // false ESCAPED is cheap, a false SUCCESS is a missed threat.
         //
-        // ORDER IS LOAD-BEARING: the seen-branch above resets
-        // ticksSinceSeen to zero BEFORE this check runs. resume()
-        // exploits that by spending all grace credit (sets
-        // ticksSinceSeen = TARGET_GRACE_TICKS): a target still present
-        // on the first post-resume tick resets the counter and the fight
-        // continues; an absent one trips 11 > 10 immediately. Reordering
-        // these two blocks would unconditionally kill every resumed fight
-        // whose target is still present — the absent-target case is
-        // unaffected (both orders → TARGET_ESCAPED).
-        ticksSinceSeen++;
-        if (ticksSinceSeen > TARGET_GRACE_TICKS) {
+        // The tracker freezes the sighting-before-absence order
+        // (TargetTracker class doc); resume() spends the grace as
+        // instant adjudication - a target still present resets the
+        // counter and the fight continues, an absent one trips the
+        // verdict immediately.
+        if (tracker.graceSpent()) {
             fail(REASON_ESCAPED);
             return lastDirective;
         }
@@ -302,11 +292,8 @@ public final class DefendProcess extends MissionShell {
         }
         // Blind-trust guard: resume() has no world access, so instead
         // of trusting the pre-pause target we spend ALL grace credit
-        // here - the very next onTick scan adjudicates. Target gone =>
-        // immediate TARGET_ESCAPED failure; present => normal leash and
-        // refresh logic. Worst-case stale steering collapses from a
-        // full grace window to exactly one tick.
-        ticksSinceSeen = TARGET_GRACE_TICKS;
+        // here - the very next onTick scan adjudicates.
+        tracker.spendAllGrace();
         return true;
     }
 
@@ -344,9 +331,8 @@ public final class DefendProcess extends MissionShell {
 
     private void engage(EntitySnapshot target) {
         targetId = target.id();
-        targetCell = target.pos();
         targetRanged = false;
-        ticksSinceSeen = 0;
+        tracker.sighted(target.pos());
     }
 
     private void engageRanged(EntitySnapshot target) {
@@ -359,7 +345,7 @@ public final class DefendProcess extends MissionShell {
         // adjacent chase rim: closing to 2 hands the initiative to a
         // kiter that backs away shooting.
         int range = targetRanged ? RANGED_STANDOFF : GOAL_RANGE;
-        lastDirective = new Directive(new GoalNear(targetCell, range), new Overrides(new Attack(targetId)));
+        lastDirective = new Directive(new GoalNear(tracker.targetCell(), range), new Overrides(new Attack(targetId)));
         return lastDirective;
     }
 
