@@ -119,10 +119,26 @@ public final class BindingActor implements Actor, MenuTransactions {
                 || held.getFoodProperties(body) != null) {
             return false;
         }
+        return useHeldAirStack();
+    }
+
+    /**
+     * Resolves one vanilla air-use for the main-hand stack: syncs the
+     * facade pose, fires {@code Item.use}, writes the mutated result
+     * stack back to the selected hotbar slot and swings. The write-back
+     * is the load-bearing half - {@code ItemStack.use} returns the
+     * mutated stack but does not write it through the player inventory
+     * (the facade has no ServerPlayer inventory-write path), so a
+     * caller that drops the result loses the emptied/filled bucket.
+     *
+     * @return true when the use consumed the click
+     */
+    private boolean useHeldAirStack() {
+        ItemStack heldStack = body.getInventory().container().getItem(body.selectedSlot);
         facade.syncPosition();
-        if (held.use(body.level(), facade, InteractionHand.MAIN_HAND)
-                .getResult()
-                .consumesAction()) {
+        var useResult = heldStack.use(body.level(), facade, InteractionHand.MAIN_HAND);
+        if (useResult.getResult().consumesAction()) {
+            body.getInventory().container().setItem(body.selectedSlot, useResult.getObject());
             body.swing(InteractionHand.MAIN_HAND);
             return true;
         }
@@ -243,21 +259,10 @@ public final class BindingActor implements Actor, MenuTransactions {
                         // Air-use items: vanilla resolves them through
                         // Item.use against a POV raycast from the
                         // actor's eyes (the bucket fills/empties at the
-                        // ray hit, the rod casts or reels). The facade's
-                        // pose is synced first or the ray fires from a
-                        // stale position.
-                        facade.syncPosition();
-                        ItemStack heldStack = body.getInventory().container().getItem(body.selectedSlot);
-                        var useResult = heldStack.use(body.level(), facade, InteractionHand.MAIN_HAND);
-                        if (useResult.getResult().consumesAction()) {
-                            // Write the used item (empty bucket) back to the
-                            // hotbar slot — ItemStack.use returns the mutated
-                            // stack but does not write it through the player
-                            // inventory (the facade has no ServerPlayer
-                            // inventory-write path).
-                            body.getInventory().container().setItem(body.selectedSlot, useResult.getObject());
-                            body.swing(InteractionHand.MAIN_HAND);
-                        }
+                        // ray hit, the rod casts or reels).
+                        // useHeldAirStack syncs the facade pose first -
+                        // the ray must not fire from a stale position.
+                        useHeldAirStack();
                     } else {
                         melee.onUsePress();
                     }
