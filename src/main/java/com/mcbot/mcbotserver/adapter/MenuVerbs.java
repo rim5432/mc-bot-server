@@ -57,6 +57,24 @@ final class MenuVerbs {
         return MenuReply.answer(src, root);
     }
 
+    static int runOpenEntity(CommandContext<CommandSourceStack> ctx, Supplier<MenuCommands.Live> live) {
+        MenuCommands.Live l = live.get();
+        if (l == null) {
+            return MenuReply.answer(ctx.getSource(), MenuReply.err("no active bot"));
+        }
+        int entityId = IntegerArgumentType.getInteger(ctx, "entityId");
+        MenuView view = l.tx().openEntityMenu(entityId);
+        if (view == null) {
+            return MenuReply.answer(
+                    ctx.getSource(),
+                    MenuReply.err("open-entity rejected: entity not found, out of reach, "
+                            + "untamed horse, or unsupported kind"));
+        }
+        JsonObject root = MenuReply.ok();
+        root.add("menu", MenuViewJson.toJsonObject(view));
+        return MenuReply.answer(ctx.getSource(), root);
+    }
+
     static int runSnapshot(Supplier<MenuCommands.Live> live, CommandSourceStack src) {
         MenuCommands.Live l = live.get();
         if (l == null) {

@@ -93,4 +93,22 @@ public interface MenuTransactions {
     default MenuView menuButtonClick(int id) {
         return null;
     }
+
+    /**
+     * Open a menu backed by a world entity (villager trading, horse
+     * inventory). Default implementation returns null — claim-only
+     * actors and test recordings legitimately have no entity surface.
+     * The adapter binding resolves the entity by runtime id, checks
+     * reach, and dispatches to the entity's own menu-opening mechanism
+     * (Merchant for villagers, HasCustomInventoryScreen for horses).
+     *
+     * @param entityId the vanilla runtime entity id (as returned by
+     *                 /entities scan); never negative
+     * @return the opened menu's first snapshot, or null when rejected
+     *         (entity not found, out of reach, untamed horse, or
+     *         unsupported entity kind)
+     */
+    default MenuView openEntityMenu(int entityId) {
+        return null;
+    }
 }

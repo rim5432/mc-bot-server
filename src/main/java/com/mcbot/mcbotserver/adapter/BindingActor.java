@@ -390,6 +390,11 @@ public final class BindingActor implements Actor, MenuTransactions {
         return current.snapshot();
     }
 
+    @Override
+    public MenuView openEntityMenu(int entityId) {
+        return menus.openEntity(entityId).map(BindingMenu::snapshot).orElse(null);
+    }
+
     /**
      * Straight clearance required ahead before the sprint gait
      * engages, in blocks (issue 0005 P1.1). Issue 0004 F6(3): a mob

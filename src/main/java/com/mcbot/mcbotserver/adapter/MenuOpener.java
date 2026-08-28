@@ -7,9 +7,14 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.Container;
 import net.minecraft.world.MenuProvider;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.animal.horse.AbstractHorse;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.ContainerLevelAccess;
+import net.minecraft.world.inventory.HorseInventoryMenu;
+import net.minecraft.world.inventory.MerchantMenu;
+import net.minecraft.world.item.trading.Merchant;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.ChestBlock;
@@ -142,6 +147,55 @@ public final class MenuOpener {
         var menu = facade.facadeInventoryMenu();
         facade.containerMenu = menu;
         return new BindingMenu(menu, facade, "inventory", null);
+    }
+
+    /**
+     * Open a menu backed by a world entity. Currently supports
+     * {@link Merchant} entities (villager trading) and
+     * {@link AbstractHorse} entities (horse inventory — must be tamed).
+     * The facade's position is synced before the menu is created so any
+     * reach or state checks inside the menu see the body's live position.
+     * Any menu the facade currently has open is closed first (vanilla
+     * parity).
+     *
+     * @param entityId the vanilla runtime entity id (as returned by
+     *                 /entities scan)
+     * @return the opened menu binding, or empty if the entity is not
+     *         found, out of reach, untamed, or an unsupported kind
+     */
+    public Optional<BindingMenu> openEntity(int entityId) {
+        closeCurrentMenu();
+        Level level = facade.body().level();
+        Entity entity = level.getEntity(entityId);
+        if (entity == null) {
+            return Optional.empty();
+        }
+
+        facade.syncPosition();
+        if (!ReachPolicy.withinReach(facade.getEyePosition(), entity.blockPosition())) {
+            return Optional.empty();
+        }
+
+        if (entity instanceof Merchant merchant) {
+            merchant.setTradingPlayer(facade);
+            var menu = new MerchantMenu(NEXT_ID.getAndIncrement(), facade.getInventory(), merchant);
+            facade.containerMenu = menu;
+            return Optional.of(new BindingMenu(menu, facade, "merchant", toCellPos(entity.blockPosition())));
+        }
+
+        if (entity instanceof AbstractHorse horse) {
+            // openCustomInventoryScreen gates on tamed + not vehicle (or
+            // bot is the passenger); it calls facade.openHorseInventory
+            // which creates the HorseInventoryMenu and sets containerMenu.
+            horse.openCustomInventoryScreen(facade);
+            var menu = facade.containerMenu;
+            if (menu instanceof HorseInventoryMenu) {
+                return Optional.of(new BindingMenu(menu, facade, "horse", toCellPos(entity.blockPosition())));
+            }
+            return Optional.empty();
+        }
+
+        return Optional.empty();
     }
 
     /**
