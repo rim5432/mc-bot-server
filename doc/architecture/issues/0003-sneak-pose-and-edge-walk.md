@@ -1,6 +1,6 @@
 ---
 title: Sneak pose and edge walk - pose-aware collision, SNEAK channel, shield block
-last_verified: 2026-08-27
+last_verified: 2026-08-28
 covers:
   - src/main/java/com/mcbot/mcbotserver/api/actor/Channel.java
   - src/main/java/com/mcbot/mcbotserver/api/world/CollisionShape.java
@@ -41,6 +41,20 @@ no BLOCK channel), waypoints are never generated on cliff edges,
 and with standability settled at 0.5 the half-slab top is already
 a full routing surface - no sneak compensation required. The
 10-minute survival acceptance runs without any of the three.
+
+Progress 2026-08-28 (partial landing, still parked for the rest):
+the sneak pose pair and the shield raise shipped through the USE
+dispatch - `BotBodyEntity.setDrive(+sneak)` applies shift +
+CROUCHING pose (1.5-height gap crawl and isCrouching visibility
+reduction are live), a `/bot sneak` harness latch survives idle
+ticks, and a held shield raises on the BODY via startUsingItem
+(blocking is hurt-entity-level). Deliberately NOT claimed: the
+SneakWalk edge traversal - vanilla's edge clip lives only in
+`Player.maybeBackOffFromEdge` (base Entity is a stub), so porting
+it stays this issue's open core, now with the pose half already in
+place. No SNEAK channel was created, honoring this sketch's own
+vocabulary-honesty rule - sneak rides MOVE as a modifier and the
+latch as body state.
 
 Debt avoidance: parameterizing `passable(Pose)` today would force
 the whole `BasicMoves` chain to thread a Pose that every v1 caller
