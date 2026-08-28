@@ -17,13 +17,6 @@ import com.mcbot.mcbotserver.api.world.WorldView;
 public interface Movement {
 
     /**
-     * The cell this movement starts from.
-     *
-     * @return source cell; never null
-     */
-    CellPos source();
-
-    /**
      * The cell this movement ends in.
      *
      * @return destination cell; never null
@@ -47,11 +40,4 @@ public interface Movement {
      * @return non-negative tick-equivalent cost
      */
     double cost(WorldView world);
-
-    /**
-     * Human-readable identity for diagnostics and debug rendering.
-     *
-     * @return short description including src/dst; never null
-     */
-    String describe();
 }

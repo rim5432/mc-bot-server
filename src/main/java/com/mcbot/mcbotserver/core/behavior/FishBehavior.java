@@ -87,11 +87,6 @@ public final class FishBehavior implements Behavior {
     }
 
     @Override
-    public String name() {
-        return name;
-    }
-
-    @Override
     public ExecutionReport tick(WorldView world, Directive directive, Actor actor) {
         Fish fish = directive != null ? directive.overrides().fish() : null;
         if (fish == null) {

@@ -37,11 +37,6 @@ class NoPathEscalationGateTest {
     private record StubMove(CellPos from, CellPos to) implements Movement {
 
         @Override
-        public CellPos source() {
-            return from;
-        }
-
-        @Override
         public CellPos destination() {
             return to;
         }
@@ -54,11 +49,6 @@ class NoPathEscalationGateTest {
         @Override
         public double cost(WorldView world) {
             return 1.0;
-        }
-
-        @Override
-        public String describe() {
-            return "stub " + from + "->" + to;
         }
     }
 

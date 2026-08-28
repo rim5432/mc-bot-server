@@ -76,9 +76,6 @@ public final class LevelThreatSensor implements ThreatSensor {
     /** Body food level (0..20), FoodData semantics. */
     private final Supplier<Integer> foodLevel;
 
-    /** Body saturation (0..foodLevel), FoodData semantics. */
-    private final Supplier<Float> saturationLevel;
-
     /** Best-food hotbar slot or -1, ranked by the assembly's catalog. */
     private final java.util.function.IntSupplier bestFoodSlot;
 
@@ -111,7 +108,6 @@ public final class LevelThreatSensor implements ThreatSensor {
      *                   rather than a dig-at-null
      * @param foodLevel     body food-level supplier (0..20, FoodData
      *                      semantics); never null
-     * @param saturationLevel body saturation supplier; never null
      * @param bestFoodSlot  best-food hotbar slot supplier, -1 when
      *                      the inventory carries no food; never null
      * @param falling       body descending supplier (real downward
@@ -130,7 +126,6 @@ public final class LevelThreatSensor implements ThreatSensor {
             Supplier<Boolean> inWall,
             Supplier<CellPos> suffocationBlock,
             Supplier<Integer> foodLevel,
-            Supplier<Float> saturationLevel,
             java.util.function.IntSupplier bestFoodSlot,
             Supplier<Boolean> falling,
             Supplier<CellPos> mlgGroundCell,
@@ -144,7 +139,6 @@ public final class LevelThreatSensor implements ThreatSensor {
             inWall,
             suffocationBlock,
             foodLevel,
-            saturationLevel,
             bestFoodSlot,
             falling,
             mlgGroundCell,
@@ -162,7 +156,6 @@ public final class LevelThreatSensor implements ThreatSensor {
         this.inWall = inWall;
         this.suffocationBlock = suffocationBlock;
         this.foodLevel = foodLevel;
-        this.saturationLevel = saturationLevel;
         this.bestFoodSlot = bestFoodSlot;
         this.falling = falling;
         this.mlgGroundCell = mlgGroundCell;
@@ -176,7 +169,6 @@ public final class LevelThreatSensor implements ThreatSensor {
         // (same category as botHealth's pipeline accessor).
         board.airSupply = airSupply.get();
         board.foodLevel = foodLevel.get();
-        board.saturationLevel = saturationLevel.get();
         board.foodSlot = bestFoodSlot.getAsInt();
         board.descending = falling.get();
         board.groundCell = mlgGroundCell.get();

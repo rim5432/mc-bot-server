@@ -155,11 +155,6 @@ public final class BasicMoves {
         public double cost(WorldView world) {
             return 1.0;
         }
-
-        @Override
-        public String describe() {
-            return "walk " + source + "->" + destination;
-        }
     }
 
     record Diagonal(CellPos source, CellPos destination) implements Movement {
@@ -203,11 +198,6 @@ public final class BasicMoves {
         public double cost(WorldView world) {
             return 1.5;
         }
-
-        @Override
-        public String describe() {
-            return "diag " + source + "->" + destination;
-        }
     }
 
     /**
@@ -226,11 +216,6 @@ public final class BasicMoves {
         @Override
         public double cost(WorldView world) {
             return 2.0;
-        }
-
-        @Override
-        public String describe() {
-            return "jumpup " + source + "->" + destination;
         }
     }
 
@@ -253,11 +238,6 @@ public final class BasicMoves {
         public double cost(WorldView world) {
             return 1.0 + depth * 1.5;
         }
-
-        @Override
-        public String describe() {
-            return "drop" + depth + " " + source + "->" + destination;
-        }
     }
 
     /**
@@ -278,11 +258,6 @@ public final class BasicMoves {
         public double cost(WorldView world) {
             return 1.5;
         }
-
-        @Override
-        public String describe() {
-            return "swim " + source + "->" + destination;
-        }
     }
 
     /** Vertical swim: treading up one cell inside a water column. */
@@ -296,11 +271,6 @@ public final class BasicMoves {
         @Override
         public double cost(WorldView world) {
             return 2.0;
-        }
-
-        @Override
-        public String describe() {
-            return "swimup " + source + "->" + destination;
         }
     }
 }

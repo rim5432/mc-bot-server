@@ -247,11 +247,6 @@ public final class PathingBehavior implements Behavior {
     }
 
     @Override
-    public String name() {
-        return name;
-    }
-
-    @Override
     public ExecutionReport tick(WorldView world, Directive directive, Actor actor) {
         if (directive == null) {
             lastGoal = null;

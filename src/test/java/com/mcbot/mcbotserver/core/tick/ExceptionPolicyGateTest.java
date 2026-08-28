@@ -66,11 +66,6 @@ class ExceptionPolicyGateTest {
             }
             return ExecutionReport.running();
         }
-
-        @Override
-        public String name() {
-            return "thrower";
-        }
     }
 
     /** Mission stub counting ticks for the degraded-mode assertion. */

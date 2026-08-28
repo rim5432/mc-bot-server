@@ -29,11 +29,4 @@ public interface Behavior {
      * @return this tick's verdict; never null
      */
     ExecutionReport tick(WorldView world, @Nullable Directive directive, Actor actor);
-
-    /**
-     * Stable identity for diagnostics and claim holder names.
-     *
-     * @return short name; never null or blank
-     */
-    String name();
 }

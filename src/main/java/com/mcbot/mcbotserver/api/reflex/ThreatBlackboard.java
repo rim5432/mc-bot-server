@@ -35,12 +35,6 @@ public final class ThreatBlackboard {
     public int foodLevel = 20;
 
     /**
-     * Body saturation at sensing time, 0..foodLevel (issue 0010
-     * section 4.1); safe-defaults to FoodData's constructor value 5.0.
-     */
-    public float saturationLevel = 5.0f;
-
-    /**
      * Hotbar slot of the best food in inventory at sensing time, or
      * -1 when none was sensed - the eat reflex's availability gate:
      * hungry with no food is an acquisition/harness problem (issue

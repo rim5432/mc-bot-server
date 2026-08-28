@@ -292,7 +292,6 @@ public final class BotAssembly {
                 body::isInWall,
                 () -> suffocationBlockOf(body),
                 body.getFoodData()::getFoodLevel,
-                body.getFoodData()::getSaturationLevel,
                 bestFoodSlot,
                 () -> body.getDeltaMovement().y < -0.25,
                 () -> mlgGroundCellOf(level, body),
