@@ -193,6 +193,24 @@ public abstract class VerbTaskHandler<P extends MissionShell> {
     }
 
     /**
+     * The {@code /bot stop} sweep over the whole assembled handler
+     * list - the emergency brake is EVERY live task verb (issue 0011:
+     * "cancel is surgical, stop is not"). The wiring must never hand
+     * the verb a single handler's stopAll; that silently spared every
+     * verb added after goto.
+     *
+     * @param handlers every assembled task handler; never null
+     * @return total missions cancelled across all verbs
+     */
+    public static int stopAllSweep(java.util.List<VerbTaskHandler<?>> handlers) {
+        int cancelled = 0;
+        for (VerbTaskHandler<?> handler : handlers) {
+            cancelled += handler.stopAll();
+        }
+        return cancelled;
+    }
+
+    /**
      * Live missions still tracked by this handler.
      *
      * @return the task-id-keyed mission map; never null

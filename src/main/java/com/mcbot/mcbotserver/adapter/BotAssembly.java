@@ -84,12 +84,12 @@ public final class BotAssembly {
 
     /**
      * Everything assembled around one body, ready to tick. The typed
-     * handler accessors exist for the seams that need a SPECIFIC verb
-     * (goto's state-summary line, stopAll, the rig's submitGoto); the
-     * {@code taskHandlers} list is what the generic drives iterate,
-     * so a new verb registers into the tick and cancel sweeps by
-     * joining the list - the server listener and the rig never learn
-     * about it.
+     * {@code gotoHandler} accessor exists for the seams that need
+     * that SPECIFIC verb (the state-summary line, the rig's
+     * submitGoto); the {@code taskHandlers} list is what every
+     * generic drive iterates - tick, cancel routing, the stop sweep -
+     * so a new verb registers into all of them by joining the list,
+     * and the server listener and the rig never learn about it.
      */
     public record Assembled(
             BotBodyEntity body,
@@ -102,9 +102,6 @@ public final class BotAssembly {
             CommandBus bus,
             List<VerbTaskHandler<?>> taskHandlers,
             GotoCommandHandler gotoHandler,
-            DigCommandHandler digHandler,
-            MineCommandHandler mineHandler,
-            AttackCommandHandler attackHandler,
             ChangeDetectingStateChannel state) {}
 
     /**
@@ -244,20 +241,7 @@ public final class BotAssembly {
                 () -> level.getDayTime() % 24000L);
 
         return new Assembled(
-                body,
-                view,
-                actor,
-                events,
-                arbiter,
-                reflex,
-                controller,
-                bus,
-                taskHandlers,
-                gotoHandler,
-                digHandler,
-                mineHandler,
-                attackHandler,
-                state);
+                body, view, actor, events, arbiter, reflex, controller, bus, taskHandlers, gotoHandler, state);
     }
 
     /**

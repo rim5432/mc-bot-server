@@ -10,6 +10,7 @@ import com.mcbot.mcbotserver.adapter.VanillaArmorCatalog;
 import com.mcbot.mcbotserver.adapter.WorldCommands;
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
 import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.core.command.VerbTaskHandler;
 import com.mojang.logging.LogUtils;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -274,7 +275,7 @@ public class McBotServer {
         }
         var a = active.pipeline();
         return new BotCommands.Channels(
-                a.events(), a.bus(), a.state(), () -> a.gotoHandler().stopAll(), () -> {
+                a.events(), a.bus(), a.state(), () -> VerbTaskHandler.stopAllSweep(a.taskHandlers()), () -> {
                     // ADR-0005 5a through the console verb: report whether
                     // a latch was actually cleared so a harness resetting
                     // a healthy bot learns it did nothing.
