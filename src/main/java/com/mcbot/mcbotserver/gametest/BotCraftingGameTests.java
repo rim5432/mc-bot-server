@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.gametest;
 
+import static com.mcbot.mcbotserver.gametest.GametestRig.SETTLE_TICKS;
 import static com.mcbot.mcbotserver.gametest.GametestRig.check;
 import static com.mcbot.mcbotserver.gametest.GametestRig.checkEquals;
 import static com.mcbot.mcbotserver.gametest.GametestRig.countItems;
@@ -445,7 +446,7 @@ public final class BotCraftingGameTests {
         helper.startSequence()
                 .thenWaitUntil(driveUntil(
                         rig, () -> check(reached(rig.body(), standCell), "waiting for arrival beside the table")))
-                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     check(!mission.isActive(), "the goto mission must retire on arrival");
                     check(mission.missionSucceeded(), "the walk must be a success");
@@ -678,7 +679,7 @@ public final class BotCraftingGameTests {
                 .thenExecute(() -> mission[0] = submitGoto(rig, chestStand))
                 .thenWaitUntil(driveUntil(
                         rig, () -> check(reached(rig.body(), chestStand), "waiting for arrival at the chest")))
-                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     check(mission[0].missionSucceeded(), "the walk to the chest must succeed");
                     var view = actor.openMenu(chestCell);
@@ -696,7 +697,7 @@ public final class BotCraftingGameTests {
                 .thenExecute(() -> mission[0] = submitGoto(rig, tableStand))
                 .thenWaitUntil(driveUntil(
                         rig, () -> check(reached(rig.body(), tableStand), "waiting for arrival at the table")))
-                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     check(mission[0].missionSucceeded(), "the walk to the table must succeed");
                     var view = actor.openMenu(tableCell);
@@ -727,7 +728,7 @@ public final class BotCraftingGameTests {
                                         + positionOf(rig.body()) + " goal=" + chestStand
                                         + " active=" + mission[0].isActive()
                                         + " ok=" + mission[0].missionSucceeded())))
-                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     check(mission[0].missionSucceeded(), "the walk back must succeed");
                     var view = actor.openMenu(chestCell);

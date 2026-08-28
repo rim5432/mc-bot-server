@@ -177,6 +177,15 @@ final class GametestRig {
      * retires the mission and the transition event never fires (this
      * exact race cost three debug rounds).
      */
+    /**
+     * The settle tick count: how long the pipeline runs after the
+     * scenario's action before assertions read the world. Three ticks
+     * lets one-tick intents flush, the arbiter pick a winner, and the
+     * transition events land. Gauntlet's two-tick sites are
+     * deliberate (mid-corridor pacing), not drift.
+     */
+    static final int SETTLE_TICKS = 3;
+
     static Runnable driveOnly(Rig rig) {
         return () -> driveTick(rig);
     }

@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.gametest;
 
+import static com.mcbot.mcbotserver.gametest.GametestRig.SETTLE_TICKS;
 import static com.mcbot.mcbotserver.gametest.GametestRig.assertEventSeen;
 import static com.mcbot.mcbotserver.gametest.GametestRig.check;
 import static com.mcbot.mcbotserver.gametest.GametestRig.checkEquals;
@@ -434,7 +435,7 @@ public final class BotHazardReflexGameTests {
                 .thenWaitUntil(driveUntil(rig, () -> assertEventSeen(rig.events(), EventKind.TASK_RESUMED)))
                 .thenWaitUntil(driveUntil(
                         rig, () -> check(reached(rig.body(), goalCell), "waiting for arrival after the self-rescue")))
-                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     check(!mission.isActive(), "mission must retire after the resumed walk");
                     check(mission.missionSucceeded(), "the resumed walk must be a success");

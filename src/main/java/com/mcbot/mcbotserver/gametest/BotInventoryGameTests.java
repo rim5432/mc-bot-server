@@ -585,14 +585,7 @@ public final class BotInventoryGameTests {
         helper.startSequence()
                 .thenWaitUntil(driveUntil(rig, () -> check(!drop.isAlive(), "waiting for the pickup")))
                 .thenExecuteAfter(0, () -> {
-                    var container = body.getInventory().container();
-                    int bread = 0;
-                    for (int i = 0; i < container.getContainerSize(); i++) {
-                        if (container.getItem(i).is(Items.BREAD)) {
-                            bread += container.getItem(i).getCount();
-                        }
-                    }
-                    checkEquals(3, bread, "the whole dropped stack must land in the container");
+                    checkEquals(3, countItems(rig, Items.BREAD), "the whole dropped stack must land in the container");
                     rig.body().discard();
                 })
                 .thenSucceed();

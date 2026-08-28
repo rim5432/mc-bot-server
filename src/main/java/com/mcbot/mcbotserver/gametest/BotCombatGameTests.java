@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.gametest;
 
+import static com.mcbot.mcbotserver.gametest.GametestRig.SETTLE_TICKS;
 import static com.mcbot.mcbotserver.gametest.GametestRig.check;
 import static com.mcbot.mcbotserver.gametest.GametestRig.checkEquals;
 import static com.mcbot.mcbotserver.gametest.GametestRig.driveOnly;
@@ -76,7 +77,7 @@ public final class BotCombatGameTests {
         container.setItem(BindingInventory.ARMOR_START, new ItemStack(Items.DIAMOND_HELMET));
 
         helper.startSequence()
-                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     check(
                             Items.DIAMOND_SWORD.equals(
@@ -123,7 +124,7 @@ public final class BotCombatGameTests {
                     waited[0]++;
                     check(!mission.isActive(), "waiting for the refusal");
                 }))
-                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     check(!mission.missionSucceeded(), "a refusal is a failure, not a success");
                     checkEquals(
@@ -187,7 +188,7 @@ public final class BotCombatGameTests {
                         rig,
                         () -> check(
                                 reflexEngageVerdict(rig.events()) != null, "waiting for the reflex mission verdict")))
-                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     BotEvent verdict = reflexEngageVerdict(rig.events());
                     check(
@@ -272,7 +273,7 @@ public final class BotCombatGameTests {
                         rig,
                         () -> check(
                                 reflexEngageVerdict(rig.events()) != null, "waiting for the reflex mission verdict")))
-                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     BotEvent verdict = reflexEngageVerdict(rig.events());
                     check(verdict != null, "the retaliation fight must be reflex-owned");
@@ -321,7 +322,7 @@ public final class BotCombatGameTests {
                         () -> check(
                                 reflexEngageVerdict(rig.events()) != null,
                                 "waiting for the walled-off engagement to time out")))
-                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     BotEvent verdict = reflexEngageVerdict(rig.events());
                     check(verdict != null, "a verdict must be present");
@@ -396,7 +397,7 @@ public final class BotCombatGameTests {
                         rig,
                         () -> check(
                                 reflexEngageVerdict(rig.events()) != null, "waiting for the reflex mission verdict")))
-                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     BotEvent verdict = reflexEngageVerdict(rig.events());
                     check(verdict != null, "the sight-started fight must be reflex-owned");

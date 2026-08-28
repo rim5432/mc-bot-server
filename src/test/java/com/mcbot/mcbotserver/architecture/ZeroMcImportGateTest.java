@@ -1,13 +1,12 @@
 package com.mcbot.mcbotserver.architecture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.mcbot.mcbotserver.testsupport.RepoRoot;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
@@ -43,7 +42,7 @@ class ZeroMcImportGateTest {
      */
     @Test
     void apiAndCoreTreesHaveZeroMcImports() throws IOException {
-        Path projectRoot = findProjectRoot();
+        Path projectRoot = RepoRoot.find();
         List<String> violations = new ArrayList<>();
         for (String pkg : new String[] {"api", "core"}) {
             Path pkgDir = projectRoot.resolve("src/main/java/com/mcbot/mcbotserver/" + pkg);
@@ -76,23 +75,5 @@ class ZeroMcImportGateTest {
                 }
             }
         }
-    }
-
-    /**
-     * Walk up from the working directory until a directory containing
-     * src/main/java/com/mcbot/mcbotserver is found.
-     *
-     * @return the project root directory
-     */
-    private Path findProjectRoot() {
-        Path dir = Paths.get("").toAbsolutePath();
-        assertNotNull(dir);
-        for (int i = 0; i < 6 && dir != null; i++) {
-            if (Files.isDirectory(dir.resolve("src/main/java/com/mcbot/mcbotserver"))) {
-                return dir;
-            }
-            dir = dir.getParent();
-        }
-        throw new IllegalStateException("project root not found from working dir");
     }
 }

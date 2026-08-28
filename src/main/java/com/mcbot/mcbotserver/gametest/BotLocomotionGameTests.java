@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.gametest;
 
+import static com.mcbot.mcbotserver.gametest.GametestRig.SETTLE_TICKS;
 import static com.mcbot.mcbotserver.gametest.GametestRig.assertEventSeen;
 import static com.mcbot.mcbotserver.gametest.GametestRig.check;
 import static com.mcbot.mcbotserver.gametest.GametestRig.checkEquals;
@@ -62,7 +63,7 @@ public final class BotLocomotionGameTests {
 
         helper.startSequence()
                 .thenWaitUntil(driveUntil(rig, () -> check(reached(rig.body(), goalCell), "waiting for arrival")))
-                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     check(!mission.isActive(), "mission must retire after arrival");
                     check(mission.missionSucceeded(), "must be a success");
@@ -110,7 +111,7 @@ public final class BotLocomotionGameTests {
         helper.startSequence()
                 .thenWaitUntil(driveUntil(
                         rig, () -> check(reached(rig.body(), goalCell), "waiting for arrival across the trench")))
-                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     check(!mission.isActive(), "mission must retire after crossing");
                     check(mission.missionSucceeded(), "crossing must be a success");
@@ -146,7 +147,7 @@ public final class BotLocomotionGameTests {
         helper.startSequence()
                 .thenWaitUntil(driveUntil(
                         rig, () -> check(reached(rig.body(), goalCell), "waiting for arrival across the deep pool")))
-                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     check(!mission.isActive(), "mission must retire after crossing");
                     check(mission.missionSucceeded(), "crossing must be a success");
@@ -221,7 +222,7 @@ public final class BotLocomotionGameTests {
                 })
                 .thenWaitUntil(driveUntil(
                         rig, () -> check(reached(rig.body(), goalCell), "still re-walking after the shove")))
-                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     checkEquals(goalCell, positionOf(rig.body()), "must still arrive after the shove");
                     rig.body().discard();
@@ -305,7 +306,7 @@ public final class BotLocomotionGameTests {
         helper.startSequence()
                 .thenWaitUntil(driveUntil(
                         rig, () -> check(reached(rig.body(), goalCell), "waiting for arrival across the lava trench")))
-                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     check(!mission.isActive(), "mission must retire after the lava crossing");
                     check(mission.missionSucceeded(), "crossing lava must be a success");

@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.gametest;
 
+import static com.mcbot.mcbotserver.gametest.GametestRig.SETTLE_TICKS;
 import static com.mcbot.mcbotserver.gametest.GametestRig.check;
 import static com.mcbot.mcbotserver.gametest.GametestRig.driveOnly;
 import static com.mcbot.mcbotserver.gametest.GametestRig.driveUntil;
@@ -101,7 +102,7 @@ public final class GauntletGameTests {
                     checkBodyOnPlane(rig, floorAbsY);
                     check(reached(rig.body(), goalCell) || !mission.isActive(), "waiting: threading the fence gap");
                 }))
-                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     check(
                             mission.missionSucceeded(),
@@ -137,7 +138,7 @@ public final class GauntletGameTests {
                         rig,
                         () -> check(
                                 reached(rig.body(), goalCell) || !mission.isActive(), "waiting for the gap threading")))
-                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     check(
                             mission.missionSucceeded(),

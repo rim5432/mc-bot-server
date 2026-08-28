@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.gametest;
 
+import static com.mcbot.mcbotserver.gametest.GametestRig.SETTLE_TICKS;
 import static com.mcbot.mcbotserver.gametest.GametestRig.check;
 import static com.mcbot.mcbotserver.gametest.GametestRig.checkEquals;
 import static com.mcbot.mcbotserver.gametest.GametestRig.driveOnly;
@@ -115,7 +116,7 @@ public final class CrashRecoveryGameTests {
                 })
                 .thenWaitUntil(driveUntil(
                         rig, () -> check(reached(rig.body(), goalCell), "waiting for post-reset arrival")))
-                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     check(!probe[0].isActive(), "the probe mission must retire after recovery");
                     check(probe[0].missionSucceeded(), "the recovered pipeline must complete the probe");

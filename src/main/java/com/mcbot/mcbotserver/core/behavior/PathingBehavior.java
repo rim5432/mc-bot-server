@@ -651,5 +651,4 @@ public final class PathingBehavior implements Behavior {
         return new CellPos(
                 (int) Math.floor(position.x()), (int) Math.floor(position.y()), (int) Math.floor(position.z()));
     }
-
 }
