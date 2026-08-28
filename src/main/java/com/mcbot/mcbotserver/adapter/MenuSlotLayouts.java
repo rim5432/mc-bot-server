@@ -78,4 +78,23 @@ final class MenuSlotLayouts {
         }
         return index <= size - 10 ? SlotRole.MAIN : SlotRole.HOTBAR;
     }
+
+    /**
+     * Brewing stand layout: vanilla BrewingStandMenu adds slots 0-2 =
+     * bottles (input water bottle, output finished potion - same slot),
+     * 3 = ingredient (nether wart, glowstone, redstone, ...), 4 = fuel
+     * (blaze powder), then the standard 27 main + 9 hotbar.
+     */
+    public static SlotRole brewingRole(int index, int size) {
+        if (index <= 2) {
+            return SlotRole.BOTTLE;
+        }
+        if (index == 3) {
+            return SlotRole.INGREDIENT;
+        }
+        if (index == 4) {
+            return SlotRole.FUEL;
+        }
+        return index <= size - 10 ? SlotRole.MAIN : SlotRole.HOTBAR;
+    }
 }

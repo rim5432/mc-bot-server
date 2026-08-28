@@ -220,7 +220,7 @@ final class MenuVerbs {
      */
     private static SlotRole parseRole(String word) {
         return switch (word) {
-            case "INPUT", "FUEL", "OUTPUT", "CONTAINER" -> SlotRole.valueOf(word);
+            case "INPUT", "FUEL", "OUTPUT", "CONTAINER", "BOTTLE", "INGREDIENT" -> SlotRole.valueOf(word);
             default -> null;
         };
     }
@@ -240,7 +240,8 @@ final class MenuVerbs {
         String type = view.type();
         boolean furnaceFamily = type.equals("furnace") || type.equals("blast_furnace") || type.equals("smoker");
         boolean anvilFamily = type.equals("anvil");
-        if (furnaceFamily || anvilFamily) {
+        boolean brewingFamily = type.equals("brewing_stand");
+        if (furnaceFamily || anvilFamily || brewingFamily) {
             return role;
         }
         return SlotRole.CONTAINER;

@@ -43,5 +43,13 @@ public enum SlotRole {
 
     /** Furnace result slot (slot 2; consumption-only, items land here
      *  from smelting - take, never deposit). */
-    OUTPUT
+    OUTPUT,
+
+    /** Brewing stand bottle slot (slots 0-2; input water bottle,
+     *  output finished potion - the same slot serves both sides). */
+    BOTTLE,
+
+    /** Brewing stand ingredient slot (slot 3; nether wart, glowstone
+     *  dust, redstone, etc. - deposit-only, never take as output). */
+    INGREDIENT
 }

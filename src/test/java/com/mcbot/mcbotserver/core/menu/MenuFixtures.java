@@ -192,6 +192,28 @@ final class MenuFixtures {
         return new MenuView("anvil", null, ItemView.EMPTY, 39, slots);
     }
 
+    /** Brewing-stand-shaped snapshot: BOTTLE 0..2, INGREDIENT 3,
+     * FUEL 4, MAIN 5..31, HOTBAR 32..40 - vanilla BrewingStandMenu
+     * mirrored (41 slots total). */
+    static MenuView brewingStand(Builder b) {
+        for (int i = 0; i <= 2; i++) {
+            b.roles.putIfAbsent(i, SlotRole.BOTTLE);
+        }
+        b.roles.putIfAbsent(3, SlotRole.INGREDIENT);
+        b.roles.putIfAbsent(4, SlotRole.FUEL);
+        for (int i = 5; i <= 31; i++) {
+            b.roles.putIfAbsent(i, SlotRole.MAIN);
+        }
+        for (int i = 32; i <= 40; i++) {
+            b.roles.putIfAbsent(i, SlotRole.HOTBAR);
+        }
+        List<SlotView> slots = new ArrayList<>(41);
+        for (int i = 0; i < 41; i++) {
+            slots.add(new SlotView(i, b.items.getOrDefault(i, ItemView.EMPTY), b.roles.get(i)));
+        }
+        return new MenuView("brewing_stand", null, ItemView.EMPTY, 41, slots);
+    }
+
     /** Own-inventory fake: result 0, grid 1..4, ARMOR 5..8 (head
      * first), MAIN 9..35, HOTBAR 36..44, OFFHAND 45 - the
      * MenuSlotLayouts survival layout mirrored. */

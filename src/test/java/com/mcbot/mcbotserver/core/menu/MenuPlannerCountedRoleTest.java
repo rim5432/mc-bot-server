@@ -127,4 +127,54 @@ class MenuPlannerCountedRoleTest {
                 List.of(new MenuPlanner.Step(2, 0, MenuClick.QUICK_MOVE)),
                 MenuPlanner.planTakeRole(menu, SlotRole.OUTPUT, 0));
     }
+
+    @Test
+    void brewingDepositBottleFillsFirstEmptyBottleSlot() {
+        MenuView menu =
+                MenuFixtures.brewingStand(MenuFixtures.builder().put(SlotRole.HOTBAR, 40, "minecraft:water_bottle", 3));
+        List<MenuPlanner.Step> plan =
+                MenuPlanner.planDepositCounted(menu, SlotRole.BOTTLE, "minecraft:water_bottle", 1);
+        assertEquals(
+                List.of(
+                        new MenuPlanner.Step(40, 0, MenuClick.PICKUP),
+                        new MenuPlanner.Step(0, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(40, 0, MenuClick.PICKUP)),
+                plan);
+    }
+
+    @Test
+    void brewingDepositIngredientGoesToSlot3() {
+        MenuView menu =
+                MenuFixtures.brewingStand(MenuFixtures.builder().put(SlotRole.HOTBAR, 40, "minecraft:nether_wart", 16));
+        List<MenuPlanner.Step> plan =
+                MenuPlanner.planDepositCounted(menu, SlotRole.INGREDIENT, "minecraft:nether_wart", 1);
+        assertEquals(
+                List.of(
+                        new MenuPlanner.Step(40, 0, MenuClick.PICKUP),
+                        new MenuPlanner.Step(3, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(40, 0, MenuClick.PICKUP)),
+                plan);
+    }
+
+    @Test
+    void brewingDepositFuelGoesToSlot4() {
+        MenuView menu = MenuFixtures.brewingStand(
+                MenuFixtures.builder().put(SlotRole.HOTBAR, 40, "minecraft:blaze_powder", 16));
+        List<MenuPlanner.Step> plan = MenuPlanner.planDepositCounted(menu, SlotRole.FUEL, "minecraft:blaze_powder", 1);
+        assertEquals(
+                List.of(
+                        new MenuPlanner.Step(40, 0, MenuClick.PICKUP),
+                        new MenuPlanner.Step(4, 1, MenuClick.PICKUP),
+                        new MenuPlanner.Step(40, 0, MenuClick.PICKUP)),
+                plan);
+    }
+
+    @Test
+    void brewingTakeBottleQuickMovesFinishedPotion() {
+        MenuView menu =
+                MenuFixtures.brewingStand(MenuFixtures.builder().put(SlotRole.BOTTLE, 0, "minecraft:strength", 1));
+        assertEquals(
+                List.of(new MenuPlanner.Step(0, 0, MenuClick.QUICK_MOVE)),
+                MenuPlanner.planTakeRole(menu, SlotRole.BOTTLE, 0));
+    }
 }
