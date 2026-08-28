@@ -5,6 +5,7 @@ import static com.mcbot.mcbotserver.gametest.GametestRig.checkEquals;
 import static com.mcbot.mcbotserver.gametest.GametestRig.driveOnly;
 import static com.mcbot.mcbotserver.gametest.GametestRig.driveUntil;
 import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
+import static com.mcbot.mcbotserver.gametest.GametestRig.spawnHostile;
 
 import com.mcbot.mcbotserver.McBotServer;
 import com.mcbot.mcbotserver.adapter.BotAssembly;
@@ -112,12 +113,8 @@ public final class BotCombatGameTests {
     public static void refusesRangedItCannotAnswer(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
         var level = helper.getLevel();
-        Skeleton skeleton = EntityType.SKELETON.create(level);
-        check(skeleton != null, "skeleton creation failed");
-        var sAbs = helper.absolutePos(new BlockPos(11, GametestRig.WALK_Y, 8));
-        skeleton.moveTo(sAbs.getX() + 0.5, sAbs.getY(), sAbs.getZ() + 0.5, 0f, 0f);
+        Skeleton skeleton = spawnHostile(helper, EntityType.SKELETON, new BlockPos(11, GametestRig.WALK_Y, 8));
         skeleton.setNoAi(true);
-        level.addFreshEntity(skeleton);
 
         DefendProcess mission = submitDefend(rig);
         int[] waited = {0};
@@ -182,12 +179,8 @@ public final class BotCombatGameTests {
     public static void defendsByKillingZombie(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
         var level = helper.getLevel();
-        Zombie zombie = EntityType.ZOMBIE.create(level);
-        check(zombie != null, "zombie creation failed");
-        var zAbs = helper.absolutePos(new BlockPos(7, GametestRig.WALK_Y, 8));
-        zombie.moveTo(zAbs.getX() + 0.5, zAbs.getY(), zAbs.getZ() + 0.5, 0f, 0f);
+        Zombie zombie = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(7, GametestRig.WALK_Y, 8));
         zombie.setNoAi(true);
-        level.addFreshEntity(zombie);
 
         helper.startSequence()
                 .thenWaitUntil(driveUntil(
@@ -269,12 +262,8 @@ public final class BotCombatGameTests {
                 helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y + 7, z), Blocks.SMOOTH_STONE);
             }
         }
-        Zombie zombie = EntityType.ZOMBIE.create(level);
-        check(zombie != null, "zombie creation failed");
-        var zAbs = helper.absolutePos(new BlockPos(7, GametestRig.WALK_Y, 8));
-        zombie.moveTo(zAbs.getX() + 0.5, zAbs.getY(), zAbs.getZ() + 0.5, 0f, 0f);
+        Zombie zombie = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(7, GametestRig.WALK_Y, 8));
         zombie.setHealth(8f);
-        level.addFreshEntity(zombie);
 
         helper.startSequence()
                 .thenWaitUntil(driveUntil(
@@ -327,12 +316,8 @@ public final class BotCombatGameTests {
                 helper.setBlock(new BlockPos(8, GametestRig.FLOOR_Y + y, z), Blocks.SMOOTH_STONE);
             }
         }
-        Zombie zombie = EntityType.ZOMBIE.create(level);
-        check(zombie != null, "zombie creation failed");
-        var zAbs = helper.absolutePos(new BlockPos(9, GametestRig.WALK_Y, 8));
-        zombie.moveTo(zAbs.getX() + 0.5, zAbs.getY(), zAbs.getZ() + 0.5, 0f, 0f);
+        Zombie zombie = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(9, GametestRig.WALK_Y, 8));
         zombie.setNoAi(true);
-        level.addFreshEntity(zombie);
 
         helper.startSequence()
                 .thenWaitUntil(driveUntil(
@@ -400,12 +385,8 @@ public final class BotCombatGameTests {
                 helper.setBlock(new BlockPos(15, GametestRig.FLOOR_Y + y, z), Blocks.SMOOTH_STONE);
             }
         }
-        Zombie zombie = EntityType.ZOMBIE.create(level);
-        check(zombie != null, "zombie creation failed");
-        var zAbs = helper.absolutePos(new BlockPos(10, GametestRig.WALK_Y, 8));
-        zombie.moveTo(zAbs.getX() + 0.5, zAbs.getY(), zAbs.getZ() + 0.5, 0f, 0f);
+        Zombie zombie = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(10, GametestRig.WALK_Y, 8));
         zombie.setHealth(8f);
-        level.addFreshEntity(zombie);
 
         helper.startSequence()
                 .thenWaitUntil(driveUntil(

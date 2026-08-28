@@ -182,6 +182,28 @@ final class GametestRig {
     }
 
     /**
+     * Spawns one hostile mob at the local cell for combat scenarios:
+     * centered on the cell (+0.5), NoAi left to the caller. Every
+     * spawn rides this helper so the centering and creation-check
+     * conventions stay pinned in one place.
+     *
+     * @param helper the gametest helper; never null
+     * @param type   the entity type to create; never null
+     * @param local  structure-local spawn cell; never null
+     * @param <T>    the spawned mob type
+     * @return the added entity; never null
+     */
+    static <T extends net.minecraft.world.entity.monster.Monster> T spawnHostile(
+            GameTestHelper helper, net.minecraft.world.entity.EntityType<T> type, BlockPos local) {
+        T mob = type.create(helper.getLevel());
+        check(mob != null, "hostile creation failed: " + type);
+        var abs = helper.absolutePos(local);
+        mob.moveTo(abs.getX() + 0.5, abs.getY(), abs.getZ() + 0.5, 0f, 0f);
+        helper.getLevel().addFreshEntity(mob);
+        return mob;
+    }
+
+    /**
      * Registers and takes control of a goto mission with the default
      * tick budget.
      *
