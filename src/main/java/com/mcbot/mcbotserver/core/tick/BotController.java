@@ -7,7 +7,6 @@ import com.mcbot.mcbotserver.api.behavior.Behavior;
 import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.event.EventQueue;
-import com.mcbot.mcbotserver.api.goal.Goal;
 import com.mcbot.mcbotserver.api.goal.Goals;
 import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.api.process.DigMission;
@@ -157,9 +156,11 @@ public final class BotController {
     private static final int KEEPALIVE_INTERVAL = 20;
 
     /**
-     * Assembles the pipeline without combat or rescue wiring: ENGAGE
-     * and ESCAPE reflex decisions degrade to the freeze hold.
-     * Delegates to the twelve-argument constructor.
+     * Assembles the pipeline without combat, rescue, or forage
+     * wiring and without dig tool selection: ENGAGE, ESCAPE and
+     * FORAGE reflex decisions degrade to the freeze hold, and mission
+     * digs run at vanilla speed. Delegates to the canonical
+     * constructor.
      *
      * @param reflex        survival bypass; never null
      * @param arbiter       task-channel winner selector; never null
@@ -182,91 +183,6 @@ public final class BotController {
             GameClock clock,
             EventQueue events,
             CrashReporter crashReporter) {
-        this(reflex, arbiter, behaviors, actor, positionSource, healthSource, clock, events, crashReporter, null, null);
-    }
-
-    /**
-     * Assembles the pipeline. All collaborators stay plain constructor
-     * arguments — no service lookup, no optional wiring.
-     *
-     * @param reflex        survival bypass; never null
-     * @param arbiter       task-channel winner selector; never null
-     * @param behaviors     execution tier; never null, may be empty
-     * @param actor         claim surface; never null
-     * @param positionSource    body position accessor; never null
-     * @param healthSource  body health accessor; never null
-     * @param clock         game-time accessor; never null
-     * @param events        event stream for the primary crash channel;
-     *                      never null
-     * @param crashReporter fallback reporter; never null
-     * @param engageMissionFactory supplies one fresh defend mission
-     *                      per reflex engage submission (the wiring
-     *                      owns identity, budgets and type sets);
-     *                      may be null - ENGAGE then degrades to the
-     *                      freeze hold
-     */
-    public BotController(
-            SurvivalReflexLayer reflex,
-            TaskArbiter arbiter,
-            List<Behavior> behaviors,
-            Actor actor,
-            CellPositionSource positionSource,
-            HealthSource healthSource,
-            GameClock clock,
-            EventQueue events,
-            CrashReporter crashReporter,
-            Supplier<BotProcess> engageMissionFactory) {
-        this(
-                reflex,
-                arbiter,
-                behaviors,
-                actor,
-                positionSource,
-                healthSource,
-                clock,
-                events,
-                crashReporter,
-                engageMissionFactory,
-                null);
-    }
-
-    /**
-     * Assembles the pipeline with combat and rescue wiring. All
-     * collaborators stay plain constructor arguments - no service
-     * lookup, no optional wiring.
-     *
-     * @param reflex        survival bypass; never null
-     * @param arbiter       task-channel winner selector; never null
-     * @param behaviors     execution tier; never null, may be empty
-     * @param actor         claim surface; never null
-     * @param positionSource    body position accessor; never null
-     * @param healthSource  body health accessor; never null
-     * @param clock         game-time accessor; never null
-     * @param events        event stream for the primary crash channel;
-     *                      never null
-     * @param crashReporter fallback reporter; never null
-     * @param engageMissionFactory supplies one fresh defend mission
-     *                      per reflex engage submission; may be null -
-     *                      ENGAGE then degrades to the freeze hold
-     * @param rescueMissionFactory supplies one fresh rescue mission
-     *                      (GotoProcess to a safe cell) per reflex
-     *                      escape submission; the factory reads body
-     *                      state to decide lava-shore vs water-target;
-     *                      may be null - ESCAPE then degrades to the
-     *                      freeze hold
-     */
-    public BotController(
-            SurvivalReflexLayer reflex,
-            TaskArbiter arbiter,
-            List<Behavior> behaviors,
-            Actor actor,
-            CellPositionSource positionSource,
-            HealthSource healthSource,
-            GameClock clock,
-            EventQueue events,
-            CrashReporter crashReporter,
-            Supplier<BotProcess> engageMissionFactory,
-            Supplier<BotProcess> rescueMissionFactory) {
         this(
                 reflex,
                 arbiter,
@@ -278,8 +194,8 @@ public final class BotController {
                 events,
                 crashReporter,
                 ToolCatalog.none(),
-                engageMissionFactory,
-                rescueMissionFactory,
+                null,
+                null,
                 null);
     }
 
