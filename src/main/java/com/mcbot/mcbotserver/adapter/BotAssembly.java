@@ -16,6 +16,7 @@ import com.mcbot.mcbotserver.core.command.CommandBus;
 import com.mcbot.mcbotserver.core.command.DigCommandHandler;
 import com.mcbot.mcbotserver.core.command.GotoCommandHandler;
 import com.mcbot.mcbotserver.core.command.MineCommandHandler;
+import com.mcbot.mcbotserver.core.command.VerbTaskHandler;
 import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.process.DefendProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
@@ -86,7 +87,15 @@ public final class BotAssembly {
 
     private BotAssembly() {}
 
-    /** Everything assembled around one body, ready to tick. */
+    /**
+     * Everything assembled around one body, ready to tick. The typed
+     * handler accessors exist for the seams that need a SPECIFIC verb
+     * (goto's state-summary line, stopAll, the rig's submitGoto); the
+     * {@code taskHandlers} list is what the generic drives iterate,
+     * so a new verb registers into the tick and cancel sweeps by
+     * joining the list - the server listener and the rig never learn
+     * about it.
+     */
     public record Assembled(
             BotBodyEntity body,
             BindingWorldView view,
@@ -96,6 +105,7 @@ public final class BotAssembly {
             SurvivalReflexLayer reflex,
             BotController controller,
             CommandBus bus,
+            List<VerbTaskHandler<?>> taskHandlers,
             GotoCommandHandler gotoHandler,
             DigCommandHandler digHandler,
             MineCommandHandler mineHandler,
@@ -320,14 +330,14 @@ public final class BotAssembly {
                 () -> level.getDayTime() % 24000L,
                 () -> poseOf(body));
         attackHandler.attach(bus);
+        List<VerbTaskHandler<?>> taskHandlers = List.of(gotoHandler, digHandler, mineHandler, attackHandler);
         // The bus has ONE cancel-listener slot: route to every verb
         // handler's public cancel method (each self-guards by its
         // missions map, so no verb dispatch is needed).
         bus.setCancelListener((taskId, verb) -> {
-            gotoHandler.onCancel(taskId, verb);
-            digHandler.onCancel(taskId, verb);
-            mineHandler.onCancel(taskId, verb);
-            attackHandler.onCancel(taskId, verb);
+            for (VerbTaskHandler<?> handler : taskHandlers) {
+                handler.onCancel(taskId, verb);
+            }
         });
 
         ChangeDetectingStateChannel state = new ChangeDetectingStateChannel(
@@ -345,6 +355,7 @@ public final class BotAssembly {
                 reflex,
                 controller,
                 bus,
+                taskHandlers,
                 gotoHandler,
                 digHandler,
                 mineHandler,
@@ -353,19 +364,18 @@ public final class BotAssembly {
     }
 
     /**
-     * Drives one production tick in the contract order: the four verb
-     * handlers, the state pull-through, the crashed-state vitals, then
-     * the pipeline. The server listener (ADR-0004 D1 END phase) and
-     * the gametest rig both call this, so the order lives in exactly
-     * one place.
+     * Drives one production tick in the contract order: every
+     * registered verb handler (in assembly order), the state
+     * pull-through, the crashed-state vitals, then the pipeline. The
+     * server listener (ADR-0004 D1 END phase) and the gametest rig
+     * both call this, so the order lives in exactly one place.
      *
      * @param a the assembled pipeline; never null
      */
     public static void tickOnce(Assembled a) {
-        a.gotoHandler().tick();
-        a.digHandler().tick();
-        a.mineHandler().tick();
-        a.attackHandler().tick();
+        for (VerbTaskHandler<?> handler : a.taskHandlers()) {
+            handler.tick();
+        }
         // Pull-through state capture: change detection pushes STATE_PUSH
         // onto the stream only when the snapshot actually moved, so a
         // per-tick drive cannot flood it.
