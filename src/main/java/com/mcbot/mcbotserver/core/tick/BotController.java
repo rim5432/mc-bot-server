@@ -1,8 +1,6 @@
 package com.mcbot.mcbotserver.core.tick;
 
 import com.mcbot.mcbotserver.api.actor.Actor;
-import com.mcbot.mcbotserver.api.actor.Channel;
-import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.actor.ToolCatalog;
 import com.mcbot.mcbotserver.api.behavior.Behavior;
@@ -24,7 +22,6 @@ import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.api.world.WorldView;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
-import com.mcbot.mcbotserver.core.process.TerminalMission;
 import com.mcbot.mcbotserver.core.reflex.MinimalReflex;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer.ReflexDecision;
@@ -55,17 +52,6 @@ import java.util.function.Supplier;
  * the mod entry class — the one place allowed to hold MC-aware wiring.
  */
 // contract: see ADR-0004 D1 + ADR-0005 D1 (pipeline order and catch frame)
-// TooManyMethods exempted: method count reflects the four-stage
-// pipeline contract, per-seat/per-source wiring accessors, and the
-// named reflex-routing stages extracted in the 2026-08-27 paydown -
-// each is load-bearing contract surface, not sprawl.
-// Ruling (2026-08-27 eat slice): the eat leg's setter + delegation
-// crossed PMD GodClass on the TCC axis (WMC 75, TCC 20.3%) - the
-// claim-shape extraction into ReflexClaimInjector paid the WMC
-// debt, but the cohesion ratio needs the queued reflex-preemption
-// extraction (workplan lean deferrals). Suppressed until then;
-// TooManyMethods below predates it.
-@SuppressWarnings({"PMD.TooManyMethods", "PMD.GodClass"})
 public final class BotController {
 
     /** Body-position accessor, block-cell granularity. */
@@ -160,6 +146,9 @@ public final class BotController {
 
     /** Mission dig tool auto-selection (hotbar scan + SLOT claim). */
     private final ToolSelector toolSelector;
+
+    /** Reflex park/resume choreography (boundaries.md §C machinery). */
+    private final ReflexPreemption preemption;
 
     private int ticksSinceKeepalive;
 
@@ -357,6 +346,13 @@ public final class BotController {
         this.hungrySeat = new ReflexMissionSeat(arbiter, PATHING_RESUBMIT_COOLDOWN);
         this.claimInjector = new ReflexClaimInjector(actor, positionSource::get);
         this.toolSelector = new ToolSelector(Objects.requireNonNull(toolCatalog, "toolCatalog"));
+        this.preemption = new ReflexPreemption(
+                this.arbiter,
+                this.missions,
+                this.actor,
+                this.claimInjector,
+                List.of(this.engageSeat, this.rescueSeat, this.hungrySeat),
+                positionSource::get);
     }
 
     /**
@@ -537,7 +533,7 @@ public final class BotController {
         if (!seat.maySubmit()) {
             return false;
         }
-        preemptAndHold(decision, new Intent.Move(0, 0, false, false), day, tod);
+        preemption.preemptAndHold(decision, new Intent.Move(0, 0, false, false), tickCounter, day, tod);
         BotProcess mission = factory.get();
         if (mission != null) {
             arbiter.register(mission);
@@ -599,21 +595,10 @@ public final class BotController {
         }
 
         // Threat gone: hand control back through world revalidation.
-        // The guard dispatches on WHO occupies the paused slot:
-        // (a) the reflex-owned fight itself (a survival reflex parked
-        // it mid-fight): resume it whenever the seat is free - even
-        // while ENGAGE keeps firing (threat present is exactly when
-        // the fight must resume; gating on decision==null would seat
-        // the requeued original over it and strand the fight);
-        // (b) anything else (the mission an engage submission parked):
-        // resume only when no reflex fired this tick AND no mission
-        // is seated AND the reflex fight is not still awaiting its
-        // seat in pending - in that window the arbiter must SELECT
-        // the fight, not resume the parked mission over it.
-        // Threat gone: hand control back through world revalidation.
-        // Guard dispatches on WHO occupies the paused slot - see
-        // resumeParkedMission for the two occupancy cases.
-        resumeParkedMission(decision != null, day, tod);
+        // The guard dispatches on WHO occupies the paused slot - see
+        // ReflexPreemption#resumeParkedMission for the two occupancy
+        // cases.
+        preemption.resumeParkedMission(decision != null, day, tod);
 
         // Stage 2: arbiter picks or keeps the winner.
         arbiter.tick(world);
@@ -656,25 +641,10 @@ public final class BotController {
     }
 
     /**
-     * Park whoever holds the body and hold it under the reflex claim
-     * for this tick - the shared skeleton of every reflex
-     * preemption: InterruptionContext snapshot, forcePauseAll with
-     * its PARKED / RETIRED_TERMINAL / NO_CURRENT outcomes, the hold
-     * claim, flush, and the retirement-lap verdict announcement.
-     * DIG decisions additionally inject their aim-and-hold claims
-     * through {@link #preemptDigClaims} before the flush.
-     *
-     * @param decision the winning reflex decision; never null
-     * @param hold     the intent that holds the body this tick;
-     *                 never null
-     * @param day      game day for event stamping
-     * @param tod      time-of-day ticks for event stamping
-     */
-    /**
-     * Route one non-null reflex decision: ENGAGE/ESCAPE hand off to
-     * their seats (returning true when this tick is fully consumed by
-     * the preemption), everything else - including a factory-less
-     * ENGAGE - degrades to the hold-and-park shape.
+     * Route one non-null reflex decision: ENGAGE/FORAGE/ESCAPE hand
+     * off to their seats (returning true when this tick is fully
+     * consumed by the preemption), everything else - including a
+     * factory-less ENGAGE - degrades to the hold-and-park shape.
      *
      * <p>Live reflex-owned mission (or the resubmit cooldown) returns
      * false so the pipeline falls through and that mission keeps
@@ -712,95 +682,8 @@ public final class BotController {
         Intent.Move hold = decision.action() == ReflexAction.ASCEND
                 ? new Intent.Move(0, 0, true, false)
                 : new Intent.Move(0, 0, false, false);
-        preemptAndHold(decision, hold, day, tod);
+        preemption.preemptAndHold(decision, hold, tickCounter, day, tod);
         return true;
-    }
-
-    /**
-     * Hand control back through world revalidation when a parked
-     * mission can be resumed. The guard dispatches on WHO occupies
-     * the paused slot:
-     * (a) the reflex-owned fight itself (a survival reflex parked it
-     * mid-fight): resume whenever the seat is free - even while
-     * ENGAGE keeps firing (threat present is exactly when the fight
-     * must resume; gating on reflexFired would seat the requeued
-     * original over it and strand the fight);
-     * (b) anything else (the mission an engage submission parked):
-     * resume only when no reflex fired this tick AND no mission is
-     * seated AND neither reflex fight is still awaiting its seat in
-     * pending - in that window the arbiter must SELECT the fight,
-     * not resume the parked mission over it.
-     *
-     * @param reflexFired whether the reflex layer emitted a decision
-     *                    this tick
-     */
-    private void resumeParkedMission(boolean reflexFired, long day, long tod) {
-        boolean reflexMissionParked =
-                engageSeat.missionIsParked() || rescueSeat.missionIsParked() || hungrySeat.missionIsParked();
-        boolean reflexMissionAwaiting = engageSeat.missionAwaitingSeat()
-                || rescueSeat.missionAwaitingSeat()
-                || hungrySeat.missionAwaitingSeat();
-        if (arbiter.paused() != null
-                && arbiter.current() == null
-                && (reflexMissionParked || (!reflexFired && !reflexMissionAwaiting))) {
-            BotProcess resuming = arbiter.paused();
-            String resumingTask = resuming.displayName();
-            String resumingId = (resuming instanceof TerminalMission tm) ? tm.missionTaskId() : null;
-            boolean resumed = arbiter.tryResume();
-            missions.resumeVerdict(resumed, resumingTask, resumingId, day, tod);
-        }
-    }
-
-    private void preemptAndHold(SurvivalReflexLayer.ReflexDecision decision, Intent.Move hold, long day, long tod) {
-        evictPausedForReflex(day, tod);
-        InterruptionContext ctx = new InterruptionContext(
-                tickCounter, positionSource.get(), activeName(), "reflex-preempt:" + decision.ruleName(), "");
-        BotProcess current = arbiter.current();
-        String pausedTask = current != null ? current.displayName() : "";
-        String pausedId = (current instanceof TerminalMission tm) ? tm.missionTaskId() : null;
-        boolean announceVerdict = false;
-        switch (arbiter.forcePauseAll(ctx)) {
-            case PARKED -> {
-                missions.paused(pausedTask, pausedId, day, tod, "paused by reflex " + decision.ruleName());
-                // No current while parked: the transition detector
-                // must not fire on stale state.
-                missions.forgetCurrent();
-            }
-            case RETIRED_TERMINAL -> announceVerdict = true;
-            case NO_CURRENT -> {}
-        }
-        actor.submit(new Claim(Channel.MOVE, decision.priority(), "reflex:" + decision.ruleName(), hold));
-        claimInjector.injectAux(decision);
-        actor.flush();
-        if (announceVerdict) {
-            // Retirement-lap corpse: its verdict is announced here,
-            // on the reflex tick, explicitly per the ParkResult
-            // contract - not via any transition-state side effect.
-            missions.announceTransition(day, tod);
-        }
-    }
-
-    /**
-     * Single-slot eviction with an honest event: when this park will
-     * occupy the paused slot over an existing occupant (the
-     * reflex-chain shape: original parked by an engage submission,
-     * fight seated, now a survival reflex parks the fight), the
-     * controller requeues the occupant itself so a DROPPED
-     * revalidation reaches the harness as TASK_DROPPED - the
-     * arbiter's internal eviction is the safety net, not the reporter.
-     */
-    private void evictPausedForReflex(long day, long tod) {
-        if (arbiter.paused() != null
-                && arbiter.current() != null
-                && arbiter.current().isActive()
-                && arbiter.paused() != arbiter.current()) {
-            BotProcess evicted = arbiter.paused();
-            String evictedName = evicted.displayName();
-            String evictedId = (evicted instanceof TerminalMission tm) ? tm.missionTaskId() : null;
-            if (arbiter.requeuePausedOrDrop() == TaskArbiter.PausedEviction.DROPPED) {
-                missions.dropped(evictedName, evictedId, day, tod, "context invalidated by reflex chain requeue");
-            }
-        }
     }
 
     /**
