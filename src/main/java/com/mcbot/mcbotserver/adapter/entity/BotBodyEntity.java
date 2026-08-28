@@ -295,6 +295,25 @@ public final class BotBodyEntity extends PathfinderMob {
     }
 
     /**
+     * Crouch semantics made real: the base Entity answers the same
+     * dimensions for every pose (only Player overrides), so without
+     * this the CROUCHING pose would flip flags without changing the
+     * collision box. Vanilla's crouch box is 0.6 x 1.5 - the 1.5-block
+     * gap crawl and the standing 1.8 are the two poses the sneak pair
+     * switches between.
+     *
+     * @param pose the requested pose
+     * @return the crouch box while crouching, the registered box
+     *         otherwise
+     */
+    @Override
+    public net.minecraft.world.entity.EntityDimensions getDimensions(Pose pose) {
+        return pose == Pose.CROUCHING
+                ? net.minecraft.world.entity.EntityDimensions.scalable(0.6f, 1.5f)
+                : super.getDimensions(pose);
+    }
+
+    /**
      * Queue an absolute rotation for the next tick.
      *
      * @param yawDeg   target body yaw in degrees

@@ -45,7 +45,9 @@ class GametestInventoryCheck {
                             "crossesDeepPool",
                             "crossesLavaTrench",
                             "recoversWhenShoved",
-                            "failsCleanlyWhenUnwalkable"),
+                            "failsCleanlyWhenUnwalkable",
+                            "sneakCrawlFitsThroughGap"),
+            "BotInteractionGameTests", Set.of("doorOpensThroughUseChain", "stairsFaceTheirPlacer"),
             "BotCombatGameTests",
                     Set.of(
                             "refusesRangedItCannotAnswer",

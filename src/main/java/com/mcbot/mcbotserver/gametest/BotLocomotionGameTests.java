@@ -12,6 +12,9 @@ import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
 import static com.mcbot.mcbotserver.gametest.GametestRig.submitGoto;
 
 import com.mcbot.mcbotserver.McBotServer;
+import com.mcbot.mcbotserver.api.actor.Channel;
+import com.mcbot.mcbotserver.api.actor.Claim;
+import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import net.minecraft.core.BlockPos;
@@ -20,6 +23,8 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.SlabBlock;
+import net.minecraft.world.level.block.state.properties.SlabType;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
@@ -307,6 +312,60 @@ public final class BotLocomotionGameTests {
                     assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
                     checkEquals(20f, rig.body().getHealth(), "fire resistance must hold for the whole crossing");
                     rig.body().discard();
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Sneak crawl (issue 0003 sketch A, pose half): a body driving
+     * with {@code Move.sneak} crosses a 1.5-block clearance (air + a
+     * bottom slab) that stops standing height - the crouching box is
+     * 0.6 x 1.5, the standing box 0.6 x 1.8. The claim carries the
+     * sneak modifier; the body applies the pose pair and the
+     * dimensions follow.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 300)
+    public static void sneakCrawlFitsThroughGap(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(4, GametestRig.WALK_Y, 8));
+
+        // Wall at x=8 across the full width: solid, except a crawl gap
+        // for z 7..9 - air at y=1, bottom slab at y=2 (clearance 1.5).
+        for (int z = 0; z < 16; z++) {
+            boolean gap = z >= 7 && z <= 9;
+            for (int y = 1; y <= 3; y++) {
+                if (gap && y == 1) {
+                    continue; // the crawl opening: air at body height
+                }
+                if (gap && y == 2) {
+                    // Bottom slab caps the opening at 1.5: crouched
+                    // height fits exactly, standing 1.8 does not.
+                    helper.setBlock(
+                            new BlockPos(8, y, z),
+                            Blocks.SMOOTH_STONE_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.BOTTOM));
+                } else {
+                    helper.setBlock(new BlockPos(8, y, z), Blocks.SMOOTH_STONE);
+                }
+            }
+        }
+        // Face east so forward drive pushes into the wall.
+        rig.body().setYRot(-90f);
+
+        helper.startSequence()
+                .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
+                    // Re-armed every tick: claims expire at flush.
+                    rig.actor().submit(new Claim(Channel.MOVE, 50, "test:sneak", new Intent.Move(1, 0, false, true)));
+                    check(
+                            rig.body().getBlockX() >= 9,
+                            "waiting for the body to cross the crawl gap (X="
+                                    + rig.body().getBlockX() + ", pose="
+                                    + rig.body().getPose() + ")");
+                }))
+                .thenExecute(() -> {
+                    check(rig.body().isAlive(), "the body must survive the crawl");
+                    check(
+                            rig.body().isCrouching(),
+                            "the body must still be crouched after crossing (pose="
+                                    + rig.body().getPose() + ")");
                 })
                 .thenSucceed();
     }
