@@ -35,9 +35,10 @@ import net.minecraftforge.registries.ForgeRegistries;
  * {@link BotAssembly#assemble} - the exact factory the
  * {@code /botspawn} server wiring uses - so a rig green means the
  * production wiring shape, not a hand-copied lookalike of it. The
- * per-tick drive ({@link #driveTick}) mirrors the server listener's
- * tick order (goto handler, state pull-through, lava flag, onTick);
- * keep the two in lockstep when either changes.
+ * per-tick drive ({@link #driveTick}) delegates to
+ * {@link BotAssembly#tickOnce}, the same method the server listener
+ * calls - the lockstep is structural, not a convention to maintain
+ * by hand.
  *
  * <p>Assertion style: gametests live in the main source set where
  * JUnit is not on the classpath, so checks throw plain
@@ -66,16 +67,52 @@ final class GametestRig {
 
     private GametestRig() {}
 
-    /** Everything one scenario needs, wired by the shared factory. */
-    record Rig(
-            BotBodyEntity body,
-            BindingWorldView view,
-            BindingActor actor,
-            InMemoryEventQueue events,
-            TaskArbiter arbiter,
-            BotController controller,
-            GotoCommandHandler gotoHandler,
-            ChangeDetectingStateChannel state) {}
+    /**
+     * Everything one scenario needs, wired by the shared factory. One
+     * field - the assembled pipeline - with convenience accessors so
+     * scenarios read {@code rig.body()} etc. without knowing the
+     * record shape; the drive methods reach the whole pipeline through
+     * {@code tickOnce}.
+     */
+    static final class Rig {
+        private final BotAssembly.Assembled assembled;
+
+        private Rig(BotAssembly.Assembled assembled) {
+            this.assembled = assembled;
+        }
+
+        BotBodyEntity body() {
+            return assembled.body();
+        }
+
+        BindingWorldView view() {
+            return assembled.view();
+        }
+
+        BindingActor actor() {
+            return assembled.actor();
+        }
+
+        InMemoryEventQueue events() {
+            return assembled.events();
+        }
+
+        TaskArbiter arbiter() {
+            return assembled.arbiter();
+        }
+
+        BotController controller() {
+            return assembled.controller();
+        }
+
+        GotoCommandHandler gotoHandler() {
+            return assembled.gotoHandler();
+        }
+
+        ChangeDetectingStateChannel state() {
+            return assembled.state();
+        }
+    }
 
     /**
      * Paves the 16x16 floor, spawns one body, wires the full
@@ -107,30 +144,20 @@ final class GametestRig {
         level.addFreshEntity(body);
 
         BotAssembly.Assembled a = BotAssembly.assemble(level, body);
-        return new Rig(
-                a.body(), a.view(), a.actor(), a.events(), a.arbiter(), a.controller(), a.gotoHandler(), a.state());
+        return new Rig(a);
     }
 
     /**
-     * One production-shaped tick: the same call order the server
-     * listener runs (goto handler, state pull-through, lava flag,
-     * pipeline). Scenarios must tick through this - a bare
+     * One production-shaped tick: delegates to
+     * {@link BotAssembly#tickOnce}, the exact call order the server
+     * listener runs. Scenarios must tick through this - a bare
      * {@code controller.onTick} skips the harness seams and reads
      * green where production would not.
      *
      * @param rig the wired rig; never null
      */
     static void driveTick(Rig rig) {
-        rig.gotoHandler().tick();
-        rig.state().current();
-        // Feed the crashed-state flags before the pipeline runs:
-        // MinimalReflex (ADR-0005 D3) reads these to decide whether
-        // to jump (lava) or ascend (low air). The normal reflex layer
-        // derives fluid/vital state from ThreatBlackboard sensors
-        // instead; these setters are the crashed-state parallel only.
-        rig.controller().setInLethalFluid(rig.body().isInLava());
-        rig.controller().setAirSupply(rig.body().getAirSupply());
-        rig.controller().onTick(rig.view());
+        BotAssembly.tickOnce(rig.assembled);
     }
 
     /**

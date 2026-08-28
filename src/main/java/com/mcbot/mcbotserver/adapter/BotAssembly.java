@@ -55,12 +55,13 @@ import net.minecraft.world.effect.MobEffectInstance;
  * factory; a wiring change lands in exactly one place.
  *
  * <p>Contract: see ADR-0004 D1/D2 (tick order, four-channel actor)
- * and boundaries.md section D (submit/event/state channels). The tick
- * ORDER around the assembled controller is the consumer's job - the
- * server listener and the gametest drive both run
- * {@code gotoHandler.tick() -> state.current() ->
- * controller.setInLethalFluid(body.isInLava()) ->
- * controller.onTick(view)}; keep the two in lockstep.
+ * and boundaries.md section D (submit/event/state channels). The
+ * tick ORDER around the assembled controller is owned here too:
+ * both the server listener and the gametest drive call
+ * {@link #tickOnce}, so the lockstep this factory promises is
+ * structural. The order used to be a convention restated in two
+ * consumers and it drifted - the rig ticked only the goto handler
+ * and read green where production would not.
  *
  * <p>Implementation note: adapter layer by necessity (server level,
  * entity, effect reads); everything it assembles from {@code core/}
@@ -349,6 +350,35 @@ public final class BotAssembly {
                 mineHandler,
                 attackHandler,
                 state);
+    }
+
+    /**
+     * Drives one production tick in the contract order: the four verb
+     * handlers, the state pull-through, the crashed-state vitals, then
+     * the pipeline. The server listener (ADR-0004 D1 END phase) and
+     * the gametest rig both call this, so the order lives in exactly
+     * one place.
+     *
+     * @param a the assembled pipeline; never null
+     */
+    public static void tickOnce(Assembled a) {
+        a.gotoHandler().tick();
+        a.digHandler().tick();
+        a.mineHandler().tick();
+        a.attackHandler().tick();
+        // Pull-through state capture: change detection pushes STATE_PUSH
+        // onto the stream only when the snapshot actually moved, so a
+        // per-tick drive cannot flood it.
+        a.state().current();
+        // Feed the crashed-state vitals before the pipeline runs:
+        // MinimalReflex (ADR-0005 D3) reads these to decide whether to
+        // jump (lava or low air). The normal reflex layer derives
+        // fluid/air state from ThreatBlackboard sensors; these flags
+        // are the crashed-state parallel that cannot depend on the
+        // sensor stack.
+        a.controller().setInLethalFluid(a.body().isInLava());
+        a.controller().setAirSupply(a.body().getAirSupply());
+        a.controller().onTick(a.view());
     }
 
     /**

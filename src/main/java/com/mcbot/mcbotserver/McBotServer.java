@@ -1,21 +1,24 @@
 package com.mcbot.mcbotserver;
 
-import com.mcbot.mcbotserver.adapter.BindingWorldView;
+import com.mcbot.mcbotserver.adapter.BotAssembly;
 import com.mcbot.mcbotserver.adapter.BotCommands;
 import com.mcbot.mcbotserver.adapter.BotControlSocket;
+import com.mcbot.mcbotserver.adapter.MenuCommands;
+import com.mcbot.mcbotserver.adapter.RecipeCatalog;
+import com.mcbot.mcbotserver.adapter.ReflexRuleReloader;
+import com.mcbot.mcbotserver.adapter.VanillaArmorCatalog;
+import com.mcbot.mcbotserver.adapter.WorldCommands;
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
-import com.mcbot.mcbotserver.core.command.CommandBus;
-import com.mcbot.mcbotserver.core.command.GotoCommandHandler;
-import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
-import com.mcbot.mcbotserver.core.state.ChangeDetectingStateChannel;
-import com.mcbot.mcbotserver.core.tick.BotController;
+import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mojang.logging.LogUtils;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.AddReloadListenerEvent;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.EntityAttributeCreationEvent;
@@ -59,21 +62,19 @@ public class McBotServer {
                     .sized(0.6f, 1.8f)
                     .build("bot_body"));
 
-    private BotController activeController;
-    private BindingWorldView activeView;
-    private BotBodyEntity activeBody;
-    private GotoCommandHandler activeGotoHandler;
-    private com.mcbot.mcbotserver.core.command.DigCommandHandler activeDigHandler;
-    private com.mcbot.mcbotserver.core.command.MineCommandHandler activeMineHandler;
-    private com.mcbot.mcbotserver.core.command.AttackCommandHandler activeAttackHandler;
-    private InMemoryEventQueue activeEvents;
-    private CommandBus activeBus;
-    private ChangeDetectingStateChannel activeState;
-    private com.mcbot.mcbotserver.adapter.BindingActor activeActor;
-    private com.mcbot.mcbotserver.adapter.RecipeCatalog activeCatalog;
+    /**
+     * One live bot session: the assembled pipeline plus the
+     * spawn-level recipe catalog. Components are set together at
+     * {@code /botspawn} and cleared together at {@code /botdespawn} -
+     * the parallel {@code active*} fields this replaced drifted
+     * exactly once (activeAttackHandler survived despawn), which is
+     * the failure mode a single field cannot have.
+     */
+    private record BotSession(BotAssembly.Assembled pipeline, RecipeCatalog catalog) {}
 
-    private final com.mcbot.mcbotserver.adapter.ReflexRuleReloader ruleReloader =
-            new com.mcbot.mcbotserver.adapter.ReflexRuleReloader();
+    private BotSession active;
+
+    private final ReflexRuleReloader ruleReloader = new ReflexRuleReloader();
 
     /**
      * Registers the mod with both Forge buses: the entity type and the
@@ -99,7 +100,7 @@ public class McBotServer {
      * @param event mod-bus callback registering that listener; never null
      */
     @SubscribeEvent
-    public void onAddReloadListeners(net.minecraftforge.event.AddReloadListenerEvent event) {
+    public void onAddReloadListeners(AddReloadListenerEvent event) {
         ruleReloader.bind(null);
         event.addListener(ruleReloader);
     }
@@ -184,40 +185,16 @@ public class McBotServer {
         if (event.phase != TickEvent.Phase.END) {
             return;
         }
-        if (activeController == null || activeView == null || activeBody == null) {
+        if (active == null) {
             return;
         }
         try {
-            if (activeGotoHandler != null) {
-                activeGotoHandler.tick();
-            }
-            if (activeDigHandler != null) {
-                activeDigHandler.tick();
-            }
-            if (activeMineHandler != null) {
-                activeMineHandler.tick();
-            }
-            if (activeAttackHandler != null) {
-                activeAttackHandler.tick();
-            }
-            if (activeState != null) {
-                // Pull-through state capture: change detection pushes
-                // STATE_PUSH onto the stream only when the snapshot
-                // actually moved, so a per-tick drive cannot flood it.
-                activeState.current();
-            }
-            // Feed the crashed-state vitals before the pipeline runs:
-            // MinimalReflex reads these to decide whether to jump
-            // (lava or low air). The normal reflex layer derives
-            // fluid/air state from ThreatBlackboard sensors; these
-            // flags are the crashed-state parallel that cannot depend
-            // on the sensor stack (ADR-0005 D3).
-            activeController.setInLethalFluid(activeBody.isInLava());
-            activeController.setAirSupply(activeBody.getAirSupply());
-            activeController.onTick(activeView);
+            // The tick order lives in the assembly, not here - the
+            // gametest rig drives the identical method.
+            BotAssembly.tickOnce(active.pipeline());
         } catch (RuntimeException e) {
             LOGGER.error("mcbotserver tick harness failed; " + "emergency latching", e);
-            activeController.emergencyLatch(e);
+            active.pipeline().controller().emergencyLatch(e);
         }
     }
 
@@ -243,8 +220,8 @@ public class McBotServer {
                             // body. The old ENTITY must leave the world too, not
                             // just the wiring - leaving it turned every extra
                             // /botspawn into an orphaned zombie standing around.
-                            if (activeBody != null && activeBody.isAlive()) {
-                                activeBody.discard();
+                            if (active != null && active.pipeline().body().isAlive()) {
+                                active.pipeline().body().discard();
                             }
                             BotBodyEntity body = BOT_BODY.get().create(level);
                             if (body == null) {
@@ -258,23 +235,12 @@ public class McBotServer {
                             // identical pipeline through the same factory, so
                             // wiring drift between production and in-engine tests
                             // is impossible by construction.
-                            var a = com.mcbot.mcbotserver.adapter.BotAssembly.assemble(level, body);
+                            var a = BotAssembly.assemble(level, body);
                             // Future /reload swaps follow the datapack table; the
                             // reloader is mod-instance state, not pipeline state.
                             ruleReloader.bind(a.reflex());
 
-                            this.activeEvents = a.events();
-                            this.activeBus = a.bus();
-                            this.activeState = a.state();
-                            this.activeController = a.controller();
-                            this.activeView = a.view();
-                            this.activeBody = body;
-                            this.activeGotoHandler = a.gotoHandler();
-                            this.activeDigHandler = a.digHandler();
-                            this.activeMineHandler = a.mineHandler();
-                            this.activeAttackHandler = a.attackHandler();
-                            this.activeActor = a.actor();
-                            this.activeCatalog = new com.mcbot.mcbotserver.adapter.RecipeCatalog(level);
+                            this.active = new BotSession(a, new RecipeCatalog(level));
 
                             String spawned = "bot spawned at " + body.blockPosition()
                                     + "; drive with /bot goto x y z tolerance timeoutTicks";
@@ -288,17 +254,7 @@ public class McBotServer {
                             var level = ctx.getSource().getLevel();
                             var bodies = level.getEntities(BOT_BODY.get(), b -> true);
                             bodies.forEach(BotBodyEntity::discard);
-                            this.activeEvents = null;
-                            this.activeBus = null;
-                            this.activeState = null;
-                            this.activeController = null;
-                            this.activeView = null;
-                            this.activeBody = null;
-                            this.activeGotoHandler = null;
-                            this.activeDigHandler = null;
-                            this.activeMineHandler = null;
-                            this.activeActor = null;
-                            this.activeCatalog = null;
+                            this.active = null;
                             int n = bodies.size();
                             String msg = "removed " + n + (n == 1 ? " bot body" : " bot bodies");
                             ctx.getSource().sendSuccess(() -> Component.literal(msg), true);
@@ -313,24 +269,44 @@ public class McBotServer {
      *         /botspawn
      */
     private BotCommands.Channels channels() {
-        if (activeEvents == null || activeBus == null || activeState == null) {
+        if (active == null) {
             return null;
         }
+        var a = active.pipeline();
         return new BotCommands.Channels(
-                activeEvents,
-                activeBus,
-                activeState,
-                () -> activeGotoHandler != null ? activeGotoHandler.stopAll() : 0,
-                () -> {
+                a.events(), a.bus(), a.state(), () -> a.gotoHandler().stopAll(), () -> {
                     // ADR-0005 5a through the console verb: report whether
                     // a latch was actually cleared so a harness resetting
                     // a healthy bot learns it did nothing.
-                    boolean wasCrashed = activeController != null && activeController.isCrashed();
-                    if (activeController != null) {
-                        activeController.reset();
-                    }
+                    boolean wasCrashed = a.controller().isCrashed();
+                    a.controller().reset();
                     return wasCrashed;
                 });
+    }
+
+    /**
+     * Live perception surface for the 0013 slice-1 read family.
+     *
+     * @return the perception surface, or null before /botspawn
+     */
+    private WorldCommands.Live worldLive() {
+        if (active == null || !active.pipeline().body().isAlive()) {
+            return null;
+        }
+        var a = active.pipeline();
+        return new WorldCommands.Live(
+                a.view(),
+                () -> new CellPos(
+                        a.body().getBlockX(), a.body().getBlockY(), a.body().getBlockZ()),
+                () -> String.valueOf(a.body().getUUID()),
+                a.actor().interactExecutor(),
+                slot -> {
+                    a.body().selectedSlot = slot;
+                    a.body().getInventory().setSelectedSlot(slot);
+                },
+                a.body()::setSneakLatched,
+                a.actor()::useHeldItemAir,
+                a.actor()::sleepAt);
     }
 
     /**
@@ -340,39 +316,16 @@ public class McBotServer {
      *
      * @return the menu surface, or null before the first /botspawn
      */
-    /**
-     * Live perception surface for the 0013 slice-1 read family.
-     *
-     * @return the perception surface, or null before /botspawn
-     */
-    private com.mcbot.mcbotserver.adapter.WorldCommands.Live worldLive() {
-        if (activeView == null || activeBody == null || activeActor == null || !activeBody.isAlive()) {
+    private MenuCommands.Live menuLive() {
+        if (active == null || !active.pipeline().body().isAlive()) {
             return null;
         }
-        return new com.mcbot.mcbotserver.adapter.WorldCommands.Live(
-                activeView,
-                () -> new com.mcbot.mcbotserver.api.types.CellPos(
-                        activeBody.getBlockX(), activeBody.getBlockY(), activeBody.getBlockZ()),
-                () -> String.valueOf(activeBody.getUUID()),
-                activeActor == null ? null : activeActor.interactExecutor(),
-                slot -> {
-                    activeBody.selectedSlot = slot;
-                    activeBody.getInventory().setSelectedSlot(slot);
-                },
-                activeBody::setSneakLatched,
-                activeActor::useHeldItemAir,
-                activeActor::sleepAt);
-    }
-
-    private com.mcbot.mcbotserver.adapter.MenuCommands.Live menuLive() {
-        if (activeActor == null || activeCatalog == null || activeBody == null || !activeBody.isAlive()) {
-            return null;
-        }
-        return new com.mcbot.mcbotserver.adapter.MenuCommands.Live(
-                activeActor,
-                activeCatalog,
-                new com.mcbot.mcbotserver.adapter.VanillaArmorCatalog(),
-                (net.minecraft.server.level.ServerLevel) activeBody.level(),
-                activeBody::blockPosition);
+        var a = active.pipeline();
+        return new MenuCommands.Live(
+                a.actor(),
+                active.catalog(),
+                new VanillaArmorCatalog(),
+                (ServerLevel) a.body().level(),
+                a.body()::blockPosition);
     }
 }
