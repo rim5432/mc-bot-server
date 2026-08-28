@@ -355,7 +355,8 @@ public class McBotServer {
                     activeBody.getInventory().setSelectedSlot(slot);
                 },
                 activeBody::setSneakLatched,
-                activeActor::useHeldItemAir);
+                activeActor::useHeldItemAir,
+                activeActor::sleepAt);
     }
 
     private com.mcbot.mcbotserver.adapter.MenuCommands.Live menuLive() {

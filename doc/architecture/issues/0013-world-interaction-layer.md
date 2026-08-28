@@ -146,6 +146,7 @@ spelling.
 | `write /actions/use "x,y,z,face"` | `use x y z face` | sync action | code 2026-08-27 (vanilla right-click chain via the facade, issue 0007 Phase 2; the consumed verdict is the receipt - a pressed button springs back, so no post-state read exists). Live pass rides the staged gametest batch |
 | `write /actions/sneak "on/off"` | `sneak on/off` | sync action (persistent latch, equip precedent) | code 2026-08-28 (crouch pose + shift courtesies on the body; edge-guard is Player-only in vanilla and deliberately NOT claimed - porting it is its own item). Live pass rides the staged gametest batch |
 | `write /actions/use-item` | `use-item` | sync action | code 2026-08-28 (vanilla Item.use against the POV raycast - the bucket fill/empty point is the look target, so ROT-aim first; hold-type items and food answer used:false with a reason). Live pass rides the staged gametest batch |
+| `write /actions/sleep "x,y,z"` | `sleep x y z` | sync action | code 2026-08-28 (verify-and-skip: real bed + reach + nighttime, then the device completes the vanilla all-sleepers night-skip the engine cannot see - the body is a PathfinderMob outside the player list. Recorded v1 gaps: no monster-proximity refusal, no spawn binding). Live pass rides the staged gametest batch |
 
 Live findings recorded: (1) GoalNear(target, 3) admits chebyshev-3
 stops that are ~5.2 euclidean eye-to-block - beyond DigExecutor's 4.5

@@ -68,6 +68,41 @@ public final class BindingActor implements Actor, MenuTransactions {
     }
 
     /**
+     * Sleep at the target bed - the synchronous /bot sleep verb's body.
+     * The device completes the vanilla all-sleepers rule the engine
+     * cannot see: ServerLevel skips the night only when every PLAYER
+     * is sleeping, and the carrier is a PathfinderMob outside that
+     * list, so after the bed verifies (real bed, in reach, nighttime)
+     * the body's sleep is completed by advancing the clock to the next
+     * morning - the same arithmetic vanilla's sleep-finish applies.
+     * Deliberate v1 gaps, both recorded: no monster-proximity refusal
+     * (the harness can scan /entities first) and no spawn-point
+     * binding (body death does not run the player respawn flow).
+     *
+     * @param target the bed cell to sleep at; never null
+     * @return null on success, or the machine-readable refusal reason
+     */
+    public String sleepAt(com.mcbot.mcbotserver.api.types.CellPos target) {
+        net.minecraft.server.level.ServerLevel level = (net.minecraft.server.level.ServerLevel) body.level();
+        net.minecraft.core.BlockPos pos = new net.minecraft.core.BlockPos(target.x(), target.y(), target.z());
+        if (!level.isLoaded(pos)) {
+            return "chunk not loaded";
+        }
+        if (!(level.getBlockState(pos).getBlock() instanceof net.minecraft.world.level.block.BedBlock)) {
+            return "not a bed";
+        }
+        if (!ReachPolicy.withinReach(body.getEyePosition(), pos)) {
+            return "out of reach";
+        }
+        if (level.isDay()) {
+            return "already daytime";
+        }
+        long time = level.getDayTime();
+        level.setDayTime(time + 24000L - (time % 24000L));
+        return null;
+    }
+
+    /**
      * Vanilla air-use for the held item - the synchronous /bot use-item
      * verb's body. Items whose use is a hold (bow draw, shield raise)
      * and food are rejected here: they ride the USE channel (combat

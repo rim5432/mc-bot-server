@@ -509,6 +509,20 @@ def cmd_write(path: str, value: str, tol: int | None = None,
         resp = wire(f"use {x} {y} {z} {face.lower()}")
         emit_json(resp)
         return 0 if resp.get("ok") and resp.get("used") else 1
+    if path == "/actions/sleep":
+        # value "x,y,z" - verify-and-skip against a real bed: the device
+        # completes the vanilla all-sleepers rule the engine cannot see
+        # (the body is not in the player list). Refusal reasons travel
+        # in the reply ("not a bed", "out of reach", "already daytime").
+        parts = value.split(",")
+        if len(parts) != 3:
+            print("write /actions/sleep: value must be 'x,y,z'",
+                  file=sys.stderr)
+            return 1
+        x, y, z = (pp.strip() for pp in parts)
+        resp = wire(f"sleep {x} {y} {z}")
+        emit_json(resp)
+        return 0 if resp.get("ok") and resp.get("slept") else 1
     if path == "/actions/use-item":
         # No argument: vanilla Item.use against the POV raycast - the
         # bucket's fill/empty point is whatever the bot is looking at.

@@ -62,7 +62,8 @@ public final class WorldCommands {
             InteractBlockExecutor interact,
             IntConsumer equip,
             java.util.function.Consumer<Boolean> sneak,
-            java.util.function.BooleanSupplier useItemAir) {}
+            java.util.function.BooleanSupplier useItemAir,
+            java.util.function.Function<com.mcbot.mcbotserver.api.types.CellPos, String> sleep) {}
 
     /**
      * Register the block / blocks / entities subtrees.
@@ -110,6 +111,12 @@ public final class WorldCommands {
                 .requires(src -> src.hasPermission(2))
                 .then(Commands.argument("slot", IntegerArgumentType.integer(0, 8))
                         .executes(ctx -> runEquip(ctx, live)));
+        var sleep = Commands.literal("sleep")
+                .requires(src -> src.hasPermission(2))
+                .then(Commands.argument("x", IntegerArgumentType.integer())
+                        .then(Commands.argument("y", IntegerArgumentType.integer())
+                                .then(Commands.argument("z", IntegerArgumentType.integer())
+                                        .executes(ctx -> runSleep(ctx, live)))));
         var useItem = Commands.literal("use-item")
                 .requires(src -> src.hasPermission(2))
                 .executes(ctx -> runUseItem(ctx, live));
@@ -134,6 +141,7 @@ public final class WorldCommands {
         dispatcher.register(use);
         dispatcher.register(sneak);
         dispatcher.register(useItem);
+        dispatcher.register(sleep);
     }
 
     /**
@@ -236,6 +244,29 @@ public final class WorldCommands {
             root.addProperty(
                     "reason",
                     "no action (out of reach, container block, block and item" + " both passed, or empty hand)");
+        }
+        return CommandResponse.answer(ctx.getSource(), root);
+    }
+
+    /**
+     * Synchronous sleep (issue 0013, sleep row): verify-and-skip. The
+     * refusal reasons are the reply's machine-readable contract; a
+     * success carries the advanced day time.
+     */
+    private static int runSleep(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
+        Live l = live.get();
+        if (l == null) {
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
+        }
+        CellPos target = new CellPos(
+                IntegerArgumentType.getInteger(ctx, "x"),
+                IntegerArgumentType.getInteger(ctx, "y"),
+                IntegerArgumentType.getInteger(ctx, "z"));
+        String refusal = l.sleep().apply(target);
+        JsonObject root = CommandResponse.ok();
+        root.addProperty("slept", refusal == null);
+        if (refusal != null) {
+            root.addProperty("reason", refusal);
         }
         return CommandResponse.answer(ctx.getSource(), root);
     }
