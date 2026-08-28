@@ -38,7 +38,11 @@ class GotoCommandGateTest {
         InMemoryEventQueue queue = new InMemoryEventQueue(() -> 1L, () -> 0L);
         CommandBus bus = new CommandBus(queue);
         TaskArbiter arbiter = new TaskArbiter();
-        new GotoCommandHandler(arbiter, queue, () -> 1L, () -> 0L).attach(bus);
+        GotoCommandHandler handler = new GotoCommandHandler(arbiter, queue, () -> 1L, () -> 0L);
+        handler.attach(bus);
+        // attach no longer self-registers: the composition root owns
+        // the one cancel-listener slot; single-handler wirings too.
+        bus.setCancelListener(handler::onCancel);
 
         assertTrue(
                 bus.submit(new BotCommand("goto", Map.of("x", "10", "y", "64", "z", "-3"))) instanceof SubmitResult.Ok);
@@ -72,7 +76,9 @@ class GotoCommandGateTest {
         InMemoryEventQueue queue = new InMemoryEventQueue(() -> 3L, () -> 15000L);
         CommandBus bus = new CommandBus(queue);
         TaskArbiter arbiter = new TaskArbiter();
-        new GotoCommandHandler(arbiter, queue, () -> 3L, () -> 15000L).attach(bus);
+        GotoCommandHandler handler = new GotoCommandHandler(arbiter, queue, () -> 3L, () -> 15000L);
+        handler.attach(bus);
+        bus.setCancelListener(handler::onCancel);
 
         SubmitResult.Ok ok =
                 (SubmitResult.Ok) bus.submit(new BotCommand("goto", Map.of("x", "50", "y", "70", "z", "50")));

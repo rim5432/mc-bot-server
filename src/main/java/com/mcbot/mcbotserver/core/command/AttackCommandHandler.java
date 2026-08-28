@@ -1,14 +1,12 @@
 package com.mcbot.mcbotserver.core.command;
 
 import com.mcbot.mcbotserver.api.command.BotCommand;
-import com.mcbot.mcbotserver.api.event.BotEvent;
-import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.event.EventQueue;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.process.AttackProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
@@ -25,18 +23,12 @@ import java.util.function.Supplier;
  * ledger 39 (the harness-directed engagement row).
  */
 // contract: see boundaries.md decision 28 (verb table grows by issue)
-public final class AttackCommandHandler {
+public final class AttackCommandHandler extends VerbTaskHandler<AttackProcess> {
 
     /** Default mission budget when the harness omits it (1 minute). */
     public static final long DEFAULT_TIMEOUT_TICKS = 1200L;
 
-    private final TaskArbiter arbiter;
-    private final EventQueue events;
-    private final LongSupplier daySupplier;
-    private final LongSupplier timeOfDaySupplier;
     private final Supplier<CellPos> positionSource;
-    private final Map<String, AttackProcess> missions = new HashMap<>();
-    private CommandBus bus;
 
     /**
      * Creates the handler over the task channel and event stream.
@@ -56,92 +48,26 @@ public final class AttackCommandHandler {
             LongSupplier daySupplier,
             LongSupplier timeOfDaySupplier,
             Supplier<CellPos> positionSource) {
-        CommandHandlerGuards.requireNonNullArgs(arbiter, events, daySupplier, timeOfDaySupplier);
-        if (positionSource == null) {
-            throw new IllegalArgumentException("positionSource must not be null");
-        }
-        this.arbiter = arbiter;
-        this.events = events;
-        this.daySupplier = daySupplier;
-        this.timeOfDaySupplier = timeOfDaySupplier;
-        this.positionSource = positionSource;
+        super(arbiter, events, daySupplier, timeOfDaySupplier);
+        this.positionSource = Objects.requireNonNull(positionSource, "positionSource");
     }
 
-    /**
-     * Wire the verb and its cancel hook onto the bus.
-     *
-     * @param bus the command channel to attach to; never null
-     */
-    public void attach(CommandBus bus) {
-        CommandHandlerGuards.requireBus(bus);
-        this.bus = bus;
-        bus.setCancelListener(this::onCancel);
-        bus.register("attack", new CommandBus.Handler() {
-            @Override
-            public String validate(BotCommand command) {
-                return validateArgs(command) ? null : "attack wants a non-blank target id [timeoutTicks]";
-            }
-
-            @Override
-            public void execute(BotCommand command, String taskId) {
-                Map<String, String> args = command.args();
-                long timeout = args.containsKey("timeoutTicks")
-                        ? Long.parseLong(args.get("timeoutTicks"))
-                        : DEFAULT_TIMEOUT_TICKS;
-                AttackProcess mission = new AttackProcess(taskId, args.get("targetId"), 50, timeout, positionSource);
-                missions.put(taskId, mission);
-                arbiter.register(mission);
-                arbiter.requestControl(mission);
-            }
-        });
+    @Override
+    protected String verb() {
+        return "attack";
     }
 
-    /**
-     * Retire finished missions. Called once per server tick by the
-     * wiring, same cadence as the dig handler's sweep.
-     */
-    public void tick() {
-        // Retire before the bus dedupe window closes so a harness
-        // retry of the same verb+args submits fresh; no extra
-        // disclosure event - the pipeline's generic terminal path
-        // carries the verdict attrs (targetId).
-        missions.values().removeIf(m -> {
-            if (m.isActive()) {
-                return false;
-            }
-            bus.retire(m.missionTaskId());
-            return true;
-        });
+    @Override
+    protected String validate(BotCommand command) {
+        return validateArgs(command) ? null : "attack wants a non-blank target id [timeoutTicks]";
     }
 
-    /**
-     * Cancel hook, routed by the McBotServer cancel router (the bus
-     * has ONE listener slot; every verb handler's cancel method is
-     * public and self-guards by its missions map).
-     *
-     * @param taskId identifier of the mission to tear down; unknown
-     *               ids are ignored, never null
-     * @param verb   wire name of the cancelled command as reported by
-     *               the dispatcher; kept for callback-signature
-     *               symmetry
-     */
-    public void onCancel(String taskId, String verb) {
-        AttackProcess mission = missions.remove(taskId);
-        if (mission == null) {
-            return;
-        }
-        mission.abort();
-        try {
-            events.push(new BotEvent(
-                    EventKind.TASK_CANCELLED,
-                    daySupplier.getAsLong(),
-                    timeOfDaySupplier.getAsLong(),
-                    false,
-                    Map.of("task", "attack:" + taskId, "taskId", taskId),
-                    "attack:" + taskId + ": cancelled by harness"));
-        } catch (RuntimeException ignored) {
-            // Reporting must never take the pipeline down with it.
-        }
+    @Override
+    protected AttackProcess createMission(String taskId, BotCommand command) {
+        Map<String, String> args = command.args();
+        long timeout =
+                args.containsKey("timeoutTicks") ? Long.parseLong(args.get("timeoutTicks")) : DEFAULT_TIMEOUT_TICKS;
+        return new AttackProcess(taskId, args.get("targetId"), 50, timeout, positionSource);
     }
 
     private static boolean validateArgs(BotCommand command) {

@@ -26,17 +26,10 @@ import java.util.function.LongSupplier;
  */
 // contract: see boundaries.md decision 28 (verb table grows by issue)
 //            + issue 0013 R1 (dig task semantics)
-public final class DigCommandHandler {
+public final class DigCommandHandler extends VerbTaskHandler<DigProcess> {
 
     /** Default mission budget when the harness omits it (1 minute). */
     public static final long DEFAULT_TIMEOUT_TICKS = 1200L;
-
-    private final TaskArbiter arbiter;
-    private final EventQueue events;
-    private final LongSupplier daySupplier;
-    private final LongSupplier timeOfDaySupplier;
-    private final Map<String, DigProcess> missions = new HashMap<>();
-    private CommandBus bus;
 
     /**
      * Creates the handler over the task channel and event stream.
@@ -49,70 +42,39 @@ public final class DigCommandHandler {
      */
     public DigCommandHandler(
             TaskArbiter arbiter, EventQueue events, LongSupplier daySupplier, LongSupplier timeOfDaySupplier) {
-        CommandHandlerGuards.requireNonNullArgs(arbiter, events, daySupplier, timeOfDaySupplier);
-        this.arbiter = arbiter;
-        this.events = events;
-        this.daySupplier = daySupplier;
-        this.timeOfDaySupplier = timeOfDaySupplier;
+        super(arbiter, events, daySupplier, timeOfDaySupplier);
     }
 
-    /**
-     * Wire the verb and its cancel hook onto the bus.
-     *
-     * @param bus the command channel to attach to; never null
-     */
-    public void attach(CommandBus bus) {
-        CommandHandlerGuards.requireBus(bus);
-        this.bus = bus;
-        // Single-handler setups self-register here; BotAssembly
-        // installs the combined router after both handlers attach,
-        // which overrides this for the full pipeline.
-        bus.setCancelListener(this::onCancel);
-        bus.register("dig", new CommandBus.Handler() {
-            @Override
-            public String validate(BotCommand command) {
-                return validateArgs(command) ? null : "dig wants integer args x y z [timeoutTicks]";
-            }
-
-            @Override
-            public void execute(BotCommand command, String taskId) {
-                Map<String, String> args = command.args();
-                long timeout = args.containsKey("timeoutTicks")
-                        ? Long.parseLong(args.get("timeoutTicks"))
-                        : DEFAULT_TIMEOUT_TICKS;
-                DigProcess mission = new DigProcess(
-                        taskId,
-                        new CellPos(
-                                Integer.parseInt(args.get("x")),
-                                Integer.parseInt(args.get("y")),
-                                Integer.parseInt(args.get("z"))),
-                        50,
-                        timeout);
-                missions.put(taskId, mission);
-                arbiter.register(mission);
-                arbiter.requestControl(mission);
-            }
-        });
+    @Override
+    protected String verb() {
+        return "dig";
     }
 
-    /**
-     * Retire finished missions and announce BLOCK_BROKEN for
-     * completed digs. Called once per server tick by the wiring, same
-     * cadence as the goto handler's sweep.
-     */
-    public void tick() {
-        // Retire-before-announce: the bus dedupe window closes first
-        // so a harness retry of the same verb+args submits fresh.
-        missions.values().removeIf(m -> {
-            if (m.isActive()) {
-                return false;
-            }
-            bus.retire(m.missionTaskId());
-            if (m.missionSucceeded()) {
-                pushBlockBroken(m);
-            }
-            return true;
-        });
+    @Override
+    protected String validate(BotCommand command) {
+        return validateArgs(command) ? null : "dig wants integer args x y z [timeoutTicks]";
+    }
+
+    @Override
+    protected DigProcess createMission(String taskId, BotCommand command) {
+        Map<String, String> args = command.args();
+        long timeout =
+                args.containsKey("timeoutTicks") ? Long.parseLong(args.get("timeoutTicks")) : DEFAULT_TIMEOUT_TICKS;
+        return new DigProcess(
+                taskId,
+                new CellPos(
+                        Integer.parseInt(args.get("x")),
+                        Integer.parseInt(args.get("y")),
+                        Integer.parseInt(args.get("z"))),
+                50,
+                timeout);
+    }
+
+    @Override
+    protected void onRetired(DigProcess mission) {
+        if (mission.missionSucceeded()) {
+            pushBlockBroken(mission);
+        }
     }
 
     private void pushBlockBroken(DigProcess mission) {
@@ -123,42 +85,13 @@ public final class DigCommandHandler {
             attrs.put("posY", String.valueOf(mission.target().y()));
             attrs.put("posZ", String.valueOf(mission.target().z()));
             attrs.put("blockId", String.valueOf(mission.initialBlockId()));
-            events.push(new BotEvent(
+            events().push(new BotEvent(
                     EventKind.BLOCK_BROKEN,
-                    daySupplier.getAsLong(),
-                    timeOfDaySupplier.getAsLong(),
+                    daySupplier().getAsLong(),
+                    timeOfDaySupplier().getAsLong(),
                     false,
                     Map.copyOf(attrs),
                     mission.missionTaskId() + ": broke " + mission.initialBlockId()));
-        } catch (RuntimeException ignored) {
-            // Reporting must never take the pipeline down with it.
-        }
-    }
-
-    /**
-     * Cancel hook, routed by the McBotServer cancel router (the bus
-     * has ONE listener slot; every verb handler's cancel method is
-     * public and self-guards by its missions map).
-     *
-     * @param taskId identifier of the mission to tear down; unknown ids
-     *               are ignored, never null
-     * @param verb   wire name of the cancelled command as reported by the
-     *               dispatcher; kept for callback-signature symmetry
-     */
-    public void onCancel(String taskId, String verb) {
-        DigProcess mission = missions.remove(taskId);
-        if (mission == null) {
-            return;
-        }
-        mission.abort();
-        try {
-            events.push(new BotEvent(
-                    EventKind.TASK_CANCELLED,
-                    daySupplier.getAsLong(),
-                    timeOfDaySupplier.getAsLong(),
-                    false,
-                    Map.of("task", "dig:" + taskId, "taskId", taskId),
-                    "dig:" + taskId + ": cancelled by harness"));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down with it.
         }

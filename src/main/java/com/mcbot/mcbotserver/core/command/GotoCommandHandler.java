@@ -1,8 +1,6 @@
 package com.mcbot.mcbotserver.core.command;
 
 import com.mcbot.mcbotserver.api.command.BotCommand;
-import com.mcbot.mcbotserver.api.event.BotEvent;
-import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.event.EventQueue;
 import com.mcbot.mcbotserver.api.goal.Goal;
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
@@ -10,8 +8,6 @@ import com.mcbot.mcbotserver.api.goal.GoalNear;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.process.GotoProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
@@ -30,19 +26,10 @@ import java.util.function.LongSupplier;
  * <p>Implementation note: runs on the server tick thread only.
  */
 // contract: see boundaries.md decision 18 (first boundary-D semantics)
-public final class GotoCommandHandler {
+public final class GotoCommandHandler extends VerbTaskHandler<GotoProcess> {
 
     /** Default mission budget in ticks when the harness omits it. */
     public static final long DEFAULT_TIMEOUT_TICKS = 1200L;
-
-    private final TaskArbiter arbiter;
-    private final EventQueue events;
-    private final LongSupplier daySupplier;
-    private final LongSupplier timeOfDaySupplier;
-    private final Map<String, GotoProcess> missions = new HashMap<>();
-    // Set in attach(); the lifecycle sweep needs the bus to close
-    // dedupe windows for deaths announced outside it.
-    private CommandBus bus;
 
     /**
      * Creates the handler over the task channel and event stream.
@@ -54,67 +41,28 @@ public final class GotoCommandHandler {
      */
     public GotoCommandHandler(
             TaskArbiter arbiter, EventQueue events, LongSupplier daySupplier, LongSupplier timeOfDaySupplier) {
-        CommandHandlerGuards.requireNonNullArgs(arbiter, events, daySupplier, timeOfDaySupplier);
-        this.arbiter = arbiter;
-        this.events = events;
-        this.daySupplier = daySupplier;
-        this.timeOfDaySupplier = timeOfDaySupplier;
+        super(arbiter, events, daySupplier, timeOfDaySupplier);
     }
 
-    /**
-     * Wire the verb and its cancel hook onto the bus.
-     *
-     * @param bus the command channel to attach to; never null
-     */
-    public void attach(CommandBus bus) {
-        CommandHandlerGuards.requireBus(bus);
-        this.bus = bus;
-        // Single-handler setups self-register here; BotAssembly
-        // installs the combined router after both handlers attach,
-        // which overrides this for the full pipeline.
-        bus.setCancelListener(this::onCancel);
-        bus.register("goto", new CommandBus.Handler() {
-            @Override
-            public String validate(BotCommand command) {
-                try {
-                    parse(command);
-                    return null;
-                } catch (IllegalArgumentException e) {
-                    return e.getMessage();
-                }
-            }
-
-            @Override
-            public void execute(BotCommand command, String taskId) {
-                ParsedGoto parsed = parse(command);
-                GotoProcess mission = new GotoProcess(taskId, parsed.goal(), 50, parsed.timeoutTicks());
-                missions.put(taskId, mission);
-                arbiter.register(mission);
-                arbiter.requestControl(mission);
-            }
-        });
+    @Override
+    protected String verb() {
+        return "goto";
     }
 
-    /**
-     * Retire finished missions from the tracking map. Terminal
-     * processes are tiny, but a long-running harness submits thousands
-     * of gotos — without this sweep the map grows forever.
-     *
-     * <p>Called once per server tick by the wiring (McBotServer), or
-     * directly by tests; safe to call at any cadence.
-     */
-    public void tick() {
-        // Retire-before-sweep: a mission that died via the arbiter's
-        // retirement lap (TIMEOUT / STUCK) had its verdict announced
-        // outside the bus, so the bus's dedupe window would otherwise
-        // hold the dead id forever and replay every harness retry.
-        missions.values().removeIf(m -> {
-            if (m.isActive()) {
-                return false;
-            }
-            bus.retire(m.missionTaskId());
-            return true;
-        });
+    @Override
+    protected String validate(BotCommand command) {
+        try {
+            parse(command);
+            return null;
+        } catch (IllegalArgumentException e) {
+            return e.getMessage();
+        }
+    }
+
+    @Override
+    protected GotoProcess createMission(String taskId, BotCommand command) {
+        ParsedGoto parsed = parse(command);
+        return new GotoProcess(taskId, parsed.goal(), 50, parsed.timeoutTicks());
     }
 
     /**
@@ -124,58 +72,8 @@ public final class GotoCommandHandler {
      *         never null
      */
     public String activeTaskSummary() {
-        var any = missions.values().iterator();
+        var any = missions().values().iterator();
         return any.hasNext() ? any.next().displayName() : "idle";
-    }
-
-    /**
-     * Cancels every live mission through the bus, so each cancel
-     * closes its idempotency window exactly like a targeted
-     * {@code /bot cancel} does. Backs the human-facing
-     * {@code /bot stop}.
-     *
-     * @return number of missions actually cancelled
-     */
-    public int stopAll() {
-        List<String> ids = List.copyOf(missions.keySet());
-        int cancelled = 0;
-        for (String id : ids) {
-            if (bus.cancel(id)) {
-                cancelled++;
-            }
-        }
-        return cancelled;
-    }
-
-    /**
-     * Aborts and forgets the goto mission registered under {@code taskId},
-     * then reports {@code TASK_CANCELLED} on the event stream. Unknown
-     * task ids are ignored.
-     *
-     * @param taskId identifier of the mission to tear down; never null
-     * @param verb   wire name of the cancelled command as reported by the
-     *               dispatcher; kept for callback-signature symmetry and
-     *               not read here
-     */
-    public void onCancel(String taskId, String verb) {
-        GotoProcess mission = missions.remove(taskId);
-        if (mission == null) {
-            return;
-        }
-        mission.abort();
-        try {
-            events.push(new BotEvent(
-                    EventKind.TASK_CANCELLED,
-                    daySupplier.getAsLong(),
-                    timeOfDaySupplier.getAsLong(),
-                    false,
-                    Map.of(
-                            "task", mission.displayName(),
-                            "taskId", mission.missionTaskId()),
-                    mission.displayName() + ": cancelled by harness"));
-        } catch (RuntimeException ignored) {
-            // Reporting must never take the pipeline down with it.
-        }
     }
 
     private ParsedGoto parse(BotCommand command) {

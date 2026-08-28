@@ -9,6 +9,7 @@ import com.mcbot.mcbotserver.core.process.MineProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
@@ -24,18 +25,12 @@ import java.util.function.Supplier;
  * + issue 0014 §4 (mine wire surface).
  */
 // contract: see boundaries.md decision 28 + issue 0014 §4
-public final class MineCommandHandler {
+public final class MineCommandHandler extends VerbTaskHandler<MineProcess> {
 
     /** Default mission budget when the harness omits it (2 minutes). */
     public static final long DEFAULT_TIMEOUT_TICKS = 2400L;
 
-    private final TaskArbiter arbiter;
-    private final EventQueue events;
-    private final LongSupplier daySupplier;
-    private final LongSupplier timeOfDaySupplier;
     private final Supplier<CellPos> botPosition;
-    private final Map<String, MineProcess> missions = new HashMap<>();
-    private CommandBus bus;
 
     /**
      * Creates the handler over the task channel and event stream.
@@ -54,74 +49,38 @@ public final class MineCommandHandler {
             LongSupplier daySupplier,
             LongSupplier timeOfDaySupplier,
             Supplier<CellPos> botPosition) {
-        if (arbiter == null
-                || events == null
-                || daySupplier == null
-                || timeOfDaySupplier == null
-                || botPosition == null) {
-            throw new IllegalArgumentException("arguments must not be null");
-        }
-        this.arbiter = arbiter;
-        this.events = events;
-        this.daySupplier = daySupplier;
-        this.timeOfDaySupplier = timeOfDaySupplier;
-        this.botPosition = botPosition;
+        super(arbiter, events, daySupplier, timeOfDaySupplier);
+        this.botPosition = Objects.requireNonNull(botPosition, "botPosition");
     }
 
-    /**
-     * Wire the verb and its cancel hook onto the bus.
-     *
-     * @param bus the command channel to attach to; never null
-     */
-    public void attach(CommandBus bus) {
-        if (bus == null) {
-            throw new IllegalArgumentException("bus must not be null");
-        }
-        this.bus = bus;
-        bus.register("mine", new CommandBus.Handler() {
-            @Override
-            public String validate(BotCommand command) {
-                return validateArgs(command) ? null : "mine wants blockType count [timeoutTicks]";
-            }
-
-            @Override
-            public void execute(BotCommand command, String taskId) {
-                Map<String, String> args = command.args();
-                String blockType = args.get("blockType");
-                int count = Integer.parseInt(args.get("count"));
-                long timeout = args.containsKey("timeoutTicks")
-                        ? Long.parseLong(args.get("timeoutTicks"))
-                        : DEFAULT_TIMEOUT_TICKS;
-                MineProcess mission = new MineProcess(taskId, blockType, count, 50, timeout, botPosition);
-                missions.put(taskId, mission);
-                arbiter.register(mission);
-                arbiter.requestControl(mission);
-            }
-        });
+    @Override
+    protected String verb() {
+        return "mine";
     }
 
-    /**
-     * Per-tick sweep: drain pending break records into BLOCK_BROKEN
-     * events (one per broken block), then retire finished missions.
-     * Called once per server tick by the wiring, same cadence as the
-     * dig/goto handlers' sweep.
-     */
-    public void tick() {
-        for (MineProcess mission : missions.values()) {
+    @Override
+    protected String validate(BotCommand command) {
+        return validateArgs(command) ? null : "mine wants blockType count [timeoutTicks]";
+    }
+
+    @Override
+    protected MineProcess createMission(String taskId, BotCommand command) {
+        Map<String, String> args = command.args();
+        String blockType = args.get("blockType");
+        int count = Integer.parseInt(args.get("count"));
+        long timeout =
+                args.containsKey("timeoutTicks") ? Long.parseLong(args.get("timeoutTicks")) : DEFAULT_TIMEOUT_TICKS;
+        return new MineProcess(taskId, blockType, count, 50, timeout, botPosition);
+    }
+
+    @Override
+    protected void beforeSweep() {
+        for (MineProcess mission : missions().values()) {
             MineProcess.BlockBreak pending;
             while ((pending = mission.pollBreak()) != null) {
                 pushBlockBroken(mission.missionTaskId(), pending);
             }
         }
-        // Retire-before-announce: the bus dedupe window closes first
-        // so a harness retry of the same verb+args submits fresh.
-        missions.values().removeIf(m -> {
-            if (m.isActive()) {
-                return false;
-            }
-            bus.retire(m.missionTaskId());
-            return true;
-        });
     }
 
     private void pushBlockBroken(String taskId, MineProcess.BlockBreak pending) {
@@ -132,42 +91,13 @@ public final class MineCommandHandler {
             attrs.put("posY", String.valueOf(pending.pos().y()));
             attrs.put("posZ", String.valueOf(pending.pos().z()));
             attrs.put("blockId", pending.blockId());
-            events.push(new BotEvent(
+            events().push(new BotEvent(
                     EventKind.BLOCK_BROKEN,
-                    daySupplier.getAsLong(),
-                    timeOfDaySupplier.getAsLong(),
+                    daySupplier().getAsLong(),
+                    timeOfDaySupplier().getAsLong(),
                     false,
                     Map.copyOf(attrs),
                     taskId + ": broke " + pending.blockId()));
-        } catch (RuntimeException ignored) {
-            // Reporting must never take the pipeline down with it.
-        }
-    }
-
-    /**
-     * Cancel hook, routed by the McBotServer cancel router (the bus
-     * has ONE listener slot; every verb handler's cancel method is
-     * public and self-guards by its missions map).
-     *
-     * @param taskId identifier of the mission to tear down; unknown ids
-     *               are ignored, never null
-     * @param verb   wire name of the cancelled command as reported by the
-     *               dispatcher; kept for callback-signature symmetry
-     */
-    public void onCancel(String taskId, String verb) {
-        MineProcess mission = missions.remove(taskId);
-        if (mission == null) {
-            return;
-        }
-        mission.abort();
-        try {
-            events.push(new BotEvent(
-                    EventKind.TASK_CANCELLED,
-                    daySupplier.getAsLong(),
-                    timeOfDaySupplier.getAsLong(),
-                    false,
-                    Map.of("task", "mine:" + taskId, "taskId", taskId),
-                    "mine:" + taskId + ": cancelled by harness"));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down with it.
         }
