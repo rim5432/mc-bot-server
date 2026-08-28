@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.adapter;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.mcbot.mcbotserver.api.menu.CraftingView;
 import com.mcbot.mcbotserver.api.menu.MenuTransactions;
@@ -146,33 +147,68 @@ final class MenuVerbs {
         if (l == null) {
             return MenuReply.answer(ctx.getSource(), MenuReply.err("no active bot"));
         }
-        String recipeId = StringArgumentType.getString(ctx, "recipeId");
-        var recipe = l.catalog().byId(recipeId);
-        if (recipe.isEmpty()) {
-            return MenuReply.answer(ctx.getSource(), MenuReply.err("no such recipe: " + recipeId));
-        }
+        // The batch chain (ledger 39): one or more comma-separated
+        // recipe ids, executed IN THE GIVEN ORDER inside the one
+        // open menu session. The harness still plans the chain -
+        // the bot only batches the execution, so plan-then-fill
+        // runs per recipe and the first failure stops the batch
+        // with the partial results on the record.
+        java.util.List<String> chain = com.google.common.base.Splitter.on(',')
+                .trimResults()
+                .splitToList(StringArgumentType.getString(ctx, "recipeId"));
         MenuView opened = l.tx().menuSnapshot();
         if (opened == null) {
             return MenuReply.answer(ctx.getSource(), MenuReply.err("no menu open - open a crafting surface first"));
         }
+        JsonArray results = new JsonArray();
         try {
-            CraftingView lens = CraftingView.of(opened);
-            MenuView filled = executeSteps(l.tx(), MenuPlanner.planRecipe(lens, recipe.get()), opened);
-            // The result slot resolves synchronously with the grid
-            // change; the post-click snapshot already carries it.
-            MenuView done = executeSteps(l.tx(), MenuPlanner.planTakeResult(CraftingView.of(filled)), filled);
-            JsonObject root = MenuReply.ok();
-            root.addProperty("result", recipe.get().resultItemId());
-            root.addProperty("count", recipe.get().resultCount());
-            root.add("menu", MenuViewJson.toJsonObject(done));
-            return MenuReply.answer(ctx.getSource(), root);
+            for (String recipeId : chain) {
+                if (recipeId.isEmpty()) {
+                    throw new IllegalArgumentException("empty recipe id in chain");
+                }
+                var recipe = l.catalog().byId(recipeId);
+                if (recipe.isEmpty()) {
+                    throw new IllegalArgumentException("no such recipe: " + recipeId);
+                }
+                opened = craftOne(l, recipe.get(), opened);
+                JsonObject row = new JsonObject();
+                row.addProperty("recipe", recipeId);
+                row.addProperty("result", recipe.get().resultItemId());
+                row.addProperty("count", recipe.get().resultCount());
+                results.add(row);
+            }
         } catch (RuntimeException e) {
             // IllegalArgumentException = plan rejected (supply, table
-            // need, wrong surface); IllegalStateException = result
-            // empty after fill. Both are sync errors: nothing further
-            // executed.
-            return MenuReply.answer(ctx.getSource(), MenuReply.err(e.getMessage()));
+            // need, wrong surface, unknown id); IllegalStateException
+            // = result empty after fill. Both are sync errors: the
+            // batch stops here with everything already crafted kept.
+            JsonObject root = MenuReply.err(e.getMessage());
+            root.add("crafted", results);
+            root.addProperty("failedAfter", results.size());
+            return MenuReply.answer(ctx.getSource(), root);
         }
+        JsonObject root = MenuReply.ok();
+        root.add("crafted", results);
+        root.add("menu", MenuViewJson.toJsonObject(opened));
+        return MenuReply.answer(ctx.getSource(), root);
+    }
+
+    /**
+     * One recipe round: fill the grid from the player region, take
+     * the resolved result. The result slot resolves synchronously
+     * with the grid change; the post-click snapshot already carries
+     * it.
+     *
+     * @param l      the live menu surface; never null
+     * @param recipe the recipe to realize; never null
+     * @param before the snapshot before this round; never null
+     * @return the snapshot after the result was taken; never null
+     */
+    private static MenuView craftOne(
+            MenuCommands.Live l, com.mcbot.mcbotserver.api.menu.RecipeView recipe, MenuView before) {
+        CraftingView lens = CraftingView.of(before);
+        MenuView filled = executeSteps(l.tx(), MenuPlanner.planRecipe(lens, recipe), before);
+        return executeSteps(l.tx(), MenuPlanner.planTakeResult(CraftingView.of(filled)), filled);
     }
 
     /**

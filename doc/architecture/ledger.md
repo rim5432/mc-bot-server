@@ -643,3 +643,25 @@ Amendment chains recorded so far (both sides annotated):
     the CLI and its own tests. Pure client-side translation - zero
     wire change; canonical doc sections 2/10 and issue 0013's wire
     table updated in the same change, 0015 section 3 closed.
+    39. The two harness-supervision conveniences landed as one
+    slice (user GO 2026-08-28 on the honest-gap list). (a) DIRECTED
+    ENGAGEMENT: `/bot attack <targetId> [timeoutTicks]` submits an
+    AttackProcess - the DefendProcess sibling with targeting
+    inverted: the harness HANDS the entity id (from `ls /entities`,
+    whose lines now carry the id= column), so there is no
+    hostile-type filter and no engagement refusal; a cow is as
+    attackable as a zombie. A never-seen id fails fast as
+    NO_SUCH_ENTITY; absence past grace fails TARGET_ESCAPED - the
+    same conservative death-vs-flight verdict as defend, because a
+    false SUCCESS costs a missed kill and a re-scan is cheap. CLI:
+    `write /entities/<id>/attack`. (b) BATCH CRAFT CHAIN: `menu
+    craft` accepts comma-separated recipe ids executed IN THE
+    GIVEN ORDER inside the one open menu session - the harness
+    still plans the chain (the list is verbatim input, the bot
+    never decides what to craft), the bot only batches the
+    execution; first failure stops the batch with partial results
+    kept in the reply (`crafted[]` + `failedAfter` - the single-id
+    reply shape changed from result/count to the same array, a
+    sanctioned break recorded here). The chain rides the existing
+    `recipe` role path - the value carries the list, no plural
+    role minted.

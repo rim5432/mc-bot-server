@@ -691,7 +691,7 @@ class WorldReadsTest(McCliTest):
         code, out, err = self.run_verb(mc.cmd_ls, "/entities/")
         self.assertEqual(code, 0)
         self.assertEqual(self.wire_calls, ["entities"])
-        self.assertIn("minecraft:cow@3,61,3 hp=10.0/10.0 dist=4.2", out)
+        self.assertIn("minecraft:cow@3,61,3 id=c-1 hp=10.0/10.0 dist=4.2", out)
         self.assertIn("truncated", err)
 
     def test_events_follow_terminates_on_idle(self):
@@ -1232,6 +1232,50 @@ class LsUniversalityTest(McCliTest):
         code, _, err = self.run_verb(mc.cmd_ls, "/events")
         self.assertEqual(code, 1)
         self.assertIn("stream", err)
+
+    def test_entities_listing_prints_the_attackable_id(self):
+        self.queue({"ok": True, "entities": [
+            {"id": "cow-uuid-1", "type": "minecraft:cow",
+             "pos": [4, 64, 2], "health": 10, "maxHealth": 10,
+             "dist": 4.6, "self": False}]})
+        code, out, _ = self.run_verb(mc.cmd_ls, "/entities/")
+        self.assertEqual(code, 0)
+        self.assertIn("id=cow-uuid-1", out,
+                      "attack targets need the id column")
+
+
+class WriteEntitiesAttackTest(McCliTest):
+    """Ledger 39: write /entities/<id>/attack -> /bot attack (job).
+    The directed engagement - the harness names the entity, the bot
+    walks to it and fights until the scan says it is gone."""
+
+    def test_attack_translates_with_default_timeout(self):
+        self.queue({"ok": True, "task": "t9", "replay": False})
+        code, _, err = self.run_verb(mc.cmd_write,
+                                     "/entities/cow-uuid-1/attack", "")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["/bot attack cow-uuid-1 1200"])
+        self.assertIn("taskId: t9", err)
+
+    def test_attack_passes_explicit_timeout(self):
+        self.queue({"ok": True, "task": "t10", "replay": False})
+        code, _, _ = self.run_verb(mc.cmd_write,
+                                   "/entities/cow-uuid-1/attack", "",
+                                   timeout=600)
+        self.assertEqual(code, 0)
+        self.assertEqual(self.wire_calls, ["/bot attack cow-uuid-1 600"])
+
+    def test_attack_rejection_exits_one(self):
+        self.queue({"ok": False, "reason": "attack wants a target id"})
+        code, _, _ = self.run_verb(mc.cmd_write,
+                                   "/entities/cow-uuid-1/attack", "")
+        self.assertEqual(code, 1)
+
+    def test_entity_read_paths_still_reject_writes(self):
+        code, _, err = self.run_verb(mc.cmd_write, "/entities/cow-uuid-1",
+                                     "pet")
+        self.assertEqual(code, 1)
+        self.assertEqual(self.wire_calls, [])
 
 
 if __name__ == "__main__":

@@ -65,6 +65,7 @@ public class McBotServer {
     private GotoCommandHandler activeGotoHandler;
     private com.mcbot.mcbotserver.core.command.DigCommandHandler activeDigHandler;
     private com.mcbot.mcbotserver.core.command.MineCommandHandler activeMineHandler;
+    private com.mcbot.mcbotserver.core.command.AttackCommandHandler activeAttackHandler;
     private InMemoryEventQueue activeEvents;
     private CommandBus activeBus;
     private ChangeDetectingStateChannel activeState;
@@ -196,6 +197,9 @@ public class McBotServer {
             if (activeMineHandler != null) {
                 activeMineHandler.tick();
             }
+            if (activeAttackHandler != null) {
+                activeAttackHandler.tick();
+            }
             if (activeState != null) {
                 // Pull-through state capture: change detection pushes
                 // STATE_PUSH onto the stream only when the snapshot
@@ -268,6 +272,7 @@ public class McBotServer {
                             this.activeGotoHandler = a.gotoHandler();
                             this.activeDigHandler = a.digHandler();
                             this.activeMineHandler = a.mineHandler();
+                            this.activeAttackHandler = a.attackHandler();
                             this.activeActor = a.actor();
                             this.activeCatalog = new com.mcbot.mcbotserver.adapter.RecipeCatalog(level);
 

@@ -64,7 +64,7 @@ superseding decision 28's table-lives-in-the-issue clause):
 | `/tasks/` | job family: `goto` `mine`, `<id>` (cat), `<id>/cancel` | value encodes args; receipt is a taskId |
 | `/player/` | `health`, `inventory/free`, `menu` (pending 0012 D1); writable: `sneak` (latch), `hotbar` (selection 0..8), `held/use` (held item against the POV ray) | writes are synchronous; reply is the verdict |
 | `/blocks/<x,y,z>` | one cell; volume reads aggregate nearby | `<blockid>` places (sync receipt; optional `@face` suffix for orientation, default up), `air` digs (job receipt), `/use <face>` runs the block's interaction, `/sleep` bed-rests (device-completed rule the engine cannot see) |
-| `/entities/` | nearby entity list, distance-sorted | read-only |
+| `/entities/` | nearby entity list, distance-sorted (lines carry the id= column) | `/attack` = directed engagement (job receipt; the harness hands the target id) |
 | `/nearby/` | nearby entity digest (distance-sorted, self-flagged) | read-only; rides the `entities` wire verb |
 | `/recipes/<slug>` | recipe pages, materialized to disk (section 6) | read-only; `dump-recipes` refreshes |
 | `/stations/<type>@<x,y,z>/<role>` | workstation snapshots | last segment is always a ROLE, never a verb |

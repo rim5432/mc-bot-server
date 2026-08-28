@@ -392,6 +392,7 @@ behind test gates, not behind prose.
 | 36 | Shapeless recipes cataloged via ingredient-index encoding; scarce-first pattern resolution | 2026-08-27 |
 | 37 | Bow ranging over USE: hold-draw semantics amend decision 14; melee ranking suppressed while ranging | 2026-08-27 |
 | 38 | Grammar fold: /actions/ retired, write addresses the noun; read re-homed to documents; ls universal | 2026-08-28 |
+| 39 | Directed engagement (/entities/<id>/attack task) + batch craft chains (harness plans, bot batches) | 2026-08-28 |
 
 ## Deferred, with reopen conditions
 

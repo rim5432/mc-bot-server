@@ -81,6 +81,7 @@ public final class BotCommands {
                 .then(gotoBranch(live))
                 .then(digBranch(live))
                 .then(mineBranch(live))
+                .then(attackBranch(live))
                 .then(cancelBranch(live))
                 .then(stopBranch(live))
                 .then(eventsBranch(live))
@@ -193,6 +194,31 @@ public final class BotCommands {
         args.put("count", String.valueOf(IntegerArgumentType.getInteger(ctx, "count")));
         args.put("timeoutTicks", String.valueOf(timeoutTicks));
         return submitCommand(ctx, live, "mine", args, null);
+    }
+
+    /**
+     * /bot attack <targetId> [timeoutTicks] - the harness-directed
+     * engagement (ledger 39): walk to the named entity and fight it
+     * until the scan says it is gone. Rides CommandBus like
+     * goto/dig/mine; verdict attrs carry the targetId.
+     */
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> attackBranch(
+            Supplier<Channels> live) {
+        // word(): entity ids are UUID-shaped (letters, digits,
+        // hyphens) - no spaces, no colons to protect.
+        return Commands.literal("attack")
+                .then(Commands.argument("targetId", StringArgumentType.word())
+                        .executes(ctx -> runAttack(ctx, live, 1200L))
+                        .then(Commands.argument("timeoutTicks", IntegerArgumentType.integer(1))
+                                .executes(ctx -> runAttack(
+                                        ctx, live, (long) IntegerArgumentType.getInteger(ctx, "timeoutTicks")))));
+    }
+
+    private static int runAttack(CommandContext<CommandSourceStack> ctx, Supplier<Channels> live, long timeoutTicks) {
+        Map<String, String> args = new LinkedHashMap<>();
+        args.put("targetId", StringArgumentType.getString(ctx, "targetId"));
+        args.put("timeoutTicks", String.valueOf(timeoutTicks));
+        return submitCommand(ctx, live, "attack", args, null);
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> cancelBranch(

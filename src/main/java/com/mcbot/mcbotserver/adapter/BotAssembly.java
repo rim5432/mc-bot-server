@@ -11,6 +11,7 @@ import com.mcbot.mcbotserver.api.world.BlockTraits;
 import com.mcbot.mcbotserver.api.world.BlockTraitsRegistry;
 import com.mcbot.mcbotserver.core.behavior.CombatBehavior;
 import com.mcbot.mcbotserver.core.behavior.PathingBehavior;
+import com.mcbot.mcbotserver.core.command.AttackCommandHandler;
 import com.mcbot.mcbotserver.core.command.CommandBus;
 import com.mcbot.mcbotserver.core.command.DigCommandHandler;
 import com.mcbot.mcbotserver.core.command.GotoCommandHandler;
@@ -97,6 +98,7 @@ public final class BotAssembly {
             GotoCommandHandler gotoHandler,
             DigCommandHandler digHandler,
             MineCommandHandler mineHandler,
+            AttackCommandHandler attackHandler,
             ChangeDetectingStateChannel state) {}
 
     /**
@@ -301,6 +303,13 @@ public final class BotAssembly {
                 () -> level.getDayTime() % 24000L,
                 () -> poseOf(body));
         mineHandler.attach(bus);
+        AttackCommandHandler attackHandler = new AttackCommandHandler(
+                arbiter,
+                events,
+                () -> level.getDayTime() / 24000L,
+                () -> level.getDayTime() % 24000L,
+                () -> poseOf(body));
+        attackHandler.attach(bus);
         // The bus has ONE cancel-listener slot: route to every verb
         // handler's public cancel method (each self-guards by its
         // missions map, so no verb dispatch is needed).
@@ -308,6 +317,7 @@ public final class BotAssembly {
             gotoHandler.onCancel(taskId, verb);
             digHandler.onCancel(taskId, verb);
             mineHandler.onCancel(taskId, verb);
+            attackHandler.onCancel(taskId, verb);
         });
 
         ChangeDetectingStateChannel state = new ChangeDetectingStateChannel(
@@ -328,6 +338,7 @@ public final class BotAssembly {
                 gotoHandler,
                 digHandler,
                 mineHandler,
+                attackHandler,
                 state);
     }
 

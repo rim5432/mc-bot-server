@@ -47,6 +47,14 @@ Wire mapping:
   write /stations/<t>@<pos>/fuel "item:count"   -> menu deposit FUEL
   write /stations/<t>@<pos>/output "all"|"N"    -> menu take OUTPUT [N]
   write /stations/crafting@<pos>/recipe "id"     -> menu craft <id>
+  write /stations/crafting@<pos>/recipe "a,b,c"  -> menu craft a,b,c
+                              (batch chain, ledger 39: executes in
+                              the GIVEN order in one menu session,
+                              harness plans the chain, first failure
+                              stops with partial results kept)
+  write /entities/<id>/attack -> /bot attack <id> [timeoutTicks]
+                              (directed engagement; ids come from
+                              ls /entities lines, id= column)
   write /blocks/<x,y,z> "oak_planks"       -> place x y z up   (sync)
   write /blocks/<x,y,z> "oak_stairs@north" -> place x y z north (sync)
   write /blocks/<x,y,z> "air"              -> /bot dig x y z  (job)
@@ -610,6 +618,18 @@ def cmd_write(path: str, value: str, tol: int | None = None,
         resp = wire("use-item")
         emit_json(resp)
         return 0 if resp.get("ok") and resp.get("used") else 1
+    entity_attack = re.fullmatch(r"/entities/([A-Za-z0-9._:-]+)/attack", path)
+    if entity_attack:
+        # The harness-directed engagement (ledger 39): walk to the
+        # named entity and fight it until the scan says it is gone.
+        # Ids come from `ls /entities` (UUID-shaped); the receipt is
+        # a taskId - wait joins it like any job.
+        timeout_val = timeout if timeout is not None else 1200
+        resp = wire(f"/bot attack {entity_attack.group(1)} {timeout_val}")
+        emit_json(resp)
+        if resp.get("ok") and "task" in resp:
+            print(f"taskId: {resp['task']}", file=sys.stderr)
+        return 0 if resp.get("ok") else 1
     if path == "/tasks/goto":
         # value is "x,y,z"
         parts = value.split(",")
@@ -930,6 +950,7 @@ def cmd_ls(path: str) -> int:
             p_ = e.get("pos", [0, 0, 0])
             mark = " [self]" if e.get("self") else ""
             print(f"{e.get('type')}@{p_[0]},{p_[1]},{p_[2]} "
+                  f"id={e.get('id')} "
                   f"hp={e.get('health')}/{e.get('maxHealth')} "
                   f"dist={e.get('dist')}{mark}")
         if resp.get("truncated"):
