@@ -5,7 +5,6 @@ import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.behavior.Behavior;
-import com.mcbot.mcbotserver.api.goal.Goal;
 import com.mcbot.mcbotserver.api.goal.Goals;
 import com.mcbot.mcbotserver.api.inventory.InventoryView;
 import com.mcbot.mcbotserver.api.inventory.WeaponCatalog;
@@ -14,6 +13,7 @@ import com.mcbot.mcbotserver.api.process.ExecutionReport;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.api.world.WorldView;
+import com.mcbot.mcbotserver.core.combat.RangedLoadouts;
 import java.util.Objects;
 
 /**
@@ -74,11 +74,6 @@ public final class CombatBehavior implements Behavior {
      * fit, honest to within a block across the bow band.
      */
     public static final double ARROW_DROP_PER_BLOCK_SQUARED = 0.0028;
-
-    private static final String BOW_ID = "minecraft:bow";
-
-    private static final java.util.Set<String> ARROW_IDS =
-            java.util.Set.of("minecraft:arrow", "minecraft:tipped_arrow", "minecraft:spectral_arrow");
 
     private final String name;
     private final BodyPositionSource positionSource;
@@ -283,34 +278,15 @@ public final class CombatBehavior implements Behavior {
     }
 
     /**
-     * The hotbar bow slot when a ranged loadout exists: a bow carried
-     * in the hotbar and arrows anywhere in the inventory. Process-tier
-     * combat planning (DefendProcess) reads this to decide whether a
-     * ranged hostile can be engaged at all, so it deliberately knows
-     * nothing about reach or band - distance gates are the caller's.
+     * The hotbar bow slot when a ranged loadout exists - delegated to
+     * the shared combat-tier loadout reader (DefendProcess's refuse
+     * gate reads the same source of truth).
      *
      * @param world read surface for the inventory; never null
      * @return the bow's hotbar slot, or -1 when the loadout is missing
      */
-    public static int rangedLoadoutSlot(WorldView world) {
-        InventoryView inventory = world.getInventory();
-        int bow = -1;
-        for (int slot = 0; slot < InventoryView.HOTBAR_SIZE; slot++) {
-            var item = inventory.main().get(slot);
-            if (!item.isEmpty() && BOW_ID.equals(item.itemId())) {
-                bow = slot;
-                break;
-            }
-        }
-        if (bow < 0) {
-            return -1;
-        }
-        for (var item : inventory.main()) {
-            if (!item.isEmpty() && ARROW_IDS.contains(item.itemId())) {
-                return bow;
-            }
-        }
-        return -1;
+    private static int rangedLoadoutSlot(WorldView world) {
+        return RangedLoadouts.hotbarBowSlot(world);
     }
 
     /**
@@ -340,5 +316,4 @@ public final class CombatBehavior implements Behavior {
             actor.submit(new Claim(Channel.SLOT, 20, name, new Intent.SelectSlot(best)));
         }
     }
-
 }

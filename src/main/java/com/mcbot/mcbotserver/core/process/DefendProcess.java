@@ -10,6 +10,7 @@ import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.EntitySnapshot;
 import com.mcbot.mcbotserver.api.world.ViewMode;
 import com.mcbot.mcbotserver.api.world.WorldView;
+import com.mcbot.mcbotserver.core.combat.RangedLoadouts;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -209,7 +210,7 @@ public final class DefendProcess extends MissionShell {
                 // the target closes in. Unarmed, refusing NOW beats
                 // bleeding to leash or timeout - the harness sees the
                 // refusal (with the threat type) and decides.
-                if (com.mcbot.mcbotserver.core.behavior.CombatBehavior.rangedLoadoutSlot(world) < 0) {
+                if (RangedLoadouts.hotbarBowSlot(world) < 0) {
                     lastRefusedType = nearest.type();
                     fail(REASON_REFUSED);
                     return lastDirective;
