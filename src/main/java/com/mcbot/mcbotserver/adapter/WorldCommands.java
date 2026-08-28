@@ -61,7 +61,8 @@ public final class WorldCommands {
             Supplier<String> botId,
             InteractBlockExecutor interact,
             IntConsumer equip,
-            java.util.function.Consumer<Boolean> sneak) {}
+            java.util.function.Consumer<Boolean> sneak,
+            java.util.function.BooleanSupplier useItemAir) {}
 
     /**
      * Register the block / blocks / entities subtrees.
@@ -109,6 +110,9 @@ public final class WorldCommands {
                 .requires(src -> src.hasPermission(2))
                 .then(Commands.argument("slot", IntegerArgumentType.integer(0, 8))
                         .executes(ctx -> runEquip(ctx, live)));
+        var useItem = Commands.literal("use-item")
+                .requires(src -> src.hasPermission(2))
+                .executes(ctx -> runUseItem(ctx, live));
         var sneak = Commands.literal("sneak")
                 .requires(src -> src.hasPermission(2))
                 .then(Commands.argument("state", com.mojang.brigadier.arguments.StringArgumentType.word())
@@ -129,6 +133,7 @@ public final class WorldCommands {
         dispatcher.register(equip);
         dispatcher.register(use);
         dispatcher.register(sneak);
+        dispatcher.register(useItem);
     }
 
     /**
@@ -231,6 +236,30 @@ public final class WorldCommands {
             root.addProperty(
                     "reason",
                     "no action (out of reach, container block, block and item" + " both passed, or empty hand)");
+        }
+        return CommandResponse.answer(ctx.getSource(), root);
+    }
+
+    /**
+     * Synchronous air-use (issue 0013, use-item row): vanilla Item.use
+     * for the held item against a POV raycast - the bucket's fill/empty
+     * point and the rod's cast are whatever the bot is looking at. The
+     * consumed verdict is the reply; hold-type items and food answer
+     * used:false with a reason (they ride the USE channel).
+     */
+    private static int runUseItem(CommandContext<CommandSourceStack> ctx, Supplier<Live> live) {
+        Live l = live.get();
+        if (l == null) {
+            return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
+        }
+        boolean used = l.useItemAir().getAsBoolean();
+        JsonObject root = CommandResponse.ok();
+        root.addProperty("used", used);
+        if (!used) {
+            root.addProperty(
+                    "reason",
+                    "no air use (empty hand, hold-type item - bow/shield ride"
+                            + " the USE channel, or food rides the EAT reflex)");
         }
         return CommandResponse.answer(ctx.getSource(), root);
     }

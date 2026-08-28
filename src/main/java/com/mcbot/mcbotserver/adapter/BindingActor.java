@@ -15,7 +15,10 @@ import java.util.Objects;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.BowItem;
+import net.minecraft.world.item.BucketItem;
+import net.minecraft.world.item.FishingRodItem;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ShieldItem;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.HitResult;
@@ -62,6 +65,33 @@ public final class BindingActor implements Actor, MenuTransactions {
      */
     public InteractBlockExecutor interactExecutor() {
         return interact;
+    }
+
+    /**
+     * Vanilla air-use for the held item - the synchronous /bot use-item
+     * verb's body. Items whose use is a hold (bow draw, shield raise)
+     * and food are rejected here: they ride the USE channel (combat
+     * draw pacing, EAT reflex) and a verb that starts a hold with
+     * nobody releasing it would orphan the state.
+     *
+     * @return true when the held item's use consumed the click
+     */
+    public boolean useHeldItemAir() {
+        ItemStack held = body.getInventory().container().getItem(body.selectedSlot);
+        if (held.isEmpty()
+                || held.getItem() instanceof BowItem
+                || held.getItem() instanceof ShieldItem
+                || held.getFoodProperties(body) != null) {
+            return false;
+        }
+        facade.syncPosition();
+        if (held.use(body.level(), facade, InteractionHand.MAIN_HAND)
+                .getResult()
+                .consumesAction()) {
+            body.swing(InteractionHand.MAIN_HAND);
+            return true;
+        }
+        return false;
     }
     /** Menu transactions: one facade+opener pair per body (0007 A1). */
     private final MenuOpener menus;
@@ -163,6 +193,21 @@ public final class BindingActor implements Actor, MenuTransactions {
                         facade.startUsingItem(InteractionHand.MAIN_HAND);
                     } else if (held instanceof ShieldItem) {
                         body.startUsingItem(InteractionHand.MAIN_HAND);
+                    } else if (held instanceof BucketItem || held instanceof FishingRodItem) {
+                        // Air-use items: vanilla resolves them through
+                        // Item.use against a POV raycast from the
+                        // actor's eyes (the bucket fills/empties at the
+                        // ray hit, the rod casts or reels). The facade's
+                        // pose is synced first or the ray fires from a
+                        // stale position.
+                        facade.syncPosition();
+                        ItemStack heldStack = body.getInventory().container().getItem(body.selectedSlot);
+                        if (heldStack
+                                .use(body.level(), facade, InteractionHand.MAIN_HAND)
+                                .getResult()
+                                .consumesAction()) {
+                            body.swing(InteractionHand.MAIN_HAND);
+                        }
                     } else {
                         melee.onUsePress();
                     }

@@ -509,6 +509,13 @@ def cmd_write(path: str, value: str, tol: int | None = None,
         resp = wire(f"use {x} {y} {z} {face.lower()}")
         emit_json(resp)
         return 0 if resp.get("ok") and resp.get("used") else 1
+    if path == "/actions/use-item":
+        # No argument: vanilla Item.use against the POV raycast - the
+        # bucket's fill/empty point is whatever the bot is looking at.
+        # ROT-aim first (look / steer) or the ray fires somewhere else.
+        resp = wire("use-item")
+        emit_json(resp)
+        return 0 if resp.get("ok") and resp.get("used") else 1
     if path == "/actions/sneak":
         # value "on"|"off" - persistent body-state latch (the equip
         # precedent): survives idle ticks until cleared. Edge-guard is
