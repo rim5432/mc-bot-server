@@ -253,12 +253,19 @@ without an anchor is a workplan item, not a row here.
 
 ## Open items
 
-- **OPEN H1 - api/ thick-interface trimming.** The api surface grew
-  convenience methods during Stage 2; a pass should decide what a
-  non-JVM harness actually needs versus what only core uses.
-  Schedule: before Stage 3 vocabulary lands - pose parameterization
-  touches the same collision predicates, and trimming afterwards
-  would churn boundary-D consumers twice.
+- **CLOSED 2026-08-29 - H1 api/ thick-interface trimming.** A full
+  consumer census (60 api files, ~130 public members) measured the
+  thickness at ~8%: ten dead or single-tier members, zero on any
+  doc-pinned boundary surface. The trims landed in fa82f92
+  (Behavior.name, Movement.source/describe,
+  ThreatBlackboard.saturationLevel, BlockSnapshot.isUnknown,
+  PriorityBands band constants to private,
+  PlanLifecycle.chebyshev deduped onto CellPos.chebyshevTo); the
+  census' kept-with-ruling rows (InventoryView/Direction accessor
+  families, BlockTraits factories) are natural carrier reads or
+  decision-25 reserved axes. The scheduling worry (trim before
+  Stage 3 or churn boundary-D twice) dissolved: nothing trimmed was
+  boundary-D surface.
 - **CLOSED 2026-08-28 - god-class paydown round with PMD as the
   yardstick.** The install-time 18 findings cleared across the
   paydown rounds (MenuVerbs/MenuSlotLayouts/ReflexRuleJsonReader/
