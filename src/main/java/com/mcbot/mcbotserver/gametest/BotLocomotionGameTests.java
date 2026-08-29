@@ -18,6 +18,8 @@ import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.types.CellPos;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -366,6 +368,120 @@ public final class BotLocomotionGameTests {
                             rig.body().isCrouching(),
                             "the body must still be crouched after crossing (pose="
                                     + rig.body().getPose() + ")");
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Scenario: the sneak edge guard, both halves. A sneaking body
+     * driven flat-out toward a plateau edge must NOT FALL: vanilla
+     * trim parks the box overhanging the edge by up to half its
+     * width, so the body cell may read one past the last plateau
+     * cell while standing safely on the support sliver - the pin is
+     * the Y level, not the cell line. The identical drive without
+     * sneak must walk off and fall to the paved floor. The plateau
+     * sits on the rig floor so the fall lands inside the structure
+     * (3-block drop, no damage pin).
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 300)
+    public static void sneakingHoldsTheLedge(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y + 3, 8));
+        for (int x = 0; x <= 7; x++) {
+            for (int z = 0; z < 16; z++) {
+                for (int y = 1; y <= 3; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), Blocks.SMOOTH_STONE);
+                }
+            }
+        }
+        rig.body().setYRot(-90f); // face east, straight at the edge
+
+        helper.startSequence()
+                .thenExecuteFor(40, () -> {
+                    rig.actor()
+                            .submit(new Claim(Channel.MOVE, 50, "test:edgesneak", new Intent.Move(1, 0, false, true)));
+                    GametestRig.driveTick(rig);
+                })
+                .thenExecuteAfter(0, () -> {
+                    // Structure-local reads only: world X differs per
+                    // pooled-run structure placement (the rig's
+                    // toLocal note - absolute coords silently test
+                    // the wrong ledge).
+                    BlockPos local = GametestRig.toLocal(helper, rig.body().blockPosition());
+                    check(
+                            local.getX() <= 8,
+                            "a sneaking body may overhang one cell but no further, local x=" + local.getX());
+                    check(local.getY() >= 4, "a sneaking body must not fall off the plateau, local y=" + local.getY());
+                })
+                .thenExecuteFor(60, () -> {
+                    rig.actor()
+                            .submit(new Claim(Channel.MOVE, 50, "test:edgewalk", new Intent.Move(1, 0, false, false)));
+                    GametestRig.driveTick(rig);
+                })
+                .thenExecuteAfter(0, () -> {
+                    BlockPos local = GametestRig.toLocal(helper, rig.body().blockPosition());
+                    check(local.getX() >= 8, "the unsneaking control must walk off the ledge, local x=" + local.getX());
+                    check(
+                            local.getY() <= 2,
+                            "the fallen control must land on the paved floor, local y=" + local.getY());
+                    rig.body().discard();
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Scenario: sneak in water means descend at the applied
+     * velocity. The tank is three source layers deep; the body faces
+     * the rim wall and drives INTO it (a zero-drive claim takes the
+     * actor's idle branch and never latches sneak - the crawl
+     * scenario learned this first), so the sneak modifier engages
+     * while the body stays put horizontally. Mid-column per-tick Y
+     * deltas must sit around the applied WATER_DESCENT_SPEED
+     * (-0.10), and the body must end standing on the tank floor.
+     * Floor-contact samples are excluded: a body resting on stone
+     * reads 0 regardless of the descent.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 300)
+    public static void sneakingInWaterSlidesDown(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(6, GametestRig.WALK_Y + 3, 8));
+        for (int x = 2; x <= 8; x++) {
+            for (int z = 4; z <= 12; z++) {
+                boolean rim = x == 2 || x == 8 || z == 4 || z == 12;
+                for (int y = 1; y <= 3; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), rim ? Blocks.SMOOTH_STONE : Blocks.WATER);
+                }
+            }
+        }
+        rig.body().setYRot(-90f); // face east, into the rim wall
+
+        final List<Double> deltas = new ArrayList<>();
+        final double[] lastY = {rig.body().getY()};
+
+        helper.startSequence()
+                .thenExecuteFor(50, () -> {
+                    rig.actor()
+                            .submit(new Claim(Channel.MOVE, 50, "test:watersink", new Intent.Move(1, 0, false, true)));
+                    GametestRig.driveTick(rig);
+                    double y = rig.body().getY();
+                    deltas.add(y - lastY[0]);
+                    lastY[0] = y;
+                })
+                .thenExecuteAfter(0, () -> {
+                    check(rig.body().isInWater(), "the descent must happen inside water");
+                    check(
+                            rig.body().getY() <= 1.9,
+                            "a sneaking body must reach the tank floor, y="
+                                    + rig.body().getY());
+                    List<Double> midColumn = new ArrayList<>();
+                    for (double delta : deltas) {
+                        if (delta < -0.01) {
+                            midColumn.add(delta);
+                        }
+                    }
+                    check(!midColumn.isEmpty(), "the descent must produce sinking ticks");
+                    double median = midColumn.get(midColumn.size() / 2);
+                    check(median <= -0.07, "sneak must apply the descent velocity (~-0.10), median delta=" + median);
+                    check(median >= -0.16, "the descent must stay near the applied rate, median delta=" + median);
+                    rig.body().discard();
                 })
                 .thenSucceed();
     }

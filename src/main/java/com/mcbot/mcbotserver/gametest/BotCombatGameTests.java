@@ -14,8 +14,11 @@ import com.mcbot.mcbotserver.adapter.inventory.BindingInventory;
 import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
 import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
+import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.process.DefendProcess;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -411,5 +414,224 @@ public final class BotCombatGameTests {
                     rig.body().discard();
                 })
                 .thenSucceed();
+    }
+
+    /**
+     * Scenario: the sword's attack cooldown gates damage, not just
+     * animation - a 60-health zombie under a full diamond-sword
+     * engagement must take its (at least six) hits spaced by the
+     * ATTACK_SPEED cadence (1.6/s = 12.5 ticks), never
+     * machine-gun-fast. The health-delta log is the oracle: each
+     * recorded drop is one landed 9.0 swing (on-ground approach, no
+     * crit, no sprint), so inter-drop gaps below 11 ticks can only
+     * mean the cooldown gate regressed.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT + 100)
+    public static void swordCooldownSpacesTheHits(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
+        rig.body().getInventory().container().setItem(0, new ItemStack(Items.DIAMOND_SWORD));
+        Zombie zombie = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(6, GametestRig.WALK_Y, 8));
+        zombie.setNoAi(true);
+        zombie.getAttribute(Attributes.MAX_HEALTH).setBaseValue(60.0);
+        zombie.setHealth(60.0f);
+
+        final List<Integer> hitTicks = new ArrayList<>();
+        final float[] lastHealth = {60.0f};
+        final int[] tick = {0};
+
+        helper.startSequence()
+                .thenWaitUntil(driveUntil(rig, () -> {
+                    tick[0]++;
+                    float health = zombie.getHealth();
+                    if (health < lastHealth[0] - 0.5f) {
+                        hitTicks.add(tick[0]);
+                    }
+                    lastHealth[0] = health;
+                    check(zombie.isDeadOrDying() || zombie.isRemoved(), "waiting for the long fight");
+                }))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    check(
+                            hitTicks.size() >= 6,
+                            "a 60-health zombie takes at least 6 nine-damage hits, got " + hitTicks.size());
+                    for (int i = 1; i < hitTicks.size(); i++) {
+                        int gap = hitTicks.get(i) - hitTicks.get(i - 1);
+                        check(
+                                gap >= 11,
+                                "attack cooldown must space hits ~12.5 ticks apart; gap " + gap + " before hit "
+                                        + (i + 1));
+                    }
+                    rig.body().discard();
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Scenario: a bot-killed hostile pays vanilla XP end to end -
+     * MeleeResolver's setLastHurtByPlayer attribution makes the
+     * zombie seed experience orbs, tickXpPickup absorbs them, and
+     * the body's level machinery moves. Zombie XP is a flat 5, so
+     * the total is assertable without flakes; the roof keeps
+     * daylight from burning the kill away from the bot.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
+    public static void killsGrantXpLevels(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y + 7, z), Blocks.SMOOTH_STONE);
+            }
+        }
+        rig.body().getInventory().container().setItem(0, new ItemStack(Items.DIAMOND_SWORD));
+        // Zero knockback: engage spam lands several small-cooldown
+        // hits, and each carries knockback that slides the NoAi
+        // target out of the structure before it dies - the orbs then
+        // spawn where no goto can economically camp. A stationary
+        // kill keeps the orb cluster at the fight position.
+        rig.body().getAttribute(Attributes.ATTACK_KNOCKBACK).setBaseValue(0.0);
+        Zombie zombie = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(7, GametestRig.WALK_Y, 8));
+        zombie.setNoAi(true);
+        zombie.setHealth(8f);
+        final CellPos[] deathSpot = {null};
+
+        helper.startSequence()
+                .thenWaitUntil(driveUntil(
+                        rig, () -> check(zombie.isDeadOrDying() || zombie.isRemoved(), "waiting for the kill")))
+                .thenExecuteAfter(0, () -> {
+                    // Camp the orb cluster: orbs spawn at the death
+                    // position and scatter, the pickup box is ~1.5, so
+                    // the body must walk to where the zombie died
+                    // before the absorption window means anything.
+                    deathSpot[0] = new CellPos(zombie.getBlockX(), zombie.getBlockY(), zombie.getBlockZ());
+                    GametestRig.submitGoto(rig, deathSpot[0]);
+                })
+                .thenWaitUntil(driveUntil(
+                        rig,
+                        () -> check(
+                                rig.body().getTotalExperience() >= 5,
+                                "camping the death spot must absorb the zombie's 5 XP, total="
+                                        + rig.body().getTotalExperience()
+                                        + ", orbs near death spot="
+                                        + orbCountNear(rig, deathSpot[0]))))
+                .thenExecuteAfter(0, () -> {
+                    check(
+                            rig.body().getExperienceLevel() >= 1 || rig.body().getExperienceProgress() > 0f,
+                            "absorbed XP must move the level or the progress bar");
+                    rig.body().discard();
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Scenario: a grounded, non-sprinting sword swing sweeps - the
+     * bystander one cell off the main target takes the sweep tick
+     * (1.0 damage with no Sweeping Edge enchant, shaved to ~0.94 by
+     * the zombie's 2 natural armor), not a full 9.0 swing and not
+     * nothing. The bystander's health is captured on
+     * the exact poll the main target's death is first seen, before
+     * the rescan can engage the bystander as a fresh main target.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
+    public static void sweepClipsBystanders(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
+        rig.body().getInventory().container().setItem(0, new ItemStack(Items.DIAMOND_SWORD));
+        Zombie main = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(6, GametestRig.WALK_Y, 8));
+        Zombie bystander = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(7, GametestRig.WALK_Y, 7));
+        main.setNoAi(true);
+        bystander.setNoAi(true);
+        main.setHealth(8f);
+        final float[] bystanderAtMainDeath = {20.0f};
+
+        helper.startSequence()
+                .thenWaitUntil(driveUntil(rig, () -> {
+                    if (main.isDeadOrDying() || main.isRemoved()) {
+                        bystanderAtMainDeath[0] = bystander.getHealth();
+                    } else {
+                        check(false, "waiting for the main-target kill");
+                    }
+                }))
+                .thenWaitUntil(driveUntil(
+                        rig,
+                        () -> check(
+                                bystander.isDeadOrDying() || bystander.isRemoved(),
+                                "waiting for the follow-up engagement to finish")))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    float captured = bystanderAtMainDeath[0];
+                    check(captured <= 19.2f, "the bystander must take the sweep tick, health=" + captured);
+                    check(captured >= 17.5f, "sweep damage is 1.0, not a full swing; health=" + captured);
+                    rig.body().discard();
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Scenario: swings landed while the body stands in water never
+     * crit - no health drop on the target may exceed the plain 9.0
+     * swing damage ceiling (a critical would read 13.5). The water
+     * basin is two source layers deep over the paved floor; the bot
+     * wades in on approach and the whole engagement runs with
+     * isInWater true. Per-hit LOWER bounds are deliberately not
+     * pinned: the engage chain re-presses attacks on rising edges,
+     * and vanilla correctly scales click-spam damage down with the
+     * cooldown factor, so individual water-fight hits may be far
+     * below 9.0 - the crit ceiling is the discriminative fact. The
+     * positive crit half (falling hits DO crit) is deferred: no
+     * production path swings reliably mid-fall, and staging one
+     * would pin bot-controlled physics, not the crit gate.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
+    public static void underwaterSwingsNeverCrit(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(4, GametestRig.WALK_Y, 8));
+        for (int x = 3; x <= 9; x++) {
+            for (int z = 5; z <= 11; z++) {
+                helper.setBlock(new BlockPos(x, GametestRig.WALK_Y, z), Blocks.WATER);
+                helper.setBlock(new BlockPos(x, GametestRig.WALK_Y + 1, z), Blocks.WATER);
+            }
+        }
+        rig.body().getInventory().container().setItem(0, new ItemStack(Items.DIAMOND_SWORD));
+        Zombie zombie = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(6, GametestRig.WALK_Y, 8));
+        zombie.setNoAi(true);
+
+        final List<Float> damages = new ArrayList<>();
+        final float[] lastHealth = {20.0f};
+
+        helper.startSequence()
+                .thenWaitUntil(driveUntil(rig, () -> {
+                    float health = zombie.getHealth();
+                    if (health < lastHealth[0] - 0.5f) {
+                        damages.add(lastHealth[0] - health);
+                    }
+                    lastHealth[0] = health;
+                    check(zombie.isDeadOrDying() || zombie.isRemoved(), "waiting for the wading fight");
+                }))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    check(!damages.isEmpty(), "the wading fight must land at least one hit");
+                    for (float damage : damages) {
+                        check(damage <= 9.5f, "an in-water swing must never crit (1.5x = 13.5), saw " + damage);
+                    }
+                    rig.body().discard();
+                })
+                .thenSucceed();
+    }
+    /** Live XP-orb census in an 8-block cube around a cell, for
+     * failure diagnostics: distinguishes "orbs never spawned" from
+     * "orbs never absorbed".
+     *
+     * @param rig  the wired rig; never null
+     * @param cell the center cell; null reports -1
+     * @return orb count near the cell, or -1 without a cell
+     */
+    private static int orbCountNear(GametestRig.Rig rig, CellPos cell) {
+        if (cell == null) {
+            return -1;
+        }
+        var center = new net.minecraft.world.phys.Vec3(cell.x() + 0.5, cell.y(), cell.z() + 0.5);
+        var box = new net.minecraft.world.phys.AABB(center, center).inflate(8.0);
+        return rig.body()
+                .level()
+                .getEntitiesOfClass(net.minecraft.world.entity.ExperienceOrb.class, box)
+                .size();
     }
 }

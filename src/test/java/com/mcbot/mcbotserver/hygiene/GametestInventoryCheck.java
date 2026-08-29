@@ -46,7 +46,9 @@ class GametestInventoryCheck {
                             "crossesLavaTrench",
                             "recoversWhenShoved",
                             "failsCleanlyWhenUnwalkable",
-                            "sneakCrawlFitsThroughGap"),
+                            "sneakCrawlFitsThroughGap",
+                            "sneakingHoldsTheLedge",
+                            "sneakingInWaterSlidesDown"),
             "BotInteractionGameTests", Set.of("doorOpensThroughUseChain", "stairsFaceTheirPlacer"),
             "BotCombatGameTests",
                     Set.of(
@@ -55,7 +57,11 @@ class GametestInventoryCheck {
                             "survivesRetaliatingZombie",
                             "holdsFireWhenSightBlocked",
                             "hostilesAggroOnSight",
-                            "equipmentMirrorFeedsAttributes"),
+                            "equipmentMirrorFeedsAttributes",
+                            "swordCooldownSpacesTheHits",
+                            "killsGrantXpLevels",
+                            "sweepClipsBystanders",
+                            "underwaterSwingsNeverCrit"),
             "BotHazardReflexGameTests",
                     Set.of(
                             "surfacesWhenAirRunsLow",
@@ -81,7 +87,9 @@ class GametestInventoryCheck {
                             "picksUpGroundItemsByTouch",
                             "anvilRenamesAndChargesLevels",
                             "enchantsThroughMenuButton",
-                            "xpSurvivesMenuCycles"),
+                            "xpSurvivesMenuCycles",
+                            "xpNeededPerLevelMatchesVanilla",
+                            "villagerTradeMenuOpens"),
             "BotCraftingGameTests",
                     Set.of(
                             "craftsDiamondBlockAtTable",
@@ -97,7 +105,16 @@ class GametestInventoryCheck {
                             "craftsShapelessPlanksFromLogs"),
             "GauntletGameTests", Set.of("gauntletEndToEnd", "routesThroughFenceGap"),
             "CrashRecoveryGameTests", Set.of("latchesAndRecoversAfterCrash"),
-            "ProductionWiringGameTests", Set.of("walksViaCommandAndServerTick"));
+            "ProductionWiringGameTests", Set.of("walksViaCommandAndServerTick"),
+            "BotDiggingGameTests",
+                    Set.of(
+                            "pickaxeDigsStoneIntoCobblestone",
+                            "bareHandedStoneLeavesNoDrop",
+                            "shearsClipLeavesIntoBlocks",
+                            "diamondOreSeedsXpOrbs",
+                            "digWearsThePickaxeOncePerBlock",
+                            "swordDigsAtDoubleWear",
+                            "breakingBlocksBuildsExhaustion"));
 
     /** Pulls the method name out of each
      * {@code @GameTest(...)} declaration in a source file. */

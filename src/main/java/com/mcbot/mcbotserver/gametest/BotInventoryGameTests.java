@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.gametest;
 
+import static com.mcbot.mcbotserver.gametest.GametestRig.SETTLE_TICKS;
 import static com.mcbot.mcbotserver.gametest.GametestRig.check;
 import static com.mcbot.mcbotserver.gametest.GametestRig.checkEquals;
 import static com.mcbot.mcbotserver.gametest.GametestRig.countItems;
@@ -728,5 +729,57 @@ public final class BotInventoryGameTests {
             }
         }
         throw new IllegalStateException("no slot with role " + role);
+    }
+
+    /**
+     * Scenario: the XP cost table matches vanilla at the three
+     * regime boundaries - level 0 (7 + 2*level), level 15 (level +
+     * 22), and level 30 (112 + (level-30)*9). The body's
+     * getXpNeededForNextLevel is a BotBodyEntity method, so this is
+     * the engine-side pin of a table the offline suite cannot reach.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void xpNeededPerLevelMatchesVanilla(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
+        helper.startSequence()
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    checkEquals(7, rig.body().getXpNeededForNextLevel(), "level 0 must need 7");
+                    rig.body().giveExperienceLevels(15);
+                    checkEquals(37, rig.body().getXpNeededForNextLevel(), "level 15 must need 37");
+                    rig.body().giveExperienceLevels(15);
+                    checkEquals(112, rig.body().getXpNeededForNextLevel(), "level 30 must need 112");
+                    rig.body().discard();
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Scenario: openEntity binds a villager's trade menu through the
+     * production opener path - the MenuOpener generic-MenuProvider
+     * fallback that 0012 landed for entity-hosted menus. The pin is
+     * the binding itself (non-null menu for a live villager within
+     * reach); the anvil-side XP economics have their own scenarios.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void villagerTradeMenuOpens(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
+        var villager = net.minecraft.world.entity.EntityType.VILLAGER.create(helper.getLevel());
+        check(villager != null, "villager creation failed");
+        var abs = helper.absolutePos(new BlockPos(5, GametestRig.WALK_Y, 8));
+        villager.moveTo(abs.getX() + 0.5, abs.getY(), abs.getZ() + 0.5, 0f, 0f);
+        helper.getLevel().addFreshEntity(villager);
+
+        var facade = new BotPlayerFacade(rig.body());
+        var opener = new com.mcbot.mcbotserver.adapter.MenuOpener(facade);
+
+        helper.startSequence()
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    var menu = opener.openEntity(villager.getId());
+                    check(menu.isPresent(), "openEntity must bind the villager trade menu");
+                    rig.body().discard();
+                })
+                .thenSucceed();
     }
 }
