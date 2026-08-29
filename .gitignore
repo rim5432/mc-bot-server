@@ -32,3 +32,6 @@ tool/.runtime/
 
 # external harness runtime scratch
 .dsh-runtime/
+
+# local agent-session scratch (plans, workspace state)
+.zcode/
