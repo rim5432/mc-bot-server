@@ -1,6 +1,6 @@
 ---
 title: Boundary Contracts
-last_verified: 2026-08-27
+last_verified: 2026-08-29
 covers:
   - doc/decisions/0002-capability-model-task-arbiter.md
   - doc/decisions/0003-reflex-layer-preemption.md
@@ -393,6 +393,13 @@ behind test gates, not behind prose.
 | 37 | Bow ranging over USE: hold-draw semantics amend decision 14; melee ranking suppressed while ranging | 2026-08-27 |
 | 38 | Grammar fold: /actions/ retired, write addresses the noun; read re-homed to documents; ls universal | 2026-08-28 |
 | 39 | Directed engagement (/entities/<id>/attack task) + batch craft chains (harness plans, bot batches) | 2026-08-28 |
+| 40 | Attack kill-confirmation: health-zero sighting = SUCCESS (amends 39) | 2026-08-28 |
+| 41 | Architecture wave: package cycles dissolved, tickOnce single home, menu kind single table | 2026-08-28 |
+| 42 | Audit completion round: cellOf/RangedLoadouts/TargetTracker extractions, controller constructors 4->2 (amends 41) | 2026-08-28 |
+| 43 | stop-contract fix: /bot stop sums all task handlers; H1 api/ thickness census closed | 2026-08-29 |
+| 44 | Ponytail re-audit: ReflexSeat folded into ReflexMissionSeat; gametest rig helpers absorbed | 2026-08-29 |
+| 45 | Rulings + engine batch: issue 0016 wired, HungryProcess/eat bugs fixed, PIT gates 150/200 | 2026-08-29 |
+| 46 | Anvil/XP surface + sneak steering gate + combat attributes + dig tool awareness; 52 gametests green | 2026-08-29 |
 
 ## Deferred, with reopen conditions
 

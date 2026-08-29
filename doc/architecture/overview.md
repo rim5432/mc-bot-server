@@ -87,32 +87,24 @@ issue 0015.
 
 ## Current status
 
-Stage 2 closed out and hardened through 2026-08-25. Three layers have
-shipped since on the same four-tier pipeline:
+Live status lives in three places that stay honest by construction —
+counts, dates, and queue positions are not restated here because they
+rot the moment the next ruling lands:
 
-- **Survival reflex ladder** (issue 0008, ledger entries 24-27):
-  drowning, lava shore-escape, fire extinguish, suffocation dig-out,
-  powder-snow climb, and idle-combat engage — every rule datapack-driven
-  with a lockstep gate pinning code rules to the shipped JSON table.
-- **Interaction surface** (issues 0007/0009, Phases 1-2): inventory
-  sense, DropSelected, block placement, and tool-supplied digging on a
-  fifth INTERACT channel; menu system (crafting table + chest) driven
-  server-side through a Player facade over the mob carrier.
-- **Harness convergence** (issues 0011/0012, landed): console verb
-  contract, disclosure responsibilities, and the Unix interaction
-  model (decision 33 + [harness-interaction.md](harness-interaction.md))
-  — world-as-namespace, tasks-as-jobs, device-side loops.
-
-The in-engine gametest suite runs ~30 scenarios covering the pipeline,
-the survival ladder, interaction surfaces, crash recovery, and
-production wiring. Remaining major rows: the Stage 3 review (frozen-
-surface lift for menu planners), HungryProcess food acquisition
-(issue 0010), and the boundary-D transport choice (MCP vs HTTP).
+- **Work queue**: [workplan.md](../guide/workplan.md) — items ordered by
+  dependency; the first item with all blockers checked off is the current
+  effort. Shipped items move to [workplan-archive.md](../guide/workplan-archive.md).
+- **Latest rulings**: [ledger.md](ledger.md) tail — every architectural
+  verdict, append-only, newest at the bottom. The
+  [decision index in boundaries.md](boundaries.md#decision-ledger-binding)
+  resolves every `decision N` citation.
+- **Engine-verified surface**: the gametest suite registered under
+  `src/main/java/com/mcbot/mcbotserver/gametest/`; its exact inventory is
+  pinned by `hygiene.GametestInventoryCheck` (code-health H-R5), not
+  restated as prose.
 
 Reverse-engineered vanilla player-behavior truths are collected in
-[Player Behavior RE](player-behavior-RE.md); the v1 convergence
-criteria live in the [work plan](../guide/workplan.md), and
-per-issue lifecycle rules in root `AGENTS.md` section 0.3.
+[Player Behavior RE](player-behavior-RE.md).
 
 Related: [Boundary Contracts & Ledger](boundaries.md),
 [Work Plan](../guide/workplan.md),

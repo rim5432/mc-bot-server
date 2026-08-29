@@ -30,52 +30,11 @@ Admission protocol:
   owned by datapack JSON and pinned by gates such as
   `ReflexPriorityOrderGateTest` - never restated as frozen prose
   inside an entry.
-
-## Index
-
-| # | Entry | Adopted |
-|---|---|---|
-| 1 | LLM stays out of the bot; harness is an external brain |  |
-| 2 | Host = server-side fake player; engine owns physics |  |
-| 3 | Capability stack: WorldView / Actor / skills / orchestration |  |
-| 4 | Data-driven trio: Registry / Codec / ReloadListener |  |
-| 5 | core package has zero MC imports |  |
-| 6 | Process/Behavior duality; central winner-take-all arbiter |  |
-| 7 | Goal is a pure data abstraction |  |
-| 8 | Movement modeled as a five-tuple |  |
-| 9 | Reflex layer is an independent bypass |  |
-| 10 | Scenario combinations are rule-table data |  |
-| 11 | DefendProcess light planner; structural refusals at engage time |  |
-| 12 | InterruptionContext snapshot; resume revalidates world first |  |
-| 13 | Behavior.tick returns ExecutionReport |  |
-| 14 | Actor four independent channels, per-tick claims |  |
-| 15 | Single tick entry; fixed reflex -> arbiter -> behaviors -> flush order |  |
-| 16 | Minimal reflex rule exercises the full preempt chain early |  |
-| 17 | WorldView exposes BlockSnapshot / EntitySnapshot / CollisionShape |  |
-| &nbsp;&nbsp;17a | isLoaded(pos) distinguishes unloaded from air |  |
-| &nbsp;&nbsp;17b | ViewMode SNAPSHOT/LIVE reserves the off-thread seam |  |
-| 18 | First boundary-D semantics: GotoCommand, submit/cancel/status |  |
-| 19 | Shape-vs-traits split for movement viability vs vocabulary |  |
-| &nbsp;&nbsp;19a | New Movements derive preconditions from shape plus traits |  |
-| &nbsp;&nbsp;19b | Settled STEP_UP_REACH / STANDABLE_THRESHOLD geometry semantics |  |
-| 20 | Plan-progress fuse and vertical trigger gate | 2026-08-24 |
-| 21 | Unreachable-goal escalation: honest NO_PATH | - |
-| 22 | ReflexAction vocabulary (boundary C growth) | 2026-08-24 |
-| 23 | Reflex-carried idle combat (ENGAGE) | 2026-08-24 |
-| 24 | Vitals pass and the extreme-scenario reflexes | 2026-08-25 |
-| 25 | Block capability axis opened - dig first | 2026-08-25 |
-| 26 | Reflex ESCAPE action and rescue mission handoff | 2026-08-25 |
-| 27 | Powder-snow climb reflex | 2026-08-25 |
-| 28 | Harness surface convergence (console + disclosure tables) | 2026-08-25 |
-| 29 | Menu transactions are imperative request-response | 2026-08-26 |
-| 30 | Consumer-count drain-lock retired from the event stream | 2026-08-26 |
-| 31 | Slot identity dual-space accepted; dual-RCON re-eval trigger | 2026-08-26 |
-| 32 | State-snapshot field set pinned at BotState's categorical rule | - |
-| 33 | Harness interaction model codified: space is a namespace, time is job control | 2026-08-27 |
-| 34 | Carrier food lifecycle: Path A FoodData on the body, free-regen floor retired, EAT reflex consumption | 2026-08-27 |
-| 35 | Third reflex seat promotion: ReflexMissionSeat unifies ENGAGE/ESCAPE; FORAGE action + ACQUIRE rule | 2026-08-27 |
-| 36 | Shapeless recipes cataloged via ingredient-index encoding; scarce-first pattern resolution | 2026-08-27 |
-| 37 | Bow ranging over USE: hold-draw semantics amend decision 14; melee ranking suppressed while ranging | 2026-08-27 |
+- Engine-debugging narrative (session.lock wedges, pooled-run
+  cross-contamination, workarounds for tooling quirks) belongs in
+  `doc/reference/toolchain.md` or the tool README, never in a verdict
+  entry. An entry records the ruling and its contract; the war story
+  of how it was verified is commit history and tooling docs.
 
 ## Amendment chains
 

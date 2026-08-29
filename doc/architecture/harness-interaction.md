@@ -187,15 +187,14 @@ when a second heavy read class actually hurts (YAGNI until then).
 - **Typed errors, never silent substitution.** A wrong verb or path
   gets a suggestion and exit 1; the tool never guesses a different
   operation.
-- **Verdicts arrive on reflex ticks too.** When a freeze lands in the
-  one-tick retirement lap (mission decided on tick N, freeze fires on
-  tick N+1 before retirement), the verdict - TASK_COMPLETED or
-  TASK_FAILED with attrs.reason - arrives on the reflex tick,
-  immediately followed by the body-halt. Never assume "events during
-  a reflex tick are reflex-only"; treat any TASK_* event as
-  authoritative regardless of pause state. A live park emits
-  TASK_PAUSED only; verdicts for parked missions arrive after
-  TASK_RESUMED.
+- **Verdicts arrive on reflex ticks too.** The full derivation — why a
+  freeze landing in the one-tick retirement lap emits the mission verdict
+  on the reflex tick, and why both `COMPLETED → PAUSED → RESUMED` and
+  `PAUSED → RESUMED → COMPLETED` are legal sequences — lives in
+  [boundaries.md invariant 7](../architecture/boundaries.md#invariants-must-hold).
+  Harness-side implication: treat any `TASK_*` event as authoritative
+  regardless of pause state; a live park emits `TASK_PAUSED` only, and
+  verdicts for parked missions arrive after `TASK_RESUMED`.
 - **Escaped-target verdicts are conservative.** A defend target that
   leaves the engaged tracking scan (14 blocks) after the 10-tick
   grace fails as TARGET_ESCAPED - death and escape are
