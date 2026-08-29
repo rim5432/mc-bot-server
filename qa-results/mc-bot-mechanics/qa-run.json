@@ -380,6 +380,68 @@
       "delta_count": 1,
       "source": "qa_flow.py normalize",
       "summary": "根据当前 canonical 重建机械计数台账"
+    },
+    {
+      "id": "CHG-003",
+      "revision": 4,
+      "action": "ADD",
+      "object_type": "execution",
+      "added_ids": [
+        "EXE-MCBOTMECHANI-001",
+        "EXE-MCBOTMECHANI-002",
+        "EXE-MCBOTMECHANI-003",
+        "EXE-MCBOTMECHANI-004",
+        "EXE-MCBOTMECHANI-005",
+        "EXE-MCBOTMECHANI-007",
+        "EXE-MCBOTMECHANI-031",
+        "EXE-MCBOTMECHANI-032"
+      ],
+      "removed_ids": [],
+      "modified_ids": [],
+      "before_count": 0,
+      "after_count": 8,
+      "delta_count": 8,
+      "source": "repo session P0a offline write-back",
+      "summary": "8 offline-backed cases (TC 001-005,007,031,032) marked passed against the 543-test green suite run; TC-006 reclassified to engine bucket (adapter descent physics)"
+    },
+    {
+      "id": "CHG-004",
+      "revision": 4,
+      "action": "ADD",
+      "object_type": "execution",
+      "added_ids": [
+        "EXE-MCBOTMECHANI-006",
+        "EXE-MCBOTMECHANI-008",
+        "EXE-MCBOTMECHANI-009",
+        "EXE-MCBOTMECHANI-010",
+        "EXE-MCBOTMECHANI-011",
+        "EXE-MCBOTMECHANI-012",
+        "EXE-MCBOTMECHANI-013",
+        "EXE-MCBOTMECHANI-014",
+        "EXE-MCBOTMECHANI-015",
+        "EXE-MCBOTMECHANI-016",
+        "EXE-MCBOTMECHANI-017",
+        "EXE-MCBOTMECHANI-018",
+        "EXE-MCBOTMECHANI-019",
+        "EXE-MCBOTMECHANI-020",
+        "EXE-MCBOTMECHANI-021",
+        "EXE-MCBOTMECHANI-022",
+        "EXE-MCBOTMECHANI-023",
+        "EXE-MCBOTMECHANI-024",
+        "EXE-MCBOTMECHANI-025",
+        "EXE-MCBOTMECHANI-026",
+        "EXE-MCBOTMECHANI-027",
+        "EXE-MCBOTMECHANI-028",
+        "EXE-MCBOTMECHANI-029",
+        "EXE-MCBOTMECHANI-030"
+      ],
+      "removed_ids": [],
+      "modified_ids": [],
+      "before_count": 8,
+      "after_count": 32,
+      "delta_count": 24,
+      "source": "repo session P0b engine write-back",
+      "summary": "24 engine-backed cases recorded against the GREEN 67/67 pooled receipt; includes one product P0 found and fixed this round (DigExecutor harvest gate) and two partial verdicts (falling-crit positive, sprint-sweep negative) with deferral reasons"
     }
   ],
   "environment": {},
@@ -909,7 +971,9 @@
       "test_data": "fixture: pathing test environment with default bot state",
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-005"
-      ]
+      ],
+      "status": "passed",
+      "execution_note": "offline-junit backing: BasicMovesClimbTest (climb viability on CLIMBABLE-tag blocks (7 tests)); verification_level=L1_offline"
     },
     {
       "id": "TC-MCBOTMECHANI-002",
@@ -933,7 +997,9 @@
       "test_data": "default fixture",
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-005"
-      ]
+      ],
+      "status": "passed",
+      "execution_note": "offline-junit backing: BasicMovesClimbTest (non-climbable neighbors rejected); verification_level=L1_offline"
     },
     {
       "id": "TC-MCBOTMECHANI-003",
@@ -957,7 +1023,9 @@
       "test_data": "fixture: dig test environment with default bot state",
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-006"
-      ]
+      ],
+      "status": "passed",
+      "execution_note": "offline-junit backing: DigPacingTest (efficiencyFormulaIsLevelSquaredPlusOne); verification_level=L1_offline"
     },
     {
       "id": "TC-MCBOTMECHANI-004",
@@ -981,7 +1049,9 @@
       "test_data": "default fixture",
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-006"
-      ]
+      ],
+      "status": "passed",
+      "execution_note": "offline-junit backing: DigPacingTest (hasteMultiplierScalesWithAmplifier); verification_level=L1_offline"
     },
     {
       "id": "TC-MCBOTMECHANI-005",
@@ -1005,7 +1075,9 @@
       "test_data": "default fixture",
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-006"
-      ]
+      ],
+      "status": "passed",
+      "execution_note": "offline-junit backing: DigPacingTest (miningFatigueMultipliersMatchVanillaTable + fatigueAndHasteStackMultiplicatively); verification_level=L1_offline"
     },
     {
       "id": "TC-MCBOTMECHANI-006",
@@ -1029,7 +1101,9 @@
       "test_data": "fixture: pathing test environment with default bot state",
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-007"
-      ]
+      ],
+      "status": "passed",
+      "execution_note": "in-engine backing: sneakingInWaterSlidesDown (median tick delta ~-0.10 pinned mid-column); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-007",
@@ -1053,7 +1127,9 @@
       "test_data": "fixture: pathing test environment with default bot state",
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-007"
-      ]
+      ],
+      "status": "passed",
+      "execution_note": "offline-junit backing: BasicMovesSwimTest (swimmingDownTheWaterColumnIsViable + 5 more viability tests); verification_level=L1_offline"
     },
     {
       "id": "TC-MCBOTMECHANI-008",
@@ -1078,7 +1154,9 @@
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-001"
       ],
-      "release_blocking_reason": "镐挖石头掉圆石 失败直接阻断核心机制可用性，影响完整玩家体验"
+      "release_blocking_reason": "镐挖石头掉圆石 失败直接阻断核心机制可用性，影响完整玩家体验",
+      "status": "passed",
+      "execution_note": "in-engine backing: pickaxeDigsStoneIntoCobblestone (cobblestone banked after walk-to-drop); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-009",
@@ -1103,7 +1181,9 @@
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-001"
       ],
-      "release_blocking_reason": "徒手挖石头不掉圆石 失败直接阻断核心机制可用性，影响完整玩家体验"
+      "release_blocking_reason": "徒手挖石头不掉圆石 失败直接阻断核心机制可用性，影响完整玩家体验",
+      "status": "passed",
+      "execution_note": "in-engine backing: bareHandedStoneLeavesNoDrop (no item entity, no container drop - harvest gate fix verified); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-010",
@@ -1127,7 +1207,9 @@
       "test_data": "fixture: flat stone platform, bot holding diamond_pickaxe, target block = stone at (0,64,0)",
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-001"
-      ]
+      ],
+      "status": "passed",
+      "execution_note": "in-engine backing: shearsClipLeavesIntoBlocks (persistent leaves clipped into item); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-011",
@@ -1151,7 +1233,9 @@
       "test_data": "fixture: flat stone platform, bot holding diamond_pickaxe, target block = stone at (0,64,0)",
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-001"
-      ]
+      ],
+      "status": "passed",
+      "execution_note": "in-engine backing: diamondOreSeedsXpOrbs (orb spawn + proximity absorption chain); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-012",
@@ -1176,7 +1260,9 @@
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-002"
       ],
-      "release_blocking_reason": "剑冷却 12.5 tick 失败直接阻断核心机制可用性，影响完整玩家体验"
+      "release_blocking_reason": "剑冷却 12.5 tick 失败直接阻断核心机制可用性，影响完整玩家体验",
+      "status": "passed",
+      "execution_note": "in-engine backing: swordCooldownSpacesTheHits (7 hits on 60HP, all gaps >= 11 ticks); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-013",
@@ -1200,7 +1286,9 @@
       "test_data": "fixture: bot holding diamond_sword (ATTACK_SPEED=1.6), target = zombie at distance 2.0",
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-002"
-      ]
+      ],
+      "status": "passed",
+      "execution_note": "in-engine backing: swordCooldownSpacesTheHits (rising-edge reset exercised by engage re-press; cadence floor held); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-014",
@@ -1224,7 +1312,9 @@
       "test_data": "fixture: combat test environment with default bot state",
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-008"
-      ]
+      ],
+      "status": "passed_partial",
+      "execution_note": "in-engine backing: underwaterSwingsNeverCrit (PARTIAL: negative condition pinned (no >9.5 hit in water); positive falling-crit deferred - no production path swings reliably mid-fall); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-015",
@@ -1248,7 +1338,9 @@
       "test_data": "default fixture",
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-008"
-      ]
+      ],
+      "status": "passed",
+      "execution_note": "in-engine backing: underwaterSwingsNeverCrit (in-water damage ceiling <= 9.5 across all landed hits); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-016",
@@ -1272,7 +1364,9 @@
       "test_data": "fixture: movement test environment with default bot state",
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-009"
-      ]
+      ],
+      "status": "passed",
+      "execution_note": "in-engine backing: sneakingHoldsTheLedge (sneak phase holds plateau Y; vanilla overhang allowed); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-017",
@@ -1296,7 +1390,9 @@
       "test_data": "default fixture",
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-009"
-      ]
+      ],
+      "status": "passed",
+      "execution_note": "in-engine backing: sneakingHoldsTheLedge (unsneaking control walks off and falls); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-018",
@@ -1321,7 +1417,9 @@
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-003"
       ],
-      "release_blocking_reason": "击杀僵尸掉经验球 失败直接阻断核心机制可用性，影响完整玩家体验"
+      "release_blocking_reason": "击杀僵尸掉经验球 失败直接阻断核心机制可用性，影响完整玩家体验",
+      "status": "passed",
+      "execution_note": "in-engine backing: killsGrantXpLevels (zombie 5 XP absorbed after zero-knockback stationary kill); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-019",
@@ -1346,7 +1444,9 @@
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-003"
       ],
-      "release_blocking_reason": "经验球拾取+等级提升 失败直接阻断核心机制可用性，影响完整玩家体验"
+      "release_blocking_reason": "经验球拾取+等级提升 失败直接阻断核心机制可用性，影响完整玩家体验",
+      "status": "passed",
+      "execution_note": "in-engine backing: killsGrantXpLevels (totalExperience >= 5; level/progress moved); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-020",
@@ -1370,7 +1470,9 @@
       "test_data": "fixture: bot holding diamond_sword, zombie at (2,64,0), bot has 0 XP",
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-003"
-      ]
+      ],
+      "status": "passed",
+      "execution_note": "in-engine backing: xpSurvivesMenuCycles (existing green scenario; BotState exposure serialized via BotStateJson offline tests); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-021",
@@ -1394,7 +1496,9 @@
       "test_data": "fixture: bot holding diamond_sword, zombie at (2,64,0), bot has 0 XP",
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-003"
-      ]
+      ],
+      "status": "passed",
+      "execution_note": "in-engine backing: xpNeededPerLevelMatchesVanilla (7 / 37 / 112 at levels 0 / 15 / 30); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-022",
@@ -1418,7 +1522,9 @@
       "test_data": "fixture: menu test environment with default bot state",
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-010"
-      ]
+      ],
+      "status": "passed",
+      "execution_note": "in-engine backing: anvilRenamesAndChargesLevels (existing green scenario); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-023",
@@ -1442,7 +1548,9 @@
       "test_data": "default fixture",
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-010"
-      ]
+      ],
+      "status": "passed",
+      "execution_note": "in-engine backing: anvilRenamesAndChargesLevels (existing green scenario (rename + level charge)); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-024",
@@ -1466,7 +1574,9 @@
       "test_data": "fixture: menu test environment with default bot state",
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-010"
-      ]
+      ],
+      "status": "passed",
+      "execution_note": "in-engine backing: enchantsThroughMenuButton (existing green scenario); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-025",
@@ -1490,7 +1600,9 @@
       "test_data": "default fixture",
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-010"
-      ]
+      ],
+      "status": "passed",
+      "execution_note": "in-engine backing: villagerTradeMenuOpens (openEntity binds merchant menu within reach); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-026",
@@ -1512,7 +1624,9 @@
       ],
       "expected_result": "DiggerItem.mineBlock 伤1点",
       "test_data": "default fixture",
-      "risk_mechanism_ids": []
+      "risk_mechanism_ids": [],
+      "status": "passed",
+      "execution_note": "in-engine backing: digWearsThePickaxeOncePerBlock (damage exactly 2 after two stone breaks); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-027",
@@ -1534,7 +1648,9 @@
       ],
       "expected_result": "SwordItem.mineBlock 伤2点",
       "test_data": "default fixture",
-      "risk_mechanism_ids": []
+      "risk_mechanism_ids": [],
+      "status": "passed",
+      "execution_note": "in-engine backing: swordDigsAtDoubleWear (damage exactly 2 after one dirt break); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-028",
@@ -1556,7 +1672,9 @@
       ],
       "expected_result": "addExhaustion(0.005F) 连续挖掘饥饿下降",
       "test_data": "default fixture",
-      "risk_mechanism_ids": []
+      "risk_mechanism_ids": [],
+      "status": "passed",
+      "execution_note": "in-engine backing: breakingBlocksBuildsExhaustion (4 gravel breaks >= 0.019 exhaustion); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-029",
@@ -1578,7 +1696,9 @@
       ],
       "expected_result": "横扫 AoE 伤害=1.0+SweepingEdge比率×主伤害",
       "test_data": "default fixture",
-      "risk_mechanism_ids": []
+      "risk_mechanism_ids": [],
+      "status": "passed",
+      "execution_note": "in-engine backing: sweepClipsBystanders (bystander took the ~0.94 sweep tick (1.0 minus zombie armor)); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-030",
@@ -1600,7 +1720,9 @@
       ],
       "expected_result": "isSprinting 时改为击退加成",
       "test_data": "default fixture",
-      "risk_mechanism_ids": []
+      "risk_mechanism_ids": [],
+      "status": "passed_partial",
+      "execution_note": "in-engine backing: sweepClipsBystanders (PARTIAL: sweep positive pinned; sprint-negative deferred - no production sprint staging); verification_level=L2_engine"
     },
     {
       "id": "TC-MCBOTMECHANI-031",
@@ -1625,7 +1747,9 @@
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-004"
       ],
-      "release_blocking_reason": "全量539测试通过 失败直接阻断核心机制可用性，影响完整玩家体验"
+      "release_blocking_reason": "全量539测试通过 失败直接阻断核心机制可用性，影响完整玩家体验",
+      "status": "passed",
+      "execution_note": "offline-junit backing: offline suite (543 tests, 0 failures, 0 skipped); verification_level=L1_offline"
     },
     {
       "id": "TC-MCBOTMECHANI-032",
@@ -1649,11 +1773,449 @@
       "test_data": "fixture: full codebase at HEAD, python tool/mcbot_tool.py test",
       "risk_mechanism_ids": [
         "RM-MCBOTMECHANI-004"
+      ],
+      "status": "passed",
+      "execution_note": "offline-junit backing: BoundaryContractMarkerTest (runs inside the offline suite); verification_level=L1_offline"
+    }
+  ],
+  "executions": [
+    {
+      "id": "EXE-MCBOTMECHANI-001",
+      "case_id": "TC-MCBOTMECHANI-001",
+      "status": "passed",
+      "executed_at": "2026-08-29T13:42:41+00:00",
+      "environment": "local JDK17, Gradle offline suite (mcbot_tool test)",
+      "verification_level": "L1_offline",
+      "backing": "BasicMovesClimbTest: climb viability on CLIMBABLE-tag blocks (7 tests)",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-OFFLINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-002",
+      "case_id": "TC-MCBOTMECHANI-002",
+      "status": "passed",
+      "executed_at": "2026-08-29T13:42:41+00:00",
+      "environment": "local JDK17, Gradle offline suite (mcbot_tool test)",
+      "verification_level": "L1_offline",
+      "backing": "BasicMovesClimbTest: non-climbable neighbors rejected",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-OFFLINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-003",
+      "case_id": "TC-MCBOTMECHANI-003",
+      "status": "passed",
+      "executed_at": "2026-08-29T13:42:41+00:00",
+      "environment": "local JDK17, Gradle offline suite (mcbot_tool test)",
+      "verification_level": "L1_offline",
+      "backing": "DigPacingTest: efficiencyFormulaIsLevelSquaredPlusOne",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-OFFLINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-004",
+      "case_id": "TC-MCBOTMECHANI-004",
+      "status": "passed",
+      "executed_at": "2026-08-29T13:42:41+00:00",
+      "environment": "local JDK17, Gradle offline suite (mcbot_tool test)",
+      "verification_level": "L1_offline",
+      "backing": "DigPacingTest: hasteMultiplierScalesWithAmplifier",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-OFFLINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-005",
+      "case_id": "TC-MCBOTMECHANI-005",
+      "status": "passed",
+      "executed_at": "2026-08-29T13:42:41+00:00",
+      "environment": "local JDK17, Gradle offline suite (mcbot_tool test)",
+      "verification_level": "L1_offline",
+      "backing": "DigPacingTest: miningFatigueMultipliersMatchVanillaTable + fatigueAndHasteStackMultiplicatively",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-OFFLINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-007",
+      "case_id": "TC-MCBOTMECHANI-007",
+      "status": "passed",
+      "executed_at": "2026-08-29T13:42:41+00:00",
+      "environment": "local JDK17, Gradle offline suite (mcbot_tool test)",
+      "verification_level": "L1_offline",
+      "backing": "BasicMovesSwimTest: swimmingDownTheWaterColumnIsViable + 5 more viability tests",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-OFFLINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-031",
+      "case_id": "TC-MCBOTMECHANI-031",
+      "status": "passed",
+      "executed_at": "2026-08-29T13:42:41+00:00",
+      "environment": "local JDK17, Gradle offline suite (mcbot_tool test)",
+      "verification_level": "L1_offline",
+      "backing": "offline suite: 543 tests, 0 failures, 0 skipped",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-OFFLINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-032",
+      "case_id": "TC-MCBOTMECHANI-032",
+      "status": "passed",
+      "executed_at": "2026-08-29T13:42:41+00:00",
+      "environment": "local JDK17, Gradle offline suite (mcbot_tool test)",
+      "verification_level": "L1_offline",
+      "backing": "BoundaryContractMarkerTest: runs inside the offline suite",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-OFFLINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-006",
+      "case_id": "TC-MCBOTMECHANI-006",
+      "status": "passed",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "sneakingInWaterSlidesDown: median tick delta ~-0.10 pinned mid-column",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-008",
+      "case_id": "TC-MCBOTMECHANI-008",
+      "status": "passed",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "pickaxeDigsStoneIntoCobblestone: cobblestone banked after walk-to-drop",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-009",
+      "case_id": "TC-MCBOTMECHANI-009",
+      "status": "passed",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "bareHandedStoneLeavesNoDrop: no item entity, no container drop - harvest gate fix verified",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-010",
+      "case_id": "TC-MCBOTMECHANI-010",
+      "status": "passed",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "shearsClipLeavesIntoBlocks: persistent leaves clipped into item",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-011",
+      "case_id": "TC-MCBOTMECHANI-011",
+      "status": "passed",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "diamondOreSeedsXpOrbs: orb spawn + proximity absorption chain",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-012",
+      "case_id": "TC-MCBOTMECHANI-012",
+      "status": "passed",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "swordCooldownSpacesTheHits: 7 hits on 60HP, all gaps >= 11 ticks",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-013",
+      "case_id": "TC-MCBOTMECHANI-013",
+      "status": "passed",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "swordCooldownSpacesTheHits: rising-edge reset exercised by engage re-press; cadence floor held",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-014",
+      "case_id": "TC-MCBOTMECHANI-014",
+      "status": "passed_partial",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "underwaterSwingsNeverCrit: PARTIAL: negative condition pinned (no >9.5 hit in water); positive falling-crit deferred - no production path swings reliably mid-fall",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-015",
+      "case_id": "TC-MCBOTMECHANI-015",
+      "status": "passed",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "underwaterSwingsNeverCrit: in-water damage ceiling <= 9.5 across all landed hits",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-016",
+      "case_id": "TC-MCBOTMECHANI-016",
+      "status": "passed",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "sneakingHoldsTheLedge: sneak phase holds plateau Y; vanilla overhang allowed",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-017",
+      "case_id": "TC-MCBOTMECHANI-017",
+      "status": "passed",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "sneakingHoldsTheLedge: unsneaking control walks off and falls",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-018",
+      "case_id": "TC-MCBOTMECHANI-018",
+      "status": "passed",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "killsGrantXpLevels: zombie 5 XP absorbed after zero-knockback stationary kill",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-019",
+      "case_id": "TC-MCBOTMECHANI-019",
+      "status": "passed",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "killsGrantXpLevels: totalExperience >= 5; level/progress moved",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-020",
+      "case_id": "TC-MCBOTMECHANI-020",
+      "status": "passed",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "xpSurvivesMenuCycles: existing green scenario; BotState exposure serialized via BotStateJson offline tests",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-021",
+      "case_id": "TC-MCBOTMECHANI-021",
+      "status": "passed",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "xpNeededPerLevelMatchesVanilla: 7 / 37 / 112 at levels 0 / 15 / 30",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-022",
+      "case_id": "TC-MCBOTMECHANI-022",
+      "status": "passed",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "anvilRenamesAndChargesLevels: existing green scenario",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-023",
+      "case_id": "TC-MCBOTMECHANI-023",
+      "status": "passed",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "anvilRenamesAndChargesLevels: existing green scenario (rename + level charge)",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-024",
+      "case_id": "TC-MCBOTMECHANI-024",
+      "status": "passed",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "enchantsThroughMenuButton: existing green scenario",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-025",
+      "case_id": "TC-MCBOTMECHANI-025",
+      "status": "passed",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "villagerTradeMenuOpens: openEntity binds merchant menu within reach",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-026",
+      "case_id": "TC-MCBOTMECHANI-026",
+      "status": "passed",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "digWearsThePickaxeOncePerBlock: damage exactly 2 after two stone breaks",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-027",
+      "case_id": "TC-MCBOTMECHANI-027",
+      "status": "passed",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "swordDigsAtDoubleWear: damage exactly 2 after one dirt break",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-028",
+      "case_id": "TC-MCBOTMECHANI-028",
+      "status": "passed",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "breakingBlocksBuildsExhaustion: 4 gravel breaks >= 0.019 exhaustion",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-029",
+      "case_id": "TC-MCBOTMECHANI-029",
+      "status": "passed",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "sweepClipsBystanders: bystander took the ~0.94 sweep tick (1.0 minus zombie armor)",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-MCBOTMECHANI-030",
+      "case_id": "TC-MCBOTMECHANI-030",
+      "status": "passed_partial",
+      "executed_at": "2026-08-29T16:21:00+00:00",
+      "environment": "runGameTestServer, Forge 1.20.1 gametest framework, pooled 67",
+      "verification_level": "L2_engine",
+      "backing": "sweepClipsBystanders: PARTIAL: sweep positive pinned; sprint-negative deferred - no production sprint staging",
+      "evidence_ids": [
+        "EV-MCBOTMECHANI-ENGINE-1"
       ]
     }
   ],
-  "executions": [],
-  "evidence": [],
+  "evidence": [
+    {
+      "id": "EV-MCBOTMECHANI-OFFLINE-1",
+      "type": "test_run_log",
+      "locator": "tool/.runtime/build-test-20260829-214241.log + build/test-results/test/*.xml",
+      "captured_at": "2026-08-29T13:42:41+00:00",
+      "summary": "Gradle offline suite: 543 tests, 0 failures, 0 skipped (checkstyle+spotless gates green). Java sources identical to HEAD 98c8d67 - only qa-results/ and doc/ files changed since the run.",
+      "related_case_ids": [
+        "TC-MCBOTMECHANI-001",
+        "TC-MCBOTMECHANI-002",
+        "TC-MCBOTMECHANI-003",
+        "TC-MCBOTMECHANI-004",
+        "TC-MCBOTMECHANI-005",
+        "TC-MCBOTMECHANI-007",
+        "TC-MCBOTMECHANI-031",
+        "TC-MCBOTMECHANI-032"
+      ]
+    },
+    {
+      "id": "EV-MCBOTMECHANI-ENGINE-1",
+      "type": "gametest_run_receipt",
+      "locator": "qa-results/engine-runs/gametest-20260830-002103.json",
+      "captured_at": "2026-08-29T16:21:03+00:00",
+      "summary": "Pooled runGameTest, 67 scenarios, 0 failed (GREEN) at worktree of 98c8d67. 15 new scenarios added this round (BotDiggingGameTests family + combat/locomotion/inventory additions); 52 pre-existing scenarios all green (zero regression after the mechanics round). Receipt written by tool/mcbot_tool.py write_engine_receipt.",
+      "related_case_ids": [
+        "TC-MCBOTMECHANI-006",
+        "TC-MCBOTMECHANI-008",
+        "TC-MCBOTMECHANI-009",
+        "TC-MCBOTMECHANI-010",
+        "TC-MCBOTMECHANI-011",
+        "TC-MCBOTMECHANI-012",
+        "TC-MCBOTMECHANI-013",
+        "TC-MCBOTMECHANI-014",
+        "TC-MCBOTMECHANI-015",
+        "TC-MCBOTMECHANI-016",
+        "TC-MCBOTMECHANI-017",
+        "TC-MCBOTMECHANI-018",
+        "TC-MCBOTMECHANI-019",
+        "TC-MCBOTMECHANI-020",
+        "TC-MCBOTMECHANI-021",
+        "TC-MCBOTMECHANI-022",
+        "TC-MCBOTMECHANI-023",
+        "TC-MCBOTMECHANI-024",
+        "TC-MCBOTMECHANI-025",
+        "TC-MCBOTMECHANI-026",
+        "TC-MCBOTMECHANI-027",
+        "TC-MCBOTMECHANI-028",
+        "TC-MCBOTMECHANI-029",
+        "TC-MCBOTMECHANI-030"
+      ]
+    }
+  ],
   "bugs": [],
   "bug_candidates": [],
   "risks": [],
