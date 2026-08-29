@@ -48,7 +48,11 @@ import net.minecraft.world.level.material.FluidState;
  *   <li>match_tool loot fidelity and XP pop ARE shipped: the break
  *       goes through Block.dropResources with the held stack as the
  *       TOOL context, so shears-on-leaves, silk-touch, fortune, and
- *       the block's experience drop all resolve correctly.</li>
+ *       the block's experience drop all resolve correctly. Both the
+ *       drop and the exhaustion are harvest-gated like vanilla's
+ *       survival path (canHarvestBlock): a wrong-tool break removes
+ *       the block and wears the tool but drops nothing - the parity
+ *       pin the bareHandedStoneLeavesNoDrop scenario guards.</li>
  * </ul>
  *
  * <p>Reach gate: a claim outside bare-hand reach is ignored (progress
@@ -147,9 +151,14 @@ public final class DigExecutor {
             // break particles (skip for FireBlock, same as destroyBlock),
             // replace with the fluid's legacy block (waterlogged stairs
             // keep their water), then drop resources with TOOL=held and
-            // THIS_ENTITY=body. XP is handled inside dropResources via
-            // spawnAfterBreak → ForgeHooks.dropXpForBlock (gated on the
-            // harvest check, so wrong-tool breaks yield no XP).
+            // THIS_ENTITY=body. The drop call is gated on
+            // hasCorrectTool exactly where vanilla gates it: the
+            // survival caller only runs playerDestroy (drops +
+            // exhaustion) when blockstate.canHarvestBlock passes, so a
+            // bare-hand stone break removes the block and pays tool
+            // wear but must not drop or seed XP (ServerPlayerGameMode
+            // destroyBlock, the survival flag1 branch). XP is handled
+            // inside dropResources via spawnAfterBreak → ForgeHooks.
             BlockState breakState = state;
             BlockEntity breakEntity = breakState.hasBlockEntity() ? body.level().getBlockEntity(pos) : null;
             FluidState breakFluid = body.level().getFluidState(pos);
@@ -157,18 +166,23 @@ public final class DigExecutor {
                 body.level().levelEvent(2001, pos, net.minecraft.world.level.block.Block.getId(breakState));
             }
             body.level().setBlock(pos, breakFluid.createLegacyBlock(), 3);
-            net.minecraft.world.level.block.Block.dropResources(breakState, body.level(), pos, breakEntity, body, held);
+            if (hasCorrectTool) {
+                net.minecraft.world.level.block.Block.dropResources(
+                        breakState, body.level(), pos, breakEntity, body, held);
+                // Mining exhaustion: vanilla's 0.005F per block rides
+                // the same harvest-gated playerDestroy call (the bot's
+                // FoodData is a custom carrier field, HungerTicker
+                // ticks it, so add directly).
+                body.getFoodData().addExhaustion(0.005F);
+            }
             // Tool durability: Item.mineBlock damages the held stack
             // (1 for DiggerItem, 2 for SwordItem, 1 for ShearsItem, 0
-            // for base Item). Gated on destroySpeed != 0 inside each
-            // override, so insta-break blocks (torches, flowers) cost
-            // nothing. Unbreaking/Mending run inside hurtAndBreak.
+            // for base Item) UNCONDITIONALLY in vanilla - the survival
+            // caller wears the tool before the harvest check gates the
+            // drops. Gated on destroySpeed != 0 inside each override,
+            // so insta-break blocks (torches, flowers) cost nothing.
+            // Unbreaking/Mending run inside hurtAndBreak.
             held.getItem().mineBlock(held, body.level(), breakState, pos, body);
-            // Mining exhaustion: vanilla Block.playerDestroy applies
-            // 0.005F per block broken (the same value Player applies
-            // via causeFoodExhaustion). The bot's FoodData is a custom
-            // carrier field (HungerTicker ticks it), so add directly.
-            body.getFoodData().addExhaustion(0.005F);
             target = null;
             heldTicks = 0;
             lastStage = -1;
