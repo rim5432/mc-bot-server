@@ -18,6 +18,7 @@ covers:
   - src/test/java/com/mcbot/mcbotserver/hygiene/GametestInventoryCheck.java
   - src/test/java/com/mcbot/mcbotserver/architecture/BytecodeArchitectureGateTest.java
   - src/test/java/com/mcbot/mcbotserver/architecture/LintPostureGateTest.java
+  - src/test/java/com/mcbot/mcbotserver/architecture/DecisionIndexSyncGateTest.java
   - src/test/java/com/mcbot/mcbotserver/core/tick/PathingTestAccess.java
   - src/test/java/com/mcbot/mcbotserver/core/tick/TickGateFixtures.java
   - src/test/java/com/mcbot/mcbotserver/core/tick/TickPipelineGateTest.java
@@ -98,6 +99,7 @@ admitted here may encode a size cap.
 | H-R9 Review claims cite or are unverified | Every factual claim in a review/assessment carries a file:line or doc-anchor citation; quoted promises are checked against the anchor; "does this abstraction exist" checks the abstraction-status table first | not mechanically checkable | review-only since 2026-08-27 |
 | H-R10 Style law is machine-owned | AGENTS section 1 semantic rules (naming, javadoc presence, import purity, width) fail the checkstyle tasks; layout is formatter-canonical (Spotless/palantir) and never hand-reformatted | `checkstyle*` + `spotlessCheck` on the default `test` flow (`build.gradle`; wired f8b63b2, promoted same day) | gated (default test path) 2026-08-27 |
 | H-R11 Lint postures are pinned | The split between hard gates (checkstyle + spotlessCheck on the default `test` flow) and `-Plint` dashboards (PMD/CPD/SpotBugs/EP) cannot silently shift: a posture change is a ruling landing gate + posture table + ruling together | `architecture.LintPostureGateTest` (block wiring pins, ignoreFailures budget) | gated 2026-08-27 |
+| H-R12 Decision index parity | boundaries.md decision index max equals ledger.md body max; every verdict has a citation-resolution row (AGENTS.md 0.3) | `architecture.DecisionIndexSyncGateTest` (text scan, no classpath) | gated 2026-08-29 |
 
 ### Rule detail
 
@@ -193,6 +195,20 @@ admitted here may encode a size cap.
   H-R8 already follow. The `lint` verb in tool/mcbot_tool.py rides
   the same ruling: it replays the canonical dashboard invocation so
   agents cannot misremember the task set.
+- **H-R12 Decision index parity.** The boundaries.md decision index is
+  the repository-wide resolution point for every `decision N` citation
+  (AGENTS.md 0.3); the ledger body is where verdict text lives. A verdict
+  landing in the ledger body without an index row silently breaks citation
+  resolution — the 08-27 ledger-split created two indexes with no sync
+  mechanism, and decisions 40-46 landed in the body only. The gate reads
+  both files as text (no classpath needed), parses the max top-level
+  number from each, and asserts equality. Parsing note: ledger entries 20+
+  carry 4-space leading indent (a pre-gate formatting drift; the append-only
+  protocol forbids reformatting published entries), so the entry pattern
+  tolerates optional leading whitespace; sub-entries (19a, 23a) are
+  excluded by the digit-before-period requirement. This gate complements
+  `doc check`, which covers front-matter and covers-drift but does not
+  parse decision numbers.
 
 ## Abstraction status (single lookup)
 
