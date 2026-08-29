@@ -7,7 +7,7 @@ covers:
   - src/main/java/com/mcbot/mcbotserver/core/event/InMemoryEventQueue.java
   - src/main/java/com/mcbot/mcbotserver/core/tick/BotController.java
 status: resolved
-superseded_by: b78fe65
+superseded_by: architecture/ledger.md
 ---
 
 # Problem
