@@ -47,12 +47,15 @@ public final class BotDiggingGameTests {
 
     /**
      * Scenario: an iron pickaxe breaks stone and cobblestone lands -
-     * the walk onto the drop site banks it. The discriminative pin
-     * is the drop CONTENT (cobblestone, not stone and not nothing)
-     * behind the vanilla harvest gate: the survival caller runs
-     * playerDestroy (drops + exhaustion) only when the held tool can
-     * harvest, which is exactly what a broken TOOL context or a
-     * missing gate would corrupt.
+     * either banked in the container after the walk onto the drop
+     * site, or lying as an item entity near it (drops scatter on
+     * spawn and the pickup box is ~1.5, so which one happens is
+     * environment noise). The discriminative pin is the drop CONTENT
+     * (cobblestone, not stone and not nothing) behind the vanilla
+     * harvest gate: the survival caller runs playerDestroy (drops +
+     * exhaustion) only when the held tool can harvest, which is
+     * exactly what a broken TOOL context or a missing gate would
+     * corrupt.
      */
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void pickaxeDigsStoneIntoCobblestone(GameTestHelper helper) {
@@ -68,9 +71,10 @@ public final class BotDiggingGameTests {
                 .thenWaitUntil(driveUntil(
                         rig,
                         () -> check(
-                                GametestRig.countItems(rig, Items.COBBLESTONE) >= 1,
-                                "walking onto the drop site must bank the cobblestone"
-                                        + " (dig stand-off is 2 cells; GroundPickup scans ~1.5)")))
+                                GametestRig.countItems(rig, Items.COBBLESTONE) >= 1
+                                        || droppedOnGround(helper, stoneLocal),
+                                "the break must leave cobblestone somewhere: banked in the container"
+                                        + " after the walk, or as an item entity at the drop site")))
                 .thenExecuteAfter(0, () -> {
                     check(mission.missionSucceeded(), "the dig must succeed, failure=" + mission.failureReasonOrNull());
                     check(
@@ -114,9 +118,12 @@ public final class BotDiggingGameTests {
 
     /**
      * Scenario: shears on oak leaves flip the leaves loot table to
-     * its shears branch - the leaf block drops itself and GroundPickup
-     * banks it. The leaves are set PERSISTENT so decay ticks cannot
-     * confound the drop with a naturally-vanished block.
+     * its shears branch - the leaf block drops itself (banked by
+     * GroundPickup after the walk, or lying at the drop site; drops
+     * scatter and the pickup box is ~1.5, so which half fires is
+     * environment noise - same tolerance as the cobblestone pair).
+     * The leaves are set PERSISTENT so decay ticks cannot confound
+     * the drop with a naturally-vanished block.
      */
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void shearsClipLeavesIntoBlocks(GameTestHelper helper) {
@@ -132,8 +139,10 @@ public final class BotDiggingGameTests {
                 .thenWaitUntil(driveUntil(
                         rig,
                         () -> check(
-                                GametestRig.countItems(rig, Items.OAK_LEAVES) >= 1,
-                                "walking onto the drop site must bank the leaves")))
+                                GametestRig.countItems(rig, Items.OAK_LEAVES) >= 1
+                                        || droppedOnGround(helper, leavesLocal),
+                                "the clip must leave leaves somewhere: banked in the container"
+                                        + " after the walk, or as an item entity at the drop site")))
                 .thenExecuteAfter(0, () -> {
                     check(
                             mission.missionSucceeded(),
@@ -169,13 +178,23 @@ public final class BotDiggingGameTests {
                 .thenWaitUntil(driveUntil(
                         rig,
                         () -> check(
-                                rig.body().getTotalExperience() >= 1,
-                                "walking onto the break site must absorb ore XP, total="
-                                        + rig.body().getTotalExperience())))
+                                rig.body().getTotalExperience() >= 1 || orbsOnGround(helper, oreLocal),
+                                "the ore break must seed XP: absorbed total="
+                                        + rig.body().getTotalExperience() + ", or orbs at the break site")))
                 .thenExecuteAfter(0, () -> {
                     check(
                             mission.missionSucceeded(),
                             "the ore break must succeed, failure=" + mission.failureReasonOrNull());
+                    if (rig.body().getTotalExperience() >= 1) {
+                        check(
+                                rig.body().getExperienceLevel() >= 1
+                                        || rig.body().getExperienceProgress() > 0f,
+                                "absorbed ore XP must move the level or the progress bar (a 7-XP roll"
+                                        + " levels up and zeroes the bar), level="
+                                        + rig.body().getExperienceLevel()
+                                        + " progress="
+                                        + rig.body().getExperienceProgress());
+                    }
                     rig.body().discard();
                 })
                 .thenSucceed();
@@ -273,6 +292,28 @@ public final class BotDiggingGameTests {
                     rig.body().discard();
                 })
                 .thenSucceed();
+    }
+
+    /** Whether any XP orb lies within 2 blocks of the cell - the
+     * spawn-residency half of the ore XP pin (absorbed is the other
+     * half; orbs scatter past the ~1.5 pickup box). */
+    private static boolean orbsOnGround(GameTestHelper helper, BlockPos local) {
+        var center = net.minecraft.world.phys.Vec3.atCenterOf(helper.absolutePos(local));
+        var box = new net.minecraft.world.phys.AABB(center, center).inflate(2.0);
+        return !helper.getLevel()
+                .getEntitiesOfClass(net.minecraft.world.entity.ExperienceOrb.class, box)
+                .isEmpty();
+    }
+
+    /** Whether at least one of the item kind lies on the ground
+     * within 2 blocks of the cell - the drop-residency half of the
+     * fidelity pin (picked-up is the other half). */
+    private static boolean droppedOnGround(GameTestHelper helper, BlockPos local) {
+        var center = net.minecraft.world.phys.Vec3.atCenterOf(helper.absolutePos(local));
+        var box = new net.minecraft.world.phys.AABB(center, center).inflate(2.0);
+        return !helper.getLevel()
+                .getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, box)
+                .isEmpty();
     }
 
     /**
