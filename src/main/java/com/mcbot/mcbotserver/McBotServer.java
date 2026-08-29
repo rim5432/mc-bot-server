@@ -120,12 +120,20 @@ public class McBotServer {
         // ATTACK_DAMAGE base 3.0 = zombie scale, preserving the
         // pre-attribute MeleeResolver constant for bare fists; weapons
         // add their mainhand modifier on top through the equipment
-        // mirror (Phase 4 combat slice).
+        // mirror (Phase 4 combat slice). ATTACK_SPEED / ATTACK_KNOCKBACK
+        // carry the vanilla bases (4.0 / 0.0) - both are Player-tier
+        // registrations, absent from Mob.createMobAttributes, and
+        // MeleeResolver's cooldown math reads them on every swing:
+        // unregistered, getAttributeValue throws and the USE edge dies
+        // mid-press (engine-batch "Can't find attribute
+        // generic.attack_speed").
         event.put(
                 BOT_BODY.get(),
                 Mob.createMobAttributes()
                         .add(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED, 0.25)
                         .add(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE, 3.0D)
+                        .add(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_SPEED, 4.0D)
+                        .add(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_KNOCKBACK, 0.0D)
                         .build());
     }
 

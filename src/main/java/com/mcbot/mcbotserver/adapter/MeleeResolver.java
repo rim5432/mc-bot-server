@@ -4,8 +4,12 @@ import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
 import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
 import com.mojang.logging.LogUtils;
 import net.minecraft.core.BlockPos;
+import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.HitResult;
@@ -59,6 +63,13 @@ final class MeleeResolver {
     private final BotBodyEntity body;
 
     /**
+     * Game time of the last melee swing that reset the cooldown. Every
+     * USE rising edge resets it (vanilla parity: spamming clicks never
+     * builds a full charge). -1 means no swing has happened yet.
+     */
+    private long lastSwingTick = -1;
+
+    /**
      * @param body the swinging body; never null
      */
     MeleeResolver(BotBodyEntity body) {
@@ -66,11 +77,81 @@ final class MeleeResolver {
     }
 
     /**
-     * Resolve one USE press: always swing; additionally hurt the
-     * nearest qualifying hostile, if any.
+     * Attack cooldown in ticks, derived from the held item's
+     * ATTACK_SPEED attribute. Vanilla formula:
+     * {@code 1.0 / attackSpeed * 20.0}. Sword (1.6) = 12.5 ticks,
+     * axe (0.8-1.0) = 20-25, empty hand (4.0) = 5. The attribute is
+     * read live because the SLOT channel may swap the held item mid-
+     * combat; the equipment mirror applies the item's attribute
+     * modifiers via detectEquipmentUpdates.
+     *
+     * @return cooldown in ticks; never negative
+     */
+    private double getAttackCooldownTicks() {
+        double speed = body.getAttributeValue(Attributes.ATTACK_SPEED);
+        return 1.0 / speed * 20.0;
+    }
+
+    /**
+     * Whether the current swing is at full charge. Since the bot only
+     * deals damage on a fully-charged swing (partial-charge damage is
+     * a Player-only affordance the harness has no use for), this gates
+     * every hurt attempt. A never-swung body is always ready.
+     *
+     * @return true when enough ticks have elapsed since the last swing
+     */
+    private boolean isAttackReady() {
+        if (lastSwingTick < 0) {
+            return true;
+        }
+        return body.level().getGameTime() - lastSwingTick >= getAttackCooldownTicks();
+    }
+
+    /**
+     * Critical hit conditions, mirrored from vanilla Player.attack
+     * (decompiled 1.20.1): the swing must be fully charged (>0.9
+     * strength scale — always true here because isAttackReady gates),
+     * the body must be falling (fallDistance > 0, not onGround), not
+     * in water, not blind, not on a climbable block, not riding, and
+     * not sprinting. Sprinting suppresses crits because a sprint-attack
+     * is a knockback sweep instead.
+     *
+     * @return true when the next hit should be a critical strike
+     */
+    private boolean isCriticalHit() {
+        return body.fallDistance > 0.0F
+                && !body.onGround()
+                && !body.isInWater()
+                && !body.hasEffect(MobEffects.BLINDNESS)
+                && !body.onClimbable()
+                && !body.isPassenger()
+                && !body.isSprinting();
+    }
+
+    /**
+     * Resolve one USE press: always swing (visual); additionally hurt
+     * the nearest qualifying hostile if the attack cooldown has
+     * elapsed. Only a ready swing resets the cooldown - vanilla
+     * resets every attack but pays scaled partial damage, while this
+     * resolver pays nothing below full charge, so resetting an
+     * unready swing would let a fast pulse defer the window forever.
+     * A harness pulsing faster than the weapon's attack speed gets
+     * one landed hit per cooldown window, vanilla's effective
+     * output.
      */
     void onUsePress() {
         body.swing(InteractionHand.MAIN_HAND);
+        boolean ready = isAttackReady();
+        // Reset only a ready swing. Vanilla resets the charge ticker on
+        // every attack but pays scaled partial damage; this resolver
+        // pays zero below full charge, so resetting an unready swing
+        // lets a caller pulsing faster than the item cooldown defer
+        // the window forever (CombatBehavior paces 10 ticks, a sword's
+        // cooldown is 12.5) - a zero-damage lockout.
+        if (!ready) {
+            return;
+        }
+        lastSwingTick = body.level().getGameTime();
         var view = body.getViewVector(1.0F).normalize();
         var eye = body.getEyePosition();
         var box = body.getBoundingBox().inflate(CANDIDATE_NET);
@@ -110,15 +191,108 @@ final class MeleeResolver {
             // bug was found by walking these lines; a future tuning
             // pass will reach for the same lever.
             LogUtils.getLogger().debug("[melee] HIT dist={} hp={}", bestDist, best.getHealth());
-            // Vanilla mob melee in full: attribute damage plus
-            // enchant bonus, knockback, Fire Aspect, and axe
-            // shield-disable all live in Mob.doHurtTarget; the old
-            // constant-3.0 hurt() skipped every one of them. The
-            // zombie-scale base now rides the ATTACK_DAMAGE attribute
-            // (3.0) with weapon modifiers added by the equipment
-            // mirror.
-            body.doHurtTarget(best);
+            performMeleeAttack(best);
         }
+    }
+
+    /**
+     * Crit-aware melee attack: replicates Mob.doHurtTarget's full
+     * chain (attribute damage + enchant bonus, knockback, Fire Aspect,
+     * post-hurt enchant effects) with a 1.5x critical-hit multiplier
+     * when {@link #isCriticalHit()} is true. doHurtTarget itself cannot
+     * carry a damage multiplier (it computes f internally), so the
+     * chain is inlined here — the same deviation class as DigExecutor's
+     * manual break sequence, where the engine's one-size-fits-all call
+     * loses context the bot needs.
+     *
+     * <p>Sweep attack: when the hit is fully charged, not a crit, not
+     * sprinting, on ground, and the held item can perform SWORD_SWEEP,
+     * the attack also hits every LivingEntity in the sword's sweep hit
+     * box (excluding self and the main target, non-allied only). Sweep
+     * damage = 1.0 + SweepingEdge ratio * main damage; knockback = 0.4;
+     * plays PLAYER_ATTACK_SWEEP. Mirrors vanilla Player.attack lines
+     * 1219-1274 (decompiled 1.20.1).
+     *
+     * @param target the hurt entity; never null
+     */
+    private void performMeleeAttack(LivingEntity target) {
+        float damage = (float) body.getAttributeValue(Attributes.ATTACK_DAMAGE);
+        float knockback = (float) body.getAttributeValue(Attributes.ATTACK_KNOCKBACK);
+        damage += EnchantmentHelper.getDamageBonus(body.getMainHandItem(), target.getMobType());
+        knockback += EnchantmentHelper.getKnockbackBonus(body);
+        boolean crit = isCriticalHit();
+        if (crit) {
+            damage *= 1.5F;
+        }
+        int fireAspect = EnchantmentHelper.getFireAspect(body);
+        if (fireAspect > 0) {
+            target.setSecondsOnFire(fireAspect * 4);
+        }
+        // Mark the target as hurt-by-player so vanilla LivingEntity.die
+        // awards XP orbs (it checks lastHurtByPlayerTime > 0). The bot
+        // is a PathfinderMob, so the mobAttack damage source does not set
+        // this flag; the BotPlayerFacade fills the typed Player slot
+        // without being spawned. die() only reads the timestamp, never
+        // calls facade methods.
+        target.setLastHurtByPlayer(body.playerFacade());
+        boolean hit = target.hurt(body.damageSources().mobAttack(body), damage);
+        if (hit) {
+            if (knockback > 0.0F) {
+                target.knockback(
+                        knockback * 0.5F,
+                        Mth.sin(body.getYRot() * ((float) Math.PI / 180F)),
+                        -Mth.cos(body.getYRot() * ((float) Math.PI / 180F)));
+                body.setDeltaMovement(body.getDeltaMovement().multiply(0.6D, 1.0D, 0.6D));
+                body.setSprinting(false);
+            }
+            EnchantmentHelper.doPostHurtEffects(target, body);
+            if (crit) {
+                // 2002 = critical-hit particle burst (vanilla
+                // Player.attack spawns it at the target's block pos).
+                body.level().levelEvent(2002, target.blockPosition(), 0);
+            }
+            // Sweep attack (vanilla Player.attack lines 1219-1274):
+            // fully charged (always true here), not crit, not sprinting,
+            // on ground, holding a sword (SWORD_SWEEP tool action).
+            // Sweep damage = 1.0 + SweepingEdge ratio * main damage;
+            // knockback 0.4; hits every LivingEntity in the sword's
+            // sweep hit box except self and the main target.
+            if (!crit
+                    && !body.isSprinting()
+                    && body.onGround()
+                    && body.getMainHandItem().canPerformAction(net.minecraftforge.common.ToolActions.SWORD_SWEEP)) {
+                float sweepDamage = 1.0F + EnchantmentHelper.getSweepingDamageRatio(body) * damage;
+                // getSweepHitBox requires a Player (Forge extension); sync
+                // the facade position to the body so the box lands in front
+                // of the actual body, not the facade's stale construction pos.
+                var facade = body.playerFacade();
+                facade.syncPosition();
+                var sweepBox = body.getMainHandItem().getSweepHitBox(facade, target);
+                for (LivingEntity bystander : body.level().getEntitiesOfClass(LivingEntity.class, sweepBox)) {
+                    if (bystander != body && bystander != target && !body.isAlliedTo(bystander)) {
+                        bystander.knockback(
+                                0.4F,
+                                Mth.sin(body.getYRot() * ((float) Math.PI / 180F)),
+                                -Mth.cos(body.getYRot() * ((float) Math.PI / 180F)));
+                        bystander.hurt(body.damageSources().mobAttack(body), sweepDamage);
+                    }
+                }
+                body.level()
+                        .playSound(
+                                null,
+                                body.getX(),
+                                body.getY(),
+                                body.getZ(),
+                                net.minecraft.sounds.SoundEvents.PLAYER_ATTACK_SWEEP,
+                                body.getSoundSource(),
+                                1.0F,
+                                1.0F);
+            }
+            body.setLastHurtMob(target);
+        }
+        // doPostDamageEffects runs on hit or miss (vanilla doHurtTarget
+        // calls it unconditionally after the hurt attempt).
+        EnchantmentHelper.doPostDamageEffects(body, target);
     }
 
     /**
