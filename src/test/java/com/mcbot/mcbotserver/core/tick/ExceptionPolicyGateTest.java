@@ -225,9 +225,18 @@ class ExceptionPolicyGateTest {
         assertTrue(h.controller.isCrashed());
         assertEquals(2, h.controller.crashCounter(), "second crash increments across respawns");
 
+        long markerBefore = h.events.resetAt();
+        assertTrue(
+                h.events.statusSnapshot(0).events().size() >= 2,
+                "two crashes must each have pushed BOT_CRASHED before the reset");
+
         h.controller.reset();
         assertFalse(h.controller.isCrashed());
         assertEquals(0, h.controller.crashCounter(), "harness reset is the full wipe");
+        // Decision 12: the dedupe window does not span bot restarts -
+        // the harness reset wipes the stream and moves the marker.
+        assertEquals(markerBefore + 1, h.events.resetAt(), "harness reset must advance the restart marker");
+        assertTrue(h.events.statusSnapshot(0).events().isEmpty(), "harness reset must wipe pre-reset events");
     }
 
     /** The catch frame covers stage 1 too — a poisoned sensor latches. */

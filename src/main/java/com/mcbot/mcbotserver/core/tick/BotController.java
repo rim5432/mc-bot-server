@@ -369,11 +369,19 @@ public final class BotController {
     }
 
     /**
-     * Harness reset: clears latch, counter and any parked mission
-     * context; next tick runs the full pipeline (ADR-0005 5a).
+     * Harness reset: clears latch and counter; the next tick runs the
+     * full pipeline (ADR-0005 5a). The harness reset is also the bot
+     * "restart" of boundaries.md decision 12, so the event stream
+     * wipes and {@code resetAt} moves - the dedupe window does not
+     * span restarts, and cursors the harness held are void by
+     * protocol (ids stay monotonic, so no stale page can replay).
+     * {@link #onRespawned()} deliberately does NOT wipe: the counter
+     * survives respawn (5b) for the same reason the stream does -
+     * silent diagnostic loss hides bugs.
      */
     public void reset() {
         crashLatch.reset();
+        events.reset();
     }
 
     /**
