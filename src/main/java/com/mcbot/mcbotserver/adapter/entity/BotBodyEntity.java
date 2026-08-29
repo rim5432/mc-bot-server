@@ -397,8 +397,17 @@ public final class BotBodyEntity extends PathfinderMob {
         if (props == null || !foodData.needsFood()) {
             return false;
         }
+        // Capture the nutrition numbers BEFORE finishUsingItem: it
+        // consumes the stack in place, and Forge's contexted
+        // FoodData.eat(Item, ItemStack, LivingEntity) re-reads the
+        // properties from the already-consumed stack - null for an
+        // air stack - so the whole meal silently applied zero food
+        // (engine eatsWhenHungry read food=10 after a confirmed bite).
+        // The vanilla int/float primitive carries no context.
+        int nutrition = props.getNutrition();
+        float saturation = props.getSaturationModifier();
         ItemStack remainder = held.finishUsingItem(level(), this);
-        foodData.eat(held.getItem(), held, this);
+        foodData.eat(nutrition, saturation);
         inventory.container().setItem(selectedSlot, remainder);
         return true;
     }

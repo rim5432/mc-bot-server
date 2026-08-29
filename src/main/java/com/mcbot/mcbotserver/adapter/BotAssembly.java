@@ -119,9 +119,17 @@ public final class BotAssembly {
         // without. Code-level floor for now; the datapack JSON pipeline
         // (decision 10) supersedes this when block traits get their
         // reload listener - tracked as a workplan follow-up.
+        // Climbable set mirrors vanilla BlockTags.CLIMBABLE (1.20.1):
+        // ladder, vine, weeping_vines, twisting_vines. The ClimbUp
+        // movement reads these; without them ladder shafts are invisible
+        // to the planner and the bot cannot route vertically through them.
         BlockTraitsRegistry traits = new MapBlockTraitsRegistry()
                 .register("minecraft:water", BlockTraits.liquidOnly())
                 .register("minecraft:lava", BlockTraits.dangerousLiquid())
+                .register("minecraft:ladder", BlockTraits.climbableOnly())
+                .register("minecraft:vine", BlockTraits.climbableOnly())
+                .register("minecraft:weeping_vines", BlockTraits.climbableOnly())
+                .register("minecraft:twisting_vines", BlockTraits.climbableOnly())
                 .seal();
         BindingWorldView view =
                 new BindingWorldView(level, traits, () -> body.getInventory().snapshot());

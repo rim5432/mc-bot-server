@@ -33,13 +33,20 @@ public final class VanillaFoodCatalog implements FoodCatalog {
     }
 
     private static Map<String, FoodFacts> build() {
+        // Key-driven enumeration (getKeys + getValue), NOT getEntries():
+        // the entry-set iteration resolved items whose food properties
+        // read null at build time while direct lookups of the SAME ids
+        // returned the live item (engine evidence 2026-08-29: table of
+        // 40 via entries, 1255 registry entries, bread missing from the
+        // table yet edible via getValue). Building through the same
+        // path the scan-time lookups use keeps the table consistent
+        // with what facts() will be asked for.
         Map<String, FoodFacts> table = new HashMap<>();
-        for (var entry : ForgeRegistries.ITEMS.getEntries()) {
-            Item item = entry.getValue();
+        for (var key : ForgeRegistries.ITEMS.getKeys()) {
+            Item item = ForgeRegistries.ITEMS.getValue(key);
             FoodProperties props = item.getFoodProperties();
             if (props != null) {
-                table.put(
-                        entry.getKey().toString(), new FoodFacts(props.getNutrition(), props.getSaturationModifier()));
+                table.put(key.toString(), new FoodFacts(props.getNutrition(), props.getSaturationModifier()));
             }
         }
         return table;
