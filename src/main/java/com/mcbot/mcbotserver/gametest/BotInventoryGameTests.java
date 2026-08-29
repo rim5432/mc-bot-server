@@ -182,7 +182,7 @@ public final class BotInventoryGameTests {
      * Scenario: clicking a backpack slot in the inventory menu picks up
      * the item via {@code container.removeItem} — the path that was
      * broken by BridgeInventory's phantom super-constructed compartments
-     * (review P1-1 on commit 3d53037). The inherited
+     * (review P1-1 on commit 650b803). The inherited
      * {@code Inventory.removeItem} operated on the empty phantom lists
      * and returned EMPTY; every backpack click would silently pick up
      * nothing. This test forces that exact code path:

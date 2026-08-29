@@ -1,4 +1,4 @@
-# Commit 87c3561 reformatted the whole tree with palantir-java-format
+# Commit 45db02f reformatted the whole tree with palantir-java-format
 # (plus one scan-gate regex adaptation); git blame skips it so history
 # still points at the authors of the actual changes.
-87c3561b431a4588fcdb8ac3b790563938c96fc1
+45db02f4b4332e4c93ac659faad4a680d038ee6f

@@ -153,7 +153,7 @@ exitable by a single grounded hop off the flooded floor and masked
 the gap) runs red without the fix and green with it; its crossing
 trace shows the body riding the surface lane across, matching F6(1).
 
-**Lava extension (2026-08-24, commit 3f2f9c0)**: the same
+**Lava extension (2026-08-24, commit 981abaf)**: the same
 direct-call deviation was applied to lava. `BotBodyEntity.customServerAiStep`
 now checks `isInLava() && !onGround()` before the water branch and
 calls `jumpInFluid(ForgeMod.LAVA_TYPE.get())`. In lava, `isInWater()`

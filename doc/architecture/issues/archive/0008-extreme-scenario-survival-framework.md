@@ -233,8 +233,8 @@ ruling must add its row before implementation.
 ## 5. Sequencing (as ruled)
 
 1. **Shipped 2026-08-25 (ledger 24)**: D1 vitals pass + D2 lava
-   ASCEND + D4 crashed-state air (6ccdb3b), D3 suffocation FREEZE
-   and the reload-parity repair (review follow-up: 6ccdb3b shipped
+   ASCEND + D4 crashed-state air (416bd31), D3 suffocation FREEZE
+   and the reload-parity repair (review follow-up: 416bd31 shipped
    the lava rule without a JSON form or datapack row - the first
    /reload would have silently dropped it; ReflexRuleJson branches
    + default table rows +
@@ -275,8 +275,8 @@ ruling must add its row before implementation.
 
 | # | Question | Ruling |
 |---|---|---|
-| D1 | Vitals sensing pass (F1)? | RULED YES - shipped 2026-08-25 (6ccdb3b, ledger 24): fireTicks / freezeTicks / inWall / inLethalFluid all sensor-stamped with safe beginTick defaults |
-| D2 | Live-pipeline lava: ASCEND-only vs + escape mission (F2)? | RULED ASCEND-only first (6ccdb3b): 130/ASCEND buys surface seconds. **UPGRADED 2026-08-25**: user ruling "must have shortest-shore escape" — replaced by ESCAPE_ON_LAVA (ESCAPE action, same priority 130, same hold 10). The reflex submits a rescue GotoProcess to the nearest shore cell (RescueMissionFactory, 12-block radius scan); the pathing behavior handles ascent + horizontal swim. The old ASCEND_IN_LETHAL_FLUID type is a hard parse error now. In-engine: `escapesLavaToShore` (5x5 pool, fire-resist, body reaches dry ground). Ledger 26 |
+| D1 | Vitals sensing pass (F1)? | RULED YES - shipped 2026-08-25 (416bd31, ledger 24): fireTicks / freezeTicks / inWall / inLethalFluid all sensor-stamped with safe beginTick defaults |
+| D2 | Live-pipeline lava: ASCEND-only vs + escape mission (F2)? | RULED ASCEND-only first (416bd31): 130/ASCEND buys surface seconds. **UPGRADED 2026-08-25**: user ruling "must have shortest-shore escape" — replaced by ESCAPE_ON_LAVA (ESCAPE action, same priority 130, same hold 10). The reflex submits a rescue GotoProcess to the nearest shore cell (RescueMissionFactory, 12-block radius scan); the pathing behavior handles ascent + horizontal swim. The old ASCEND_IN_LETHAL_FLUID type is a hard parse error now. In-engine: `escapesLavaToShore` (5x5 pool, fire-resist, body reaches dry ground). Ledger 26 |
 | D3 | Suffocation FREEZE rule at 115 (F4)? | RULED YES - shipped 2026-08-25 (ledger 24): FREEZE_ON_SUFFOCATION 115/hold 10, FREEZE action; ladder-gated between SURFACE and LAVA. SUPERSEDED same day by issue 0009: with dig capability the rescue direction is known (the eye block), so the rule is renamed DIG_ON_SUFFOCATION with the DIG self-rescue action - same priority, same hold, same ladder slot; the FREEZE survives only as the targetless-degrade path and the crashed-state behavior |
-| D4 | Widen MinimalReflex with an air check (F8)? | RULED YES - shipped 2026-08-25 (6ccdb3b): one more if, air < 80 holds jump; ADR-0005 D3 dependency class intact |
+| D4 | Widen MinimalReflex with an air check (F8)? | RULED YES - shipped 2026-08-25 (416bd31): one more if, air < 80 holds jump; ADR-0005 D3 dependency class intact |
 | D5 | Fire: sense-only, no rule (F3)? | RULED ADOPTED initially (no rule; sensing fields arrived with D1). **REVISED 2026-08-25**: user ruling "fire find-water is needed, urgency by burn-to-death threshold" — EXTINGUISH_FIRE rule added (ESCAPE action, priority 105 between SURFACE and FREEZE). Triggers only when remainingFireTicks/20 >= health (lethal band; integer division matching engine's 1.0F-per-20-ticks cadence, decompiled Entity.baseTick:483). Non-lethal fire stays sense-only per the original D5 intent. Rescue factory paths to nearest water-adjacent cell; water contact extinguishes. In-engine: `findsWaterWhenBurning` (health=5, fireTicks=100, water 4 blocks east). Ledger 26 |

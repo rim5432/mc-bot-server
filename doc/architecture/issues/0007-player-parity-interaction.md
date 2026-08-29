@@ -272,7 +272,7 @@ state) turns out to be facade-hostile.
    hotbar 1). 24/24 gametests pass. Remaining in Phase 2: core
    click-sequence PLANNER (places materials via clicks instead of
    direct container writes), CraftingView api type.
-   Post-review hardening 2026-08-25 (e5545f6, 28229e0; 33/33
+   Post-review hardening 2026-08-25 (8645150, 8ec7791; 33/33
    gametests): the P2 design review found the phantom slot-search
    family unsealed on `BridgeInventory` — vanilla
    `placeItemBackInInventory` searched the phantom `items` list, so
@@ -297,8 +297,8 @@ state) turns out to be facade-hostile.
    materials like the 3x3. Double chests are explicitly rejected
    (vanilla merges halves into CompoundContainer; binding one half
    silently exposed 27 of 54 slots).
-   Vocabulary + surface round 2026-08-26 (b24b9d2, c936ba1,
-   ca69864, f413ad8; 36/36 gametests; user rulings):
+   Vocabulary + surface round 2026-08-26 (a57ab4c, f644c95,
+   609a8bb, 2263c07; 36/36 gametests; user rulings):
    - Armor order ruling AMENDED - pulled forward from Phase 4 and
      landed with the SlotRole slice: bridge-side translation
      (binding = 75 - vanillaFlat, armor only) in the four flat-index
@@ -327,7 +327,7 @@ state) turns out to be facade-hostile.
    - Double chests land the full vanilla merge (ChestBlock
      .getContainer, sixRows for the pair; blocked chests rejected
      like vanilla) - supersedes the reject-only interim above.
-   Closeout 2026-08-26 (9e113c5, 72e7498, f5e7bd9, 6580b99;
+   Closeout 2026-08-26 (497d5ac, 077c2db, 6c458eb, 473dc56;
    37/37 gametests): the planner half landed and Phase 2 is
    complete. api CraftingView projects grid + result out of a
    MenuView through SlotRole - callers never do flat arithmetic,
@@ -429,7 +429,7 @@ state) turns out to be facade-hostile.
   the SlotRole disclosure round made armor first-class addressable,
   so the translation was pulled forward and landed bridge-side
   (binding = 75 - vanillaFlat, armor only, in the four flat-index
-  accessors; b24b9d2, pinned by equipsArmorThroughMenuClicks).
+  accessors; a57ab4c, pinned by equipsArmorThroughMenuClicks).
 - **Core never writes menu state.** `ResultSlot.onTake` consumes
   grid materials on take; a core-side slot writer bypasses that
   and duplicates items. All menu mutations go through the

@@ -331,7 +331,7 @@ test count when red).
          is the crashed-state precedent, not the mechanism here -
          this is a normal reflex directive. Offline gate test +
          in-engine drowning-recovery scenario.
-         Landed 2026-08-25 (vitals sensing pass, commit 6ccdb3b):
+         Landed 2026-08-25 (vitals sensing pass, commit 416bd31):
          ThreatBlackboard.airSupply + LevelThreatSensor feed,
          SurfaceOnLowAirRule (trigger 80 / release 200 / priority 110,
          hysteresis), reflex_rules.json SURFACE_ON_LOW_AIR row,
@@ -347,7 +347,7 @@ test count when red).
          tracking - the arbiter-side shape is the working
          hypothesis). Offline gate + in-engine night-idle
          survival scenario.
-         Landed 2026-08-25 (idle-combat reflex, commit 79961e9
+         Landed 2026-08-25 (idle-combat reflex, commit c947aff
          context): the reflex-carried path was chosen over the
          arbiter-side idle-band — EngageOnHostileProximityRule
          (trigger 6 blocks / release 14 / priority 90, hysteresis)

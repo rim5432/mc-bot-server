@@ -28,7 +28,7 @@ got stale pre-crash events against the contract's promise.
 
 # Ruling
 
-The user ruled: **wire it** (option 1). b78fe65 makes
+The user ruled: **wire it** (option 1). 9b62109 makes
 `BotController.reset()` - the harness restart seam - wipe the stream
 and advance `resetAt`. `onRespawned()` deliberately does NOT wipe:
 the counter survives respawn (ADR-0005 5b) for the same reason the
