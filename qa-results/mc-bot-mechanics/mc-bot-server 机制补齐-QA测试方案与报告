@@ -1,0 +1,211 @@
+# mc-bot-server 机制补齐 — QA 测试方案
+
+> 测试对象：mc-bot-server 本轮补齐的 9 类机制缺口
+> 版本：dev 0.1.0 | Forge 1.20.1-47.4.10 | Java 17
+> 测试模式：方案设计（plan-only），执行证据待 in-engine gametest 补充
+
+---
+
+## 一、测试范围
+
+### 1.1 覆盖机制（13 项需求）
+
+| 编号 | 机制 | 优先级 | 核心源文件 |
+|------|------|--------|-----------|
+| REQ-001 | 梯子/藤蔓攀爬 | P1 | BasicMoves.java |
+| REQ-002 | 附魔感知挖掘速度 | P1 | DigPacing.java |
+| REQ-003 | yya 轴下潜 | P1 | BasicMoves.java, BotBodyEntity.java |
+| REQ-004 | match_tool 掉落保真 | P0 | DigExecutor.java, GroundPickup.java |
+| REQ-005 | 攻击速度缩放 | P0 | MeleeResolver.java |
+| REQ-006 | 暴击 | P1 | MeleeResolver.java |
+| REQ-007 | 潜行边缘行走 | P1 | BotBodyEntity.java |
+| REQ-008 | XP 系统 | P0 | BotBodyEntity.java, BotPlayerFacade.java, BotState.java |
+| REQ-009 | 铁砧/酿造/附魔/交易基础设施 | P1 | BindingMenu.java, MenuSlotLayouts.java, MenuOpener.java |
+| REQ-010 | 工具耐久消耗 | P2 | DigExecutor.java |
+| REQ-011 | 挖掘疲劳值 | P2 | DigExecutor.java |
+| REQ-012 | 横扫攻击 | P2 | MeleeResolver.java |
+| REQ-013 | 无回归 | P0 | 全量测试套件 (539 tests) |
+
+### 1.2 验证维度
+
+1. **编译通过**：`compileJava` 无错误，checkstyle/spotless 通过
+2. **测试全绿**：全量 539 个离线 JUnit 测试通过
+3. **vanilla 机制对齐**：核心数学公式（XP 曲线、攻击冷却、挖掘进度、暴击条件）与反编译 1.20.1 源码逐行对齐
+4. **边界契约完整**：frozen contract 写位点有 `// contract` marker，BoundaryContractMarkerTest 通过
+5. **无回归**：改动不破坏已有机制（饥饿、生命、反射、物品栏、合成等）
+
+### 1.3 不覆盖范围
+
+- in-engine gametest 端到端验证（铁砧花费计算、酿造计时、附魔种子、村民交易实际游戏内行为）
+- harness 侧智能决策层（何时修装备、何时附魔、和谁交易）
+- 实际游戏运行时的物理交互手感验证（攀爬手感、下潜速度、横扫范围）
+
+---
+
+## 二、风险点
+
+### 2.1 P0 阻断级风险（4 项）
+
+| 编号 | 风险机制 | 触发条件 | 影响 | 检测方式 |
+|------|---------|---------|------|---------|
+| RM-001 | match_tool 条件不触发 | `destroyBlock` 传 `ItemStack.EMPTY` 作为 tool | 石头不掉圆石、树叶不掉苹果、silk-touch/fortune 失效 | 挖石头验证掉落物为圆石 |
+| RM-002 | 攻击冷却失效 | 无 `lastSwingTick` 冷却追踪 | 每次点击都满伤害，vanilla 中狂点应只有第一击满伤害 | 连续攻击验证伤害随冷却时间变化 |
+| RM-003 | XP 系统断裂 | `BotBodyEntity` 无 XP 字段，`setLastHurtByPlayer` 未调用 | 击杀不掉经验球，铁砧/附魔无法消耗 XP | 击杀僵尸验证经验球生成+拾取+等级提升 |
+| RM-004 | 回归破坏 | 改动核心文件（BotBodyEntity, MeleeResolver, DigExecutor） | 已有 539 测试失败，已有机制（饥饿、反射、物品栏）破坏 | 全量 test 套件 |
+
+### 2.2 P1 高优先级风险（6 项）
+
+| 编号 | 风险机制 | 影响 | 检测方式 |
+|------|---------|------|---------|
+| RM-005 | 攀爬不可达 — Climb viability 检查错误 | 路径规划不生成攀爬 edge，bot 无法上梯子 | 梯子旁验证 BasicMoves 生成 Climb edge |
+| RM-006 | 附魔乘数错误 — Efficiency 公式或 Haste/Fatigue 叠加顺序错误 | 挖掘速度与 vanilla 不一致 | Efficiency V 钻石镐挖石头验证速度 |
+| RM-007 | 下潜不生效 — sneak 在水中未映射为下潜 | bot 无法在水中下潜，只能上浮 | 水中 sneak 验证 y 速度为负 |
+| RM-008 | 暴击条件遗漏 — 缺少 isInWater 或 onClimbable 检查 | 水中/梯子上也能暴击，与 vanilla 不一致 | 水中下落攻击验证不暴击 |
+| RM-009 | 边缘回退失效 — maybeBackOffFromEdge 条件错误或迭代不收敛 | sneak 时仍会坠落悬崖 | sneak 走到悬崖边验证不坠落 |
+| RM-010 | 菜单 XP 不同步 — facade XP 字段永远为 0 | 铁砧/附魔显示无 XP，无法消耗 | 打开铁砧验证 XP 等级显示正确 |
+
+### 2.3 P2 细节级风险（3 项）
+
+- 工具耐久消耗不正确（DiggerItem 应伤 1、SwordItem 应伤 2）
+- 挖掘疲劳值不正确（应为 0.005/block）
+- 横扫攻击条件或伤害公式错误（应为 1.0 + SweepingEdge比率 × 主伤害）
+
+---
+
+## 三、测试用例
+
+共 32 条用例，其中 P0 7 条、P1 14 条、P2 11 条。所有用例当前状态为 `not_executed`（方案阶段），执行待 in-engine gametest 环境就绪。
+
+### 3.1 P0 用例（7 条）
+
+| 用例 | 需求 | 标题 | 验证要点 |
+|------|------|------|---------|
+| TC-008 | REQ-004 | 镐挖石头掉圆石 | TOOL=镐时 match_tool 触发，掉落圆石 |
+| TC-009 | REQ-004 | 徒手挖石头不掉圆石 | 徒手时 match_tool 不满足，不掉圆石（vanilla 行为） |
+| TC-012 | REQ-005 | 剑冷却 12.5 tick | ATTACK_SPEED=1.6 cooldown=12.5t，未就绪只挥空不造成伤害 |
+| TC-018 | REQ-008 | 击杀僵尸掉经验球 | setLastHurtByPlayer 使 die() 检查 lastHurtByPlayerTime>0 生成 ExperienceOrb |
+| TC-019 | REQ-008 | 经验球拾取+等级提升 | tickXpPickup 吸收范围内 ExperienceOrb，experienceLevel 按 vanilla 公式提升 |
+| TC-031 | REQ-013 | 全量 539 测试通过 | `python tool/mcbot_tool.py test` 全绿+编译+checkstyle+spotless |
+| TC-032 | REQ-013 | 边界契约 marker 完整 | BoundaryContractMarkerTest 通过，所有 frozen contract 写位点有 marker |
+
+### 3.2 P1 用例（14 条）
+
+| 用例 | 需求 | 标题 | 验证要点 |
+|------|------|------|---------|
+| TC-001 | REQ-001 | 梯子上生成 Climb edge | CLIMBABLE tag 方块旁 BasicMoves 生成 Climb movement |
+| TC-003 | REQ-002 | Efficiency V 速度加成 | 包含 (1+5^2)=26 倍乘数 |
+| TC-006 | REQ-003 | 水中 sneak 下潜 | 水中+非地面+sneak 时 y 速度 -0.10/tick |
+| TC-007 | REQ-003 | SwimDown viability | 源/目标均液体且可通行时 viable |
+| TC-010 | REQ-004 | 剪刀剪树叶掉树叶 | TOOL=剪刀时 match_tool shears |
+| TC-011 | REQ-004 | 挖掘生成 XP 球 | 煤矿/红石矿通过 spawnAfterBreak 生成 ExperienceOrb |
+| TC-013 | REQ-005 | rising edge 重置冷却 | 每次 USE rising edge 重置 lastSwingTick（vanilla parity：狂点不蓄力） |
+| TC-014 | REQ-006 | 下落攻击暴击 1.5x | 全部暴击条件满足时伤害×1.5，播放 2002 粒子 |
+| TC-016 | REQ-007 | sneak 悬崖边不坠落 | maybeBackOffFromEdge 削减 x/z 速度直到脚下有地面 |
+| TC-020 | REQ-008 | XP 暴露 harness | BotState 第 13 组件 experienceLevel，BotStateJson 序列化为 xp key |
+| TC-021 | REQ-008 | XP 公式 vanilla 对齐 | 0-15: 7+2l, 15-30: 37+5(l-15), 30+: 112+9(l-30) |
+| TC-022 | REQ-009 | 铁砧菜单+XP 同步 | MenuOpener 打开铁砧，facade.syncExperience 同步 body XP |
+| TC-024 | REQ-009 | 附魔台+按钮 | MenuOpener 打开附魔台，clickButton(int) 选择附魔选项 |
+
+### 3.3 P2 用例（11 条）
+
+| 用例 | 需求 | 标题 | 验证要点 |
+|------|------|------|---------|
+| TC-002 | REQ-001 | 非攀爬方块不生成 Climb | 普通方块（石头、泥土）旁不生成 Climb movement |
+| TC-004 | REQ-002 | Haste II 叠加 | Haste II 效果下挖掘速度额外 +40%（20%/级） |
+| TC-005 | REQ-002 | Mining Fatigue III 减速 | Fatigue III 减至 0.7^3=0.343 倍 |
+| TC-015 | REQ-006 | 水中不暴击 | isInWater=true 时即使下落也不暴击 |
+| TC-017 | REQ-007 | 非 sneak 正常坠落 | 非 sneak 状态走向边缘，maybeBackOffFromEdge 不干预 |
+| TC-023 | REQ-009 | 铁砧重命名 | setAnvilName 调 AnvilMenu.setItemName，null/blank 清除重命名 |
+| TC-025 | REQ-009 | 村民交易打开 | openEntity(entityId) 打开村民 MerchantMenu |
+| TC-026 | REQ-010 | 镐挖方块伤 1 耐久 | DiggerItem.mineBlock 在 destroySpeed!=0 时伤 1 点 |
+| TC-027 | REQ-010 | 剑挖方块伤 2 耐久 | SwordItem.mineBlock 伤 2 点（剑不适合挖方块） |
+| TC-028 | REQ-011 | 每方块 0.005 exhaustion | addExhaustion(0.005F)，连续挖掘导致饥饿值下降 |
+| TC-029 | REQ-012 | 剑满蓄力非疾跑横扫 | 横扫 AoE 伤害=1.0+SweepingEdge比率×主伤害，击退 0.4 |
+| TC-030 | REQ-012 | 疾跑不横扫 | isSprinting=true 时不触发横扫，改为击退加成（vanilla 行为） |
+
+---
+
+## 四、已知未覆盖
+
+以下范围本轮明确不覆盖，需后续独立工作补充：
+
+1. **in-engine gametest 端到端验证**：铁砧花费计算、酿造计时、附魔种子生成、村民交易执行的实际游戏内行为。基础设施（菜单打开、slot layout、XP 委托、铁砧重命名、附魔按钮点击）已就绪并编译通过，但未在运行的 MC 实例中验证实际行为。
+
+2. **harness 侧智能决策层**：bot 侧机制已全部就绪，但"什么时候修装备、什么时候附魔、和谁交易、什么时候用横扫"等决策逻辑属于 harness 侧（外部 LLM 驱动层），是独立项目，本轮未触及。
+
+3. **实际游戏运行时物理交互验证**：攀爬手感、下潜速度、横扫范围、边缘回退的实际游戏体验，仅通过代码审查和 vanilla 源码对齐验证，未在真实游戏中实测。需 in-engine gametest 或人工游戏测试补充。
+
+4. **工具耐久/挖掘疲劳的长期累积效应**：单方块消耗已验证，但长时间挖掘后的工具损坏、饥饿值耗尽、自动切换工具等连锁行为未测试。
+
+---
+
+## 附录：vanilla 机制对齐参考
+
+| 机制 | vanilla 源码位置 | 复刻方式 |
+|------|-----------------|---------|
+| XP 升级曲线 | `Player.getXpNeededForNextLevel()` | verbatim 公式复刻 |
+| 攻击冷却 | `Player.getAttackStrengthScale()` | `1.0/ATTACK_SPEED*20` ticks |
+| 暴击条件 | `Player.attack()` lines 1201-1214 | 7 项条件逐行复刻 |
+| 横扫攻击 | `Player.attack()` lines 1219-1274 | 条件+伤害公式+击退+音效复刻 |
+| 挖掘进度 | `Player.gameMode.destroyBlock()` | `digSpeed/destroySpeed/divisor` |
+| 工具耐久 | `DiggerItem.mineBlock()` / `SwordItem.mineBlock()` | 直接调用 vanilla 方法 |
+| 挖掘疲劳 | `Block.playerDestroy()` | `causeFoodExhaustion(0.005F)` |
+| 边缘回退 | `Player.maybeBackOffFromEdge()` | verbatim 算法复刻（0.05 步长迭代） |
+| match_tool 掉落 | `Block.dropResources()` LootParams.TOOL | 手动 break 序列传入 held stack |
+
+---
+
+## 附录 B：P0 结构化行为拆解
+
+### REQ-004 match_tool 掉落保真
+- **Actor**: DigExecutor (adapter layer)
+- **前置**: 挖掘进度达到 1.0，手持物品非空
+- **触发**: DigExecutor.onTick 检测 progress >= 1.0
+- **规则**: 手动 break 序列：捕获 state+be+fluid → emit 2001 → setBlock(fluid legacy) → Block.dropResources(state, level, pos, be, body, held) TOOL=held
+- **状态变化**: 方块被移除，掉落物实体和 XP 球生成，GroundPickup 后续拾取
+- **可观察结果**: 镐挖石头掉圆石、徒手不掉、剪刀剪树叶掉树叶、煤矿掉经验球
+- **失败行为**: TOOL 上下文错误时 match_tool 条件不触发，掉落物与 vanilla 不一致
+
+### REQ-005 攻击速度缩放
+- **Actor**: MeleeResolver (adapter layer)
+- **前置**: bot 手持武器，目标在攻击范围内
+- **触发**: USE intent rising edge 到达 MeleeResolver.onUsePress
+- **规则**: cooldown = 1.0/ATTACK_SPEED×20 ticks; currentTick - lastSwingTick < cooldown 时只 swing 不 hurt; ≥ cooldown 时 hurt 并更新 lastSwingTick
+- **状态变化**: lastSwingTick 更新，目标受到伤害或仅挥空
+- **可观察结果**: 剑冷却 12.5t，连续点击只有满蓄力攻击造成全额伤害
+- **失败行为**: 冷却追踪缺失时每次点击都满伤害，与 vanilla 狂点行为不一致
+
+### REQ-008 XP 系统
+- **Actor**: BotBodyEntity + MeleeResolver + BotPlayerFacade (adapter layer)
+- **前置**: bot 存在，有 experienceLevel/experienceProgress/totalExperience 字段
+- **触发**: 击杀怪物 / 拾取经验球 / 菜单消耗 XP
+- **规则**: MeleeResolver 攻击时 setLastHurtByPlayer(facade) → 怪物 die() 检查 lastHurtByPlayerTime>0 生成 ExperienceOrb → tickXpPickup 吸收 → 等级按 vanilla 公式提升 → BotState 暴露
+- **状态变化**: experienceLevel/experienceProgress/totalExperience 更新，经验球被吸收
+- **可观察结果**: 击杀僵尸后经验球出现、拾取后等级提升、harness 可读取 xp 字段
+- **失败行为**: setLastHurtByPlayer 未调用时击杀不掉经验球，facade XP 不同步时菜单无法消耗
+
+### REQ-013 无回归
+- **Actor**: Gradle build system (tool layer)
+- **前置**: 代码改动完成
+- **触发**: python tool/mcbot_tool.py test
+- **规则**: compileJava → checkstyleMain → spotlessCheck → test (539 JUnit)，全部通过才 BUILD SUCCESSFUL
+- **状态变化**: build/ 目录生成编译产物和测试报告
+- **可观察结果**: BUILD SUCCESSFUL，0 failures，0 errors
+- **失败行为**: 任一阶段失败时 BUILD FAILED，需修复后重跑
+
+---
+
+## 附录 C：风险机制详情（失败模式 + 业务影响 + Oracle）
+
+| ID | 风险 | 失败模式 | 业务影响 | 可观察 Oracle |
+|----|------|---------|---------|--------------|
+| RM-001 | match_tool 不触发 | dropResources 收到 EMPTY tool，loot table match_tool 永远 false | 挖掘不掉落正确物品，生存模式不可玩 | 镐挖石头后地面出现圆石；徒手挖石头无圆石 |
+| RM-002 | 攻击冷却失效 | 无 lastSwingTick 追踪，每次 USE 都 hurt | 攻击输出远超 vanilla，战斗失衡 | 剑连续攻击时冷却未就绪只挥空；满蓄力全额伤害 |
+| RM-003 | XP 系统断裂 | 无 experienceLevel 字段，未调用 setLastHurtByPlayer | 无法获取经验，铁砧/附魔不可用 | 击杀僵尸后出现 ExperienceOrb；拾取后等级提升 |
+| RM-004 | 回归破坏 | 改动核心文件导致已有测试失败 | 已有机制回归，整体质量下降 | test 输出 BUILD SUCCESSFUL，539 测试 0 failures |
+| RM-005 | 攀爬不可达 | Climb viability 条件错误，不生成攀爬 edge | 无法上梯子/藤蔓，地形导航受限 | 梯子旁 BasicMoves.from 返回 Climb 类型且 viable=true |
+| RM-006 | 附魔乘数错误 | Efficiency 公式错误或 Haste/Fatigue 叠加顺序错 | 挖掘速度与 vanilla 不一致 | Efficiency V 钻石镐 perTickProgress 含 26x 乘数 |
+| RM-007 | 下潜不生效 | sneak 在水中未映射为下潜 | 无法水下导航和探索 | 水中 sneak 时 y 速度 -0.10/tick |
+| RM-008 | 暴击条件遗漏 | 缺少 isInWater/onClimbable 检查 | 水中/梯子上错误触发暴击 | 水中下落攻击伤害不乘 1.5 |
+| RM-009 | 边缘回退失效 | maybeBackOffFromEdge 条件错误或迭代不收敛 | sneak 时仍坠落悬崖 | sneak 走向边缘 y 坐标不变 |
+| RM-010 | 菜单 XP 不同步 | facade XP 永远为 0，syncExperience 未调用 | 铁砧/附魔显示无 XP，无法操作 | 5 级经验时铁砧显示等级 5；重命名后等级变 4 |

@@ -1,0 +1,1728 @@
+{
+  "schema_version": 2,
+  "run_id": "qa-e22622aa9574",
+  "revision": 4,
+  "profile": "plan",
+  "test_intent": "non_ui_validation",
+  "execution_level": "blocked",
+  "selected_path": "undetermined",
+  "created_at": "2026-08-29T13:49:26.711176+00:00",
+  "target": {
+    "type": "attachment_or_directory",
+    "name": "mc-bot-server 机制补齐",
+    "source": "D:/mc-bot-server"
+  },
+  "request_contract": {
+    "request_summary": "对 mc-bot-server 本轮补齐的 9 项机制缺口进行 QA 验证：梯子攀爬、附魔挖掘速度、yya下潜、match_tool掉落、攻击速度/暴击、潜行边缘、XP系统、铁砧/酿造/附魔/交易基础设施、工具耐久/挖掘疲劳/横扫攻击。验证编译通过、测试全绿、代码实现与 vanilla 机制对齐、无回归。",
+    "request_hash": "sha256:2fded1662ad75ef84a2caa4034d6a419aaf71aac79be7dc7310780c39e39662a",
+    "task_mode": "plan",
+    "scope": {
+      "included_source_ids": [],
+      "excluded_source_ids": [],
+      "included_rounds": [],
+      "excluded_rounds": []
+    },
+    "evidence_policy": {
+      "allow_new_execution": false,
+      "allow_precheck_bug_promotion": false,
+      "required_bug_evidence_level": "L2_observation"
+    },
+    "delivery": {
+      "artifact_required": true,
+      "format": "lark_doc",
+      "carrier": "lark_doc",
+      "filenames": [
+        "mc-bot-server 机制补齐-QA测试方案与报告"
+      ],
+      "artifacts": [
+        {
+          "format": "lark_doc",
+          "carrier": "lark_doc",
+          "filename": "mc-bot-server 机制补齐-QA测试方案与报告"
+        }
+      ],
+      "required_sections": [],
+      "section_order": [],
+      "must_surface_to_user": true
+    }
+  },
+  "phase_receipts": [
+    {
+      "stage": "baseline",
+      "revision": 2,
+      "state": "CLOSED",
+      "checked_at": "2026-08-29T13:53:02.587807+00:00",
+      "source_fingerprint": "sha256:c9cfd9a55726a92d76af39bee5ee757d1d0367bc14e12caec6d240c78a249ac4",
+      "warnings": 0
+    },
+    {
+      "stage": "design",
+      "revision": 3,
+      "state": "CLOSED",
+      "checked_at": "2026-08-29T13:55:45.618362+00:00",
+      "source_fingerprint": "sha256:3a16d1a78f0b466ba250949010492f29f2ebbbc2753402484ae984067dc50a41",
+      "warnings": 0
+    },
+    {
+      "stage": "baseline",
+      "revision": 3,
+      "state": "CLOSED",
+      "checked_at": "2026-08-29T14:11:31.371887+00:00",
+      "source_fingerprint": "sha256:ca04c155431ca2a5c1da54e1f3492bc2cd25cc25b6b5b63128b7b699047d40c6",
+      "warnings": 0
+    },
+    {
+      "stage": "baseline",
+      "revision": 4,
+      "state": "DISCLOSE",
+      "checked_at": "2026-08-29T14:14:47.045051+00:00",
+      "source_fingerprint": "sha256:715e970b2610302422dac0496a5bf67870ea4f56e6088d9b36b604fceee84f51",
+      "warnings": 1
+    },
+    {
+      "stage": "design",
+      "revision": 4,
+      "state": "DISCLOSE",
+      "checked_at": "2026-08-29T14:14:54.498732+00:00",
+      "source_fingerprint": "sha256:715e970b2610302422dac0496a5bf67870ea4f56e6088d9b36b604fceee84f51",
+      "warnings": 1
+    }
+  ],
+  "input": {
+    "summary": "mc-bot-server 本轮补齐 9 类机制缺口，涉及 12 个核心源文件、539 个现有测试。验证维度：编译通过、测试全绿、vanilla 机制对齐、无回归。",
+    "sources": [
+      {
+        "id": "SRC-CODEBASE",
+        "type": "directory",
+        "locator": "D:/mc-bot-server",
+        "version": "dev 0.1.0",
+        "coverage_note": "182 个 Java 源文件，本轮改动 12 个核心文件",
+        "access_status": "read",
+        "completeness_checked": true
+      },
+      {
+        "id": "SRC-VANILLA",
+        "type": "directory",
+        "locator": "D:/mc-decompiled/forge-1.20.1-47.4.10",
+        "version": "1.20.1 Forge 47.4.10",
+        "coverage_note": "vanilla 反编译参考树，用于机制对齐验证",
+        "access_status": "read",
+        "completeness_checked": true
+      }
+    ],
+    "assumptions": [],
+    "conflicts": [],
+    "artifacts": [
+      {
+        "id": "SRC-001",
+        "source_id": "SRC-CODEBASE",
+        "name": "BasicMoves.java",
+        "path": "src/main/java/com/mcbot/mcbotserver/core/pathing/BasicMoves.java",
+        "type": "source",
+        "integrity": "complete",
+        "covers": "REQ-001, REQ-003",
+        "locator": "D:/mc-bot-server/src/main/java/com/mcbot/mcbotserver/core/pathing/BasicMoves.java",
+        "access_status": "read",
+        "completeness_checked": true
+      },
+      {
+        "id": "SRC-002",
+        "source_id": "SRC-CODEBASE",
+        "name": "DigPacing.java",
+        "path": "src/main/java/com/mcbot/mcbotserver/core/actor/DigPacing.java",
+        "type": "source",
+        "integrity": "complete",
+        "covers": "REQ-MCBOTMECHANI-002",
+        "locator": "D:/mc-bot-server/src/main/java/com/mcbot/mcbotserver/core/actor/DigPacing.java",
+        "access_status": "read",
+        "completeness_checked": true
+      },
+      {
+        "id": "SRC-003",
+        "source_id": "SRC-CODEBASE",
+        "name": "BotBodyEntity.java",
+        "path": "src/main/java/com/mcbot/mcbotserver/adapter/entity/BotBodyEntity.java",
+        "type": "source",
+        "integrity": "complete",
+        "covers": "REQ-003, REQ-007, REQ-008, REQ-010, REQ-011",
+        "locator": "D:/mc-bot-server/src/main/java/com/mcbot/mcbotserver/adapter/entity/BotBodyEntity.java",
+        "access_status": "read",
+        "completeness_checked": true
+      },
+      {
+        "id": "SRC-004",
+        "source_id": "SRC-CODEBASE",
+        "name": "DigExecutor.java",
+        "path": "src/main/java/com/mcbot/mcbotserver/adapter/DigExecutor.java",
+        "type": "source",
+        "integrity": "complete",
+        "covers": "REQ-004, REQ-010, REQ-011",
+        "locator": "D:/mc-bot-server/src/main/java/com/mcbot/mcbotserver/adapter/DigExecutor.java",
+        "access_status": "read",
+        "completeness_checked": true
+      },
+      {
+        "id": "SRC-005",
+        "source_id": "SRC-CODEBASE",
+        "name": "MeleeResolver.java",
+        "path": "src/main/java/com/mcbot/mcbotserver/adapter/MeleeResolver.java",
+        "type": "source",
+        "integrity": "complete",
+        "covers": "REQ-005, REQ-006, REQ-012",
+        "locator": "D:/mc-bot-server/src/main/java/com/mcbot/mcbotserver/adapter/MeleeResolver.java",
+        "access_status": "read",
+        "completeness_checked": true
+      },
+      {
+        "id": "SRC-006",
+        "source_id": "SRC-CODEBASE",
+        "name": "BotPlayerFacade.java",
+        "path": "src/main/java/com/mcbot/mcbotserver/adapter/BotPlayerFacade.java",
+        "type": "source",
+        "integrity": "complete",
+        "covers": "REQ-008, REQ-009",
+        "locator": "D:/mc-bot-server/src/main/java/com/mcbot/mcbotserver/adapter/BotPlayerFacade.java",
+        "access_status": "read",
+        "completeness_checked": true
+      },
+      {
+        "id": "SRC-007",
+        "source_id": "SRC-CODEBASE",
+        "name": "BotState.java + BotStateSnapshots.java + BotStateJson.java",
+        "path": "src/main/java/com/mcbot/mcbotserver/api/state/BotState.java",
+        "type": "source",
+        "integrity": "complete",
+        "covers": "REQ-MCBOTMECHANI-008",
+        "locator": "D:/mc-bot-server/src/main/java/com/mcbot/mcbotserver/api/state/BotState.java",
+        "access_status": "read",
+        "completeness_checked": true
+      },
+      {
+        "id": "SRC-008",
+        "source_id": "SRC-CODEBASE",
+        "name": "BindingMenu.java",
+        "path": "src/main/java/com/mcbot/mcbotserver/adapter/BindingMenu.java",
+        "type": "source",
+        "integrity": "complete",
+        "covers": "REQ-MCBOTMECHANI-009",
+        "locator": "D:/mc-bot-server/src/main/java/com/mcbot/mcbotserver/adapter/BindingMenu.java",
+        "access_status": "read",
+        "completeness_checked": true
+      },
+      {
+        "id": "SRC-009",
+        "source_id": "SRC-CODEBASE",
+        "name": "MenuSlotLayouts.java + MenuOpener.java",
+        "path": "src/main/java/com/mcbot/mcbotserver/adapter/MenuSlotLayouts.java",
+        "type": "source",
+        "integrity": "complete",
+        "covers": "REQ-MCBOTMECHANI-009",
+        "locator": "D:/mc-bot-server/src/main/java/com/mcbot/mcbotserver/adapter/MenuSlotLayouts.java",
+        "access_status": "read",
+        "completeness_checked": true
+      },
+      {
+        "id": "SRC-010",
+        "source_id": "SRC-CODEBASE",
+        "name": "GroundPickup.java",
+        "path": "src/main/java/com/mcbot/mcbotserver/adapter/entity/GroundPickup.java",
+        "type": "source",
+        "integrity": "complete",
+        "covers": "REQ-MCBOTMECHANI-004",
+        "locator": "D:/mc-bot-server/src/main/java/com/mcbot/mcbotserver/adapter/entity/GroundPickup.java",
+        "access_status": "read",
+        "completeness_checked": true
+      },
+      {
+        "id": "SRC-011",
+        "source_id": "SRC-CODEBASE",
+        "name": "测试套件 (539 tests)",
+        "path": "src/test/java/",
+        "type": "test_suite",
+        "integrity": "complete",
+        "covers": "REQ-MCBOTMECHANI-013",
+        "locator": "D:/mc-bot-server/src/test/java/",
+        "access_status": "read",
+        "completeness_checked": true
+      }
+    ]
+  },
+  "open_questions": [],
+  "change_ledger": [
+    {
+      "id": "CHG-001",
+      "revision": 4,
+      "action": "ADD",
+      "object_type": "run",
+      "added_ids": [
+        "qa-e22622aa9574"
+      ],
+      "removed_ids": [],
+      "modified_ids": [],
+      "before_count": 0,
+      "after_count": 1,
+      "delta_count": 1,
+      "source": "qa_flow.py normalize",
+      "summary": "根据当前 canonical 重建机械计数台账"
+    },
+    {
+      "id": "CHG-002",
+      "revision": 4,
+      "action": "ADD",
+      "object_type": "requirement",
+      "added_ids": [
+        "REQ-MCBOTMECHANI-001",
+        "REQ-MCBOTMECHANI-002",
+        "REQ-MCBOTMECHANI-003",
+        "REQ-MCBOTMECHANI-004",
+        "REQ-MCBOTMECHANI-005",
+        "REQ-MCBOTMECHANI-006",
+        "REQ-MCBOTMECHANI-007",
+        "REQ-MCBOTMECHANI-008",
+        "REQ-MCBOTMECHANI-009",
+        "REQ-MCBOTMECHANI-010",
+        "REQ-MCBOTMECHANI-011",
+        "REQ-MCBOTMECHANI-012",
+        "REQ-MCBOTMECHANI-013"
+      ],
+      "removed_ids": [],
+      "modified_ids": [],
+      "before_count": 0,
+      "after_count": 13,
+      "delta_count": 13,
+      "source": "qa_flow.py normalize",
+      "summary": "根据当前 canonical 重建机械计数台账"
+    },
+    {
+      "id": "CHG-003",
+      "revision": 4,
+      "action": "ADD",
+      "object_type": "risk_mechanism",
+      "added_ids": [
+        "RM-MCBOTMECHANI-001",
+        "RM-MCBOTMECHANI-002",
+        "RM-MCBOTMECHANI-003",
+        "RM-MCBOTMECHANI-004",
+        "RM-MCBOTMECHANI-005",
+        "RM-MCBOTMECHANI-006",
+        "RM-MCBOTMECHANI-007",
+        "RM-MCBOTMECHANI-008",
+        "RM-MCBOTMECHANI-009",
+        "RM-MCBOTMECHANI-010"
+      ],
+      "removed_ids": [],
+      "modified_ids": [],
+      "before_count": 0,
+      "after_count": 10,
+      "delta_count": 10,
+      "source": "qa_flow.py normalize",
+      "summary": "根据当前 canonical 重建机械计数台账"
+    },
+    {
+      "id": "CHG-004",
+      "revision": 4,
+      "action": "ADD",
+      "object_type": "case",
+      "added_ids": [
+        "TC-MCBOTMECHANI-001",
+        "TC-MCBOTMECHANI-002",
+        "TC-MCBOTMECHANI-003",
+        "TC-MCBOTMECHANI-004",
+        "TC-MCBOTMECHANI-005",
+        "TC-MCBOTMECHANI-006",
+        "TC-MCBOTMECHANI-007",
+        "TC-MCBOTMECHANI-008",
+        "TC-MCBOTMECHANI-009",
+        "TC-MCBOTMECHANI-010",
+        "TC-MCBOTMECHANI-011",
+        "TC-MCBOTMECHANI-012",
+        "TC-MCBOTMECHANI-013",
+        "TC-MCBOTMECHANI-014",
+        "TC-MCBOTMECHANI-015",
+        "TC-MCBOTMECHANI-016",
+        "TC-MCBOTMECHANI-017",
+        "TC-MCBOTMECHANI-018",
+        "TC-MCBOTMECHANI-019",
+        "TC-MCBOTMECHANI-020",
+        "TC-MCBOTMECHANI-021",
+        "TC-MCBOTMECHANI-022",
+        "TC-MCBOTMECHANI-023",
+        "TC-MCBOTMECHANI-024",
+        "TC-MCBOTMECHANI-025",
+        "TC-MCBOTMECHANI-026",
+        "TC-MCBOTMECHANI-027",
+        "TC-MCBOTMECHANI-028",
+        "TC-MCBOTMECHANI-029",
+        "TC-MCBOTMECHANI-030",
+        "TC-MCBOTMECHANI-031",
+        "TC-MCBOTMECHANI-032"
+      ],
+      "removed_ids": [],
+      "modified_ids": [],
+      "before_count": 0,
+      "after_count": 32,
+      "delta_count": 32,
+      "source": "qa_flow.py normalize",
+      "summary": "根据当前 canonical 重建机械计数台账"
+    },
+    {
+      "id": "CHG-005",
+      "revision": 4,
+      "action": "ADD",
+      "object_type": "delivery",
+      "added_ids": [
+        "mc-bot-server 机制补齐-QA测试方案与报告"
+      ],
+      "removed_ids": [],
+      "modified_ids": [],
+      "before_count": 0,
+      "after_count": 1,
+      "delta_count": 1,
+      "source": "qa_flow.py normalize",
+      "summary": "根据当前 canonical 重建机械计数台账"
+    }
+  ],
+  "environment": {},
+  "screenshot_policy": "unconfirmed",
+  "plan": {
+    "scope": [],
+    "out_of_scope": [],
+    "entry_criteria": [],
+    "exit_criteria": [],
+    "regression": []
+  },
+  "requirements": [
+    {
+      "id": "REQ-MCBOTMECHANI-001",
+      "source": "SRC-001",
+      "risk": "P1",
+      "title": "梯子/藤蔓攀爬",
+      "statement": "Climb movement 在 CLIMBABLE tag 方块上 viable；jump 在攀爬状态下作为向上推力；路径规划生成 Climb edge。",
+      "verification": "BasicMovesClimbTest + in-engine gametest",
+      "summary": "梯子/藤蔓攀爬",
+      "behavior": {
+        "actor": "BasicMoves (pathing layer)",
+        "precondition": "bot 相邻 CLIMBABLE tag 方块，上方目标格可通行",
+        "trigger": "PathingGraph 枚举 BasicMoves.from(src)",
+        "rule": "Climb movement viable 当且仅当源格相邻攀爬方块且目标格在正上方且可通行",
+        "state_change": "PathingGraph 收录 Climb edge，路径规划可生成含攀爬的路径",
+        "observable_result": "BotPath 包含 climb 类型的 step，bot 可沿梯子上升",
+        "failure_behavior": "viability 检查失败时不生成 Climb edge，bot 无法通过路径规划上梯子"
+      },
+      "impact_scope": [
+        "core/pathing/BasicMoves.java",
+        "core/pathing/PathingBehavior.java",
+        "api/pathing/BotMove.java"
+      ]
+    },
+    {
+      "id": "REQ-MCBOTMECHANI-002",
+      "source": "SRC-002",
+      "risk": "P1",
+      "title": "附魔感知挖掘速度",
+      "statement": "Efficiency I-V 乘数 (1+level^2)、Haste 20%/级、Mining Fatigue 30%/级、Aqua Affinity 消除水下 5x 惩罚，全部应用于 perTickProgress。",
+      "verification": "DigPacingEnchantmentTest",
+      "summary": "附魔感知挖掘速度",
+      "behavior": {
+        "actor": "DigPacing (core actor layer)",
+        "precondition": "bot 手持工具开始挖掘，目标方块可破坏",
+        "trigger": "DigExecutor.onTick 调用 DigPacing.perTickProgress",
+        "rule": "progress = baseSpeed × efficiency(1+level²) × haste(1+0.2×level) × fatigue(0.7^level) × water(AquaAffinity?1:0.2) × air(onGround?1:0.2)",
+        "state_change": "progress 逐 tick 累积，达到 1.0 时方块破坏",
+        "observable_result": "挖掘耗时与 vanilla 公式对齐，Efficiency V 钻石镐挖石头显著加速",
+        "failure_behavior": "乘数缺失或顺序错误时挖掘速度偏离 vanilla，可能过快或过慢"
+      },
+      "impact_scope": [
+        "core/actor/DigPacing.java",
+        "adapter/DigExecutor.java",
+        "api/actor/DigIntent.java"
+      ]
+    },
+    {
+      "id": "REQ-MCBOTMECHANI-003",
+      "source": "SRC-001, SRC-003",
+      "risk": "P1",
+      "title": "yya 轴下潜",
+      "statement": "SwimDown movement 在水中 viable；PathingBehavior 在 waypoint 低于 floor 时提交 sneak=true；BotBodyEntity.applyWaterDescent 在 sneak+水中+非地面时施加 -0.10/tick 下潜速度。",
+      "verification": "BasicMovesSwimTest + in-engine",
+      "summary": "yya 轴下潜",
+      "behavior": {
+        "actor": "BotBodyEntity (adapter layer)",
+        "precondition": "bot 在水中，非地面，sneak=true",
+        "trigger": "PathingBehavior 在 waypoint 低于 floor 时提交 Move(sneak=true)",
+        "rule": "applyWaterDescent 在 isInWater && !onGround && isShiftKeyDown 时设置 y 速度 -0.10/tick",
+        "state_change": "bot y 坐标逐 tick 下降，缓慢下潜",
+        "observable_result": "水中 sneak 时 y 速度为负，bot 可下潜到目标深度",
+        "failure_behavior": "条件不满足时不施加下潜，bot 保持漂浮或上升"
+      },
+      "impact_scope": [
+        "core/pathing/BasicMoves.java",
+        "core/pathing/PathingBehavior.java",
+        "adapter/entity/BotBodyEntity.java"
+      ]
+    },
+    {
+      "id": "REQ-MCBOTMECHANI-004",
+      "source": "SRC-004, SRC-010",
+      "risk": "P0",
+      "title": "match_tool 掉落保真",
+      "statement": "方块破坏走 Block.dropResources(state, level, pos, be, body, held)，TOOL 上下文为实际手持物品；match_tool 条件正常解析（石头→镐掉圆石、树叶→剪刀掉树叶、silk-touch/fortune）；XP 球通过 spawnAfterBreak 生成；GroundPickup 拾取物品。",
+      "verification": "in-engine gametest（挖石头验证圆石掉落）",
+      "summary": "match_tool 掉落保真",
+      "behavior": {
+        "actor": "DigExecutor (adapter layer)",
+        "precondition": "挖掘进度达到 1.0，手持物品非空",
+        "trigger": "DigExecutor.onTick 检测 progress >= 1.0",
+        "rule": "手动 break 序列：捕获 state+be+fluid → emit 2001 → setBlock(fluid legacy) → Block.dropResources(state, level, pos, be, body, held) TOOL=held",
+        "state_change": "方块被移除，掉落物实体和 XP 球生成，GroundPickup 后续拾取",
+        "observable_result": "镐挖石头掉圆石、徒手不掉、剪刀剪树叶掉树叶、煤矿掉经验球",
+        "failure_behavior": "TOOL 上下文错误时 match_tool 条件不触发，掉落物与 vanilla 不一致"
+      },
+      "impact_scope": [
+        "adapter/DigExecutor.java",
+        "adapter/entity/GroundPickup.java",
+        "core/actor/DigPacing.java"
+      ]
+    },
+    {
+      "id": "REQ-MCBOTMECHANI-005",
+      "source": "SRC-005",
+      "risk": "P0",
+      "title": "攻击速度缩放",
+      "statement": "lastSwingTick 记录上次挥击；cooldown = 1.0/ATTACK_SPEED*20（剑 12.5t、斧 20-25t、空手 5t）；冷却未就绪时只挥空不造成伤害；每次 rising edge 重置冷却（vanilla parity）。",
+      "verification": "in-engine gametest（连续攻击验证冷却）",
+      "summary": "攻击速度缩放",
+      "behavior": {
+        "actor": "MeleeResolver (adapter layer)",
+        "precondition": "bot 手持武器，目标在攻击范围内",
+        "trigger": "USE intent rising edge 到达 MeleeResolver.onUsePress",
+        "rule": "cooldown = 1.0/ATTACK_SPEED×20 ticks; currentTick - lastSwingTick < cooldown 时只 swing 不 hurt; ≥ cooldown 时 hurt 并更新 lastSwingTick",
+        "state_change": "lastSwingTick 更新，目标受到伤害或仅挥空",
+        "observable_result": "剑冷却 12.5t，连续点击只有满蓄力攻击造成全额伤害",
+        "failure_behavior": "冷却追踪缺失时每次点击都满伤害，与 vanilla 狂点行为不一致"
+      },
+      "impact_scope": [
+        "adapter/MeleeResolver.java",
+        "api/actor/Intent.java"
+      ]
+    },
+    {
+      "id": "REQ-MCBOTMECHANI-006",
+      "source": "SRC-005",
+      "risk": "P1",
+      "title": "暴击",
+      "statement": "isCriticalHit() 检查 vanilla 全部条件（fallDistance>0、!onGround、!isInWater、!BLINDNESS、!onClimbable、!isPassenger、!isSprinting）；满足时伤害×1.5，播放 2002 暴击粒子。",
+      "verification": "in-engine gametest（下落攻击验证 1.5x）",
+      "summary": "暴击",
+      "behavior": {
+        "actor": "MeleeResolver (adapter layer)",
+        "precondition": "bot 正在攻击目标，伤害计算阶段",
+        "trigger": "performMeleeAttack 调用 isCriticalHit()",
+        "rule": "fallDistance>0 && !onGround && !isInWater && !hasEffect(BLINDNESS) && !onClimbable && !isPassenger && !isSprinting",
+        "state_change": "满足时 damage ×= 1.5，播放 2002 暴击粒子",
+        "observable_result": "下落攻击伤害为普通攻击 1.5 倍，水中/梯子上不暴击",
+        "failure_behavior": "条件遗漏时可能在水中或梯子上错误触发暴击"
+      },
+      "impact_scope": [
+        "adapter/MeleeResolver.java"
+      ]
+    },
+    {
+      "id": "REQ-MCBOTMECHANI-007",
+      "source": "SRC-003",
+      "risk": "P1",
+      "title": "潜行边缘行走",
+      "statement": "override maybeBackOffFromEdge(Vec3, MoverType)，条件 moverType==SELF && y<=0 && isShiftKeyDown && isBotAboveGround；0.05 步长迭代削减 x/z 直到脚下有地面；isBotAboveGround 复刻 vanilla Player.isAboveGround。",
+      "verification": "in-engine gametest（sneak 走到悬崖边验证不坠落）",
+      "summary": "潜行边缘行走",
+      "behavior": {
+        "actor": "BotBodyEntity (adapter layer)",
+        "precondition": "bot isShiftKeyDown，moverType=SELF，y 速度 ≤ 0",
+        "trigger": "BotBodyEntity.move 调用 maybeBackOffFromEdge(vec3, moverType)",
+        "rule": "条件满足时 0.05 步长迭代削减 x/z 速度分量直到 isBotAboveGround 检测脚下有地面",
+        "state_change": "速度向量被逐步削减，bot 停在边缘不坠落",
+        "observable_result": "sneak 走到悬崖边 y 坐标不变，非 sneak 时正常坠落",
+        "failure_behavior": "迭代不收敛或条件错误时 sneak 仍可能坠落"
+      },
+      "impact_scope": [
+        "adapter/entity/BotBodyEntity.java"
+      ]
+    },
+    {
+      "id": "REQ-MCBOTMECHANI-008",
+      "source": "SRC-003, SRC-006, SRC-007",
+      "risk": "P0",
+      "title": "XP 系统",
+      "statement": "experienceLevel/experienceProgress/totalExperience 存储于 BotBodyEntity；getXpNeededForNextLevel 复刻 vanilla 公式；tickXpPickup 每 tick 吸收范围内 ExperienceOrb；MeleeResolver 攻击时 setLastHurtByPlayer(facade) 使击杀掉经验球；BotState 暴露 experienceLevel，BotStateJson 序列化为 xp。",
+      "verification": "in-engine gametest（击杀僵尸验证经验球拾取+等级提升）",
+      "summary": "XP 系统",
+      "behavior": {
+        "actor": "BotBodyEntity + MeleeResolver + BotPlayerFacade (adapter layer)",
+        "precondition": "bot 存在，有 experienceLevel/experienceProgress/totalExperience 字段",
+        "trigger": "击杀怪物 / 拾取经验球 / 菜单消耗 XP",
+        "rule": "MeleeResolver 攻击时 setLastHurtByPlayer(facade) → 怪物 die() 检查 lastHurtByPlayerTime>0 生成 ExperienceOrb → tickXpPickup 吸收 → 等级按 vanilla 公式提升 → BotState 暴露",
+        "state_change": "experienceLevel/experienceProgress/totalExperience 更新，经验球被吸收",
+        "observable_result": "击杀僵尸后经验球出现、拾取后等级提升、harness 可读取 xp 字段",
+        "failure_behavior": "setLastHurtByPlayer 未调用时击杀不掉经验球，facade XP 不同步时菜单无法消耗"
+      },
+      "impact_scope": [
+        "adapter/entity/BotBodyEntity.java",
+        "adapter/BotPlayerFacade.java",
+        "adapter/MeleeResolver.java",
+        "api/state/BotState.java",
+        "api/state/BotStateJson.java"
+      ]
+    },
+    {
+      "id": "REQ-MCBOTMECHANI-009",
+      "source": "SRC-006, SRC-008, SRC-009",
+      "risk": "P1",
+      "title": "铁砧/酿造/附魔/交易基础设施",
+      "statement": "BotPlayerFacade.syncExperience 在 menu 操作前同步 XP 字段；giveExperienceLevels/giveExperiencePoints override 委托给 body；BindingMenu.setAnvilName 调 AnvilMenu.setItemName；MenuSlotLayouts 注册 anvil/brewing/enchanting/merchant role；MenuOpener generic MenuProvider 回退路径打开铁砧/酿造台/附魔台；openEntity 打开村民交易。",
+      "verification": "in-engine gametest（打开铁砧验证菜单+XP 消耗）",
+      "summary": "铁砧/酿造/附魔/交易基础设施",
+      "behavior": {
+        "actor": "MenuOpener + BindingMenu + BotPlayerFacade (adapter layer)",
+        "precondition": "harness 请求打开铁砧/酿造台/附魔台/村民交易",
+        "trigger": "MenuOpener.open(blockPos) 或 openEntity(entityId)",
+        "rule": "generic MenuProvider 回退路径打开方块菜单 → openEntity 打开村民 → facade.syncExperience 同步 XP → setAnvilName/clickButton 执行操作",
+        "state_change": "菜单打开，XP 字段同步，操作执行后 XP 消耗",
+        "observable_result": "铁砧显示正确 XP 等级、重命名生效、附魔选项可选、村民交易可打开",
+        "failure_behavior": "facade XP 永远为 0 时菜单显示无 XP，MenuProvider 回退缺失时菜单打不开"
+      },
+      "impact_scope": [
+        "adapter/MenuOpener.java",
+        "adapter/MenuSlotLayouts.java",
+        "adapter/BindingMenu.java",
+        "adapter/BotPlayerFacade.java"
+      ]
+    },
+    {
+      "id": "REQ-MCBOTMECHANI-010",
+      "source": "SRC-003, SRC-004",
+      "risk": "P2",
+      "title": "工具耐久消耗",
+      "statement": "方块破坏后 held.getItem().mineBlock(held, level, state, pos, body)；DiggerItem 伤 1、SwordItem 伤 2、ShearsItem 伤 1、基类 Item 不伤；gate 在 destroySpeed!=0；Unbreaking/Mending 在 hurtAndBreak 内自动生效。",
+      "verification": "in-engine（挖 100 块验证镐耐久减少）",
+      "summary": "工具耐久消耗",
+      "behavior": {
+        "actor": "DigExecutor (adapter layer)",
+        "precondition": "方块破坏完成，手持物品非空",
+        "trigger": "DigExecutor 手动 break 序列完成后",
+        "rule": "held.getItem().mineBlock(held, level, state, pos, body): DiggerItem 伤1、SwordItem 伤2、ShearsItem 伤1、基类不伤; gate 在 destroySpeed!=0",
+        "state_change": "工具耐久减少，可能触发 Unbreaking 豁免或 Mending 修复",
+        "observable_result": "镐挖 100 块后耐久条减少，瞬破方块（火把）不消耗",
+        "failure_behavior": "mineBlock 未调用时工具无限耐久，与 vanilla 不一致"
+      },
+      "impact_scope": [
+        "adapter/DigExecutor.java"
+      ]
+    },
+    {
+      "id": "REQ-MCBOTMECHANI-011",
+      "source": "SRC-004",
+      "risk": "P2",
+      "title": "挖掘疲劳值",
+      "statement": "方块破坏后 body.getFoodData().addExhaustion(0.005F)，mirror vanilla Block.playerDestroy 的 0.005/block。",
+      "verification": "in-engine（连续挖掘验证饥饿值下降）",
+      "summary": "挖掘疲劳值",
+      "behavior": {
+        "actor": "DigExecutor (adapter layer)",
+        "precondition": "方块破坏完成",
+        "trigger": "DigExecutor 手动 break 序列完成后",
+        "rule": "body.getFoodData().addExhaustion(0.005F)，mirror vanilla Block.playerDestroy",
+        "state_change": "foodData.exhaustionLevel 累积，>4.0 时消耗 saturation，再耗尽消耗 foodLevel",
+        "observable_result": "连续挖掘后饥饿值下降，HungerTicker 正常处理 exhaustion",
+        "failure_behavior": "exhaustion 未应用时挖掘不消耗饥饿，与 vanilla 不一致"
+      },
+      "impact_scope": [
+        "adapter/DigExecutor.java",
+        "adapter/entity/HungerTicker.java"
+      ]
+    },
+    {
+      "id": "REQ-MCBOTMECHANI-012",
+      "source": "SRC-005",
+      "risk": "P2",
+      "title": "横扫攻击",
+      "statement": "条件 !crit && !isSprinting && onGround && 手持剑(SWORD_SWEEP)；横扫伤害=1.0+SweepingEdge比率×主伤害；击退 0.4；getSweepHitBox(facade, target) 范围内 LivingEntity，排除自己/主目标/同盟；播放 PLAYER_ATTACK_SWEEP。",
+      "verification": "in-engine（多怪站位验证横扫 AoE）",
+      "summary": "横扫攻击",
+      "behavior": {
+        "actor": "MeleeResolver (adapter layer)",
+        "precondition": "主攻击命中，手持剑",
+        "trigger": "performMeleeAttack 主 hurt 成功后",
+        "rule": "!crit && !isSprinting && onGround && SWORD_SWEEP → 伤害=1.0+SweepingEdge比率×主伤害, 击退0.4, getSweepHitBox 范围内排除自己/主目标/同盟",
+        "state_change": "附近敌人受到横扫伤害和击退，播放 PLAYER_ATTACK_SWEEP",
+        "observable_result": "多怪站位时附近敌人受到横扫伤害，疾跑时不横扫（改为击退加成）",
+        "failure_behavior": "条件错误时疾跑也可能横扫，或非剑武器也触发横扫"
+      },
+      "impact_scope": [
+        "adapter/MeleeResolver.java"
+      ]
+    },
+    {
+      "id": "REQ-MCBOTMECHANI-013",
+      "source": "SRC-011",
+      "risk": "P0",
+      "title": "无回归",
+      "statement": "全部 539 个现有测试通过；编译无错误；checkstyle/spotless 通过。",
+      "verification": "python tool/mcbot_tool.py test",
+      "summary": "无回归",
+      "behavior": {
+        "actor": "Gradle build system (tool layer)",
+        "precondition": "代码改动完成",
+        "trigger": "python tool/mcbot_tool.py test",
+        "rule": "compileJava → checkstyleMain → spotlessCheck → test (539 JUnit)，全部通过才 BUILD SUCCESSFUL",
+        "state_change": "build/ 目录生成编译产物和测试报告",
+        "observable_result": "BUILD SUCCESSFUL，0 failures，0 errors",
+        "failure_behavior": "任一阶段失败时 BUILD FAILED，需修复后重跑"
+      },
+      "impact_scope": [
+        "全量 src/main/java",
+        "全量 src/test/java",
+        "build.gradle",
+        "gradle.properties"
+      ]
+    }
+  ],
+  "risk_mechanisms": [
+    {
+      "id": "RM-MCBOTMECHANI-001",
+      "requirement_id": "REQ-004",
+      "title": "match_tool 条件不触发",
+      "mechanism": "destroyBlock 传 EMPTY tool 导致 loot table match_tool 永远 false",
+      "detection": "挖石头验证掉落物为圆石",
+      "priority": "P0",
+      "status": "identified",
+      "failure_mode": "Block.dropResources 收到 ItemStack.EMPTY 作为 TOOL，loot table 的 match_tool 条件永远为 false",
+      "business_impact": "bot 挖掘不掉落正确物品（石头不掉圆石、树叶不掉苹果），无法获取资源，生存模式不可玩",
+      "oracle": "手持镐挖石头后地面出现圆石物品实体；徒手挖石头后无圆石掉落",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-004"
+      ],
+      "case_ids": [
+        "TC-MCBOTMECHANI-008",
+        "TC-MCBOTMECHANI-009",
+        "TC-MCBOTMECHANI-010",
+        "TC-MCBOTMECHANI-011"
+      ]
+    },
+    {
+      "id": "RM-MCBOTMECHANI-002",
+      "requirement_id": "REQ-005",
+      "title": "攻击冷却失效",
+      "mechanism": "无冷却追踪导致每次点击都满伤害",
+      "detection": "连续攻击验证伤害随冷却变化",
+      "priority": "P0",
+      "status": "identified",
+      "failure_mode": "无 lastSwingTick 冷却追踪，每次 USE rising edge 都执行 hurt，伤害不随冷却时间缩放",
+      "business_impact": "bot 攻击输出远超 vanilla 玩家，战斗难度失衡，PvP/PvE 体验不一致",
+      "oracle": "剑连续攻击时，冷却未就绪（<12.5t）的攻击只挥空不造成伤害；满蓄力攻击造成全额伤害",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-005"
+      ],
+      "case_ids": [
+        "TC-MCBOTMECHANI-012",
+        "TC-MCBOTMECHANI-013"
+      ]
+    },
+    {
+      "id": "RM-MCBOTMECHANI-003",
+      "requirement_id": "REQ-008",
+      "title": "XP 系统断裂",
+      "mechanism": "BotBodyEntity 无 XP 字段，击杀不掉经验球",
+      "detection": "击杀僵尸验证经验球+等级提升",
+      "priority": "P0",
+      "status": "identified",
+      "failure_mode": "BotBodyEntity 无 experienceLevel 字段，MeleeResolver 未调用 setLastHurtByPlayer，击杀怪物不掉经验球",
+      "business_impact": "bot 无法获取经验，铁砧/附魔无法消耗 XP，完整玩家体验断裂",
+      "oracle": "击杀僵尸后地面出现 ExperienceOrb 实体；bot 接触后 experienceLevel 提升；harness 可读取 xp 字段",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-008"
+      ],
+      "case_ids": [
+        "TC-MCBOTMECHANI-018",
+        "TC-MCBOTMECHANI-019",
+        "TC-MCBOTMECHANI-020",
+        "TC-MCBOTMECHANI-021"
+      ]
+    },
+    {
+      "id": "RM-MCBOTMECHANI-004",
+      "requirement_id": "REQ-013",
+      "title": "回归破坏",
+      "mechanism": "改动核心文件导致已有测试失败",
+      "detection": "全量 test 套件",
+      "priority": "P0",
+      "status": "identified",
+      "failure_mode": "改动 BotBodyEntity/MeleeResolver/DigExecutor 等核心文件导致已有测试断言失败",
+      "business_impact": "已有机制（饥饿、生命、反射、物品栏、合成）回归，整体质量下降",
+      "oracle": "python tool/mcbot_tool.py test 输出 BUILD SUCCESSFUL，539 测试 0 failures",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-013"
+      ],
+      "case_ids": [
+        "TC-MCBOTMECHANI-031",
+        "TC-MCBOTMECHANI-032"
+      ]
+    },
+    {
+      "id": "RM-MCBOTMECHANI-005",
+      "requirement_id": "REQ-001",
+      "title": "攀爬不可达",
+      "mechanism": "Climb viability 检查错误",
+      "detection": "梯子旁验证生成 Climb edge",
+      "priority": "P1",
+      "status": "identified",
+      "failure_mode": "Climb movement viability 检查条件错误（如缺少 CLIMBABLE tag 检查或上方可通行检查），路径规划不生成攀爬 edge",
+      "business_impact": "bot 无法通过路径规划上梯子/藤蔓，地形导航能力受限",
+      "oracle": "在梯子旁调用 BasicMoves.from(src) 返回的 movement 列表包含 Climb 类型，且 viable=true",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-001"
+      ],
+      "case_ids": [
+        "TC-MCBOTMECHANI-001",
+        "TC-MCBOTMECHANI-002"
+      ]
+    },
+    {
+      "id": "RM-MCBOTMECHANI-006",
+      "requirement_id": "REQ-002",
+      "title": "附魔乘数错误",
+      "mechanism": "Efficiency 公式或 Haste/Fatigue 叠加顺序错误",
+      "detection": "Efficiency V 验证速度",
+      "priority": "P1",
+      "status": "identified",
+      "failure_mode": "Efficiency 公式错误（如用 level 而非 level²）或 Haste/Fatigue 乘数叠加顺序错误",
+      "business_impact": "挖掘速度与 vanilla 不一致，附魔效果感知偏差，游戏体验失真",
+      "oracle": "Efficiency V 钻石镐挖石头的 perTickProgress 包含 (1+5²)=26 倍乘数；Haste II 额外 +40%",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-002"
+      ],
+      "case_ids": [
+        "TC-MCBOTMECHANI-003",
+        "TC-MCBOTMECHANI-004",
+        "TC-MCBOTMECHANI-005"
+      ]
+    },
+    {
+      "id": "RM-MCBOTMECHANI-007",
+      "requirement_id": "REQ-003",
+      "title": "下潜不生效",
+      "mechanism": "sneak 在水中未映射为下潜",
+      "detection": "水中 sneak 验证 y 速度为负",
+      "priority": "P1",
+      "status": "identified",
+      "failure_mode": "sneak 在水中未映射为下潜，或 applyWaterDescent 条件错误（如缺少 isInWater 检查）",
+      "business_impact": "bot 无法在水中下潜，只能上浮，水下导航和探索能力缺失",
+      "oracle": "bot 在水中、非地面、sneak=true 时 y 速度为 -0.10/tick，y 坐标逐 tick 下降",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-003"
+      ],
+      "case_ids": [
+        "TC-MCBOTMECHANI-006",
+        "TC-MCBOTMECHANI-007"
+      ]
+    },
+    {
+      "id": "RM-MCBOTMECHANI-008",
+      "requirement_id": "REQ-006",
+      "title": "暴击条件遗漏",
+      "mechanism": "缺少 isInWater 或 onClimbable 检查",
+      "detection": "水中下落验证不暴击",
+      "priority": "P1",
+      "status": "identified",
+      "failure_mode": "isCriticalHit() 缺少 vanilla 条件（如 isInWater、onClimbable、isPassenger 检查），在水中或梯子上错误触发暴击",
+      "business_impact": "暴击触发条件与 vanilla 不一致，战斗伤害计算偏差",
+      "oracle": "bot 在水中下落攻击时伤害不乘以 1.5；在地面以上下落且全部条件满足时伤害×1.5",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-006"
+      ],
+      "case_ids": [
+        "TC-MCBOTMECHANI-014",
+        "TC-MCBOTMECHANI-015"
+      ]
+    },
+    {
+      "id": "RM-MCBOTMECHANI-009",
+      "requirement_id": "REQ-007",
+      "title": "边缘回退失效",
+      "mechanism": "maybeBackOffFromEdge 条件错误或迭代不收敛",
+      "detection": "sneak 悬崖边验证不坠落",
+      "priority": "P1",
+      "status": "identified",
+      "failure_mode": "maybeBackOffFromEdge override 条件错误或 0.05 步长迭代不收敛，sneak 时仍走过边缘坠落",
+      "business_impact": "bot 在悬崖边 sneak 时仍会坠落，安全移动能力缺失，高地形作业危险",
+      "oracle": "bot sneak 状态走向悬崖边缘时 y 坐标不变，停在边缘方块上；非 sneak 时正常坠落",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-007"
+      ],
+      "case_ids": [
+        "TC-MCBOTMECHANI-016",
+        "TC-MCBOTMECHANI-017"
+      ]
+    },
+    {
+      "id": "RM-MCBOTMECHANI-010",
+      "requirement_id": "REQ-009",
+      "title": "菜单 XP 不同步",
+      "mechanism": "facade XP 字段永远为 0",
+      "detection": "铁砧验证 XP 显示正确",
+      "priority": "P1",
+      "status": "identified",
+      "failure_mode": "BotPlayerFacade 的 experienceLevel/experienceProgress 字段永远为 0，syncExperience 未被调用或未正确同步 body XP",
+      "business_impact": "铁砧/附魔菜单显示无 XP，无法执行需要消耗 XP 的操作，菜单系统不可用",
+      "oracle": "bot 有 5 级经验时打开铁砧，菜单 UI 显示等级 5；铁砧重命名消耗 1 级后 bot 等级变为 4",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-009"
+      ],
+      "case_ids": [
+        "TC-MCBOTMECHANI-022",
+        "TC-MCBOTMECHANI-023",
+        "TC-MCBOTMECHANI-024",
+        "TC-MCBOTMECHANI-025"
+      ]
+    }
+  ],
+  "observed_surfaces": [],
+  "cases": [
+    {
+      "id": "TC-MCBOTMECHANI-001",
+      "requirement_id": "REQ-MCBOTMECHANI-001",
+      "title": "梯子上生成 Climb edge",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "CLIMBABLE tag 方块旁 BasicMoves 生成 Climb movement",
+      "module": "pathing",
+      "type": "unit",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-001"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - CLIMBABLE tag 方块旁 BasicMoves 生成 Climb movement",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "CLIMBABLE tag 方块旁 BasicMoves 生成 Climb movement",
+      "test_data": "fixture: pathing test environment with default bot state",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-005"
+      ]
+    },
+    {
+      "id": "TC-MCBOTMECHANI-002",
+      "requirement_id": "REQ-MCBOTMECHANI-001",
+      "title": "非攀爬方块不生成 Climb",
+      "priority": "P2",
+      "validation_scope": "formal",
+      "description": "普通方块旁不生成 Climb movement",
+      "module": "pathing",
+      "type": "unit",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-001"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - 普通方块旁不生成 Climb movement",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "普通方块旁不生成 Climb movement",
+      "test_data": "default fixture",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-005"
+      ]
+    },
+    {
+      "id": "TC-MCBOTMECHANI-003",
+      "requirement_id": "REQ-MCBOTMECHANI-002",
+      "title": "Efficiency V 速度加成",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "Efficiency V 包含 (1+5^2)=26 倍乘数",
+      "module": "dig",
+      "type": "unit",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-002"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - Efficiency V 包含 (1+5^2)=26 倍乘数",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "Efficiency V 包含 (1+5^2)=26 倍乘数",
+      "test_data": "fixture: dig test environment with default bot state",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-006"
+      ]
+    },
+    {
+      "id": "TC-MCBOTMECHANI-004",
+      "requirement_id": "REQ-MCBOTMECHANI-002",
+      "title": "Haste II 叠加",
+      "priority": "P2",
+      "validation_scope": "formal",
+      "description": "Haste II 额外 +40%",
+      "module": "dig",
+      "type": "unit",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-002"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - Haste II 额外 +40%",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "Haste II 额外 +40%",
+      "test_data": "default fixture",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-006"
+      ]
+    },
+    {
+      "id": "TC-MCBOTMECHANI-005",
+      "requirement_id": "REQ-MCBOTMECHANI-002",
+      "title": "Mining Fatigue III 减速",
+      "priority": "P2",
+      "validation_scope": "formal",
+      "description": "Fatigue III 减至 0.343 倍",
+      "module": "dig",
+      "type": "unit",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-002"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - Fatigue III 减至 0.343 倍",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "Fatigue III 减至 0.343 倍",
+      "test_data": "default fixture",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-006"
+      ]
+    },
+    {
+      "id": "TC-MCBOTMECHANI-006",
+      "requirement_id": "REQ-MCBOTMECHANI-003",
+      "title": "水中 sneak 下潜",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "水中+非地面+sneak 时 y 速度 -0.10/tick",
+      "module": "pathing",
+      "type": "unit",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-003"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - 水中+非地面+sneak 时 y 速度 -0.10/tick",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "水中+非地面+sneak 时 y 速度 -0.10/tick",
+      "test_data": "fixture: pathing test environment with default bot state",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-007"
+      ]
+    },
+    {
+      "id": "TC-MCBOTMECHANI-007",
+      "requirement_id": "REQ-MCBOTMECHANI-003",
+      "title": "SwimDown viability",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "源/目标均液体且可通行时 viable",
+      "module": "pathing",
+      "type": "unit",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-003"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - 源/目标均液体且可通行时 viable",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "源/目标均液体且可通行时 viable",
+      "test_data": "fixture: pathing test environment with default bot state",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-007"
+      ]
+    },
+    {
+      "id": "TC-MCBOTMECHANI-008",
+      "requirement_id": "REQ-MCBOTMECHANI-004",
+      "title": "镐挖石头掉圆石",
+      "priority": "P0",
+      "validation_scope": "formal",
+      "description": "TOOL=镐时 match_tool 触发掉圆石",
+      "module": "dig",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-004"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - TOOL=镐时 match_tool 触发掉圆石",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "TOOL=镐时 match_tool 触发掉圆石",
+      "test_data": "fixture: flat stone platform, bot holding diamond_pickaxe, target block = stone at (0,64,0)",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-001"
+      ],
+      "release_blocking_reason": "镐挖石头掉圆石 失败直接阻断核心机制可用性，影响完整玩家体验"
+    },
+    {
+      "id": "TC-MCBOTMECHANI-009",
+      "requirement_id": "REQ-MCBOTMECHANI-004",
+      "title": "徒手挖石头不掉圆石",
+      "priority": "P0",
+      "validation_scope": "formal",
+      "description": "徒手时 match_tool 不满足",
+      "module": "dig",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-004"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - 徒手时 match_tool 不满足",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "徒手时 match_tool 不满足",
+      "test_data": "fixture: flat stone platform, bot holding diamond_pickaxe, target block = stone at (0,64,0)",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-001"
+      ],
+      "release_blocking_reason": "徒手挖石头不掉圆石 失败直接阻断核心机制可用性，影响完整玩家体验"
+    },
+    {
+      "id": "TC-MCBOTMECHANI-010",
+      "requirement_id": "REQ-MCBOTMECHANI-004",
+      "title": "剪刀剪树叶掉树叶",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "TOOL=剪刀时 match_tool shears",
+      "module": "dig",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-004"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - TOOL=剪刀时 match_tool shears",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "TOOL=剪刀时 match_tool shears",
+      "test_data": "fixture: flat stone platform, bot holding diamond_pickaxe, target block = stone at (0,64,0)",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-001"
+      ]
+    },
+    {
+      "id": "TC-MCBOTMECHANI-011",
+      "requirement_id": "REQ-MCBOTMECHANI-004",
+      "title": "挖掘生成 XP 球",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "煤矿/红石矿生成 ExperienceOrb",
+      "module": "dig",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-004"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - 煤矿/红石矿生成 ExperienceOrb",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "煤矿/红石矿生成 ExperienceOrb",
+      "test_data": "fixture: flat stone platform, bot holding diamond_pickaxe, target block = stone at (0,64,0)",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-001"
+      ]
+    },
+    {
+      "id": "TC-MCBOTMECHANI-012",
+      "requirement_id": "REQ-MCBOTMECHANI-005",
+      "title": "剑冷却 12.5 tick",
+      "priority": "P0",
+      "validation_scope": "formal",
+      "description": "ATTACK_SPEED=1.6 cooldown=12.5t，未就绪只挥空",
+      "module": "combat",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-005"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - ATTACK_SPEED=1.6 cooldown=12.5t，未就绪只挥空",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "ATTACK_SPEED=1.6 cooldown=12.5t，未就绪只挥空",
+      "test_data": "fixture: bot holding diamond_sword (ATTACK_SPEED=1.6), target = zombie at distance 2.0",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-002"
+      ],
+      "release_blocking_reason": "剑冷却 12.5 tick 失败直接阻断核心机制可用性，影响完整玩家体验"
+    },
+    {
+      "id": "TC-MCBOTMECHANI-013",
+      "requirement_id": "REQ-MCBOTMECHANI-005",
+      "title": "rising edge 重置冷却",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "每次 USE rising edge 重置 lastSwingTick",
+      "module": "combat",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-005"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - 每次 USE rising edge 重置 lastSwingTick",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "每次 USE rising edge 重置 lastSwingTick",
+      "test_data": "fixture: bot holding diamond_sword (ATTACK_SPEED=1.6), target = zombie at distance 2.0",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-002"
+      ]
+    },
+    {
+      "id": "TC-MCBOTMECHANI-014",
+      "requirement_id": "REQ-MCBOTMECHANI-006",
+      "title": "下落攻击暴击 1.5x",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "全部暴击条件满足时伤害×1.5+2002粒子",
+      "module": "combat",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-006"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - 全部暴击条件满足时伤害×1.5+2002粒子",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "全部暴击条件满足时伤害×1.5+2002粒子",
+      "test_data": "fixture: combat test environment with default bot state",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-008"
+      ]
+    },
+    {
+      "id": "TC-MCBOTMECHANI-015",
+      "requirement_id": "REQ-MCBOTMECHANI-006",
+      "title": "水中不暴击",
+      "priority": "P2",
+      "validation_scope": "formal",
+      "description": "isInWater=true 时不暴击",
+      "module": "combat",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-006"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - isInWater=true 时不暴击",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "isInWater=true 时不暴击",
+      "test_data": "default fixture",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-008"
+      ]
+    },
+    {
+      "id": "TC-MCBOTMECHANI-016",
+      "requirement_id": "REQ-MCBOTMECHANI-007",
+      "title": "sneak 悬崖边不坠落",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "maybeBackOffFromEdge 削减速度直到脚下有地面",
+      "module": "movement",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-007"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - maybeBackOffFromEdge 削减速度直到脚下有地面",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "maybeBackOffFromEdge 削减速度直到脚下有地面",
+      "test_data": "fixture: movement test environment with default bot state",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-009"
+      ]
+    },
+    {
+      "id": "TC-MCBOTMECHANI-017",
+      "requirement_id": "REQ-MCBOTMECHANI-007",
+      "title": "非 sneak 正常坠落",
+      "priority": "P2",
+      "validation_scope": "formal",
+      "description": "非 sneak 时不干预",
+      "module": "movement",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-007"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - 非 sneak 时不干预",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "非 sneak 时不干预",
+      "test_data": "default fixture",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-009"
+      ]
+    },
+    {
+      "id": "TC-MCBOTMECHANI-018",
+      "requirement_id": "REQ-MCBOTMECHANI-008",
+      "title": "击杀僵尸掉经验球",
+      "priority": "P0",
+      "validation_scope": "formal",
+      "description": "setLastHurtByPlayer 使 die() 生成 ExperienceOrb",
+      "module": "xp",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-008"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - setLastHurtByPlayer 使 die() 生成 ExperienceOrb",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "setLastHurtByPlayer 使 die() 生成 ExperienceOrb",
+      "test_data": "fixture: bot holding diamond_sword, zombie at (2,64,0), bot has 0 XP",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-003"
+      ],
+      "release_blocking_reason": "击杀僵尸掉经验球 失败直接阻断核心机制可用性，影响完整玩家体验"
+    },
+    {
+      "id": "TC-MCBOTMECHANI-019",
+      "requirement_id": "REQ-MCBOTMECHANI-008",
+      "title": "经验球拾取+等级提升",
+      "priority": "P0",
+      "validation_scope": "formal",
+      "description": "tickXpPickup 吸收+等级提升",
+      "module": "xp",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-008"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - tickXpPickup 吸收+等级提升",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "tickXpPickup 吸收+等级提升",
+      "test_data": "fixture: bot holding diamond_sword, zombie at (2,64,0), bot has 0 XP",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-003"
+      ],
+      "release_blocking_reason": "经验球拾取+等级提升 失败直接阻断核心机制可用性，影响完整玩家体验"
+    },
+    {
+      "id": "TC-MCBOTMECHANI-020",
+      "requirement_id": "REQ-MCBOTMECHANI-008",
+      "title": "XP 暴露 harness",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "BotState 第13组件+JSON xp key",
+      "module": "xp",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-008"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - BotState 第13组件+JSON xp key",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "BotState 第13组件+JSON xp key",
+      "test_data": "fixture: bot holding diamond_sword, zombie at (2,64,0), bot has 0 XP",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-003"
+      ]
+    },
+    {
+      "id": "TC-MCBOTMECHANI-021",
+      "requirement_id": "REQ-MCBOTMECHANI-008",
+      "title": "XP 公式 vanilla 对齐",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "0-15:7+2l, 15-30:37+5(l-15), 30+:112+9(l-30)",
+      "module": "xp",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-008"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - 0-15:7+2l, 15-30:37+5(l-15), 30+:112+9(l-30)",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "0-15:7+2l, 15-30:37+5(l-15), 30+:112+9(l-30)",
+      "test_data": "fixture: bot holding diamond_sword, zombie at (2,64,0), bot has 0 XP",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-003"
+      ]
+    },
+    {
+      "id": "TC-MCBOTMECHANI-022",
+      "requirement_id": "REQ-MCBOTMECHANI-009",
+      "title": "铁砧菜单+XP 同步",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "MenuOpener 打开+facade.syncExperience",
+      "module": "menu",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-009"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - MenuOpener 打开+facade.syncExperience",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "MenuOpener 打开+facade.syncExperience",
+      "test_data": "fixture: menu test environment with default bot state",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-010"
+      ]
+    },
+    {
+      "id": "TC-MCBOTMECHANI-023",
+      "requirement_id": "REQ-MCBOTMECHANI-009",
+      "title": "铁砧重命名",
+      "priority": "P2",
+      "validation_scope": "formal",
+      "description": "setAnvilName 调 AnvilMenu.setItemName",
+      "module": "menu",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-009"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - setAnvilName 调 AnvilMenu.setItemName",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "setAnvilName 调 AnvilMenu.setItemName",
+      "test_data": "default fixture",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-010"
+      ]
+    },
+    {
+      "id": "TC-MCBOTMECHANI-024",
+      "requirement_id": "REQ-MCBOTMECHANI-009",
+      "title": "附魔台+按钮",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "MenuOpener 打开+clickButton 选附魔",
+      "module": "menu",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-009"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - MenuOpener 打开+clickButton 选附魔",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "MenuOpener 打开+clickButton 选附魔",
+      "test_data": "fixture: menu test environment with default bot state",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-010"
+      ]
+    },
+    {
+      "id": "TC-MCBOTMECHANI-025",
+      "requirement_id": "REQ-MCBOTMECHANI-009",
+      "title": "村民交易打开",
+      "priority": "P2",
+      "validation_scope": "formal",
+      "description": "openEntity 打开 MerchantMenu",
+      "module": "menu",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-009"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - openEntity 打开 MerchantMenu",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "openEntity 打开 MerchantMenu",
+      "test_data": "default fixture",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-010"
+      ]
+    },
+    {
+      "id": "TC-MCBOTMECHANI-026",
+      "requirement_id": "REQ-MCBOTMECHANI-010",
+      "title": "镐挖方块伤1耐久",
+      "priority": "P2",
+      "validation_scope": "formal",
+      "description": "DiggerItem.mineBlock 伤1点",
+      "module": "dig",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-010"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - DiggerItem.mineBlock 伤1点",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "DiggerItem.mineBlock 伤1点",
+      "test_data": "default fixture",
+      "risk_mechanism_ids": []
+    },
+    {
+      "id": "TC-MCBOTMECHANI-027",
+      "requirement_id": "REQ-MCBOTMECHANI-010",
+      "title": "剑挖方块伤2耐久",
+      "priority": "P2",
+      "validation_scope": "formal",
+      "description": "SwordItem.mineBlock 伤2点",
+      "module": "dig",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-010"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - SwordItem.mineBlock 伤2点",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "SwordItem.mineBlock 伤2点",
+      "test_data": "default fixture",
+      "risk_mechanism_ids": []
+    },
+    {
+      "id": "TC-MCBOTMECHANI-028",
+      "requirement_id": "REQ-MCBOTMECHANI-011",
+      "title": "每方块0.005 exhaustion",
+      "priority": "P2",
+      "validation_scope": "formal",
+      "description": "addExhaustion(0.005F) 连续挖掘饥饿下降",
+      "module": "dig",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-011"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - addExhaustion(0.005F) 连续挖掘饥饿下降",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "addExhaustion(0.005F) 连续挖掘饥饿下降",
+      "test_data": "default fixture",
+      "risk_mechanism_ids": []
+    },
+    {
+      "id": "TC-MCBOTMECHANI-029",
+      "requirement_id": "REQ-MCBOTMECHANI-012",
+      "title": "剑满蓄力非疾跑横扫",
+      "priority": "P2",
+      "validation_scope": "formal",
+      "description": "横扫 AoE 伤害=1.0+SweepingEdge比率×主伤害",
+      "module": "combat",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-012"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - 横扫 AoE 伤害=1.0+SweepingEdge比率×主伤害",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "横扫 AoE 伤害=1.0+SweepingEdge比率×主伤害",
+      "test_data": "default fixture",
+      "risk_mechanism_ids": []
+    },
+    {
+      "id": "TC-MCBOTMECHANI-030",
+      "requirement_id": "REQ-MCBOTMECHANI-012",
+      "title": "疾跑不横扫",
+      "priority": "P2",
+      "validation_scope": "formal",
+      "description": "isSprinting 时改为击退加成",
+      "module": "combat",
+      "type": "gametest",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-012"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - isSprinting 时改为击退加成",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "isSprinting 时改为击退加成",
+      "test_data": "default fixture",
+      "risk_mechanism_ids": []
+    },
+    {
+      "id": "TC-MCBOTMECHANI-031",
+      "requirement_id": "REQ-MCBOTMECHANI-013",
+      "title": "全量539测试通过",
+      "priority": "P0",
+      "validation_scope": "formal",
+      "description": "test 全绿+编译+checkstyle+spotless",
+      "module": "regression",
+      "type": "integration",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-013"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - test 全绿+编译+checkstyle+spotless",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "test 全绿+编译+checkstyle+spotless",
+      "test_data": "fixture: full codebase at HEAD, python tool/mcbot_tool.py test",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-004"
+      ],
+      "release_blocking_reason": "全量539测试通过 失败直接阻断核心机制可用性，影响完整玩家体验"
+    },
+    {
+      "id": "TC-MCBOTMECHANI-032",
+      "requirement_id": "REQ-MCBOTMECHANI-013",
+      "title": "边界契约 marker 完整",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "BoundaryContractMarkerTest 通过",
+      "module": "regression",
+      "type": "integration",
+      "requirement_ids": [
+        "REQ-MCBOTMECHANI-013"
+      ],
+      "steps": [
+        "前置: 准备测试环境 - BoundaryContractMarkerTest 通过",
+        "执行: 触发被测机制",
+        "观察: 记录可观察结果",
+        "断言: 验证结果与预期一致"
+      ],
+      "expected_result": "BoundaryContractMarkerTest 通过",
+      "test_data": "fixture: full codebase at HEAD, python tool/mcbot_tool.py test",
+      "risk_mechanism_ids": [
+        "RM-MCBOTMECHANI-004"
+      ]
+    }
+  ],
+  "executions": [],
+  "evidence": [],
+  "bugs": [],
+  "bug_candidates": [],
+  "risks": [],
+  "acceptance_checks": [],
+  "blockers": [],
+  "manual_handoff": {
+    "required": false,
+    "status": "not_required",
+    "reason": "",
+    "target_platform": "",
+    "operator": "",
+    "prerequisites": [],
+    "case_ids": [],
+    "evidence_requirements": [],
+    "result_submission": []
+  },
+  "unverified": [
+    "in-engine gametest 端到端验证（铁砧花费计算、酿造计时、附魔种子、村民交易实际游戏内行为）未在运行的 MC 实例中验证",
+    "harness 侧智能决策层（何时修装备、何时附魔、和谁交易）是独立项目，本轮未触及",
+    "实际游戏运行时的物理交互验证（攀爬手感、下潜速度、横扫范围）仅通过代码审查和 vanilla 对齐，未在真实游戏中实测"
+  ],
+  "coverage": {
+    "requirement_total": 13,
+    "requirement_linked": 13,
+    "requirement_unlinked": 0,
+    "p0_requirement_total": 4,
+    "p0_requirement_linked": 4,
+    "case_total": 32,
+    "case_status_counts": {
+      "未执行": 32
+    },
+    "acceptance_total": 0,
+    "acceptance_status_counts": {}
+  },
+  "release_decision": {
+    "decision": "undetermined",
+    "rationale": "尚未执行。",
+    "conditions": []
+  },
+  "delivery_manifest": {
+    "source_revision": 4,
+    "outputs": [
+      {
+        "purpose": "deliverable",
+        "carrier": "lark_doc",
+        "format": "lark_doc",
+        "filename": "mc-bot-server 机制补齐-QA测试方案与报告",
+        "source_revision": 4,
+        "sha256": "3fb720000291f32478ebff732444eac83a9c6bab528268e2fee76668a7cf6619",
+        "locator": "https://bytedance.larkoffice.com/docx/TVNndSFvXo7gxrxXPxpcipc0nVf",
+        "readback_receipt": "{\n  \"ok\": false,\n  \"identity\": \"user\",\n  \"error\": {\n    \"type\": \"validation\",\n    \"subtype\": \"invalid_argument\",\n    \"message\": \"unknown flag \\\"--document-id\\\" for \\\"lark-cli docs +fetch\\\"\",\n    \"hint",
+        "validated": false,
+        "status": "created"
+      }
+    ],
+    "fingerprint": "sha256:715e970b2610302422dac0496a5bf67870ea4f56e6088d9b36b604fceee84f51"
+  },
+  "test_data": {
+    "writes_allowed": false,
+    "accounts": [],
+    "created_records": [],
+    "cleanup": {
+      "required": false,
+      "status": "completed",
+      "command": "none",
+      "residuals": []
+    }
+  },
+  "disclosures": [
+    "非 stale/failed 产物必须匹配当前 revision（delivery_manifest.outputs[].source_revision）"
+  ]
+}
