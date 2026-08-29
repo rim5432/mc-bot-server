@@ -142,6 +142,14 @@ landed (archive). Remaining:
            CombatBehaviorLoadoutTest (5 cases); gametest
            equipmentMirrorFeedsAttributes staged pending engine
            (live server holds run/world, H-R5).    [dep: none]
+           AMENDED 2026-08-29 (b677ad5): MeleeResolver no longer
+           routes through Mob.doHurtTarget - the chain is inlined
+           (performMeleeAttack) to carry the 1.5x crit multiplier
+           and the sword sweep, the item-derived attack cooldown
+           gates damage with a ready-gated reset, and the body
+           gained ATTACK_SPEED/ATTACK_KNOCKBACK bases. Weapon
+           ranking is DPS-shaped again; the inlined chain is the
+           same deviation class as DigExecutor's break sequence.
   - [x] M  Hunger sense + consumption (landed 2026-08-27, user GO
            = Path A ruling, ledger 34): carrier-owned FoodData with
            verbatim tick clone (free regen floor retired - regen is
@@ -271,7 +279,12 @@ its open reserves, none blocking a current stage:
          control - unlock: first underwater scenario that needs it.
          Requires threading the sneak bit through setDrive and a
          gametest proving travel() consumes yya unrotated.
-                                                        [dep: none]
+         UPDATE 2026-08-29: the descent half is real - sneak
+         in water maps to downward thrust (applyWaterDescent) and
+         the planner drives it through the SwimDown edge with the
+         liquid-gated sneak flag (cf3a96f); ascent predates
+         (jumpInFluid). Remaining: a harness-facing deliberate-
+         depth story if one is ever demanded.   [dep: none]
 - [ ] S  Pose.SWIMMING getDimensions override + pose-aware collision
          predicates so the carrier can crawl 1-block flooded gaps -
          rides issue 0003's pickup.      [dep: issue 0003 un-parks]
@@ -328,14 +341,25 @@ dies (2026-08-29):
          request) - the device fills one recipe per call; the harness
          orchestrates chains today.                          [dep: none]
 - [ ] M  Multi-target combat and retreat choreography.       [dep: none]
-- [ ] S  Climb (ladders / vines) - the trait exists, no deliberate
-         move yet.                                           [dep: none]
+- [ ] S  Climb (ladders / vines) - PARTIAL 2026-08-29: the
+         deliberate move landed (BasicMoves.ClimbUp, trait-driven,
+         offline-gated by BasicMovesClimbTest, cf3a96f) but no
+         engine scenario exercises a real ladder ascent yet - the
+         gametest is the remaining half.     [dep: none]
 - [ ] S  Spatial memory / waypoint persistence across sessions.
                                                              [dep: none]
 - [ ] M  Transport beyond the RCON console bridge (MCP / HTTP /
          stdio) - the bot stays blind to the choice.         [dep: none]
-- [ ] S  Dig-fidelity tail: enchantment-aware dig speed and
-         match_tool loot fidelity.                           [dep: none]
+- [x] S  Dig-fidelity tail: enchantment-aware dig speed and
+         match_tool loot fidelity (landed 2026-08-29, 63114ea):
+         DigPacing.applyDigSpeedModifiers ports Player.getDigSpeed
+         minus the airborne half (efficiency / haste / mining
+         fatigue / underwater without Aqua Affinity;
+         DigPacingTest-gated), and the break sequence drops
+         resources with the held stack as TOOL context plus
+         Item.mineBlock durability and vanilla mining exhaustion -
+         engine-proven by the pooled batch's dig scenarios
+         (52/52).                             [dep: none]
 
 Combat envelope honesty (retired map "known limits", unchanged):
 melee standoff-kill; creeper trades hits (accepted risk); ranged
