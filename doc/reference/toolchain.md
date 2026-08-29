@@ -1,6 +1,6 @@
 ---
 title: Toolchain Reference
-last_verified: 2026-08-27
+last_verified: 2026-08-29
 covers:
   - gradle.properties
   - build.gradle
@@ -28,7 +28,7 @@ Facts about this repo's build toolchain. This document **covers**
 | Error Prone | plugin 5.1.0 + core 2.42.0 — 2.42.0 is the last core that runs on a JDK 17 toolchain; verified working on the moddev compile chain unmodified, flags must go through `options.errorprone.check(...)` (raw `-Xep:` compilerArgs are rejected by plain javac when disabled) |
 | SpotBugs | plugin 6.5.11 + tool 4.10.4 — scoped to api/core packages via `onlyAnalyze`, which removes the MC auxclasspath problem entirely |
 | JaCoCo | Gradle builtin; `jacocoTestReport` emits xml+html, manual-run lens |
-| PIT mutation | plugin `info.solidsoft.pitest` 1.15.0 + junit5 engine 1.2.1 — manual `gradle pitest`; full-tree baseline ≈ 2min at this repo size |
+| PIT mutation | plugin `info.solidsoft.pitest` 1.15.0 + junit5 engine 1.2.1 — manual `gradle pitest`; full-tree baseline ≈ 2min at this repo size. Scoped rounds pass `-PpitClasses`/`-PpitTests` (comma-joined patterns) so adapter classes' MC references stay off the minion classpath |
 
 Do not hardcode versions into new docs; link here instead.
 

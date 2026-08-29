@@ -1,6 +1,6 @@
 ---
 title: ADR-0001 Use moddev-legacyforge instead of ForgeGradle
-last_verified: 2026-08-27
+last_verified: 2026-08-29
 covers:
   - build.gradle
   - gradle.properties
