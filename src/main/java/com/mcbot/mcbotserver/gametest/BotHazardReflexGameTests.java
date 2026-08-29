@@ -74,7 +74,7 @@ public final class BotHazardReflexGameTests {
         var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
 
         // Four-deep pool over the whole floor; stone at the bottom.
-        GametestRig.fillPool(helper, 0, 15, 4);
+        GametestRig.fillPool(helper, 0, 15, 0, 15, 4, Blocks.WATER);
 
         // Teleport to the pool bottom and force low air. The body
         // stands on the stone floor (onGround=true), so the first
@@ -149,13 +149,7 @@ public final class BotHazardReflexGameTests {
         // 5x5 two-deep lava pool centered at (7, FLOOR_Y, 7); stone
         // floor at FLOOR_Y-2. The surrounding floor stays the
         // template's default (air above stone) — that is the shore.
-        for (int x = 5; x <= 9; x++) {
-            for (int z = 5; z <= 9; z++) {
-                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y, z), Blocks.LAVA);
-                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y - 1, z), Blocks.LAVA);
-                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y - 2, z), Blocks.SMOOTH_STONE);
-            }
-        }
+        GametestRig.fillPool(helper, 5, 9, 5, 9, 2, Blocks.LAVA);
         // Ensure the shore ring has a solid floor (the template may
         // leave it air-only).
         for (int x = 0; x < 16; x++) {

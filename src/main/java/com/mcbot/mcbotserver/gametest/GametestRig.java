@@ -364,18 +364,26 @@ final class GametestRig {
     }
 
     /**
-     * Fills a water pool over the test floor across an inclusive x
-     * lane: {@code waterDepth} water layers topped by smooth stone.
-     * Shared terrain carve for hazard and locomotion scenarios.
+     * Fills a liquid pool over the test floor across an inclusive
+     * x/z rectangle: {@code depth} fluid layers downward from the
+     * floor, topped by smooth stone. Shared terrain carve for hazard
+     * and locomotion scenarios - full lanes pass z 0..15, pools bound
+     * both axes.
      */
     public static void fillPool(
-            net.minecraft.gametest.framework.GameTestHelper helper, int xFrom, int xToInclusive, int waterDepth) {
+            net.minecraft.gametest.framework.GameTestHelper helper,
+            int xFrom,
+            int xToInclusive,
+            int zFrom,
+            int zToInclusive,
+            int depth,
+            net.minecraft.world.level.block.Block fluid) {
         for (int x = xFrom; x <= xToInclusive; x++) {
-            for (int z = 0; z < 16; z++) {
-                for (int d = 0; d < waterDepth; d++) {
-                    helper.setBlock(new BlockPos(x, FLOOR_Y - d, z), Blocks.WATER);
+            for (int z = zFrom; z <= zToInclusive; z++) {
+                for (int d = 0; d < depth; d++) {
+                    helper.setBlock(new BlockPos(x, FLOOR_Y - d, z), fluid);
                 }
-                helper.setBlock(new BlockPos(x, FLOOR_Y - waterDepth, z), Blocks.SMOOTH_STONE);
+                helper.setBlock(new BlockPos(x, FLOOR_Y - depth, z), Blocks.SMOOTH_STONE);
             }
         }
     }

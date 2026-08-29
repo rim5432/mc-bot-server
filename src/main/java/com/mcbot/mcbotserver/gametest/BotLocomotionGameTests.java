@@ -100,11 +100,7 @@ public final class BotLocomotionGameTests {
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void crossesWaterTrench(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
-        for (int x = 6; x <= 8; x++) {
-            for (int z = 0; z < 16; z++) {
-                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y, z), Blocks.WATER);
-            }
-        }
+        GametestRig.fillPool(helper, 6, 8, 0, 15, 1, Blocks.WATER);
         CellPos goalCell = localToCell(helper, new BlockPos(12, GametestRig.WALK_Y, 8));
         var mission = submitGoto(rig, goalCell);
 
@@ -140,7 +136,7 @@ public final class BotLocomotionGameTests {
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void crossesDeepPool(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
-        GametestRig.fillPool(helper, 6, 8, 3);
+        GametestRig.fillPool(helper, 6, 8, 0, 15, 3, Blocks.WATER);
         CellPos goalCell = localToCell(helper, new BlockPos(12, GametestRig.WALK_Y, 8));
         var mission = submitGoto(rig, goalCell, GametestRig.MISSION_BUDGET + 150);
 
@@ -295,11 +291,7 @@ public final class BotLocomotionGameTests {
     public static void crossesLavaTrench(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
         rig.body().addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 1200, 0, false, false));
-        for (int x = 6; x <= 8; x++) {
-            for (int z = 0; z < 16; z++) {
-                helper.setBlock(new BlockPos(x, GametestRig.FLOOR_Y, z), Blocks.LAVA);
-            }
-        }
+        GametestRig.fillPool(helper, 6, 8, 0, 15, 1, Blocks.LAVA);
         CellPos goalCell = localToCell(helper, new BlockPos(12, GametestRig.WALK_Y, 8));
         var mission = submitGoto(rig, goalCell, 500);
 
