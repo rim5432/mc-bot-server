@@ -16,6 +16,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.AnvilMenu;
 import net.minecraft.world.inventory.BeaconMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.ContainerSynchronizer;
@@ -191,6 +192,25 @@ public final class BindingMenu {
         Optional<MobEffect> primary = resolveEffect(primaryKey);
         Optional<MobEffect> secondary = resolveEffect(secondaryKey);
         beacon.updateEffects(primary, secondary);
+    }
+
+    /**
+     * Set the anvil rename text for the item in the left input slot.
+     * AnvilMenu.setItemName updates the rename field and recomputes the
+     * result (a rename alone costs 1 level; combined with repair or
+     * enchant transfer the cost stacks). Pass null or blank to clear the
+     * rename (reverts to the item's default name).
+     *
+     * @param name the new item name, or null/blank to clear
+     * @throws IllegalStateException when the open menu is not an anvil menu
+     */
+    public void setAnvilName(String name) {
+        ensureOpen();
+        ensureStillValid();
+        if (!(menu instanceof AnvilMenu anvil)) {
+            throw new IllegalStateException("setAnvilName requires an open anvil menu");
+        }
+        anvil.setItemName(name == null || name.isBlank() ? "" : name);
     }
 
     private static Optional<MobEffect> resolveEffect(String key) {

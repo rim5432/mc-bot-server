@@ -595,6 +595,129 @@ public final class BotInventoryGameTests {
         return total;
     }
 
+    /**
+     * Scenario: the anvil rename loop end to end — an item QUICK_MOVE'd
+     * into the input slot, the rename text set, the result slot taken;
+     * the body's XP pays the 1-level rename cost and the renamed item
+     * lands in the bot inventory. This is the engine verification the
+     * eatsWhenHungry lesson demands: the anvil's mayPickup gate reads
+     * the facade's experienceLevel field, which only syncExperience
+     * keeps truthful.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 200)
+    public static void anvilRenamesAndChargesLevels(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+        BlockPos anvilLocal = new BlockPos(7, GametestRig.WALK_Y, 8);
+        helper.setBlock(anvilLocal, Blocks.ANVIL);
+        BlockPos anvilAbs = helper.absolutePos(anvilLocal);
+
+        rig.body().giveExperienceLevels(5);
+        rig.body().getInventory().container().setItem(0, new ItemStack(Items.IRON_SWORD));
+
+        var tx = rig.actor().menuTransactions();
+        var view = tx.openMenu(GametestRig.cellOf(anvilAbs));
+        check(view != null, "opening the anvil must succeed");
+        checkEquals("anvil", view.type(), "the opened menu must be the anvil");
+
+        int hotbar0 = firstSlotWithRole(view, SlotRole.HOTBAR);
+        view = tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
+        check(!view.slot(0).isEmpty(), "the sword must land in the anvil input slot");
+        tx.setAnvilName("Botblade");
+
+        // The take targets the OUTPUT slot (2) — AnvilMenu's mayPickup
+        // gate reads the synced experienceLevel, and the take fires
+        // onTake -> giveExperienceLevels(-1) through the facade.
+        view = tx.menuClick(2, 0, MenuClick.PICKUP);
+        check(view.carried() != null && !view.carried().isEmpty(), "the renamed result must be takeable");
+        check(view.slot(0).isEmpty(), "the take must consume the input sword");
+        tx.menuClick(hotbar0, 0, MenuClick.PICKUP);
+        tx.closeMenu();
+
+        checkEquals(4, rig.body().getExperienceLevel(), "the 1-level rename cost must be paid from the body's XP");
+        checkEquals(
+                "Botblade",
+                rig.body().getInventory().container().getItem(0).getHoverName().getString(),
+                "the renamed sword must carry the set name");
+        rig.body().discard();
+        helper.succeed();
+    }
+
+    /**
+     * Scenario: the enchanting table through clickMenuButton — sword +
+     * lapis deposited, body levels sufficient, option 0 clicked; the
+     * enchant consumes one lapis and levels through the facade
+     * delegation. The enchantment power needs bookshelves (with none
+     * the menu offers no enchantment list at all), hence the shelves.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 200)
+    public static void enchantsThroughMenuButton(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+        BlockPos tableLocal = new BlockPos(7, GametestRig.WALK_Y, 8);
+        helper.setBlock(tableLocal, Blocks.ENCHANTING_TABLE);
+        helper.setBlock(new BlockPos(9, GametestRig.WALK_Y + 1, 8), Blocks.BOOKSHELF);
+        helper.setBlock(new BlockPos(8, GametestRig.WALK_Y + 1, 9), Blocks.BOOKSHELF);
+
+        rig.body().giveExperienceLevels(30);
+        var container = rig.body().getInventory().container();
+        container.setItem(0, new ItemStack(Items.IRON_SWORD));
+        container.setItem(1, new ItemStack(Items.LAPIS_LAZULI, 8));
+
+        var tx = rig.actor().menuTransactions();
+        var view = tx.openMenu(GametestRig.cellOf(helper.absolutePos(tableLocal)));
+        check(view != null, "opening the enchanting table must succeed");
+
+        int hotbar0 = firstSlotWithRole(view, SlotRole.HOTBAR);
+        int hotbar1 = hotbar0 + 1;
+        view = tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
+        view = tx.menuClick(hotbar1, 0, MenuClick.QUICK_MOVE);
+        check(!view.slot(1).isEmpty(), "the lapis must land in the enchanting fuel slot");
+
+        tx.menuButtonClick(0);
+        var after = tx.menuSnapshot();
+        checkEquals(7, after.slot(1).item().count(), "option 0 consumes exactly one lapis");
+        check(rig.body().getExperienceLevel() < 30, "the enchant must charge levels through the facade delegation");
+        // The enchanted sword is proven by the consumed inputs: a failed
+        // clickMenuButton consumes nothing.
+        view = tx.menuClick(0, 0, MenuClick.QUICK_MOVE);
+        checkEquals(1, countItems(rig, Items.IRON_SWORD), "the sword must come back to the inventory");
+        tx.closeMenu();
+
+        rig.body().discard();
+        helper.succeed();
+    }
+
+    /**
+     * Scenario: XP persistence across the menu open/close cycle — the
+     * syncExperience round trip must not create or destroy body XP
+     * (the facade fields are write-only mirrors, never a second
+     * source of truth).
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void xpSurvivesMenuCycles(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+        BlockPos chestLocal = new BlockPos(7, GametestRig.WALK_Y, 8);
+        helper.setBlock(chestLocal, Blocks.CHEST);
+        BlockPos chestAbs = helper.absolutePos(chestLocal);
+
+        rig.body().giveExperienceLevels(7);
+        rig.body().getInventory().container().setItem(0, new ItemStack(Items.DIAMOND));
+        var tx = rig.actor().menuTransactions();
+
+        for (int cycle = 0; cycle < 3; cycle++) {
+            var view = tx.openMenu(GametestRig.cellOf(chestAbs));
+            check(view != null, "opening the chest must succeed on cycle " + cycle);
+            int hotbar0 = firstSlotWithRole(view, SlotRole.HOTBAR);
+            tx.menuClick(hotbar0, 0, MenuClick.PICKUP);
+            tx.menuClick(hotbar0, 0, MenuClick.PICKUP);
+            tx.closeMenu();
+            checkEquals(
+                    7, rig.body().getExperienceLevel(), "menu cycle " + cycle + " must not create or destroy body XP");
+        }
+        checkEquals(1, countItems(rig, Items.DIAMOND), "the diamond round trip must be lossless");
+        rig.body().discard();
+        helper.succeed();
+    }
+
     /** First flat slot index carrying the given role (e.g. the first
      * HOTBAR slot). Role-based addressing - flat layouts differ per
      * menu kind. */

@@ -1,13 +1,17 @@
 package com.mcbot.mcbotserver.adapter.entity;
 
+import com.mcbot.mcbotserver.adapter.BotPlayerFacade;
 import com.mcbot.mcbotserver.adapter.inventory.BindingInventory;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.ai.control.MoveControl;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * The physical body: a vanilla-pathfinding-capable mob whose locomotion
@@ -75,6 +79,40 @@ public final class BotBodyEntity extends PathfinderMob {
     private int presenceCooldown;
 
     /**
+     * Experience level (vanilla Player.experienceLevel mirror). 0 at
+     * spawn; increases as XP orbs are absorbed. The level formula in
+     * {@link #getXpNeededForNextLevel()} matches vanilla: 0-15 uses
+     * 7+level*2, 15-30 uses 37+(level-15)*5, 30+ uses 112+(level-30)*9.
+     */
+    private int experienceLevel;
+
+    /**
+     * Progress toward the next level, 0.0..1.0 (vanilla
+     * Player.experienceProgress mirror). Added to by giveExperiencePoints;
+     * when it reaches 1.0 the level increments and the remainder carries.
+     */
+    private float experienceProgress;
+
+    /**
+     * Total experience points ever absorbed (vanilla Player.totalExperience
+     * mirror). Used for scoreboard and anvil cost display; never decreases
+     * on level-up (only the progress bar resets).
+     */
+    private int totalExperience;
+
+    /**
+     * Lazy-initialized Player facade for kill-XP attribution. Vanilla
+     * mobs award XP orbs in die() only when lastHurtByPlayerTime > 0,
+     * which is set by LivingEntity.setLastHurtByPlayer(Player). The bot
+     * is a PathfinderMob and cannot be that Player directly, so the
+     * facade fills the typed slot — it is never spawned, never moves,
+     * and die() only reads the timestamp, not any facade method. Created
+     * on first melee hit to avoid paying the menu-bridge construction
+     * cost for a bot that never fights.
+     */
+    private BotPlayerFacade playerFacade;
+
+    /**
      * Ticks between presence scans. The scan queries a wide entity
      * box and ray-traces one line of sight per candidate; hostile
      * awareness does not need per-tick latency (vanilla targeting
@@ -88,6 +126,16 @@ public final class BotBodyEntity extends PathfinderMob {
      * 32); the per-monster attribute check below is the authority.
      */
     private static final double PRESENCE_SCAN_HALF_WIDTH = 40.0;
+
+    /**
+     * Downward velocity applied while sneaking in water. Vanilla
+     * Player.travel interprets shift-held-in-water as descent;
+     * LivingEntity.travel (the carrier's superclass) does not, so the
+     * binding applies it directly. -0.10/tick before the water drag
+     * (0.8x) and gravity (-0.005) in travel() yields a net ~-0.085/tick
+     * descent, comparable to a player holding shift at the surface.
+     */
+    private static final float WATER_DESCENT_SPEED = -0.10f;
 
     /**
      * The body's hunger state (Phase 4 eat slice, issue 0010): a
@@ -285,12 +333,11 @@ public final class BotBodyEntity extends PathfinderMob {
      * Apply the sneak pose pair: the shift flag drives vanilla's
      * pressure-plate/trigger courtesies, and CROUCHING pose gives the
      * 1.5-block height (gap crawl + {@code isCrouching} visibility
-     * reduction) - both entity-level, no player required. Deliberate
-     * omission: vanilla's walk-off-the-edge clip lives only in
-     * {@code Player.maybeBackOffFromEdge} (the base Entity method is a
-     * stub), so a sneaking body CAN still step off a ledge - porting
-     * that guard is its own item with its own gametest, not free
-     * rider behavior here.
+     * reduction) - both entity-level, no player required. The walk-off-
+     * the-edge guard is implemented via {@link #maybeBackOffFromEdge}
+     * (a verbatim clone of Player.maybeBackOffFromEdge), so a sneaking
+     * body stops at ledges exactly like a player - the old "base Entity
+     * maybeBackOffFromEdge is a stub" gap is closed.
      *
      * @param sneakOn true to crouch, false to stand back up
      */
@@ -364,6 +411,7 @@ public final class BotBodyEntity extends PathfinderMob {
         float movedHorizontally = (float) Math.hypot(getX() - xo, getZ() - zo);
         foodData.addExhaustion(movedHorizontally * (isSprinting() ? 0.1f : 0.01f));
         applyDriveJump();
+        applyWaterDescent();
         if (hasPendingRotation) {
             // setRot does yaw%360 / pitch%360 normalization internally;
             // setYHeadRot aligns the head with the body so the model does
@@ -376,6 +424,7 @@ public final class BotBodyEntity extends PathfinderMob {
         }
         tickPresence();
         groundPickup.tick();
+        tickXpPickup();
     }
 
     /**
@@ -455,6 +504,256 @@ public final class BotBodyEntity extends PathfinderMob {
             // waypoint is still above us.
             jumpFromGround();
             driveJump = false;
+        }
+    }
+
+    /**
+     * Water descent: shift-held-in-water maps to downward thrust.
+     * Vanilla Player.travel handles this natively; LivingEntity.travel
+     * (the carrier's superclass) does not — the water section has no
+     * shift-key branch (verified against decompiled 1.20.1
+     * LivingEntity.java lines 2086-2125). So the binding applies the
+     * descent directly, the same class of deviation as jumpInFluid for
+     * ascent. Gated on !driveJump so an active ascent claim wins over a
+     * stale sneak flag (the pathing layer never submits both, but the
+     * harness latch can).
+     */
+    private void applyWaterDescent() {
+        if (!driveJump && isShiftKeyDown() && isInWater() && !onGround()) {
+            setDeltaMovement(
+                    getDeltaMovement().x(),
+                    WATER_DESCENT_SPEED,
+                    getDeltaMovement().z());
+        }
+    }
+
+    /**
+     * Sneak edge guard: a verbatim clone of Player.maybeBackOffFromEdge
+     * (decompiled 1.20.1 Player.java lines 1116-1168), adapted for a
+     * non-Player carrier. The base Entity implementation is a no-op
+     * (returns the movement vector unchanged), so without this override a
+     * sneaking bot walks straight off ledges.
+     *
+     * <p>Conditions (all must hold): the mover type is SELF (the binding
+     * drives movement through LivingEntity.travel → move(SELF, delta)),
+     * the movement has no upward component (y <= 0 — jumping off a ledge
+     * is still allowed), shift is held (isShiftKeyDown, which Player
+     * exposes as isStayingOnGroundSurface), and the body is above ground
+     * (onGround or close enough that a block is within step height below).
+     *
+     * <p>Algorithm: reduce x and z in 0.05 increments while the body,
+     * offset by (dx, -maxUpStep, dz), has no collision — no collision
+     * means no ground below that offset, i.e. the body would walk off the
+     * edge. The loop stops at the largest dx/dz that still has ground
+     * below, so the body creeps right up to the edge but never past it.
+     * Three passes: x-only, z-only, then combined diagonal.
+     *
+     * @param movement the intended movement vector; never null
+     * @param moverType the mover type; never null
+     * @return the edge-clamped movement vector; never null
+     */
+    @Override
+    protected Vec3 maybeBackOffFromEdge(Vec3 movement, MoverType moverType) {
+        if (moverType != MoverType.SELF || movement.y > 0.0 || !isShiftKeyDown() || !isBotAboveGround()) {
+            return movement;
+        }
+        double dx = movement.x;
+        double dz = movement.z;
+        double step = 0.05;
+        while (dx != 0.0 && level().noCollision(this, getBoundingBox().move(dx, -maxUpStep(), 0.0))) {
+            if (Math.abs(dx) < step) {
+                dx = 0.0;
+            } else if (dx > 0.0) {
+                dx -= step;
+            } else {
+                dx += step;
+            }
+        }
+        while (dz != 0.0 && level().noCollision(this, getBoundingBox().move(0.0, -maxUpStep(), dz))) {
+            if (Math.abs(dz) < step) {
+                dz = 0.0;
+            } else if (dz > 0.0) {
+                dz -= step;
+            } else {
+                dz += step;
+            }
+        }
+        while (dx != 0.0
+                && dz != 0.0
+                && level().noCollision(this, getBoundingBox().move(dx, -maxUpStep(), dz))) {
+            if (Math.abs(dx) < step) {
+                dx = 0.0;
+            } else if (dx > 0.0) {
+                dx -= step;
+            } else {
+                dx += step;
+            }
+            if (Math.abs(dz) < step) {
+                dz = 0.0;
+            } else if (dz > 0.0) {
+                dz -= step;
+            } else {
+                dz += step;
+            }
+        }
+        return new Vec3(dx, movement.y, dz);
+    }
+
+    /**
+     * Whether the body is close enough to ground that the edge guard
+     * should engage. Mirrors Player.isAboveGround (decompiled 1.20.1
+     * Player.java lines 1170-1173): on ground always qualifies; a
+     * falling body qualifies only when fallDistance is below step height
+     * AND a block exists within that distance below (noCollision returns
+     * false). A body already over open air (no block below) is excluded —
+     * the guard only prevents walking OFF an edge, not mid-air steering.
+     *
+     * @return true when the edge guard should apply
+     */
+    private boolean isBotAboveGround() {
+        return onGround()
+                || (fallDistance < maxUpStep()
+                        && !level().noCollision(this, getBoundingBox().move(0.0, fallDistance - maxUpStep(), 0.0)));
+    }
+
+    // ------------------------------------------------------------------
+    // Experience (vanilla Player.experience* mirror)
+    // ------------------------------------------------------------------
+
+    /**
+     * The bot's current experience level. Mirrors Player.experienceLevel.
+     *
+     * @return experience level; never negative
+     */
+    public int getExperienceLevel() {
+        return experienceLevel;
+    }
+
+    /**
+     * Progress toward the next level, 0.0..1.0. Mirrors
+     * Player.experienceProgress.
+     *
+     * @return progress fraction; 0.0..1.0
+     */
+    public float getExperienceProgress() {
+        return experienceProgress;
+    }
+
+    /**
+     * Total experience points ever absorbed. Mirrors Player.totalExperience.
+     *
+     * @return total XP; never negative
+     */
+    public int getTotalExperience() {
+        return totalExperience;
+    }
+
+    /**
+     * XP required to go from the current level to the next. Verbatim
+     * vanilla formula (decompiled Player.java getXpNeededForNextLevel):
+     * level >= 30: 112 + (level-30)*9; level >= 15: 37 + (level-15)*5;
+     * else: 7 + level*2.
+     *
+     * @return XP points needed for the next level
+     */
+    public int getXpNeededForNextLevel() {
+        if (experienceLevel >= 30) {
+            return 112 + (experienceLevel - 30) * 9;
+        }
+        if (experienceLevel >= 15) {
+            return 37 + (experienceLevel - 15) * 5;
+        }
+        return 7 + experienceLevel * 2;
+    }
+
+    /**
+     * Add experience points, leveling up as needed. Mirrors
+     * Player.giveExperiencePoints (decompiled lines 1718-1743): clamps
+     * to int, adds to total, fills the progress bar, and rolls overflow
+     * into level-ups. Negative values subtract (used by anvil/enchant
+     * costs).
+     *
+     * @param points XP to add (or subtract if negative)
+     */
+    public void giveExperiencePoints(int points) {
+        if (points == 0) {
+            return;
+        }
+        // Clamp to int range to match vanilla (net.minecraft.util.Mth.clamp
+        // is not needed here because int arithmetic is already bounded).
+        totalExperience = Math.max(0, totalExperience + points);
+        float needed = getXpNeededForNextLevel();
+        experienceProgress += (float) points / needed;
+        while (experienceProgress < 0.0F) {
+            float overflow = experienceProgress * needed;
+            if (experienceLevel > 0) {
+                experienceLevel--;
+                needed = getXpNeededForNextLevel();
+                experienceProgress = 1.0F + overflow / needed;
+            } else {
+                experienceProgress = 0.0F;
+                break;
+            }
+        }
+        while (experienceProgress >= 1.0F) {
+            float overflow = (experienceProgress - 1.0F) * needed;
+            experienceLevel++;
+            needed = getXpNeededForNextLevel();
+            experienceProgress = overflow / needed;
+        }
+        experienceProgress = Mth.clamp(experienceProgress, 0.0F, 1.0F);
+    }
+
+    /**
+     * Add (or subtract) whole levels. Mirrors Player.giveExperienceLevels.
+     *
+     * @param levels levels to add (or subtract if negative)
+     */
+    public void giveExperienceLevels(int levels) {
+        experienceLevel = Math.max(0, experienceLevel + levels);
+        // Vanilla resets the progress bar only on level LOSS (a menu
+        // cost); positive grants (orbs, kills) keep the bar - zeroing
+        // it here would drop earned progress precision every level-up.
+        if (levels < 0) {
+            experienceProgress = 0.0F;
+        }
+    }
+
+    /**
+     * Lazy Player facade for kill-XP attribution. See {@link #playerFacade}
+     * field javadoc for why this exists. Created once and cached; the
+     * facade is never spawned and carries no world state.
+     *
+     * @return the cached facade; never null after first call
+     */
+    public BotPlayerFacade playerFacade() {
+        if (playerFacade == null) {
+            playerFacade = new BotPlayerFacade(this);
+        }
+        return playerFacade;
+    }
+
+    /**
+     * Absorb nearby experience orbs. Vanilla XP orbs fly toward players
+     * and call player.giveExperiencePoints on contact; a PathfinderMob
+     * carrier is invisible to that attraction, so the bot scans manually.
+     * Range matches GroundPickup (bounding box inflated 1.0/0.5/1.0) —
+     * the bot walks over orbs to collect them, same as items. XP orbs
+     * have no pickup delay (unlike ItemEntity), so every orb in range is
+     * absorbed immediately.
+     *
+     * <p>Called from customServerAiStep every tick; the scan is cheap
+     * (entity class filter on a small box) and the orbs despawn on their
+     * own if never collected.
+     */
+    private void tickXpPickup() {
+        var box = getBoundingBox().inflate(1.0, 0.5, 1.0);
+        for (net.minecraft.world.entity.ExperienceOrb orb :
+                level().getEntitiesOfClass(net.minecraft.world.entity.ExperienceOrb.class, box)) {
+            if (orb.isAlive() && orb.value > 0) {
+                giveExperiencePoints(orb.value);
+                orb.discard();
+            }
         }
     }
 

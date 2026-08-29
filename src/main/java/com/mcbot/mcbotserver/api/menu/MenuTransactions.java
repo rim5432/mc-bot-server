@@ -116,6 +116,19 @@ public interface MenuTransactions {
     }
 
     /**
+     * Set the open anvil menu's rename text. AnvilMenu.setItemName
+     * updates the rename field and recomputes the result (a rename
+     * alone costs 1 level). Default implementation is a no-op —
+     * claim-only actors and test recordings legitimately have no
+     * rename surface.
+     *
+     * @param name the new item name, or null/blank to clear
+     * @throws IllegalStateException when no menu is open, the menu is
+     *         closed, or the open menu is not an anvil
+     */
+    default void setAnvilName(String name) {}
+
+    /**
      * Set a beacon menu's primary and secondary effects. BeaconMenu does
      * not use button clicks — effects are applied directly, consuming one
      * payment item. Default implementation is a no-op — claim-only actors

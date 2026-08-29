@@ -243,12 +243,58 @@ public final class BotPlayerFacade extends Player {
      * Sync the facade's entity position to the body's current position.
      * Call before any menu operation that may read position (reach
      * checks, sound positioning). Uses {@code setPos} which is not
-     * final on Entity.
+     * final on Entity. Also syncs experience: anvil and enchanting menus
+     * read the public {@code experienceLevel} field directly for the
+     * affordability check, and the facade is never player-ticked so its
+     * field stays at the construction default (0) without this sync.
      */
     public void syncPosition() {
         setPos(body.getX(), body.getY(), body.getZ());
         setYRot(body.getYRot());
         setXRot(body.getXRot());
+        syncExperience();
+    }
+
+    /**
+     * Copy the body's experience state into the facade's Player fields.
+     * AnvilMenu and EnchantmentMenu access {@code experienceLevel} as a
+     * public field (not a getter), so delegation via override is
+     * impossible — the fields must be written before the menu reads
+     * them. Called from {@link #syncPosition()} so every menu operation
+     * sees the body's live level.
+     */
+    private void syncExperience() {
+        this.experienceLevel = body.getExperienceLevel();
+        this.experienceProgress = body.getExperienceProgress();
+        this.totalExperience = body.getTotalExperience();
+    }
+
+    /**
+     * Deduct or grant levels on the body, then re-sync so the facade
+     * field stays consistent. AnvilMenu calls
+     * {@code player.giveExperienceLevels(-cost)} after a successful
+     * result take; overriding here routes the cost to the body's XP
+     * store instead of the facade's dead field.
+     *
+     * @param levels levels to add (positive) or subtract (negative)
+     */
+    @Override
+    public void giveExperienceLevels(int levels) {
+        body.giveExperienceLevels(levels);
+        syncExperience();
+    }
+
+    /**
+     * Deduct or grant experience points on the body, then re-sync.
+     * Mirror of {@link #giveExperienceLevels(int)} for the points-based
+     * path (enchanting tables use levels, but some mod menus use points).
+     *
+     * @param points XP to add (positive) or subtract (negative)
+     */
+    @Override
+    public void giveExperiencePoints(int points) {
+        body.giveExperiencePoints(points);
+        syncExperience();
     }
 
     /**

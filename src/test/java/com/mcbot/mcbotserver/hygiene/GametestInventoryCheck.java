@@ -78,7 +78,10 @@ class GametestInventoryCheck {
                             "storesAndRetrievesFromChest",
                             "equipsArmorThroughMenuClicks",
                             "wearsBestArmorThroughPlanner",
-                            "picksUpGroundItemsByTouch"),
+                            "picksUpGroundItemsByTouch",
+                            "anvilRenamesAndChargesLevels",
+                            "enchantsThroughMenuButton",
+                            "xpSurvivesMenuCycles"),
             "BotCraftingGameTests",
                     Set.of(
                             "craftsDiamondBlockAtTable",

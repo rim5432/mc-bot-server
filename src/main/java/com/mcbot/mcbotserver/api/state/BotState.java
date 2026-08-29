@@ -38,6 +38,12 @@ import java.util.Map;
  * @param foodLevel          hunger 0..20, vanilla FoodData semantics
  *                           (ledger 34); entered through the H-R4
  *                           friction protocol with this component
+ * @param experienceLevel    vanilla experience level (0 at spawn);
+ *                           drives enchanting/anvil/trading cost display
+ *                           on the harness side. The progress fraction
+ *                           is deliberately absent (continuous, would
+ *                           push a packet every orb pickup — same
+ *                           bucketing rationale as healthHearts).
  */
 // contract: see boundaries.md Boundary D protocol (state snapshot shape)
 public record BotState(
@@ -51,7 +57,8 @@ public record BotState(
         String currentTaskSummary,
         int healthHearts,
         int freeSlots,
-        int foodLevel) {
+        int foodLevel,
+        int experienceLevel) {
 
     /**
      * Creates a validated snapshot.
@@ -80,6 +87,9 @@ public record BotState(
         }
         if (freeSlots < 0) {
             throw new IllegalArgumentException("freeSlots must not be negative");
+        }
+        if (experienceLevel < 0) {
+            throw new IllegalArgumentException("experienceLevel must not be negative");
         }
         if (selectedHotbarSlot < 0 || selectedHotbarSlot > 8) {
             throw new IllegalArgumentException("selectedHotbarSlot must be 0..8");

@@ -89,6 +89,15 @@ public final class ActorMenuTransactions implements MenuTransactions {
     }
 
     @Override
+    public void setAnvilName(String name) {
+        BindingMenu current = menus.currentMenu();
+        if (current == null) {
+            throw new IllegalStateException("no menu is open");
+        }
+        current.setAnvilName(name);
+    }
+
+    @Override
     public MenuView setBeaconEffects(String primaryKey, String secondaryKey) {
         BindingMenu current = menus.currentMenu();
         if (current == null) {

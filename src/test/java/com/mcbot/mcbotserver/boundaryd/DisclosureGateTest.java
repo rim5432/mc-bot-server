@@ -177,11 +177,14 @@ class DisclosureGateTest {
                 "healthHearts",
                 "freeSlots",
                 // Ledger 34 (eat slice): hunger rides the snapshot.
-                "foodLevel");
+                "foodLevel",
+                // Experience level: enchanting/anvil/trading cost display;
+                // progress fraction deliberately absent (continuous).
+                "experienceLevel");
         Set<String> components = Stream.of(BotState.class.getRecordComponents())
                 .map(java.lang.reflect.RecordComponent::getName)
                 .collect(Collectors.toSet());
         assertEquals(allowed, components, "BotState shape drifted outside the frozen model-relevant set");
-        new BotState(new CellPos(0, 64, 0), 0f, 0f, "overworld", Map.of(), 0, Map.of(), "idle", 20, 0, 20);
+        new BotState(new CellPos(0, 64, 0), 0f, 0f, "overworld", Map.of(), 0, Map.of(), "idle", 20, 0, 20, 0);
     }
 }

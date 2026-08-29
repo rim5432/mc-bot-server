@@ -203,7 +203,8 @@ class WireVocabularyGateTest {
                 "currentTaskSummary",
                 "healthHearts",
                 "freeSlots",
-                "foodLevel");
+                "foodLevel",
+                "experienceLevel");
     }
 
     /** Pins the serialized wire keys of the state snapshot: the
@@ -224,7 +225,8 @@ class WireVocabularyGateTest {
                 "goto:task-1",
                 8,
                 12,
-                17);
+                17,
+                0);
         var obj = BotStateJson.toJsonObject(sample);
         assertEquals(
                 Set.of(
@@ -238,7 +240,8 @@ class WireVocabularyGateTest {
                         "task",
                         "healthHearts",
                         "freeSlots",
-                        "food"),
+                        "food",
+                        "xp"),
                 obj.keySet(),
                 "serialized state wire keys drifted; the mapping is " + "documented at boundaries.md (decision 32)");
     }

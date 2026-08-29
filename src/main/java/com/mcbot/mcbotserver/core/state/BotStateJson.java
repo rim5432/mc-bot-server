@@ -34,7 +34,7 @@ public final class BotStateJson {
      *
      * @param state the snapshot to render; never null
      * @return object with keys pos, yaw, pitch, dim, items, slot,
-     *         effects, task, healthHearts, freeSlots, food; never
+     *         effects, task, healthHearts, freeSlots, food, xp; never
      *         null.
      *         Wire keys are frozen (H-R4): dim/items/slot/effects/
      *         task are the serialized forms of the dimension/
@@ -63,6 +63,7 @@ public final class BotStateJson {
         root.addProperty("healthHearts", state.healthHearts());
         root.addProperty("freeSlots", state.freeSlots());
         root.addProperty("food", state.foodLevel());
+        root.addProperty("xp", state.experienceLevel());
         return root;
     }
 }
