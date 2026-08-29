@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
  * so a deleted scenario stays green everywhere except
  * {@code build runGameTest} - which is exactly how
  * {@code routesThroughFenceGap} was once lost to a probe-cleanup
- * regex and only restored after the drift was noticed (c23c932).
+ * regex and only restored after the drift was noticed (f60c3ea).
  *
  * <p>Why a pinned list instead of a minimum count: a count cannot
  * tell "one test replaced by another" from "one test lost". Updating

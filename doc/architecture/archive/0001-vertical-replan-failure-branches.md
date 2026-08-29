@@ -406,16 +406,16 @@ on the previous PR being present.
 
 | PR | Commit | Fixes | Behavior change? |
 |---|---|---|---|
-| 1 | `a06d582` (+ `e3fbf6f` catches) | 1, 2, 3 | No (frame contract, keepalive, physicalised shove, limbo characterization) |
-| 2 | `8cd6ec2` | 4 | Yes (motion detector removed; plan-progress fuse; STUCK_EPSILON semantic redefined to new-min margin) |
-| 3 | `8c775bc` | 5 | No (cell-equality to Chebyshev-1, same out-of-band semantics) |
-| 4 | `ac8bf75` | 6 | Yes (vertical gate: airborne ticks skip trigger eval, landing edge bypasses replan cooldown) |
+| 1 | `9eb72c8` (+ `8c6c504` catches) | 1, 2, 3 | No (frame contract, keepalive, physicalised shove, limbo characterization) |
+| 2 | `52628e2` | 4 | Yes (motion detector removed; plan-progress fuse; STUCK_EPSILON semantic redefined to new-min margin) |
+| 3 | `076da14` | 5 | No (cell-equality to Chebyshev-1, same out-of-band semantics) |
+| 4 | `cba8dd3` | 6 | Yes (vertical gate: airborne ticks skip trigger eval, landing edge bypasses replan cooldown) |
 
 **Resolution (2026-08-23).** All four PRs are landed and the
 §7 test matrix is closed: keepalive emission is pinned in
 `TickPipelineGateTest`, the physicalised shove gametest is
 `BotSliceGameTests.recoversWhenShoved` (real knockback impulse,
-commit `ac1392d`), the limbo characterization lives in
+commit `100dec0`), the limbo characterization lives in
 `LimboCharacterizationGateTest`, the vertical gate in
 `VerticalGateTest` (4 cases), and the freshness tolerance in
 `AdoptFreshnessGateTest`. The full offline suite runs green.

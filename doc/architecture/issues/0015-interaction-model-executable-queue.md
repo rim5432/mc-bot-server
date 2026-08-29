@@ -98,7 +98,7 @@ archived D1 table and its rulings:
          2026-08-27 (H-R4 convergence): landed with the Phase 2/3
          menu transactions in adapter MenuCommands; the
          [dep: 0007 Path A] note pre-dated the Phase 2 facade
-         baseline (650b803). D3/D5/D2 below remain open.
+         baseline (913438e). D3/D5/D2 below remain open.
 - [ ] M  D3 derivation events - MENU_OPENED / MENU_CLOSED from
          MissionReporter diffing BindingActor.currentMenuKind()
          ({kind,x,y,z} composite key; same-tick open-close invisible;

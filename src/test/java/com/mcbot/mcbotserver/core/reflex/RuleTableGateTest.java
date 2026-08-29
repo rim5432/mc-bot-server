@@ -166,7 +166,7 @@ class RuleTableGateTest {
      * by the first /reload (replaceRules swaps the whole table) -
      * exactly the "believing in a safety reflex it does not have"
      * hazard the hard-error parser exists to prevent. Found live in
-     * review of 416bd31: AscendInLethalFluidRule shipped without a
+     * review of 676d957: AscendInLethalFluidRule shipped without a
      * JSON form; this gate keeps it from recurring.
      */
     @Test

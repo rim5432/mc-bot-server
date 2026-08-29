@@ -142,7 +142,7 @@ landed (archive). Remaining:
            CombatBehaviorLoadoutTest (5 cases); gametest
            equipmentMirrorFeedsAttributes staged pending engine
            (live server holds run/world, H-R5).    [dep: none]
-           AMENDED 2026-08-29 (44a9427): MeleeResolver no longer
+           AMENDED 2026-08-29 (725e528): MeleeResolver no longer
            routes through Mob.doHurtTarget - the chain is inlined
            (performMeleeAttack) to carry the 1.5x crit multiplier
            and the sword sweep, the item-derived attack cooldown
@@ -197,7 +197,7 @@ landed (archive). Remaining:
            CombatRangedGateTest 5 cases; draw-release onto a live
            target rides the staged gametest batch.
   - [x] M  Remaining menu kinds SHIPPED (2026-08-28: the slot-role
-           series 6fc92c8..d116b3d landed anvil, brewing stand,
+           series db96778..cf99695 landed anvil, brewing stand,
            grindstone, stonecutter, loom, cartography, smithing,
            enchanting + button clicks, beacon effects, merchant
            (villager) and horse inventory via entity-backed opening).
@@ -248,7 +248,7 @@ survivors are deliberate NON-executions, each with its trigger:
                                             [dep: stage 3 review opens]
 - [x] S  MenuCommands embedded mini-JSON protocol extraction:
          RESOLVED 2026-08-29 without a helper - the Reply merge
-         (a3f9319) and the MenuVerbs/InspectOps splits dissolved the
+         (e2b0330) and the MenuVerbs/InspectOps splits dissolved the
          embedded protocol this row worried about; nothing left to
          extract.                                    [dep: none]
 - Verified non-findings kept on purpose (do not re-litigate without
@@ -282,7 +282,7 @@ its open reserves, none blocking a current stage:
          UPDATE 2026-08-29: the descent half is real - sneak
          in water maps to downward thrust (applyWaterDescent) and
          the planner drives it through the SwimDown edge with the
-         liquid-gated sneak flag (4987ae3); ascent predates
+         liquid-gated sneak flag (68dec65); ascent predates
          (jumpInFluid). Remaining: a harness-facing deliberate-
          depth story if one is ever demanded.   [dep: none]
 - [ ] S  Pose.SWIMMING getDimensions override + pose-aware collision
@@ -343,7 +343,7 @@ dies (2026-08-29):
 - [ ] M  Multi-target combat and retreat choreography.       [dep: none]
 - [ ] S  Climb (ladders / vines) - PARTIAL 2026-08-29: the
          deliberate move landed (BasicMoves.ClimbUp, trait-driven,
-         offline-gated by BasicMovesClimbTest, 4987ae3) but no
+         offline-gated by BasicMovesClimbTest, 68dec65) but no
          engine scenario exercises a real ladder ascent yet - the
          gametest is the remaining half.     [dep: none]
 - [ ] S  Spatial memory / waypoint persistence across sessions.
@@ -351,7 +351,7 @@ dies (2026-08-29):
 - [ ] M  Transport beyond the RCON console bridge (MCP / HTTP /
          stdio) - the bot stays blind to the choice.         [dep: none]
 - [x] S  Dig-fidelity tail: enchantment-aware dig speed and
-         match_tool loot fidelity (landed 2026-08-29, bf74ab0):
+         match_tool loot fidelity (landed 2026-08-29, e03e945):
          DigPacing.applyDigSpeedModifiers ports Player.getDigSpeed
          minus the airborne half (efficiency / haste / mining
          fatigue / underwater without Aqua Affinity;

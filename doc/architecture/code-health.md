@@ -97,7 +97,7 @@ admitted here may encode a size cap.
 | H-R7 Package structure | Main modules single-level, module names never reused as subpackages; test packages mirror main or are sanctioned metas | `architecture.PackageStructureGateTest` | gated 2026-08-25 |
 | H-R8 Contract markers present | Every src/main implementer of a boundary interface carries its `contract: see` pointer (AGENTS.md 1.4.3.1) | `architecture.BoundaryContractMarkerTest` | gated 2026-08-25 |
 | H-R9 Review claims cite or are unverified | Every factual claim in a review/assessment carries a file:line or doc-anchor citation; quoted promises are checked against the anchor; "does this abstraction exist" checks the abstraction-status table first | not mechanically checkable | review-only since 2026-08-27 |
-| H-R10 Style law is machine-owned | AGENTS section 1 semantic rules (naming, javadoc presence, import purity, width) fail the checkstyle tasks; layout is formatter-canonical (Spotless/palantir) and never hand-reformatted | `checkstyle*` + `spotlessCheck` on the default `test` flow (`build.gradle`; wired 2a8d7ef, promoted same day) | gated (default test path) 2026-08-27 |
+| H-R10 Style law is machine-owned | AGENTS section 1 semantic rules (naming, javadoc presence, import purity, width) fail the checkstyle tasks; layout is formatter-canonical (Spotless/palantir) and never hand-reformatted | `checkstyle*` + `spotlessCheck` on the default `test` flow (`build.gradle`; wired 11631bd, promoted same day) | gated (default test path) 2026-08-27 |
 | H-R11 Lint postures are pinned | The split between hard gates (checkstyle + spotlessCheck on the default `test` flow) and `-Plint` dashboards (PMD/CPD/SpotBugs/EP) cannot silently shift: a posture change is a ruling landing gate + posture table + ruling together | `architecture.LintPostureGateTest` (block wiring pins, ignoreFailures budget) | gated 2026-08-27 |
 | H-R12 Decision index parity | boundaries.md decision index max equals ledger.md body max; every verdict has a citation-resolution row (AGENTS.md 0.3) | `architecture.DecisionIndexSyncGateTest` (text scan, no classpath) | gated 2026-08-29 |
 
@@ -141,7 +141,7 @@ admitted here may encode a size cap.
 - **H-R5 Gametest edits are engine-verified before commit.** The
   offline suite cannot see gametest registration: a probe-cleanup
   regex once deleted `routesThroughFenceGap` silently and every
-  offline check stayed green (restored verbatim in c23c932). Any
+  offline check stayed green (restored verbatim in f60c3ea). Any
   commit touching the gametest package under
   `src/main/java/com/mcbot/mcbotserver/gametest/` runs `build
   runGameTest` first. Mechanical half:
@@ -236,17 +236,17 @@ Rule registry rows above.
 
 | Round | Date | Commits | Closes / affected | Evidence |
 |---|---|---|---|---|
-| Deep-clean | 08-23 | a38b9c0, 264b66e, 372f34e, 6115ef5, 85413cc, d464ede, ffc7c74 | stdlib adoption, FQNs became imports, `pose`->`position` wire-key-safe rename | offline suite 0 skips; main source set 8654->8396 |
-| Gametest harness consolidation | 08-23 | 3c73d6a, 35e86c5 | `GametestRig` extracted, redundant scenario removed | offline suite green |
-| PathingBehavior decomposition | 08-23 | b412643..15efdf8, 9a13693, c23c932 | shell + WaypointCursor/PlanProgressFuse/ReplanGate/PlanLifecycle; routesThroughFenceGap incident recorded (H-R5 lesson) | 159 offline cases 0 skips; 7/7 gametests; blast radius stayed in core.behavior |
-| Controller and actor decomposition | 08-25 | 87e796c, 0280079, 1fac61f, 066caa6, d6b492e | MissionReporter, ReflexEngageSeat, MeleeResolver, PresenceLayer, triggerVerdict | zero test edits across all five commits (258 cases) |
-| Inline-FQN second sweep | 08-25 | b2686dd, bda1b9f | H7 closed (H10 opened) | compile + full suite green |
-| Test-package mirroring | 08-25 | 1a19241 | H8 closed alongside the H-R7 admission | five top-level test packages, every one a mirror or sanctioned meta |
-| Sensor-interface ruling | 08-25 | 8e59a1d | H9 closed (`BodyPositionSource` dedup) | three-way contract collision retired; local single-consumer sources stay nested |
-| preemptDigClaims extraction | 08-25 | c2d3f9a | H10 closed | park semantics pinned by ArbiterGateTest / ReflexChainGateTest |
-| Static analysis stack | 08-27 | 2a8d7ef, 665176e, 45db02f, ae7ce91, bd4f2db, e3abc68, 09173e9, a8f8602 | H-R10 admitted, then promoted to the default `test` flow same day | baselines zeroed; Error Prone 24->20->0; suite 407/407 through the landing chain |
+| Deep-clean | 08-23 | 183c8e0, b954651, 030b49c, dbc3bd1, f233b3a, b33cb6a, a1a1f89 | stdlib adoption, FQNs became imports, `pose`->`position` wire-key-safe rename | offline suite 0 skips; main source set 8654->8396 |
+| Gametest harness consolidation | 08-23 | 450bf48, 160ca4c | `GametestRig` extracted, redundant scenario removed | offline suite green |
+| PathingBehavior decomposition | 08-23 | 1a68dd9..cee9a2c, 81897b8, f60c3ea | shell + WaypointCursor/PlanProgressFuse/ReplanGate/PlanLifecycle; routesThroughFenceGap incident recorded (H-R5 lesson) | 159 offline cases 0 skips; 7/7 gametests; blast radius stayed in core.behavior |
+| Controller and actor decomposition | 08-25 | 29c6a3b, 1623dab, 7f87136, 72a476b, 281a147 | MissionReporter, ReflexEngageSeat, MeleeResolver, PresenceLayer, triggerVerdict | zero test edits across all five commits (258 cases) |
+| Inline-FQN second sweep | 08-25 | c23cf35, 1c6d331 | H7 closed (H10 opened) | compile + full suite green |
+| Test-package mirroring | 08-25 | 888fc97 | H8 closed alongside the H-R7 admission | five top-level test packages, every one a mirror or sanctioned meta |
+| Sensor-interface ruling | 08-25 | 0e290ad | H9 closed (`BodyPositionSource` dedup) | three-way contract collision retired; local single-consumer sources stay nested |
+| preemptDigClaims extraction | 08-25 | 5e26c15 | H10 closed | park semantics pinned by ArbiterGateTest / ReflexChainGateTest |
+| Static analysis stack | 08-27 | 11631bd, 8b18e64, 7bd7804, b3d1e80, 2529455, b3cc623, 95e1a64, 8ea8554 | H-R10 admitted, then promoted to the default `test` flow same day | baselines zeroed; Error Prone 24->20->0; suite 407/407 through the landing chain |
 
-The repo-wide reformat (45db02f, 198 files) is blame-excluded via
+The repo-wide reformat (7bd7804, 198 files) is blame-excluded via
 `.git-blame-ignore-revs`; the WorldCommandsWireShapeGateTest regexes
 gained `\s*` tolerance in that same commit for the rewrap.
 
@@ -260,19 +260,19 @@ without an anchor is a workplan item, not a row here.
 | Ruling | Anchor | Settled in |
 |---|---|---|
 | Plan-progress fuse: three OR criteria; accumulator immune to external replan | `PlanProgressFuse` Javadoc (invariants migrated verbatim from issue 0001) | boundaries.md ledger 20 (issue 0001 archived 2026-08-24) |
-| Vertical trigger gate: airborne ticks skip trigger eval; landing edge bypasses cooldown | `ReplanGate` Javadoc + steering in `PathingBehavior` | ac8bf75 |
-| Park semantics: explicit ParkResult, atomic retire sweep, resume revalidation | `TaskArbiter.forcePauseAll` + `ParkResult` Javadoc | 579efdf |
-| One-tick retirement lap: verdict announced on the reflex tick; no tail sweep inside arbiter tick | `TaskArbiter.tick` tail comment; harness-interaction.md fidelity rules | 579efdf |
-| Shape contract: STEP_UP_REACH / STANDABLE_THRESHOLD split, footprint rule, fence-as-wall | `CollisionShape` constant Javadoc + boundaries.md decision ledger 19b (issue 0002 archived) | 551d271 |
+| Vertical trigger gate: airborne ticks skip trigger eval; landing edge bypasses cooldown | `ReplanGate` Javadoc + steering in `PathingBehavior` | cba8dd3 |
+| Park semantics: explicit ParkResult, atomic retire sweep, resume revalidation | `TaskArbiter.forcePauseAll` + `ParkResult` Javadoc | d3d440b |
+| One-tick retirement lap: verdict announced on the reflex tick; no tail sweep inside arbiter tick | `TaskArbiter.tick` tail comment; harness-interaction.md fidelity rules | d3d440b |
+| Shape contract: STEP_UP_REACH / STANDABLE_THRESHOLD split, footprint rule, fence-as-wall | `CollisionShape` constant Javadoc + boundaries.md decision ledger 19b (issue 0002 archived) | 4edc609 |
 | Melee LOS clip: eye-to-surface ray with lava-opaque cells | `MeleeResolver.sightBlocked` | player-behavior-RE combat record |
-| Executor jump actuation: direct `jumpFromGround()` under swapped MoveControl | `BotBodyEntity` deviation comment | c0c256c |
+| Executor jump actuation: direct `jumpFromGround()` under swapped MoveControl | `BotBodyEntity` deviation comment | ed54e4d |
 
 ## Open items
 
 - **CLOSED 2026-08-29 - H1 api/ thick-interface trimming.** A full
   consumer census (60 api files, ~130 public members) measured the
   thickness at ~8%: ten dead or single-tier members, zero on any
-  doc-pinned boundary surface. The trims landed in 41d0e3e
+  doc-pinned boundary surface. The trims landed in 88568bd
   (Behavior.name, Movement.source/describe,
   ThreatBlackboard.saturationLevel, BlockSnapshot.isUnknown,
   PriorityBands band constants to private,

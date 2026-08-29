@@ -151,7 +151,7 @@ spelling.
 
 Live findings recorded: (1) GoalNear(target, 3) admits chebyshev-3
 stops that are ~5.2 euclidean eye-to-block - beyond DigExecutor's 4.5
-reach; fixed to range 2 (45c9a66). (2) The proposal's `view` verb
+reach; fixed to range 2 (3864b28). (2) The proposal's `view` verb
 collapsed into `cat /nearby` per the no-new-verbs principle.
 
 BLOCK_BROKEN event (absorbs 0009 F3): emitted by the dig completion
