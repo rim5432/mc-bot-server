@@ -353,10 +353,14 @@ public final class BotBodyEntity extends PathfinderMob {
         setSpeed((float) getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED));
         setXxa(driveStrafe);
         setZza(driveForward);
-        // Movement exhaustion, vanilla-shaped (Player.aiStep rates):
-        // sprinting burns 10x the walking cost per block; nothing on a
-        // mob accumulates exhaustion naturally, so the carrier feeds it
-        // from the distance it actually traveled this tick.
+        // Movement exhaustion: nothing on a mob accumulates it
+        // naturally, so the carrier feeds it from actual horizontal
+        // distance. Sprint is vanilla-parity at 0.1/block
+        // (Player.checkMovementStatistics); walk is a recorded
+        // deviation at 0.01/block — vanilla walk is 0/block, but a
+        // zero-walk carrier would never exhaust on foot, so the bot
+        // uses the vanilla swim rate as its walking floor. See
+        // player-behavior-RE.md section 1 for the full deviation note.
         float movedHorizontally = (float) Math.hypot(getX() - xo, getZ() - zo);
         foodData.addExhaustion(movedHorizontally * (isSprinting() ? 0.1f : 0.01f));
         applyDriveJump();

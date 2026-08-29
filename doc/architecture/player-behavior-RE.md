@@ -47,8 +47,18 @@ deviation cited.
   10 ticks, foodLevel >= 18 slow regen (1 HP per 80 ticks), starvation
   damage below foodLevel 0. The natural-regeneration gamerule and
   difficulty gate the regen/starvation branches exactly as vanilla.
-- **Movement exhaustion** feeds from actual distance traveled; sprint
-  burns 10x the walk rate per block.
+- **Movement exhaustion** feeds from actual distance traveled. Vanilla
+  rates (Player.checkMovementStatistics, decompiled 1.20.1): sprint
+  0.1 exhaustion per block, walk 0 per block (walking on ground is
+  free), swim / underwater wade 0.01 per block. Sprint is therefore
+  10x the swim rate, not 10x walk — walk has no rate to multiply.
+  Deviation (BotBodyEntity.customServerAiStep): the mob carrier
+  accumulates no exhaustion naturally, so it is fed manually from
+  horizontal distance traveled. Sprint matches vanilla at 0.1/block;
+  walk charges 0.01/block (the vanilla swim rate, not vanilla's zero
+  walk rate) — a non-zero baseline so a purely-walking carrier still
+  drains hunger over time. This is not vanilla parity; it is recorded
+  here because the original comment called it "vanilla-shaped."
 - **The eat chain is one finishUsingItem pass**: consume sound,
   probability effects, stack shrink, the EAT game event, then
   FoodData nutrition. Vanilla keeps nibble state private, so the
@@ -63,8 +73,13 @@ deviation cited.
 - **Swimming is vanilla fluid physics**: ASCEND holds jump and the
   physics do the ascent (issue 0004). Deliberate dive/ascend on the
   reserved yya axis is issue 0004 D3; v1 ships ascent only.
-- **Powder snow is climbable** (escape is pure held jump); the freeze
-  kill sits at freezeTicks = 100 (decision 27).
+- **Powder snow is climbable** (escape is pure held jump). Vanilla
+  full-freeze is at freezeTicks = 140 (Entity.getTicksRequiredToFreeze),
+  where the "freezing" phase deals 1.0 damage per 40 ticks
+  (LivingEntity.baseTick). The bot's climb reflex fires at
+  TRIGGER_FREEZE = 100 (ClimbOutOfPowderSnowRule), leaving 40 ticks
+  of margin before damage starts — 100 is the bot's trigger threshold,
+  not the vanilla kill threshold (decision 27).
 - **Fire is lethal-band only**: fireTicks/20 >= health is the kill
   band; below it no rule fires - vanilla resolves it (issue 0008 D5).
 - **Suffocation digs the eye block** with authentic vanilla hand-dig
@@ -110,7 +125,13 @@ deviation cited.
   edge, release on the falling edge or USE claim loss (orphaned-guard
   parity with the bow).
 - **Melee line of sight** is an eye-to-surface ray in which lava
-  counts as opaque (mirrored by MeleeResolver.sightBlocked).
+  counts as opaque. The bot splits this into two independent checks
+  in MeleeResolver: `sightBlocked()` runs a vanilla ClipContext with
+  Block.COLLIDER / Fluid.NONE (solid terrain only — lava is
+  transparent to this clip), and `lavaBetween()` is a separate
+  0.5-block point-sample along the segment that flags lava. Both
+  must pass (neither returns true) for a swing to connect; calling
+  the lava opacity "mirrored by sightBlocked" alone is imprecise.
 - **Hostile acquisition is their own AI**: follow range, line of
   sight, and free target slots. A carrier-side presence pass is
   enough for hostiles to acquire the body on sight (ruling
