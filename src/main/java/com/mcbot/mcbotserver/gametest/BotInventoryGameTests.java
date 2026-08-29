@@ -155,10 +155,7 @@ public final class BotInventoryGameTests {
                         200,
                         "gt-place",
                         new Intent.InteractBlock(
-                                new com.mcbot.mcbotserver.api.types.CellPos(
-                                        absTarget.getX(), absTarget.getY(), absTarget.getZ()),
-                                com.mcbot.mcbotserver.api.types.Direction.UP,
-                                hit)));
+                                GametestRig.cellOf(absTarget), com.mcbot.mcbotserver.api.types.Direction.UP, hit)));
         driveOnly(rig).run();
 
         helper.startSequence()
@@ -399,8 +396,7 @@ public final class BotInventoryGameTests {
 
         var actor = rig.actor().menuTransactions();
         BlockPos leftAbs = helper.absolutePos(leftLocal);
-        var view = actor.openMenu(
-                new com.mcbot.mcbotserver.api.types.CellPos(leftAbs.getX(), leftAbs.getY(), leftAbs.getZ()));
+        var view = actor.openMenu(GametestRig.cellOf(leftAbs));
         check(view != null, "opening either half of a double chest must succeed");
         checkEquals(54, containerSlotsOf(view), "a double chest must expose all 54 container slots");
         checkEquals(SlotRole.CONTAINER, view.slot(53).role(), "slot 53 (last chest slot) must be CONTAINER");
@@ -429,7 +425,7 @@ public final class BotInventoryGameTests {
         rig.body().getInventory().container().setItem(0, new ItemStack(Items.DIAMOND, 32));
 
         var actor = rig.actor().menuTransactions();
-        var view = actor.openMenu(cellOf(chestAbs));
+        var view = actor.openMenu(GametestRig.cellOf(chestAbs));
         check(view != null, "the chest must open");
         checkEquals(27, containerSlotsOf(view), "a single chest exposes 27 container slots");
 
@@ -444,7 +440,7 @@ public final class BotInventoryGameTests {
         actor.closeMenu();
 
         // Reopen: the deposit survived the close (real block entity).
-        view = actor.openMenu(cellOf(chestAbs));
+        view = actor.openMenu(GametestRig.cellOf(chestAbs));
         checkEquals(32, view.slot(0).item().count(), "the deposit must survive close and reopen");
         hotbar0 = firstSlotWithRole(view, SlotRole.HOTBAR);
         view = actor.menuClick(0, 0, MenuClick.PICKUP);
@@ -561,10 +557,6 @@ public final class BotInventoryGameTests {
         menu.close();
         rig.body().discard();
         helper.succeed();
-    }
-
-    private static com.mcbot.mcbotserver.api.types.CellPos cellOf(BlockPos abs) {
-        return new com.mcbot.mcbotserver.api.types.CellPos(abs.getX(), abs.getY(), abs.getZ());
     }
 
     /**

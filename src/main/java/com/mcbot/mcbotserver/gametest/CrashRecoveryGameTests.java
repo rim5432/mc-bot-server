@@ -13,7 +13,6 @@ import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
 import static com.mcbot.mcbotserver.gametest.GametestRig.submitGoto;
 
 import com.mcbot.mcbotserver.McBotServer;
-import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.process.BotProcess;
@@ -22,7 +21,6 @@ import com.mcbot.mcbotserver.api.process.InterruptionContext;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.WorldView;
 import com.mcbot.mcbotserver.core.process.GotoProcess;
-import java.util.List;
 import java.util.function.Supplier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -120,23 +118,18 @@ public final class CrashRecoveryGameTests {
                 .thenExecuteAfter(0, () -> {
                     check(!probe[0].isActive(), "the probe mission must retire after recovery");
                     check(probe[0].missionSucceeded(), "the recovered pipeline must complete the probe");
-                    check(missionCompletedSeen(rig), "TASK_COMPLETED must reach the stream after reset");
+                    check(
+                            GametestRig.eventSeen(rig.events(), EventKind.TASK_COMPLETED),
+                            "TASK_COMPLETED must reach the stream after reset");
                     rig.body().discard();
                 })
                 .thenSucceed();
     }
 
     private static int crashEvents(GametestRig.Rig rig) {
-        return (int) rig.events().statusSnapshot(0).events().stream()
+        return (int) GametestRig.eventsOf(rig.events()).stream()
                 .filter(e -> EventKind.BOT_CRASHED.equals(e.kind()))
                 .count();
-    }
-
-    private static boolean missionCompletedSeen(GametestRig.Rig rig) {
-        List<String> kinds = rig.events().statusSnapshot(0).events().stream()
-                .map(BotEvent::kind)
-                .toList();
-        return kinds.contains(EventKind.TASK_COMPLETED);
     }
 
     /**

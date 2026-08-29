@@ -16,7 +16,6 @@ import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.process.DefendProcess;
-import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -131,7 +130,7 @@ public final class BotCombatGameTests {
                             DefendProcess.REASON_REFUSED,
                             mission.failureReasonOrNull(),
                             "the refusal reason must be structured");
-                    BotEvent failed = rig.events().statusSnapshot(0).events().stream()
+                    BotEvent failed = GametestRig.eventsOf(rig.events()).stream()
                             .filter(e -> EventKind.TASK_FAILED.equals(e.kind()))
                             .findFirst()
                             .orElse(null);
@@ -146,11 +145,8 @@ public final class BotCombatGameTests {
                             waited[0] <= REFUSAL_WINDOW_TICKS,
                             "a structural refusal lands on the engage tick, not " + "after a chase; waited " + waited[0]
                                     + " ticks");
-                    List<String> kinds = rig.events().statusSnapshot(0).events().stream()
-                            .map(BotEvent::kind)
-                            .toList();
                     check(
-                            !kinds.contains(EventKind.TASK_PAUSED),
+                            !GametestRig.eventSeen(rig.events(), EventKind.TASK_PAUSED),
                             "a standoff-range skeleton must not trip the engage " + "reflex (no TASK_PAUSED expected)");
                     rig.body().discard();
                 })
@@ -230,7 +226,7 @@ public final class BotCombatGameTests {
      *         retired yet
      */
     private static BotEvent reflexEngageVerdict(InMemoryEventQueue events) {
-        return events.statusSnapshot(0).events().stream()
+        return GametestRig.eventsOf(events).stream()
                 .filter(e -> EventKind.TASK_FAILED.equals(e.kind()) || EventKind.TASK_COMPLETED.equals(e.kind()))
                 .filter(e -> e.attrs().getOrDefault("task", "").startsWith("reflex-engage"))
                 .findFirst()

@@ -13,7 +13,6 @@ import static com.mcbot.mcbotserver.gametest.GametestRig.submitGoto;
 import com.mcbot.mcbotserver.McBotServer;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.types.CellPos;
-import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -110,7 +109,7 @@ public final class GauntletGameTests {
                                     + "section regressed. reason="
                                     + mission.failureReasonOrNull()
                                     + " bodyAt=" + positionOf(rig.body()));
-                    assertCompleted(rig);
+                    GametestRig.assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
                     rig.body().discard();
                 })
                 .thenSucceed();
@@ -145,7 +144,7 @@ public final class GauntletGameTests {
                             "the gap is the only passage; routing must find it."
                                     + " reason=" + mission.failureReasonOrNull()
                                     + " bodyAt=" + positionOf(rig.body()));
-                    assertCompleted(rig);
+                    GametestRig.assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
                     rig.body().discard();
                 })
                 .thenSucceed();
@@ -192,12 +191,5 @@ public final class GauntletGameTests {
         }
         helper.setBlock(new BlockPos(13, fy + 1, 7), Blocks.OAK_FENCE);
         helper.setBlock(new BlockPos(13, fy + 1, 9), Blocks.OAK_FENCE);
-    }
-
-    private static void assertCompleted(GametestRig.Rig rig) {
-        List<String> kinds = rig.events().statusSnapshot(0).events().stream()
-                .map(e -> e.kind())
-                .toList();
-        check(kinds.contains(EventKind.TASK_COMPLETED), "TASK_COMPLETED must reach the stream, got " + kinds);
     }
 }

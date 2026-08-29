@@ -383,13 +383,10 @@ public final class BotCraftingGameTests {
         rig.body().getInventory().container().setItem(0, new ItemStack(Items.DIAMOND, 9));
 
         var actor = rig.actor().menuTransactions();
-        var view = actor.openMenu(new CellPos(tableAbs.getX(), tableAbs.getY(), tableAbs.getZ()));
+        var view = actor.openMenu(GametestRig.cellOf(tableAbs));
         check(view != null, "openMenu must succeed at the table");
         checkEquals("crafting_table", view.type(), "the opened menu must be the crafting table");
-        checkEquals(
-                new CellPos(tableAbs.getX(), tableAbs.getY(), tableAbs.getZ()),
-                view.sourcePos(),
-                "the snapshot must carry the table's position");
+        checkEquals(GametestRig.cellOf(tableAbs), view.sourcePos(), "the snapshot must carry the table's position");
 
         // Fill all nine cells from the hotbar stack; the planner
         // resolves sources by role, so the scenario never names a
@@ -452,7 +449,7 @@ public final class BotCraftingGameTests {
                     check(mission.missionSucceeded(), "the walk must be a success");
 
                     var actor = rig.actor().menuTransactions();
-                    var view = actor.openMenu(new CellPos(tableAbs.getX(), tableAbs.getY(), tableAbs.getZ()));
+                    var view = actor.openMenu(GametestRig.cellOf(tableAbs));
                     check(view != null, "openMenu must succeed after walking there");
                     CraftingView craft = CraftingView.of(view);
                     for (var step : MenuPlanner.planGridFill(craft, "minecraft:diamond", 0, 1, 2, 3, 4, 5, 6, 7, 8)) {
@@ -671,8 +668,8 @@ public final class BotCraftingGameTests {
 
         var actor = rig.actor().menuTransactions();
         GotoProcess[] mission = {null};
-        var chestCell = new CellPos(chestAbs.getX(), chestAbs.getY(), chestAbs.getZ());
-        var tableCell = new CellPos(tableAbs.getX(), tableAbs.getY(), tableAbs.getZ());
+        var chestCell = GametestRig.cellOf(chestAbs);
+        var tableCell = GametestRig.cellOf(tableAbs);
 
         helper.startSequence()
                 // Leg 1: walk to the chest and pull materials.

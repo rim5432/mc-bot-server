@@ -269,9 +269,18 @@ final class GametestRig {
         return goal.equals(positionOf(body));
     }
 
-    static CellPos localToCell(GameTestHelper helper, BlockPos local) {
-        BlockPos abs = helper.absolutePos(local);
+    /**
+     * Absolute world coordinates to the cell that contains them.
+     *
+     * @param abs absolute block position; never null
+     * @return the owning cell; never null
+     */
+    static CellPos cellOf(BlockPos abs) {
         return new CellPos(abs.getX(), abs.getY(), abs.getZ());
+    }
+
+    static CellPos localToCell(GameTestHelper helper, BlockPos local) {
+        return cellOf(helper.absolutePos(local));
     }
 
     /**
@@ -316,6 +325,33 @@ final class GametestRig {
     }
 
     /**
+     * The raw events currently on the stream (cursor-zero full
+     * replay); the read model behind the event assertions.
+     *
+     * @param events the rig's event stream; never null
+     * @return the events in stream order; never null
+     */
+    static List<BotEvent> eventsOf(InMemoryEventQueue events) {
+        return events.statusSnapshot(0).events();
+    }
+
+    private static List<String> eventKinds(InMemoryEventQueue events) {
+        return eventsOf(events).stream().map(BotEvent::kind).toList();
+    }
+
+    /**
+     * Whether one event kind already appeared - the wait-condition
+     * shape of {@link #assertEventSeen}.
+     *
+     * @param events the rig's event stream; never null
+     * @param kind   registered event-kind string; never null
+     * @return true when the kind is anywhere on the stream
+     */
+    static boolean eventSeen(InMemoryEventQueue events, String kind) {
+        return eventKinds(events).contains(kind);
+    }
+
+    /**
      * Asserts the given event kind already appeared on the stream;
      * usable inside wait-until conditions and terminal executes.
      *
@@ -323,8 +359,7 @@ final class GametestRig {
      * @param kind   registered event-kind string; never null
      */
     static void assertEventSeen(InMemoryEventQueue events, String kind) {
-        List<String> kinds =
-                events.statusSnapshot(0).events().stream().map(BotEvent::kind).toList();
+        List<String> kinds = eventKinds(events);
         check(kinds.contains(kind), "expected " + kind + " in stream, got " + kinds);
     }
 
