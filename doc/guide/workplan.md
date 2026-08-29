@@ -234,10 +234,15 @@ survivors are deliberate NON-executions, each with its trigger:
 - [ ] S  CombatOrder permits exactly Attack: flatten onto Overrides'
          payload at the Stage 3 review - boundary-B Directive shape
          is frozen until then.            [dep: stage 3 review opens]
-- [ ] S  MenuCommands embedded mini-JSON protocol extraction
-         (MenuCommandJson helper): deferred while those files were
-         in flight from the concurrent 0012 batch, which has since
-         landed - re-evaluate freely.                 [dep: none]
+- [ ] S  InterruptionContext.interruptedTask() written-never-read:
+         flatten candidate for the Stage 3 review - boundary-C
+         frozen vocabulary, not cuttable outside it.
+                                            [dep: stage 3 review opens]
+- [x] S  MenuCommands embedded mini-JSON protocol extraction:
+         RESOLVED 2026-08-29 without a helper - the Reply merge
+         (df8bc46) and the MenuVerbs/InspectOps splits dissolved the
+         embedded protocol this row worried about; nothing left to
+         extract.                                    [dep: none]
 - Verified non-findings kept on purpose (do not re-litigate without
   new evidence): Heuristic interface (decision 7 seam; planned
   climbs/drops supply second suppliers), PresenceLayer / IdleLook /
@@ -251,7 +256,8 @@ survivors are deliberate NON-executions, each with its trigger:
   rides the seat wiring after issue 0010 rules on the facade.
   PathingBehavior's four ctors kept (three are valid default pairs).
 - Round-3 kept-rulings: EngageReflexGateTest stays whole (~55%
-  scaffolding; re-evaluate on a fourth scenario family);
+  scaffolding; re-evaluate on a fourth scenario family - counter:
+  fight / rescue / forage = 3 seat families today);
   sleep-poll loops stay (the flaky part was the wall-clock budget,
   fixed via the injected AStar clock); MockWorldView terrain motifs
   added opportunistically during future edits, never speculatively.
