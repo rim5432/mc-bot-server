@@ -36,7 +36,8 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Rule: AGENTS.md 0.3 (boundaries decision index resolves every
  * {@code decision N} citation); ledger.md admission protocol (append-only,
- * one numbered verdict per ruling).
+ * one numbered verdict per ruling); code-health.md H-R12 (this gate's
+ * registry row).
  */
 class DecisionIndexSyncGateTest {
 

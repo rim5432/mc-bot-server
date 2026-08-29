@@ -191,7 +191,7 @@ when a second heavy read class actually hurts (YAGNI until then).
   freeze landing in the one-tick retirement lap emits the mission verdict
   on the reflex tick, and why both `COMPLETED → PAUSED → RESUMED` and
   `PAUSED → RESUMED → COMPLETED` are legal sequences — lives in
-  [boundaries.md invariant 7](../architecture/boundaries.md#invariants-must-hold).
+  [boundaries.md invariant 7](boundaries.md#invariants-must-hold).
   Harness-side implication: treat any `TASK_*` event as authoritative
   regardless of pause state; a live park emits `TASK_PAUSED` only, and
   verdicts for parked missions arrive after `TASK_RESUMED`.

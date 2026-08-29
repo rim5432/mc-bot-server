@@ -345,8 +345,8 @@ BotState getState();
 The verdict texts live in doc/architecture/ledger.md; this index is
 where every `boundaries.md decision N` citation resolves. Entries
 extend only forward - amendments annotate both sides (the chains are
-listed under the ledger's index), and ordering-critical numbers sit
-behind test gates, not behind prose.
+listed under the ledger's Amendment chains section), and
+ordering-critical numbers sit behind test gates, not behind prose.
 
 | # | Entry | Adopted |
 |---|---|---|
