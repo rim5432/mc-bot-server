@@ -1,28 +1,36 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-mcbot_tool.py — mc-bot-server 开发流程集中工具
-================================================
+mcbot_tool.py - centralized dev-workflow toolbox for mc-bot-server
+==================================================================
 
-agent / 人都用这套 CLI 跑 build / test / 看日志 / 管进程 / 协调并发。
-不要再直接 `./gradlew ...` —— 那条路你之前已经踩过坑了。
+Agents and humans run build / test / logs / process management /
+concurrency coordination through this one CLI.
+Do not call `./gradlew ...` directly - that path has bitten before.
 
-设计要点：
-  1. **hang-proof log**：用 Popen + 实时 readline 双写 console + 文件，
-     gradle 跟 console 真实同步，不会因为 pipe buffer 满阻塞。
-  2. **跨进程文件锁**（`tool/.runtime/<name>.lock`）：写 build/ 的任务
-     （compile/test/jar/build/clean/sync）共用全局 `build` 锁；每个长跑
-     任务（runClient / runServer / runGameTest / runData）持独立
-     `run.<task>` 锁——专用服和客户端可同时存活（它们只读构建产物）。
-     同一命名空间的第二个调用立刻 fail-fast 而不是悄悄抢资源。
-  3. **stale lock takeover**：如果上家 PID 已死，自动接管或提示清掉；
-     `lock status/clear/takeover` 遍历所有命名空间。
-  4. **gradle 自动发现**：优先 $MCBOT_GRADLE > 本机 wrapper dist > PATH。
-  5. **build / test 默认 --no-daemon**：避免 daemon 残留和锁冲突；
-     跑 game / runClient / runServer 之类当然也不 daemon。
-  6. **零外部依赖**：只 stdlib，跨 Windows / mac / Linux。
+Design notes:
+  1. **hang-proof log**: Popen + realtime readline dual-writes to the
+     console and a file, so gradle output and the console stay truly
+     in sync and a full pipe buffer cannot block.
+  2. **cross-process file locks** (`tool/.runtime/<name>.lock`): tasks
+     that write build/ (compile/test/jar/build/clean/sync) share one
+     global `build` lock; each long-running task (runClient /
+     runServer / runGameTest / runData) holds its own `run.<task>`
+     lock - a dedicated server and a client can coexist (they only
+     read build outputs). A second caller in the same namespace
+     fails fast instead of quietly contending for resources.
+  3. **stale lock takeover**: if the holding PID is dead, take over
+     automatically or prompt to clear; `lock status/clear/takeover`
+     walks every namespace.
+  4. **gradle auto-discovery**: $MCBOT_GRADLE > local wrapper dist >
+     PATH, in that order.
+  5. **build / test default to --no-daemon**: avoids daemon residue
+     and lock conflicts; game / runClient / runServer runs likewise
+     never use a daemon.
+  6. **zero external dependencies**: stdlib only, across Windows /
+     macOS / Linux.
 
-用法：见 `python tool/mcbot_tool.py --help` 或 tool/README.md。
+Usage: see `python tool/mcbot_tool.py --help` or tool/README.md.
 """
 from __future__ import annotations
 
