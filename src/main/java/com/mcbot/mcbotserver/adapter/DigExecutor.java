@@ -4,9 +4,15 @@ import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.actor.DigPacing;
 import net.minecraft.core.BlockPos;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FluidState;
 
 /**
  * The dig half of the entity binding: converts a held INTERACT claim
@@ -32,16 +38,17 @@ import net.minecraft.world.level.block.state.BlockState;
  *       so the break lands at exactly 1.0.</li>
  *   <li>Forge LeftClickBlock / onBlockBreakEvent hooks are Player-typed
  *       — protection-mod interop defers with the facade.</li>
- *   <li>The loot context receives {@code ItemStack.EMPTY} as the tool,
- *       not the held stack — {@code match_tool} loot conditions
- *       (shears-on-leaves, silk-touch variants) behave as bare-hand
- *       until Phase 4 routes the break through a tool-aware path.</li>
- *   <li>No XP pop, no tool durability, no mining exhaustion — those
- *       arrive with their own phase gates (exhaustion concerns issue
- *       0010).</li>
- *   <li>No underwater dig penalty ({@code isEyeInFluid /= 5}) — only
- *       the airborne penalty is modelled; both environment effects are
- *       Phase 4 territory alongside efficiency/haste.</li>
+ *   <li>Tool durability and mining exhaustion ARE shipped: after the
+ *       block breaks, {@code Item.mineBlock} damages the held tool
+ *       (1 for pickaxes/axes/shovels, 2 for swords, 1 for shears,
+ *       0 for non-tools), and {@code FoodData.addExhaustion(0.005F)}
+ *       applies the vanilla per-block mining exhaustion (mirrors
+ *       Block.playerDestroy). Unbreaking and Mending enchantments run
+ *       inside hurtAndBreak automatically.</li>
+ *   <li>match_tool loot fidelity and XP pop ARE shipped: the break
+ *       goes through Block.dropResources with the held stack as the
+ *       TOOL context, so shears-on-leaves, silk-touch, fortune, and
+ *       the block's experience drop all resolve correctly.</li>
  * </ul>
  *
  * <p>Reach gate: a claim outside bare-hand reach is ignored (progress
@@ -109,7 +116,17 @@ public final class DigExecutor {
         // may switch the held item mid-dig; vanilla's per-tick
         // incremental destroy progress does the same.
         ItemStack held = body.getInventory().container().getItem(body.selectedSlot);
-        float toolSpeed = held.getDestroySpeed(state);
+        float baseSpeed = held.getDestroySpeed(state);
+        int efficiency = EnchantmentHelper.getItemEnchantmentLevel(Enchantments.BLOCK_EFFICIENCY, held);
+        int hasteAmplifier = body.hasEffect(MobEffects.DIG_SPEED)
+                ? body.getEffect(MobEffects.DIG_SPEED).getAmplifier()
+                : -1;
+        int fatigueAmplifier = body.hasEffect(MobEffects.DIG_SLOWDOWN)
+                ? body.getEffect(MobEffects.DIG_SLOWDOWN).getAmplifier()
+                : -1;
+        boolean underwaterWithoutAqua = body.isEyeInFluid(FluidTags.WATER) && !EnchantmentHelper.hasAquaAffinity(body);
+        float toolSpeed = DigPacing.applyDigSpeedModifiers(
+                baseSpeed, efficiency, hasteAmplifier, fatigueAmplifier, underwaterWithoutAqua);
         boolean hasCorrectTool = !state.requiresCorrectToolForDrops() || held.isCorrectToolForDrops(state);
         heldTicks++;
         float progress = DigPacing.cumulativeProgress(
@@ -117,15 +134,41 @@ public final class DigExecutor {
                         state.getDestroySpeed(body.level(), pos), toolSpeed, hasCorrectTool, body.onGround()),
                 heldTicks);
         if (progress >= 1.0f) {
-            // Clear the crack broadcast first: destroyBlock emits the
-            // 2001 break effect itself, and a stale stage would linger
+            // Clear the crack broadcast first: the manual break sequence
+            // emits the 2001 effect itself, and a stale stage would linger
             // on the next dig of the same cell.
             body.level().destroyBlockProgress(body.getId(), pos, -1);
-            // Drop items only when the tool is correct for the block —
-            // vanilla ServerPlayerGameMode.destroyBlock passes
-            // player.hasCorrectToolForDrops(state) as the drop flag, so
-            // a hand-mined stone block breaks but yields no cobblestone.
-            body.level().destroyBlock(pos, hasCorrectTool);
+            // Tool-aware break: Level.destroyBlock always passes
+            // ItemStack.EMPTY as the tool to Block.dropResources, so
+            // match_tool loot conditions (stone→pickaxe, leaves→shears,
+            // silk-touch, fortune) never fired. Replicate the vanilla
+            // dropResources path with the actual held stack: capture
+            // state + block entity + fluid BEFORE removal, emit 2001
+            // break particles (skip for FireBlock, same as destroyBlock),
+            // replace with the fluid's legacy block (waterlogged stairs
+            // keep their water), then drop resources with TOOL=held and
+            // THIS_ENTITY=body. XP is handled inside dropResources via
+            // spawnAfterBreak → ForgeHooks.dropXpForBlock (gated on the
+            // harvest check, so wrong-tool breaks yield no XP).
+            BlockState breakState = state;
+            BlockEntity breakEntity = breakState.hasBlockEntity() ? body.level().getBlockEntity(pos) : null;
+            FluidState breakFluid = body.level().getFluidState(pos);
+            if (!(breakState.getBlock() instanceof net.minecraft.world.level.block.FireBlock)) {
+                body.level().levelEvent(2001, pos, net.minecraft.world.level.block.Block.getId(breakState));
+            }
+            body.level().setBlock(pos, breakFluid.createLegacyBlock(), 3);
+            net.minecraft.world.level.block.Block.dropResources(breakState, body.level(), pos, breakEntity, body, held);
+            // Tool durability: Item.mineBlock damages the held stack
+            // (1 for DiggerItem, 2 for SwordItem, 1 for ShearsItem, 0
+            // for base Item). Gated on destroySpeed != 0 inside each
+            // override, so insta-break blocks (torches, flowers) cost
+            // nothing. Unbreaking/Mending run inside hurtAndBreak.
+            held.getItem().mineBlock(held, body.level(), breakState, pos, body);
+            // Mining exhaustion: vanilla Block.playerDestroy applies
+            // 0.005F per block broken (the same value Player applies
+            // via causeFoodExhaustion). The bot's FoodData is a custom
+            // carrier field (HungerTicker ticks it), so add directly.
+            body.getFoodData().addExhaustion(0.005F);
             target = null;
             heldTicks = 0;
             lastStage = -1;

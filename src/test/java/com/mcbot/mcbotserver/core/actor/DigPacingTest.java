@@ -157,4 +157,97 @@ class DigPacingTest {
                 IllegalArgumentException.class, () -> new Claim(Channel.INTERACT, 10, "test", new Intent.Use(true)));
         assertThrows(IllegalArgumentException.class, () -> new Intent.Dig(null));
     }
+
+    // ---- applyDigSpeedModifiers: the vanilla modifier stack (Player.getDigSpeed lines 752-781) ----
+
+    private static final float SPEED_EPS = 0.001f;
+
+    @Test
+    void noModifiersReturnsBaseSpeed() {
+        float speed = DigPacing.applyDigSpeedModifiers(6.0f, 0, -1, -1, false);
+        assertEquals(6.0f, speed, SPEED_EPS, "no effects, no enchantments: base speed passes through");
+    }
+
+    @Test
+    void efficiencyOnlyAppliesWhenBaseSpeedAboveOne() {
+        // Bare hand (1.0) and wrong tool (1.0) get NO efficiency bonus,
+        // even with Efficiency V. Vanilla gates on f > 1.0F.
+        float bareHand = DigPacing.applyDigSpeedModifiers(1.0f, 5, -1, -1, false);
+        assertEquals(1.0f, bareHand, SPEED_EPS, "Efficiency must not apply to bare-hand speed (1.0)");
+        // A real tool (iron pickaxe = 6.0) with Efficiency I gets +2.
+        float ironEff1 = DigPacing.applyDigSpeedModifiers(6.0f, 1, -1, -1, false);
+        assertEquals(8.0f, ironEff1, SPEED_EPS, "Efficiency I: 6 + (1^2 + 1) = 8");
+    }
+
+    @Test
+    void efficiencyFormulaIsLevelSquaredPlusOne() {
+        // Efficiency III: +10 (3^2 + 1)
+        float eff3 = DigPacing.applyDigSpeedModifiers(8.0f, 3, -1, -1, false);
+        assertEquals(18.0f, eff3, SPEED_EPS, "Efficiency III: 8 + (3^2 + 1) = 18");
+        // Efficiency V: +26 (5^2 + 1) — the max vanilla level
+        float eff5 = DigPacing.applyDigSpeedModifiers(9.0f, 5, -1, -1, false);
+        assertEquals(35.0f, eff5, SPEED_EPS, "Efficiency V: 9 + (5^2 + 1) = 35");
+    }
+
+    @Test
+    void hasteMultiplierScalesWithAmplifier() {
+        // Haste I (amp 0): *1.2
+        float haste1 = DigPacing.applyDigSpeedModifiers(6.0f, 0, 0, -1, false);
+        assertEquals(7.2f, haste1, SPEED_EPS, "Haste I: 6 * (1 + 1*0.2) = 7.2");
+        // Haste II (amp 1): *1.4
+        float haste2 = DigPacing.applyDigSpeedModifiers(6.0f, 0, 1, -1, false);
+        assertEquals(8.4f, haste2, SPEED_EPS, "Haste II: 6 * (1 + 2*0.2) = 8.4");
+        // Haste III (amp 2): *1.6
+        float haste3 = DigPacing.applyDigSpeedModifiers(10.0f, 0, 2, -1, false);
+        assertEquals(16.0f, haste3, SPEED_EPS, "Haste III: 10 * (1 + 3*0.2) = 16");
+    }
+
+    @Test
+    void miningFatigueMultipliersMatchVanillaTable() {
+        // Fatigue I (amp 0): *0.3
+        float fatigue1 = DigPacing.applyDigSpeedModifiers(10.0f, 0, -1, 0, false);
+        assertEquals(3.0f, fatigue1, SPEED_EPS, "Fatigue I: 10 * 0.3 = 3.0");
+        // Fatigue II (amp 1): *0.09
+        float fatigue2 = DigPacing.applyDigSpeedModifiers(10.0f, 0, -1, 1, false);
+        assertEquals(0.9f, fatigue2, SPEED_EPS, "Fatigue II: 10 * 0.09 = 0.9");
+        // Fatigue III (amp 2): *0.0027
+        float fatigue3 = DigPacing.applyDigSpeedModifiers(10.0f, 0, -1, 2, false);
+        assertEquals(0.027f, fatigue3, SPEED_EPS, "Fatigue III: 10 * 0.0027 = 0.027");
+        // Fatigue IV+ (amp 3): *0.00081 — the default branch
+        float fatigue4 = DigPacing.applyDigSpeedModifiers(10.0f, 0, -1, 3, false);
+        assertEquals(0.0081f, fatigue4, SPEED_EPS, "Fatigue IV: 10 * 0.00081 = 0.0081");
+    }
+
+    @Test
+    void underwaterPenaltyAppliesOnlyWithoutAquaAffinity() {
+        // Underwater, no Aqua Affinity: /5
+        float underwater = DigPacing.applyDigSpeedModifiers(10.0f, 0, -1, -1, true);
+        assertEquals(2.0f, underwater, SPEED_EPS, "underwater without Aqua Affinity: 10 / 5 = 2.0");
+        // Underwater WITH Aqua Affinity (flag false): no penalty
+        float withAqua = DigPacing.applyDigSpeedModifiers(10.0f, 0, -1, -1, false);
+        assertEquals(10.0f, withAqua, SPEED_EPS, "underwater with Aqua Affinity: no penalty");
+    }
+
+    @Test
+    void combinedModifiersApplyInVanillaOrder() {
+        // Diamond pickaxe (8.0) + Efficiency III (+10) + Haste II (*1.4)
+        // + underwater (/5): (8 + 10) * 1.4 / 5 = 18 * 1.4 / 5 = 5.04
+        float combined = DigPacing.applyDigSpeedModifiers(8.0f, 3, 1, -1, true);
+        assertEquals(5.04f, combined, SPEED_EPS, "Eff III + Haste II + underwater: (8+10)*1.4/5 = 5.04");
+    }
+
+    @Test
+    void fatigueAndHasteStackMultiplicatively() {
+        // Haste I (*1.2) + Fatigue I (*0.3): 10 * 1.2 * 0.3 = 3.6
+        float both = DigPacing.applyDigSpeedModifiers(10.0f, 0, 0, 0, false);
+        assertEquals(3.6f, both, SPEED_EPS, "Haste I + Fatigue I: 10 * 1.2 * 0.3 = 3.6");
+    }
+
+    @Test
+    void efficiencyDoesNotApplyToBareHandEvenWithOtherModifiers() {
+        // Bare hand (1.0) + Efficiency V + Haste I: efficiency skipped,
+        // haste applies: 1.0 * 1.2 = 1.2
+        float bareHandWithEff = DigPacing.applyDigSpeedModifiers(1.0f, 5, 0, -1, false);
+        assertEquals(1.2f, bareHandWithEff, SPEED_EPS, "bare hand ignores Efficiency V but still gets Haste I");
+    }
 }

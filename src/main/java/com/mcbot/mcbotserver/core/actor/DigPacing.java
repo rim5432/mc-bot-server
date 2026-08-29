@@ -118,4 +118,73 @@ public final class DigPacing {
     public static int stageOf(float cumulativeProgress) {
         return Math.min((int) (cumulativeProgress * 10f), 9);
     }
+
+    /**
+     * Apply the full vanilla dig-speed modifier stack to a base tool
+     * speed. Mirrors {@code Player.getDigSpeed} (decompiled 1.20.1,
+     * lines 752-781) minus the airborne penalty — that lives in
+     * {@link #perTickProgress} so the pure half can test it without an
+     * engine. Multiplication is associative across these factors, so
+     * splitting airborne to the per-tick call is numerically exact.
+     *
+     * <p>Modifier order (matches vanilla):
+     * <ol>
+     *   <li>Efficiency enchant: {@code speed += level^2 + 1}, only when
+     *       base speed {@code > 1.0} (the tool is effective against this
+     *       block; bare-hand and wrong-tool get no efficiency bonus).</li>
+     *   <li>Haste (DIG_SPEED): {@code speed *= 1.0 + (amplifier+1) * 0.2}.</li>
+     *   <li>Mining Fatigue (DIG_SLOWDOWN): amplifier 0 -> 0.3, 1 -> 0.09,
+     *       2 -> 0.0027, 3+ -> 0.00081.</li>
+     *   <li>Underwater without Aqua Affinity: {@code speed /= 5.0}. Aqua
+     *       Affinity on the helmet cancels this; Water Breathing does NOT
+     *       (common misconception — vanilla checks the enchant, not the
+     *       potion).</li>
+     * </ol>
+     *
+     * <p>Amplifier parameters use {@code -1} for "effect not present" so
+     * the pure method needs no MC classes; the adapter maps
+     * {@code hasEffect} to the sentinel.
+     *
+     * @param baseSpeed              the held item's {@code getDestroySpeed}
+     *                               against the target block; 1.0 for bare
+     *                               hand or wrong tool
+     * @param efficiencyLevel        Efficiency enchant level on the held
+     *                               item; 0 when absent
+     * @param hasteAmplifier         Haste (DIG_SPEED) amplifier, or -1
+     *                               when not active
+     * @param fatigueAmplifier       Mining Fatigue (DIG_SLOWDOWN)
+     *                               amplifier, or -1 when not active
+     * @param underwaterWithoutAqua  true when the eye is in water AND the
+     *                               helmet has no Aqua Affinity
+     * @return the effective dig speed after all modifiers; the airborne
+     *         penalty (divide by 5) is NOT applied here —
+     *         {@link #perTickProgress} applies it from the
+     *         {@code onGround} flag
+     */
+    public static float applyDigSpeedModifiers(
+            float baseSpeed,
+            int efficiencyLevel,
+            int hasteAmplifier,
+            int fatigueAmplifier,
+            boolean underwaterWithoutAqua) {
+        float speed = baseSpeed;
+        if (speed > 1.0f && efficiencyLevel > 0) {
+            speed += efficiencyLevel * efficiencyLevel + 1;
+        }
+        if (hasteAmplifier >= 0) {
+            speed *= 1.0f + (hasteAmplifier + 1) * 0.2f;
+        }
+        if (fatigueAmplifier >= 0) {
+            speed *= switch (fatigueAmplifier) {
+                case 0 -> 0.3f;
+                case 1 -> 0.09f;
+                case 2 -> 0.0027f;
+                default -> 0.00081f;
+            };
+        }
+        if (underwaterWithoutAqua) {
+            speed /= 5.0f;
+        }
+        return speed;
+    }
 }
