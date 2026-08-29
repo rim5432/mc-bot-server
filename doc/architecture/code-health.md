@@ -204,7 +204,7 @@ abstractions already exist.
 
 | Abstraction | Implementations / callers | Next promotion trigger |
 |---|---|---|
-| `ReflexSeat` (core/tick) | ReflexEngageSeat + ReflexRescueSeat | a third seat (0010's EAT reflex if it needs handoff) generalizes the controller-side three-way resume dispatch |
+| `ReflexMissionSeat` (core/tick) | one parameterized seat serving the fight / rescue / forage handoffs (ledger 35); the one-impl `ReflexSeat` interface folded 2026-08-29 | a second seat IMPLEMENTATION (a fourth seat kind with distinct policy) re-raises an interface |
 | `DigMission` (api/process) | DigProcess + MineProcess; a new dig-family mission costs zero controller change | a second CLAIM KIND (attack for hunt, use for eat) lifts process-driven claim injection to a declared BotProcess capability |
 | `submitAimAndDig` (BotController) | mission-dig path + preemptDigClaims | a second non-dig per-tick interaction widens the pair |
 | `MenuTransactions` (api.menu) | BindingActor; ruled form (ledger 29, not-claims-not-second-controller) | eat / use-item decides claim-vs-transaction; design agenda belongs to 0010 |

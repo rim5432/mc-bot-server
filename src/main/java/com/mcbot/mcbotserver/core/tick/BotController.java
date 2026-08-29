@@ -447,7 +447,7 @@ public final class BotController {
      *         tick would starve the very mission the reflex submitted
      */
     private boolean handoffToSeat(
-            ReflexSeat seat, Supplier<BotProcess> factory, ReflexDecision decision, long day, long tod) {
+            ReflexMissionSeat seat, Supplier<BotProcess> factory, ReflexDecision decision, long day, long tod) {
         seat.retireFinished();
         if (!seat.maySubmit()) {
             return false;

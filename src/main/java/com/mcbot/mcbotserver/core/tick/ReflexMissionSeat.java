@@ -21,7 +21,7 @@ import com.mcbot.mcbotserver.core.process.TaskArbiter;
  * (ESCAPE rescue handoff), and 34 (food acquisition). Package-private
  * by design; not part of any boundary.
  */
-final class ReflexMissionSeat implements ReflexSeat {
+final class ReflexMissionSeat {
 
     private final TaskArbiter arbiter;
 
@@ -60,7 +60,6 @@ final class ReflexMissionSeat implements ReflexSeat {
      * announced by the transition detector; keeping the corpse would
      * only blur the parked/awaiting queries.
      */
-    @Override
     public void retireFinished() {
         if (mission != null && !mission.isActive()) {
             mission = null;
@@ -71,7 +70,6 @@ final class ReflexMissionSeat implements ReflexSeat {
      * @return true when no mission is live and the resubmit cooldown
      *         has elapsed
      */
-    @Override
     public boolean maySubmit() {
         return mission == null && ticksSinceSubmit >= resubmitCooldownTicks;
     }
@@ -81,7 +79,6 @@ final class ReflexMissionSeat implements ReflexSeat {
      *
      * @param mission the freshly registered mission; never null
      */
-    @Override
     public void submitted(BotProcess mission) {
         this.mission = mission;
         this.ticksSinceSubmit = 0;
