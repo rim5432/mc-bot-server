@@ -264,7 +264,12 @@ jacocoTestReport {
 }
 
 pitest {
-    targetClasses = ['com.mcbot.mcbotserver.*']
+    // Scoped rounds pass -PpitClasses/-PpitTests (comma-joined
+    // patterns); the owed-baselines round used them to score the
+    // PathingBehavior+MineProcess pair without the minion classpath
+    // choking on adapter classes' MC references.
+    targetClasses = project.hasProperty('pitClasses') ? [project.pitClasses] : ['com.mcbot.mcbotserver.*']
+    targetTests = project.hasProperty('pitTests') ? [project.pitTests] : ['com.mcbot.mcbotserver.*']
     excludedTestClasses = ['com.mcbot.mcbotserver.gametest.*']
     junit5PluginVersion = '1.2.1'
     threads = 4
