@@ -56,6 +56,10 @@ class HungryProcessTest {
         assertFalse(hungry.missionSucceeded());
         assertEquals(HungryProcess.REASON_EXHAUSTED, hungry.failureReasonOrNull());
         assertEquals("none", hungry.verdictAttrs().get("strategy"));
+        // The terminal hold must not hand the mover a far goal: the
+        // old (0,64,0) origin anchor made every post-failure tick plan
+        // toward the world origin and wedged the engine batch.
+        assertNull(hungry.onTick(world), "terminal hold stays null, never a far anchor");
     }
 
     @Test

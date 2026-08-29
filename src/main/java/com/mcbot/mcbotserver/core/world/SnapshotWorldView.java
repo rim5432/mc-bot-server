@@ -70,11 +70,6 @@ public final class SnapshotWorldView implements WorldView {
     // runs on server tick thread; reads live world state
     public static SnapshotWorldView capture(WorldView live, CellPos a, CellPos b) {
         Objects.requireNonNull(live, "live");
-        long volume =
-                (long) (Math.abs(a.x() - b.x()) + 17) * (Math.abs(a.y() - b.y()) + 9) * (Math.abs(a.z() - b.z()) + 17);
-        if (volume > 20000) {
-            com.mojang.logging.LogUtils.getLogger().info("[SNAPSHOT] large capture a={} b={} volume={}", a, b, volume);
-        }
         int minX = Math.min(a.x(), b.x()) - XZ_MARGIN;
         int maxX = Math.max(a.x(), b.x()) + XZ_MARGIN;
         int minY = Math.min(a.y(), b.y()) - Y_MARGIN;

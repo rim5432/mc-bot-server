@@ -81,7 +81,13 @@ public final class HungryProcess extends MissionShell implements DigMission {
     private CellPos collectCell;
     private CellPos waterCell;
     private int collectTicks;
-    private Directive lastDirective = Directive.of(new GoalNear(new CellPos(0, 64, 0), 0));
+    // Null until a phase sets it - matches Attack/Defend. The old
+    // initializer pointed the hold directive at the world origin
+    // (0,64,0), so a mission that failed before its first real
+    // directive handed the mover a goal 100+ blocks away; the planner
+    // then snapshotted a 380k-cell capture box toward the origin and
+    // wedged the engine batch's server thread for minutes per retry.
+    private Directive lastDirective;
 
     private enum Phase {
         ASSESS,
