@@ -90,6 +90,20 @@ moved to `api.process` (produce where consumed), and the
 when `BindingInventory` moved to `adapter.inventory`. There are no
 cycle exceptions left; a new one is a design regression.
 
+## Continuous integration
+
+The public mirror at `github.com/rim5432/mc-bot-server` runs the
+offline gate on every push and PR (`.github/workflows/ci.yml`):
+`compileJava` + the default `test` flow, meaning offline JUnit plus
+the checkstyle/spotlessCheck hard gates. CI invokes `gradlew`
+directly on purpose - the toolbox lock exists to serialize
+concurrent agents on this one checkout, which a fresh CI runner
+does not have. Engine gametests stay local-only
+(`build runGameTest`); GitHub-hosted runners cannot boot the game.
+CI is the enforcement mirror of this page, not a second toolchain:
+if CI fails on a commit that passed locally, suspect uncommitted
+local state, not CI drift.
+
 ## When a build fails
 
 ```bash
