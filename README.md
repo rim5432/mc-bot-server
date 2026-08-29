@@ -93,4 +93,4 @@ the offline test suite is the contract.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) — Copyright (c) 2026 rim5432
