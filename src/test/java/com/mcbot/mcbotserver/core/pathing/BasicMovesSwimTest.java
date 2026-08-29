@@ -73,6 +73,43 @@ class BasicMovesSwimTest {
     }
 
     @Test
+    void swimmingDownTheWaterColumnIsViable() {
+        MockWorldView w = shoreAndWater();
+        // Source at SURFACE_Y, destination one below — both are liquid
+        // in the shoreAndWater fixture (y from SURFACE_Y-1 to SURFACE_Y+1).
+        var down = new BasicMoves.SwimDown(WATER, new CellPos(1, SURFACE_Y - 1, 0));
+        assertTrue(down.isViable(w), "descending inside a water column must be viable");
+    }
+
+    @Test
+    void swimmingDownFromDryLandIsRejected() {
+        MockWorldView w = shoreAndWater();
+        // Source is dry shore, not liquid — SwimDown requires source liquid.
+        var down = new BasicMoves.SwimDown(SHORE, new CellPos(0, SURFACE_Y - 1, 0));
+        assertFalse(down.isViable(w), "descending from dry land must refuse — source must be liquid");
+    }
+
+    @Test
+    void swimmingDownIntoAirIsRejected() {
+        MockWorldView w = shoreAndWater();
+        // Destination below the water column floor is air (not liquid).
+        var down = new BasicMoves.SwimDown(new CellPos(1, SURFACE_Y - 1, 0), new CellPos(1, SURFACE_Y - 2, 0));
+        assertFalse(down.isViable(w), "descending into air must refuse — destination must be liquid");
+    }
+
+    @Test
+    void swimmingDownIntoABlockedCellIsRejected() {
+        MockWorldView w = shoreAndWater();
+        // Place a solid block at the destination, keeping the liquid trait
+        // to isolate the passability check from the liquid check.
+        CellPos dest = new CellPos(1, SURFACE_Y - 1, 0);
+        w.putBlock(new BlockSnapshot(dest, "minecraft:stone"));
+        w.putShape(dest, CollisionShape.fullCube());
+        var down = new BasicMoves.SwimDown(WATER, dest);
+        assertFalse(down.isViable(w), "descending into a blocked cell must refuse");
+    }
+
+    @Test
     void unannotatedWaterIsInvisibleToSwim() {
         MockWorldView w = shoreAndWater();
         // Strip the trait: passable shape stays, but without the

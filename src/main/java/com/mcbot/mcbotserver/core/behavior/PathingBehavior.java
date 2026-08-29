@@ -11,6 +11,7 @@ import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.ExecutionReport;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
+import com.mcbot.mcbotserver.api.world.ViewMode;
 import com.mcbot.mcbotserver.api.world.WorldView;
 import com.mcbot.mcbotserver.core.pathing.AStarPathFinder;
 import com.mcbot.mcbotserver.core.pathing.MoveGraph;
@@ -320,7 +321,7 @@ public final class PathingBehavior implements Behavior {
         // last waypoint once the cursor runs past it, so a brake
         // undershoot keeps pushing into the goal cell instead of
         // idling one cell short until the mission budget dies.
-        steerTowardCurrentWaypoint(position, actor);
+        steerTowardCurrentWaypoint(world, position, actor);
         return ExecutionReport.running();
     }
 
@@ -542,7 +543,7 @@ public final class PathingBehavior implements Behavior {
      * @param to       the segment's far end; never null
      * @return non-negative distance in metres
      */
-    private static double distanceToSegment(Vec3 position, CellPos from, CellPos to) {
+    static double distanceToSegment(Vec3 position, CellPos from, CellPos to) {
         double ax = from.x() + 0.5;
         double az = from.z() + 0.5;
         double abx = to.x() + 0.5 - ax;
@@ -553,7 +554,7 @@ public final class PathingBehavior implements Behavior {
         return Math.hypot(position.x() - (ax + abx * t), position.z() - (az + abz * t));
     }
 
-    private void steerTowardCurrentWaypoint(Vec3 position, Actor actor) {
+    private void steerTowardCurrentWaypoint(WorldView world, Vec3 position, Actor actor) {
         CellPos wp = cursor.steerTarget();
         double dx = wp.x() + 0.5 - position.x();
         double dz = wp.z() + 0.5 - position.z();
@@ -565,15 +566,49 @@ public final class PathingBehavior implements Behavior {
         // held thrust reads as a continuous hop cadence.
         // Auto-step clears rises <= 0.5 (slabs); taller steps need
         // this thrust to leave the ground.
-        boolean jumpForWaypoint = wp.y() > floorOf(position).y();
+        CellPos floor = floorOf(position);
+        boolean jumpForWaypoint = wp.y() > floor.y();
+        // Sneak is the execution half of a SwimDown edge only: the
+        // waypoint below a body already standing in liquid. In water
+        // the shift flag maps to downward thrust (BotBodyEntity
+        // applyWaterDescent). The medium check is load-bearing here,
+        // not the executor's concern alone - on land the same flag
+        // engages the sneak edge guard (maybeBackOffFromEdge), which
+        // pins every Drop and step-down leg at the ledge, the
+        // corridor-STUCK regression this gate closes.
+        boolean sneakForWaypoint = sneakForLeg(wp, floor, liquid(world, floor));
         // Arrival brake (issue 0005 P2.2): scale drive down as the
         // terminal waypoint closes, floored at ARRIVE_MIN_DRIVE so
         // the body always creeps into the goal predicate.
         CellPos end = cursor.last();
         double endDist = Math.hypot(end.x() + 0.5 - position.x(), end.z() + 0.5 - position.z());
         double forward = Math.min(1.0, Math.max(ARRIVE_MIN_DRIVE, endDist / BRAKE_DISTANCE));
-        actor.submit(new Claim(Channel.MOVE, 10, name, new Intent.Move(forward, 0, jumpForWaypoint, false)));
+        actor.submit(new Claim(Channel.MOVE, 10, name, new Intent.Move(forward, 0, jumpForWaypoint, sneakForWaypoint)));
         actor.submit(new Claim(Channel.ROT, 10, name, new Intent.Look(yaw, steerPitch(position, wp))));
+    }
+
+    /**
+     * Whether the steering leg down to {@code wp} earns the sneak
+     * flag: only a SwimDown edge does - the waypoint below a floor
+     * cell that is itself liquid. {@code BasicMoves.SwimDown}
+     * viability demands a liquid source, so the gate matches the
+     * edge type exactly and land legs (Drop, step-down) never hold
+     * shift; a sneaking body cannot leave a ledge (the edge guard),
+     * so a land sneak would deadlock every descending leg.
+     *
+     * @param wp             the steer target cell; never null
+     * @param floor          the cell containing the body's feet; never
+     *                       null
+     * @param floorIsLiquid  whether the floor cell carries the liquid
+     *                       trait
+     * @return true only for a water descent leg
+     */
+    static boolean sneakForLeg(CellPos wp, CellPos floor, boolean floorIsLiquid) {
+        return wp.y() < floor.y() && floorIsLiquid;
+    }
+
+    private static boolean liquid(WorldView world, CellPos cell) {
+        return world.getBlockTraits(cell, ViewMode.LIVE).liquid();
     }
 
     /**

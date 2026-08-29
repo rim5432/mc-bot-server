@@ -35,8 +35,8 @@ import java.util.Objects;
  *
  * <p>Non-geometric block properties (climbable / liquid / damaging)
  * live in {@link com.mcbot.mcbotserver.api.world.BlockTraits} and are
- * consulted by the swim set; Ladder / pillar Movements will read
- * traits the same way when they land.
+ * consulted by the swim and climb sets; the trait is the property the
+ * empty collision shape cannot infer (decision 19).
  *
  * <p>Decision 19a gate (swim): the full physical precondition is
  * derivable from Shape plus Traits - passability from the (empty)
@@ -62,6 +62,7 @@ public final class BasicMoves {
             out.add(new JumpUp(src, new CellPos(src.x() + d.dx, src.y() + 1, src.z() + d.dz)));
             out.add(new Swim(src, new CellPos(src.x() + d.dx, src.y(), src.z() + d.dz)));
             out.add(new SwimUp(src, new CellPos(src.x() + d.dx, src.y() + 1, src.z() + d.dz)));
+            out.add(new SwimDown(src, new CellPos(src.x() + d.dx, src.y() - 1, src.z() + d.dz)));
             for (int k = 1; k <= MAX_DROP; k++) {
                 out.add(new Drop(src, new CellPos(src.x() + d.dx, src.y() - k, src.z() + d.dz), k));
             }
@@ -71,6 +72,13 @@ public final class BasicMoves {
                 out.add(new Diagonal(src, new CellPos(src.x() + dx, src.y(), src.z() + dz)));
             }
         }
+        // Vertical-only water descent: straight down inside a water
+        // column. Mirrors ClimbUp's vertical-only shape.
+        out.add(new SwimDown(src, new CellPos(src.x(), src.y() - 1, src.z())));
+        // Vertical climb: trait-driven, no horizontal component. Generated
+        // from every cell; isViable refuses when the source is not
+        // climbable. Mirrors SwimUp's vertical-only shape.
+        out.add(new ClimbUp(src, new CellPos(src.x(), src.y() + 1, src.z())));
         return out;
     }
 
@@ -142,6 +150,20 @@ public final class BasicMoves {
      */
     private static boolean liquid(WorldView world, CellPos cell) {
         return world.getBlockTraits(cell, ViewMode.LIVE).liquid();
+    }
+
+    /**
+     * Whether the cell carries the climbable trait (ladder, vine,
+     * weeping/twisting vines). Reads the trait, never the shape — a
+     * ladder's collision box is empty above the rung, so the shape
+     * cannot say "this cell is climbable" (decision 19).
+     *
+     * @param world the view; must not be null
+     * @param cell  the cell to test; must not be null
+     * @return true when the traits registry marks the cell climbable
+     */
+    private static boolean climbable(WorldView world, CellPos cell) {
+        return world.getBlockTraits(cell, ViewMode.LIVE).climbable();
     }
 
     record Walk(CellPos source, CellPos destination) implements Movement {
@@ -266,6 +288,59 @@ public final class BasicMoves {
         @Override
         public boolean isViable(WorldView world) {
             return liquid(world, source) && passable(world, destination) && liquid(world, destination);
+        }
+
+        @Override
+        public double cost(WorldView world) {
+            return 2.0;
+        }
+    }
+
+    /**
+     * Vertical or diagonal descent inside a water column. The source
+     * must be liquid (the body is already submerged); the destination
+     * one cell below must be both passable and liquid — descending into
+     * air is a Drop, not a swim. The executor interprets {@code sneak}
+     * in water as downward thrust (see BotBodyEntity); on land the same
+     * flag is just crouch, so the pathing layer does not need to know
+     * which medium it is in.
+     */
+    record SwimDown(CellPos source, CellPos destination) implements Movement {
+
+        @Override
+        public boolean isViable(WorldView world) {
+            return liquid(world, source) && passable(world, destination) && liquid(world, destination);
+        }
+
+        @Override
+        public double cost(WorldView world) {
+            return 2.0;
+        }
+    }
+
+    /**
+     * Vertical ascent through a climbable cell (ladder, vine, weeping/
+     * twisting vines). The source carries the climbable trait; the
+     * destination is one above and must be body-passable (another
+     * ladder cell or open air). No floor support required — the ladder
+     * is the support, exactly as vanilla {@code Entity.onClimbable}
+     * does not demand ground contact.
+     *
+     * <p>Executor: vanilla {@code LivingEntity.travel()} climbs
+     * automatically when {@code onClimbable()} is true and horizontal
+     * drive is present; {@code PathingBehavior} supplies {@code forward
+     * >= ARRIVE_MIN_DRIVE} on every steer tick, so a pure-vertical
+     * ladder run still gets the input vanilla needs. No special
+     * jump branch is required — the climbable check in travel() runs
+     * for every LivingEntity, including the bot's PathfinderMob carrier.
+     */
+    record ClimbUp(CellPos source, CellPos destination) implements Movement {
+
+        @Override
+        public boolean isViable(WorldView world) {
+            return climbable(world, source)
+                    && passable(world, destination)
+                    && passable(world, new CellPos(destination.x(), destination.y() + 1, destination.z()));
         }
 
         @Override
