@@ -49,7 +49,7 @@ python tool/mcbot_tool.py test -- --tests "*ReflexChainGateTest*"
 | `test` | JUnit suite; **rides checkstyleMain/Test + spotlessCheck as hard gates** |
 | `lint` | one-command static-analysis verdict (`gradle qualityCheck -Plint --continue`): compiles both source sets, runs PMD + CPD red walls and the SpotBugs dashboard |
 | `gradle <args>` | any other gradle invocation with the same lock (opt-in analyzer rounds: `-Plint pmdMain ...`) |
-| `status` | one-page view: locks, live processes, last log path |
+| `status` | one-page view: locks, live processes, last log path, engine-receipt currency (newest gametest receipt vs later adapter/gametest commits) |
 | `log tail\|cat\|list` | recent output / full log by task fragment / log inventory |
 | `lock status\|clear` | who holds what; force-clear a dead holder |
 | `proc list\|killdaemon` | java/gradle process census; daemon kill requires `--yes` |

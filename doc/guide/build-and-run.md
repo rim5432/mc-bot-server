@@ -1,6 +1,6 @@
 ---
 title: Build & Run Guide
-last_verified: 2026-08-29
+last_verified: 2026-08-30
 covers:
   - tool/mcbot_tool.py
 ---
@@ -139,6 +139,15 @@ python tool/mcbot_tool.py build runGameTest   # runs the suite, auto-exits
 Exit code = number of failed required tests (0 on green). The server
 runs headless and as fast as the CPU allows - a full boot plus suite is
 roughly 30-60s.
+
+Every finished run writes a receipt to
+`qa-results/engine-runs/gametest-<stamp>.json` (scenario total, failed
+list, git rev, GREEN flag). Receipts are the currency record behind
+H-R5's verification discipline: `status` renders the newest one plus
+how many later commits touched `adapter/` or `gametest/` since - a
+non-zero count with a verified claim pending means rerun before the
+claim. Receipt writing is telemetry; a receipt failure warns and
+never blocks the run.
 
 **Structure templates**: MC 1.20.1 ships no empty template. The gametest
 framework resolves `mcbotserver:<name>` through StructureTemplateManager

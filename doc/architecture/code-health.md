@@ -1,6 +1,6 @@
 ---
 title: Code Health Ledger
-last_verified: 2026-08-29
+last_verified: 2026-08-30
 covers:
   - build.gradle
   - config/checkstyle/checkstyle.xml
@@ -92,7 +92,7 @@ admitted here may encode a size cap.
 | H-R2 No inline FQNs | A type used in code is imported; FQNs appear only where Java demands them | none scheduled (textually checkable, lowest value) | review-only |
 | H-R3 English-only everywhere | Zero CJK codepoints in any `.md` file and any Java source | `hygiene.EnglishOnlyScan` | gated 2026-08-24 |
 | H-R4 Wire keys frozen | Serialized boundary-D keys survive field renames | `boundaryd.WireVocabularyGateTest` (kind inventory, attr-key vocabulary, record component pins) | gated 2026-08-25 |
-| H-R5 Gametest inventory | The registered `@GameTest` set cannot silently shrink | `hygiene.GametestInventoryCheck` | gated |
+| H-R5 Gametest inventory | The registered `@GameTest` set cannot silently shrink; verification currency is receipt-backed (`qa-results/engine-runs/`, surfaced by `status`) | `hygiene.GametestInventoryCheck` | gated |
 | H-R6 Geometry spectrum rationale | Threshold constants document their partial-top-spectrum reasoning | not mechanically checkable | review-only |
 | H-R7 Package structure | Main modules single-level, module names never reused as subpackages; test packages mirror main or are sanctioned metas | `architecture.PackageStructureGateTest` | gated 2026-08-25 |
 | H-R8 Contract markers present | Every src/main implementer of a boundary interface carries its `contract: see` pointer (AGENTS.md 1.4.3.1) | `architecture.BoundaryContractMarkerTest` | gated 2026-08-25 |
