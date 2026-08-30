@@ -67,7 +67,9 @@ class GametestInventoryCheck {
                             "sweepClipsBystanders",
                             "underwaterSwingsNeverCrit",
                             "raisedShieldBlocksIncomingArrow",
-                            "bowChargedShotDamagesDistantTarget")),
+                            "bowChargedShotDamagesDistantTarget",
+                            "rearArrowBypassesTheRaisedShield",
+                            "bowTapShotDealsWeakDamage")),
             Map.entry(
                     "BotHazardReflexGameTests",
                     Set.of(
@@ -126,7 +128,8 @@ class GametestInventoryCheck {
                             "digWearsThePickaxeOncePerBlock",
                             "swordDigsAtDoubleWear",
                             "breakingBlocksBuildsExhaustion",
-                            "toolSelectorPicksThePickaxeForStone")));
+                            "toolSelectorPicksThePickaxeForStone",
+                            "toolSelectorPicksShearsForLeaves")));
     /** Pulls the method name out of each
      * {@code @GameTest(...)} declaration in a source file. */
     private static final Pattern GAME_TEST_METHOD =

@@ -787,4 +787,107 @@ public final class BotCombatGameTests {
                 })
                 .thenSucceed();
     }
+    /**
+     * Scenario: a raised shield blocks only the frontal hemisphere -
+     * an arrow from BEHIND lands full damage through the same raised
+     * shield (vanilla LivingEntity.hurt's direction gate: the
+     * source-to-body vector dotted against the view vector must be
+     * negative to block; a rear source fails it). The body faces
+     * east with the shield up; the archer stands west.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
+    public static void rearArrowBypassesTheRaisedShield(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(11, GametestRig.WALK_Y, 8));
+        rig.body().getInventory().container().setItem(0, new ItemStack(Items.SHIELD));
+        rig.body().setYRot(-90f); // face east; the archer fires from the west, behind
+        final float[] before = {20.0f};
+
+        helper.startSequence()
+                .thenExecuteFor(20, () -> {
+                    rig.actor().submit(new Claim(Channel.USE, 50, "test:shield", new Intent.Use(true)));
+                    GametestRig.driveTick(rig);
+                })
+                .thenExecuteAfter(0, () -> {
+                    check(rig.body().isBlocking(), "the shield must be up");
+                    before[0] = rig.body().getHealth();
+                    fireArrowFromWestAt(helper, rig);
+                })
+                .thenExecuteFor(30, () -> {
+                    rig.actor().submit(new Claim(Channel.USE, 50, "test:shield", new Intent.Use(true)));
+                    GametestRig.driveTick(rig);
+                })
+                .thenExecuteAfter(
+                        0,
+                        () -> check(
+                                rig.body().getHealth() < before[0],
+                                "a rear arrow must land through the raised shield, before=" + before[0] + " after="
+                                        + rig.body().getHealth()))
+                .thenExecuteAfter(0, () -> rig.body().discard())
+                .thenSucceed();
+    }
+
+    /**
+     * Spawns an arrow six cells west of the body flying east at it.
+     *
+     * @param helper the running gametest; never null
+     * @param rig    the wired rig; never null
+     */
+    private static void fireArrowFromWestAt(GameTestHelper helper, GametestRig.Rig rig) {
+        var local = GametestRig.toLocal(helper, rig.body().blockPosition());
+        var abs = helper.absolutePos(new BlockPos(local.getX() - 6, GametestRig.WALK_Y, local.getZ()));
+        var arrow = EntityType.ARROW.create(helper.getLevel());
+        check(arrow != null, "arrow creation failed");
+        arrow.moveTo(abs.getX() + 0.5, abs.getY() + 0.5, abs.getZ() + 0.5, -90f, 0f);
+        arrow.shoot(1.0, 0.0, 0.0, 3.0f, 0.0f);
+        helper.getLevel().addFreshEntity(arrow);
+    }
+    /**
+     * Scenario: the charge flows into the damage - a 4-tick tap
+     * release stays in the weak band (below the 0.1 charge floor no
+     * arrow spawns at all; just above it the damage is a fraction of
+     * the full draw) on one target while the 25-tick hold on another
+     * lands the heavy band. Two NoAi zombies, one hand-pumped shot
+     * each.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT + 100)
+    public static void bowTapShotDealsWeakDamage(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(4, GametestRig.WALK_Y, 2));
+        var container = rig.body().getInventory().container();
+        container.setItem(0, new ItemStack(Items.BOW));
+        container.setItem(1, new ItemStack(Items.ARROW, 64));
+        Zombie fullDraw = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(4, GametestRig.WALK_Y, 8));
+        Zombie tap = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(7, GametestRig.WALK_Y, 8));
+        fullDraw.setNoAi(true);
+        tap.setNoAi(true);
+
+        helper.startSequence()
+                .thenExecuteFor(25, () -> {
+                    rig.actor().submit(new Claim(Channel.USE, 50, "test:draw", new Intent.Use(true)));
+                    GametestRig.driveTick(rig);
+                })
+                .thenExecuteFor(2, () -> {
+                    rig.actor().submit(new Claim(Channel.USE, 50, "test:draw", new Intent.Use(false)));
+                    GametestRig.driveTick(rig);
+                })
+                .thenWaitUntil(driveUntil(
+                        rig,
+                        () -> check(
+                                fullDraw.getHealth() < 14f,
+                                "the full draw must land heavy damage, health=" + fullDraw.getHealth())))
+                .thenExecuteAfter(0, () -> rig.body().setYRot(-60f))
+                .thenExecuteFor(4, () -> {
+                    rig.actor().submit(new Claim(Channel.USE, 50, "test:tap", new Intent.Use(true)));
+                    GametestRig.driveTick(rig);
+                })
+                .thenExecuteFor(2, () -> {
+                    rig.actor().submit(new Claim(Channel.USE, 50, "test:tap", new Intent.Use(false)));
+                    GametestRig.driveTick(rig);
+                })
+                .thenExecuteFor(60, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    check(tap.getHealth() > 15f, "a 4-tick tap must stay in the weak band, health=" + tap.getHealth());
+                    rig.body().discard();
+                })
+                .thenSucceed();
+    }
 }

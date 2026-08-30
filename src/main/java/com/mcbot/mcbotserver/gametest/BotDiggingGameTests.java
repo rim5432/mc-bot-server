@@ -378,4 +378,38 @@ public final class BotDiggingGameTests {
                 })
                 .thenSucceed();
     }
+    /**
+     * Scenario: the mission tool selector is class-aware - shears
+     * for leaves, exactly as the pickaxe for stone. Sword selected
+     * at slot 0, shears at slot 1; a dig mission on persistent oak
+     * leaves must swap the selection and leave the sword unworn.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
+    public static void toolSelectorPicksShearsForLeaves(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
+        var container = rig.body().getInventory().container();
+        container.setItem(0, new ItemStack(Items.DIAMOND_SWORD));
+        container.setItem(1, new ItemStack(Items.SHEARS));
+        rig.body().selectedSlot = 0;
+        BlockPos leavesLocal = new BlockPos(6, GametestRig.WALK_Y, 8);
+        helper.setBlock(
+                leavesLocal,
+                Blocks.OAK_LEAVES
+                        .defaultBlockState()
+                        .setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT, true));
+        DigProcess mission = submitDig(rig, localToCell(helper, leavesLocal));
+
+        helper.startSequence()
+                .thenWaitUntil(driveUntil(rig, () -> check(!mission.isActive(), "waiting for the clip")))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    check(
+                            mission.missionSucceeded(),
+                            "the clip must succeed, failure=" + mission.failureReasonOrNull());
+                    checkEquals(1, rig.body().selectedSlot, "the selector must swap to the shears slot");
+                    checkEquals(0, container.getItem(0).getDamageValue(), "the sword must stay unworn");
+                    rig.body().discard();
+                })
+                .thenSucceed();
+    }
 }
