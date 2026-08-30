@@ -104,6 +104,26 @@ CI is the enforcement mirror of this page, not a second toolchain:
 if CI fails on a commit that passed locally, suspect uncommitted
 local state, not CI drift.
 
+## Scenario-authoring checklist (engine-learned)
+
+Six traps every new gametest scenario should check before its first
+pooled run - each one cost a debugging round somewhere:
+
+1. Structure-local coordinates only - `GametestRig.toLocal` for
+   every body/block comparison; world coordinates silently test the
+   wrong cell under pooled placement.
+2. Drops, orbs, and other scatter accept residency either way -
+   banked/absorbed OR lying as an entity at the site; "walked over
+   and picked it up" flakes past the ~1.5 pickup box.
+3. Stationary-kill staging zeroes ATTACK_KNOCKBACK - cooldown-scaled
+   spam hits slide NoAi targets out of the structure.
+4. Direct-arbiter mission submissions never see BLOCK_BROKEN - that
+   disclosure belongs to the command-handler sweep.
+5. Sneak needs a nonzero drive claim (into a wall) - zero-drive
+   claims take the actor's idle branch and never latch the pose.
+6. XP assertions carry the level-up branch (`level >= 1 ||
+   progress > 0`) - a 7-XP roll wraps the bar to zero.
+
 ## When a build fails
 
 ```bash

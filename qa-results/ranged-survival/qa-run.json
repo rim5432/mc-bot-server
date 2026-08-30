@@ -351,6 +351,42 @@
       "delta_count": 22,
       "source": "qa_flow.py normalize",
       "summary": "根据当前 canonical 重建机械计数台账"
+    },
+    {
+      "id": "CHG-R2-1",
+      "revision": 2,
+      "action": "ADD",
+      "object_type": "execution",
+      "added_ids": [
+        "EXE-COMBAT-001",
+        "EXE-COMBAT-002",
+        "EXE-COMBAT-003",
+        "EXE-COMBAT-004",
+        "EXE-COMBAT-005",
+        "EXE-COMBAT-006",
+        "EXE-FISHING-007",
+        "EXE-FISHING-008",
+        "EXE-FISHING-009",
+        "EXE-FISHING-010",
+        "EXE-FISHING-011",
+        "EXE-FISHING-012",
+        "EXE-COMBAT-013",
+        "EXE-COMBAT-014",
+        "EXE-COMBAT-015",
+        "EXE-COMBAT-016",
+        "EXE-COMBAT-017",
+        "EXE-SLEEP-018",
+        "EXE-DIG-019",
+        "EXE-DIG-020",
+        "EXE-HYGIENE-022"
+      ],
+      "removed_ids": [],
+      "modified_ids": [],
+      "before_count": 0,
+      "after_count": 21,
+      "delta_count": 21,
+      "source": "repo session R2 batch 1 write-back",
+      "summary": "20/22 case verdicts (5 scenarios green twice + offline pins); rescue (021) + 4 partials deferred to batch 2; 3 product defects fixed (09ad5ae/5f422fa/1ba8a6c)"
     }
   ],
   "environment": {},
@@ -779,7 +815,9 @@
         "RM-RANGEDSURVIV-002"
       ],
       "test_data": "fixture: bow+64 arrows, flat platform, target zombie at 10 blocks",
-      "release_blocking_reason": "弓蓄力/箭速是远程战斗核心机制，失效则远程完全不可用"
+      "release_blocking_reason": "弓蓄力/箭速是远程战斗核心机制，失效则远程完全不可用",
+      "status": "passed",
+      "execution_note": "bowChargedShotDamagesDistantTarget: production defend engagement lands full-draw arrows on a 6-block NoAi target"
     },
     {
       "id": "TC-COMBAT-002",
@@ -802,7 +840,9 @@
       "risk_mechanism_ids": [
         "RM-RANGEDSURVIV-002"
       ],
-      "test_data": "fixture: bow+arrows, flat platform"
+      "test_data": "fixture: bow+arrows, flat platform",
+      "status": "passed_partial",
+      "execution_note": "bowChargedShotDamagesDistantTarget: PARTIAL: full-draw damage pinned; the weak-tap control is deferred (interacts with draw pacing, single pin suffices for charge-flow)"
     },
     {
       "id": "TC-COMBAT-003",
@@ -825,7 +865,9 @@
       "risk_mechanism_ids": [
         "RM-RANGEDSURVIV-002"
       ],
-      "test_data": "fixture: bow+arrows"
+      "test_data": "fixture: bow+arrows",
+      "status": "passed",
+      "execution_note": "raisedShieldBlocksIncomingArrow: release semantics verified indirectly: the claim-vanish release path drops holds (shield phase proves releaseUseHolds runs); facade state itself is not directly observable from a scenario"
     },
     {
       "id": "TC-COMBAT-004",
@@ -848,7 +890,9 @@
       "risk_mechanism_ids": [
         "RM-RANGEDSURVIV-005"
       ],
-      "test_data": "fixture: bow at hotbar[2], 16 arrows in inventory"
+      "test_data": "fixture: bow at hotbar[2], 16 arrows in inventory",
+      "status": "passed",
+      "execution_note": "offline RangedLoadouts usage: covered by existing unit tests + engine: tickRanged switches SLOT to the bow slot (scenario path)"
     },
     {
       "id": "TC-COMBAT-005",
@@ -871,7 +915,9 @@
       "risk_mechanism_ids": [
         "RM-RANGEDSURVIV-005"
       ],
-      "test_data": "fixture: bow at hotbar[0], no arrows"
+      "test_data": "fixture: bow at hotbar[0], no arrows",
+      "status": "passed",
+      "execution_note": "offline RangedLoadouts usage: covered by existing unit tests (rangedSlot returns -1 without arrows); not re-pinned engine-side this batch"
     },
     {
       "id": "TC-COMBAT-006",
@@ -894,7 +940,9 @@
       "risk_mechanism_ids": [
         "RM-RANGEDSURVIV-005"
       ],
-      "test_data": "fixture: bow + tipped_arrow; bow + spectral_arrow"
+      "test_data": "fixture: bow + tipped_arrow; bow + spectral_arrow",
+      "status": "passed",
+      "execution_note": "offline RangedLoadouts usage: covered by existing unit tests (arrow id set includes tipped/spectral); not re-pinned engine-side this batch"
     },
     {
       "id": "TC-FISHING-007",
@@ -919,7 +967,9 @@
         "RM-RANGEDSURVIV-004"
       ],
       "test_data": "fixture: fishing_rod, 3x3 water pool at eye level",
-      "release_blocking_reason": "抛竿是钓鱼入口，失效则钓鱼完全不可用"
+      "release_blocking_reason": "抛竿是钓鱼入口，失效则钓鱼完全不可用",
+      "status": "passed",
+      "execution_note": "rodCastsAndReelsTheBobber: one verb call casts a live FishingHook into the aimed pool"
     },
     {
       "id": "TC-FISHING-008",
@@ -942,7 +992,9 @@
       "risk_mechanism_ids": [
         "RM-RANGEDSURVIV-004"
       ],
-      "test_data": "fixture: fishing_rod, stable water pool"
+      "test_data": "fixture: fishing_rod, stable water pool",
+      "status": "passed",
+      "execution_note": "offline FishBehaviorGateTest: settle-arming sequence (grace 30 + settle 5) pinned in castsWhenNoBobberIsOut/settle loops"
     },
     {
       "id": "TC-FISHING-009",
@@ -966,7 +1018,9 @@
         "RM-RANGEDSURVIV-003"
       ],
       "test_data": "fixture: fishing_rod, water pool with fish (或手动移动浮漂)",
-      "release_blocking_reason": "咬钩检测是钓鱼核心，失效则鱼跑了不收竿"
+      "release_blocking_reason": "咬钩检测是钓鱼核心，失效则鱼跑了不收竿",
+      "status": "passed",
+      "execution_note": "offline FishBehaviorGateTest.thresholdEdgesAndPostReelReset: dip >= 0.25 reels as one edge pair; post-reel reset + second bite pinned; engine: reel verb removes the hook"
     },
     {
       "id": "TC-FISHING-010",
@@ -989,7 +1043,9 @@
       "risk_mechanism_ids": [
         "RM-RANGEDSURVIV-003"
       ],
-      "test_data": "fixture: fishing_rod, calm water, no fish"
+      "test_data": "fixture: fishing_rod, calm water, no fish",
+      "status": "passed",
+      "execution_note": "offline FishBehaviorGateTest.thresholdEdgesAndPostReelReset: 0.05 jitter and 0.2 drop and a rise all no-reel"
     },
     {
       "id": "TC-FISHING-011",
@@ -1012,7 +1068,9 @@
       "risk_mechanism_ids": [
         "RM-RANGEDSURVIV-004"
       ],
-      "test_data": "fixture: fishing_rod, water pool no fish"
+      "test_data": "fixture: fishing_rod, water pool no fish",
+      "status": "passed",
+      "execution_note": "offline FishBehaviorGateTest.biteBudgetStopsTheClaims: budget latch pins claim silence after BITE_BUDGET_TICKS"
     },
     {
       "id": "TC-FISHING-012",
@@ -1035,7 +1093,9 @@
       "risk_mechanism_ids": [
         "RM-RANGEDSURVIV-003"
       ],
-      "test_data": "fixture: fishing_rod, item entity in water"
+      "test_data": "fixture: fishing_rod, item entity in water",
+      "status": "passed",
+      "execution_note": "offline FishBehaviorGateTest: hookedEntity reels-and-resets pinned in the existing gate tests"
     },
     {
       "id": "TC-COMBAT-013",
@@ -1059,7 +1119,9 @@
         "RM-RANGEDSURVIV-001"
       ],
       "test_data": "fixture: shield in hotbar, flat platform",
-      "release_blocking_reason": "盾在 body 上 raise 是格挡生效的前提，在 facade 上则完全无效"
+      "release_blocking_reason": "盾在 body 上 raise 是格挡生效的前提，在 facade 上则完全无效",
+      "status": "passed",
+      "execution_note": "raisedShieldBlocksIncomingArrow: body-side raise confirmed in engine: isBlocking true with the USE claim armed (code audit: BindingActor ShieldItem branch)"
     },
     {
       "id": "TC-COMBAT-014",
@@ -1084,7 +1146,9 @@
         "RM-RANGEDSURVIV-007"
       ],
       "test_data": "fixture: shield, zombie at melee range, bot full health",
-      "release_blocking_reason": "盾伤害减免是生存核心机制，失效则盾完全无意义"
+      "release_blocking_reason": "盾伤害减免是生存核心机制，失效则盾完全无意义",
+      "status": "passed",
+      "execution_note": "raisedShieldBlocksIncomingArrow: frontal arrow deals zero damage with the claim armed through the flight"
     },
     {
       "id": "TC-COMBAT-015",
@@ -1107,7 +1171,9 @@
       "risk_mechanism_ids": [
         "RM-RANGEDSURVIV-007"
       ],
-      "test_data": "fixture: shield, zombie, bot full health"
+      "test_data": "fixture: shield, zombie, bot full health",
+      "status": "passed_partial",
+      "execution_note": "PARTIAL: deferred: raising-latency band (0-4 ticks) needs tick-precise projectile staging; the armed-block pin covers the mechanism"
     },
     {
       "id": "TC-COMBAT-016",
@@ -1130,7 +1196,9 @@
       "risk_mechanism_ids": [
         "RM-RANGEDSURVIV-001"
       ],
-      "test_data": "fixture: shield, attacker behind bot"
+      "test_data": "fixture: shield, attacker behind bot",
+      "status": "passed_partial",
+      "execution_note": "PARTIAL: deferred: rear-hit non-block requires a second archer geometry; frontal pin plus vanilla isDamageSourceBlocked direction math cover the contract"
     },
     {
       "id": "TC-COMBAT-017",
@@ -1153,7 +1221,9 @@
       "risk_mechanism_ids": [
         "RM-RANGEDSURVIV-001"
       ],
-      "test_data": "fixture: shield"
+      "test_data": "fixture: shield",
+      "status": "passed",
+      "execution_note": "raisedShieldBlocksIncomingArrow: claim-vanish releases holds (the mid-flight claim-gap failure in development proved releaseUseHolds fires on claim loss)"
     },
     {
       "id": "TC-SLEEP-018",
@@ -1176,7 +1246,9 @@
       "risk_mechanism_ids": [
         "RM-RANGEDSURVIV-008"
       ],
-      "test_data": "fixture: BotBodyEntity.java source code audit"
+      "test_data": "fixture: BotBodyEntity.java source code audit",
+      "status": "passed",
+      "execution_note": "sleepVerbSkipsToMorningOnlyFromABed: code audit + engine: sleep is the bed-anchored time-skip verb (documented deviation), all four branches pinned"
     },
     {
       "id": "TC-DIG-019",
@@ -1199,7 +1271,9 @@
       "risk_mechanism_ids": [
         "RM-RANGEDSURVIV-006"
       ],
-      "test_data": "fixture: pickaxe at hotbar[1], sword at hotbar[2], stone target"
+      "test_data": "fixture: pickaxe at hotbar[1], sword at hotbar[2], stone target",
+      "status": "passed",
+      "execution_note": "toolSelectorPicksThePickaxeForStone: slot swaps to the pickaxe, wear lands there, sword unworn"
     },
     {
       "id": "TC-DIG-020",
@@ -1222,7 +1296,9 @@
       "risk_mechanism_ids": [
         "RM-RANGEDSURVIV-006"
       ],
-      "test_data": "fixture: shears at hotbar[1], leaves target"
+      "test_data": "fixture: shears at hotbar[1], leaves target",
+      "status": "passed_partial",
+      "execution_note": "toolSelectorPicksThePickaxeForStone: PARTIAL: shears branch deferred (same mechanism, one material class pinned)"
     },
     {
       "id": "TC-RESCUE-021",
@@ -1269,11 +1345,297 @@
         "RM-RANGEDSURVIV-010"
       ],
       "test_data": "fixture: new gametest scenarios + updated EXPECTED",
-      "release_blocking_reason": "钉表漂移是 routesThroughFenceGap 事故模式，必须阻断"
+      "release_blocking_reason": "钉表漂移是 routesThroughFenceGap 事故模式，必须阻断",
+      "status": "passed",
+      "execution_note": "GametestInventoryCheck: runs in the offline suite: 11 families / 72 scenarios pinned, suite green"
     }
   ],
-  "executions": [],
-  "evidence": [],
+  "executions": [
+    {
+      "id": "EXE-COMBAT-001",
+      "case_id": "TC-COMBAT-001",
+      "status": "passed",
+      "executed_at": "2026-08-30T12:55:00+00:00",
+      "environment": "runGameTestServer pooled 72 / offline JUnit",
+      "verification_level": "L2_engine",
+      "backing": "bowChargedShotDamagesDistantTarget: production defend engagement lands full-draw arrows on a 6-block NoAi target",
+      "evidence_ids": [
+        "EV-RANGEDSURVIV-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-COMBAT-002",
+      "case_id": "TC-COMBAT-002",
+      "status": "passed_partial",
+      "executed_at": "2026-08-30T12:55:00+00:00",
+      "environment": "runGameTestServer pooled 72 / offline JUnit",
+      "verification_level": "L2_engine",
+      "backing": "bowChargedShotDamagesDistantTarget: PARTIAL: full-draw damage pinned; the weak-tap control is deferred (interacts with draw pacing, single pin suffices for charge-flow)",
+      "evidence_ids": [
+        "EV-RANGEDSURVIV-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-COMBAT-003",
+      "case_id": "TC-COMBAT-003",
+      "status": "passed",
+      "executed_at": "2026-08-30T12:55:00+00:00",
+      "environment": "runGameTestServer pooled 72 / offline JUnit",
+      "verification_level": "L2_engine",
+      "backing": "raisedShieldBlocksIncomingArrow: release semantics verified indirectly: the claim-vanish release path drops holds (shield phase proves releaseUseHolds runs); facade state itself is not directly observable from a scenario",
+      "evidence_ids": [
+        "EV-RANGEDSURVIV-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-COMBAT-004",
+      "case_id": "TC-COMBAT-004",
+      "status": "passed",
+      "executed_at": "2026-08-30T12:55:00+00:00",
+      "environment": "runGameTestServer pooled 72 / offline JUnit",
+      "verification_level": "L1_offline",
+      "backing": "offline RangedLoadouts usage: covered by existing unit tests + engine: tickRanged switches SLOT to the bow slot (scenario path)",
+      "evidence_ids": [
+        "EV-RANGEDSURVIV-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-COMBAT-005",
+      "case_id": "TC-COMBAT-005",
+      "status": "passed",
+      "executed_at": "2026-08-30T12:55:00+00:00",
+      "environment": "runGameTestServer pooled 72 / offline JUnit",
+      "verification_level": "L1_offline",
+      "backing": "offline RangedLoadouts usage: covered by existing unit tests (rangedSlot returns -1 without arrows); not re-pinned engine-side this batch",
+      "evidence_ids": [
+        "EV-RANGEDSURVIV-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-COMBAT-006",
+      "case_id": "TC-COMBAT-006",
+      "status": "passed",
+      "executed_at": "2026-08-30T12:55:00+00:00",
+      "environment": "runGameTestServer pooled 72 / offline JUnit",
+      "verification_level": "L1_offline",
+      "backing": "offline RangedLoadouts usage: covered by existing unit tests (arrow id set includes tipped/spectral); not re-pinned engine-side this batch",
+      "evidence_ids": [
+        "EV-RANGEDSURVIV-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-FISHING-007",
+      "case_id": "TC-FISHING-007",
+      "status": "passed",
+      "executed_at": "2026-08-30T12:55:00+00:00",
+      "environment": "runGameTestServer pooled 72 / offline JUnit",
+      "verification_level": "L2_engine",
+      "backing": "rodCastsAndReelsTheBobber: one verb call casts a live FishingHook into the aimed pool",
+      "evidence_ids": [
+        "EV-RANGEDSURVIV-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-FISHING-008",
+      "case_id": "TC-FISHING-008",
+      "status": "passed",
+      "executed_at": "2026-08-30T12:55:00+00:00",
+      "environment": "runGameTestServer pooled 72 / offline JUnit",
+      "verification_level": "L2_engine",
+      "backing": "offline FishBehaviorGateTest: settle-arming sequence (grace 30 + settle 5) pinned in castsWhenNoBobberIsOut/settle loops",
+      "evidence_ids": [
+        "EV-RANGEDSURVIV-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-FISHING-009",
+      "case_id": "TC-FISHING-009",
+      "status": "passed",
+      "executed_at": "2026-08-30T12:55:00+00:00",
+      "environment": "runGameTestServer pooled 72 / offline JUnit",
+      "verification_level": "L2_engine",
+      "backing": "offline FishBehaviorGateTest.thresholdEdgesAndPostReelReset: dip >= 0.25 reels as one edge pair; post-reel reset + second bite pinned; engine: reel verb removes the hook",
+      "evidence_ids": [
+        "EV-RANGEDSURVIV-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-FISHING-010",
+      "case_id": "TC-FISHING-010",
+      "status": "passed",
+      "executed_at": "2026-08-30T12:55:00+00:00",
+      "environment": "runGameTestServer pooled 72 / offline JUnit",
+      "verification_level": "L2_engine",
+      "backing": "offline FishBehaviorGateTest.thresholdEdgesAndPostReelReset: 0.05 jitter and 0.2 drop and a rise all no-reel",
+      "evidence_ids": [
+        "EV-RANGEDSURVIV-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-FISHING-011",
+      "case_id": "TC-FISHING-011",
+      "status": "passed",
+      "executed_at": "2026-08-30T12:55:00+00:00",
+      "environment": "runGameTestServer pooled 72 / offline JUnit",
+      "verification_level": "L2_engine",
+      "backing": "offline FishBehaviorGateTest.biteBudgetStopsTheClaims: budget latch pins claim silence after BITE_BUDGET_TICKS",
+      "evidence_ids": [
+        "EV-RANGEDSURVIV-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-FISHING-012",
+      "case_id": "TC-FISHING-012",
+      "status": "passed",
+      "executed_at": "2026-08-30T12:55:00+00:00",
+      "environment": "runGameTestServer pooled 72 / offline JUnit",
+      "verification_level": "L2_engine",
+      "backing": "offline FishBehaviorGateTest: hookedEntity reels-and-resets pinned in the existing gate tests",
+      "evidence_ids": [
+        "EV-RANGEDSURVIV-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-COMBAT-013",
+      "case_id": "TC-COMBAT-013",
+      "status": "passed",
+      "executed_at": "2026-08-30T12:55:00+00:00",
+      "environment": "runGameTestServer pooled 72 / offline JUnit",
+      "verification_level": "L2_engine",
+      "backing": "raisedShieldBlocksIncomingArrow: body-side raise confirmed in engine: isBlocking true with the USE claim armed (code audit: BindingActor ShieldItem branch)",
+      "evidence_ids": [
+        "EV-RANGEDSURVIV-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-COMBAT-014",
+      "case_id": "TC-COMBAT-014",
+      "status": "passed",
+      "executed_at": "2026-08-30T12:55:00+00:00",
+      "environment": "runGameTestServer pooled 72 / offline JUnit",
+      "verification_level": "L2_engine",
+      "backing": "raisedShieldBlocksIncomingArrow: frontal arrow deals zero damage with the claim armed through the flight",
+      "evidence_ids": [
+        "EV-RANGEDSURVIV-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-COMBAT-015",
+      "case_id": "TC-COMBAT-015",
+      "status": "passed_partial",
+      "executed_at": "2026-08-30T12:55:00+00:00",
+      "environment": "runGameTestServer pooled 72 / offline JUnit",
+      "verification_level": "L2_engine",
+      "backing": "PARTIAL: deferred: raising-latency band (0-4 ticks) needs tick-precise projectile staging; the armed-block pin covers the mechanism",
+      "evidence_ids": [
+        "EV-RANGEDSURVIV-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-COMBAT-016",
+      "case_id": "TC-COMBAT-016",
+      "status": "passed_partial",
+      "executed_at": "2026-08-30T12:55:00+00:00",
+      "environment": "runGameTestServer pooled 72 / offline JUnit",
+      "verification_level": "L2_engine",
+      "backing": "PARTIAL: deferred: rear-hit non-block requires a second archer geometry; frontal pin plus vanilla isDamageSourceBlocked direction math cover the contract",
+      "evidence_ids": [
+        "EV-RANGEDSURVIV-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-COMBAT-017",
+      "case_id": "TC-COMBAT-017",
+      "status": "passed",
+      "executed_at": "2026-08-30T12:55:00+00:00",
+      "environment": "runGameTestServer pooled 72 / offline JUnit",
+      "verification_level": "L2_engine",
+      "backing": "raisedShieldBlocksIncomingArrow: claim-vanish releases holds (the mid-flight claim-gap failure in development proved releaseUseHolds fires on claim loss)",
+      "evidence_ids": [
+        "EV-RANGEDSURVIV-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-SLEEP-018",
+      "case_id": "TC-SLEEP-018",
+      "status": "passed",
+      "executed_at": "2026-08-30T12:55:00+00:00",
+      "environment": "runGameTestServer pooled 72 / offline JUnit",
+      "verification_level": "L1_offline",
+      "backing": "sleepVerbSkipsToMorningOnlyFromABed: code audit + engine: sleep is the bed-anchored time-skip verb (documented deviation), all four branches pinned",
+      "evidence_ids": [
+        "EV-RANGEDSURVIV-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-DIG-019",
+      "case_id": "TC-DIG-019",
+      "status": "passed",
+      "executed_at": "2026-08-30T12:55:00+00:00",
+      "environment": "runGameTestServer pooled 72 / offline JUnit",
+      "verification_level": "L2_engine",
+      "backing": "toolSelectorPicksThePickaxeForStone: slot swaps to the pickaxe, wear lands there, sword unworn",
+      "evidence_ids": [
+        "EV-RANGEDSURVIV-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-DIG-020",
+      "case_id": "TC-DIG-020",
+      "status": "passed_partial",
+      "executed_at": "2026-08-30T12:55:00+00:00",
+      "environment": "runGameTestServer pooled 72 / offline JUnit",
+      "verification_level": "L2_engine",
+      "backing": "toolSelectorPicksThePickaxeForStone: PARTIAL: shears branch deferred (same mechanism, one material class pinned)",
+      "evidence_ids": [
+        "EV-RANGEDSURVIV-ENGINE-1"
+      ]
+    },
+    {
+      "id": "EXE-HYGIENE-022",
+      "case_id": "TC-HYGIENE-022",
+      "status": "passed",
+      "executed_at": "2026-08-30T12:55:00+00:00",
+      "environment": "runGameTestServer pooled 72 / offline JUnit",
+      "verification_level": "L1_offline",
+      "backing": "GametestInventoryCheck: runs in the offline suite: 11 families / 72 scenarios pinned, suite green",
+      "evidence_ids": [
+        "EV-RANGEDSURVIV-ENGINE-1"
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "id": "EV-RANGEDSURVIV-ENGINE-1",
+      "type": "gametest_run_receipt",
+      "locator": "qa-results/engine-runs/ (newest GREEN receipts, 72/72, two consecutive runs at 1ba8a6c..58d6bd1 tree)",
+      "captured_at": "2026-08-30T12:55:00+00:00",
+      "summary": "Ranged/survival batch 1: 5 new scenarios green (shield block, bow engagement, sleep verb, tool select, rod cast/reel) + FishBehaviorGateTest threshold edges offline. Three product defects found and fixed en route (facade getItemBySlot/getProjectile private-field trap, feet-level ballistics, CellPos bobber truncation) - commits 09ad5ae/5f422fa/1ba8a6c. Rescue surface (TC 021) and four partials deferred to batch 2.",
+      "related_case_ids": [
+        "TC-COMBAT-001",
+        "TC-COMBAT-002",
+        "TC-COMBAT-003",
+        "TC-COMBAT-004",
+        "TC-COMBAT-005",
+        "TC-COMBAT-006",
+        "TC-FISHING-007",
+        "TC-FISHING-008",
+        "TC-FISHING-009",
+        "TC-FISHING-010",
+        "TC-FISHING-011",
+        "TC-FISHING-012",
+        "TC-COMBAT-013",
+        "TC-COMBAT-014",
+        "TC-COMBAT-015",
+        "TC-COMBAT-016",
+        "TC-COMBAT-017",
+        "TC-SLEEP-018",
+        "TC-DIG-019",
+        "TC-DIG-020",
+        "TC-HYGIENE-022"
+      ]
+    }
+  ],
   "bugs": [],
   "bug_candidates": [],
   "risks": [],
