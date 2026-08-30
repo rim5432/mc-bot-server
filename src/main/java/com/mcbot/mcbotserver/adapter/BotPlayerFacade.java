@@ -164,6 +164,58 @@ public final class BotPlayerFacade extends Player {
     }
 
     /**
+     * Hands and armor resolve through the body's equipment mirror.
+     * Vanilla's use chain reads held items through
+     * {@code getItemBySlot} ({@code LivingEntity.getItemInHand}),
+     * NOT through {@code getInventory()} or {@code getMainHandItem}
+     * - without this override, {@code startUsingItem} reads the empty
+     * private hands list and silently no-ops, killing every
+     * facade-held draw (bow charge first, any hold item next) at its
+     * first guard.
+     *
+     * @param slot the vanilla equipment slot; never null
+     * @return the body's mirrored stack for that slot; never null
+     */
+    @Override
+    public ItemStack getItemBySlot(net.minecraft.world.entity.EquipmentSlot slot) {
+        return body.getItemBySlot(slot);
+    }
+
+    /**
+     * Projectile ammo resolution over the bridged inventory. Vanilla
+     * Player.getProjectile's fallback scan iterates the PRIVATE
+     * {@code this.inventory} field (empty default on this facade),
+     * so a bow release with arrows only in the backpack silently
+     * found nothing and never fired - same trap family as
+     * {@code getMainHandItem}. Hands first (offhand quivers work
+     * through the equipment mirror), then the full bridged
+     * container.
+     *
+     * @param shootable the weapon stack; never null
+     * @return the ammo stack, or empty when none is carried
+     */
+    @Override
+    public ItemStack getProjectile(ItemStack shootable) {
+        if (!(shootable.getItem() instanceof net.minecraft.world.item.ProjectileWeaponItem weapon)) {
+            return ItemStack.EMPTY;
+        }
+        java.util.function.Predicate<ItemStack> ammo = weapon.getAllSupportedProjectiles();
+        for (net.minecraft.world.InteractionHand hand : net.minecraft.world.InteractionHand.values()) {
+            ItemStack held = getItemInHand(hand);
+            if (ammo.test(held)) {
+                return held;
+            }
+        }
+        for (int i = 0; i < getInventory().getContainerSize(); i++) {
+            ItemStack stack = getInventory().getItem(i);
+            if (ammo.test(stack)) {
+                return stack;
+            }
+        }
+        return ItemStack.EMPTY;
+    }
+
+    /**
      * Close the current menu and revert to the inventory menu. Overrides
      * the default which reverts to the super's (empty) inventoryMenu.
      */

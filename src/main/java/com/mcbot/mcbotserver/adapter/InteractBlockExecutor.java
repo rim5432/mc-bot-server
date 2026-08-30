@@ -147,17 +147,12 @@ public final class InteractBlockExecutor {
         // nothing here runs without a winning claim.
         InteractionResult itemUse = held.getItem().useOn(new UseOnContext(facade, InteractionHand.MAIN_HAND, hit));
         if (itemUse.consumesAction()) {
-            // BlockItem.place shrinks its context's itemStack, but the
-            // facade's getMainHandItem override routes that reference to the
-            // body's hotbar slot. The shrink is observed on the same object
-            // yet the count does not change on the body's container read-back
-            // — the placement path's mutation is not reaching the Inventory
-            // backing store. Re-apply the shrink directly on the body's slot
-            // reference so the device's inventory stays consistent with
-            // vanilla placement semantics.
-            if (!facade.getAbilities().instabuild && held.getCount() > 0) {
-                held.shrink(1);
-            }
+            // BlockItem.place shrinks its context stack; with the
+            // facade's getItemBySlot bridged to the body's equipment
+            // mirror, that shrink lands on the live hotbar stack and
+            // no compensating write-back exists anymore (the old
+            // manual shrink was a workaround for the empty private
+            // hands list and would double-count now).
             body.swing(InteractionHand.MAIN_HAND);
             return true;
         }
