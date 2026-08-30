@@ -1,6 +1,6 @@
 ---
 title: Block capability axis - dig first, pulled forward by the suffocation escape
-last_verified: 2026-08-29
+last_verified: 2026-08-30
 covers:
   - doc/architecture/boundaries.md
   - src/main/java/com/mcbot/mcbotserver/api/actor/Channel.java
@@ -65,8 +65,13 @@ exactly the channel 0007 section 6.2 hypothesized.
   water without aqua affinity /5, haste/mining-fatigue effects.
 - Crack animation: `level.destroyBlockProgress(breakerId, pos, stage)`
   with `stage = (int)(f * 10)`, broadcast only on change, -1 clears.
-- The break itself: `level.destroyBlock(pos, drop=true)` - fires the
-  2001 level event and drops inside that call.
+- The break itself: the survival caller runs `playerDestroy` (drops
+  + 0.005 exhaustion) ONLY when `canHarvestBlock` passes - the
+  `flag1` branch of `ServerPlayerGameMode.destroyBlock`. The block
+  loot tables carry no tool gating of their own for stone-class
+  (cobblestone's entry has only `survives_explosion`); the harvest
+  gate lives entirely in the caller. `mineBlock` tool wear runs
+  unconditionally, before that gate.
 - Server-authoritative facing: the server's destroy machinery never
   checks where the player looks; the client is trusted to keep the
   crosshair on the block. A bot's executor may do the same honestly.
@@ -94,7 +99,13 @@ that failure where it belongs.
 resets progress, air at the site stops silently (someone else broke
 it), out-of-reach claims never progress (4.5-block eye-to-center
 gate, vanilla block reach), crack stages broadcast on change, the
-break is `level.destroyBlock(pos, true)`, the body swings every
+break is the manual tool-aware sequence (state + block entity +
+fluid captured before removal, 2001 event, fluid legacy replacement,
+`Block.dropResources` with the held stack as the TOOL context,
+harvest-gated on the computed `hasCorrectTool` exactly where vanilla
+gates it - a wrong-tool break wears the tool but drops nothing and
+seeds no XP; `mineBlock` wear stays unconditional, 0.005 exhaustion
+rides the harvest gate with the drops), and the body swings every
 progressing tick (the client player's visible cadence).
 `DigPacing` (core, zero MC imports) owns the arithmetic so layer-1
 tests pin the numbers: gravel 18 ticks, stone 150, insta-pop, never,
@@ -140,7 +151,7 @@ TASK_PAUSED (which names the rule) is the siren either way.
 |---|---|---|
 | F1 | Crashed-state dig: should MinimalReflex dig when the latch is set and the eye is buried? | Deferred with the 0008 F8 asymmetry argument: rare x rare, and dig needs executor wiring + an eye-cell feed - more than ADR-0005 D3's "a few ifs". Revisit if a crashed body ever dies buried. |
 | F2 | Tool-accelerated digging: `getDestroySpeed` from a held item. | RESOLVED 2026-08-25 (6487259): DigExecutor feeds ItemStack.getDestroySpeed + hasCorrectToolForDrops every tick; DigPacing consumes them exactly as designed. |
-| F3 | BLOCK_BROKEN disclosure event (harness observability of digs). | Not queued. The suffocation preemption already discloses through TASK_PAUSED naming the rule; a dig-specific event earns its place when a mission digs (workplan gap inventory: harvest-and-place loops). |
+| F3 | BLOCK_BROKEN disclosure event (harness observability of digs). | RESOLVED (with the dig-task slice, issue 0013): the handler sweep emits BLOCK_BROKEN with the target's initial block id when a DigProcess retires; note for scenario authors - the disclosure belongs to the command-handler path, so directly-registered missions (the gametest rig's submit pattern) never see it. |
 | F4 | Missions claiming INTERACT (a DigProcess, harvest-and-place). | The channel is general and behaviors may claim it; nothing is queued until a task vocabulary needs it (the workplan gap inventory owns that demand). |
 
 ## 5. Sequencing
