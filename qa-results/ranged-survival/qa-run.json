@@ -403,6 +403,22 @@
       "delta_count": 1,
       "source": "repo session R2 batch 2 write-back",
       "summary": "Round closed: 22/22 verdicts (75 scenarios green twice; 1 N/A-by-citation; rescue residual deferred)"
+    },
+    {
+      "id": "CHG-R2-3",
+      "revision": 2,
+      "action": "MODIFY",
+      "object_type": "run",
+      "added_ids": [],
+      "removed_ids": [],
+      "modified_ids": [
+        "release_decision"
+      ],
+      "before_count": 0,
+      "after_count": 0,
+      "delta_count": 0,
+      "source": "repo session post-review correction",
+      "summary": "release_decision undetermined -> conditional_go (was a closeout omission; conditions enumerate the five partials and the rescue residual)"
     }
   ],
   "environment": {},
@@ -1714,9 +1730,16 @@
     "acceptance_status_counts": {}
   },
   "release_decision": {
-    "decision": "undetermined",
-    "rationale": "尚未执行。",
-    "conditions": []
+    "decision": "conditional_go",
+    "rationale": "All 22 cases carry verdicts against a GREEN 75/75 pooled engine suite (two consecutive runs) plus offline suite green; the five partials each pin the load-bearing half of their contract with the deferred half explicitly reasoned.",
+    "conditions": [
+      "TC-COMBAT-002 partial: full-draw pinned, weak-tap band pinned as delta<=4; exact per-charge damage curve not pinned",
+      "TC-COMBAT-003 partial: release semantics proven via claim-vanish hold-drop; facade use-state itself not directly observable from scenarios",
+      "TC-COMBAT-015 partial: N/A in 1.20.1 (no shield warmup) recorded by citation, not execution",
+      "TC-COMBAT-016 partial: rear-hit pinned; only frontal+rear geometry, not the full hemisphere sweep",
+      "TC-DIG-020 partial: shears selection pinned on one material class",
+      "Rescue FREEZE-degradation path (no-route fallback) remains untested - deferred"
+    ]
   },
   "delivery_manifest": {
     "source_revision": 2,
