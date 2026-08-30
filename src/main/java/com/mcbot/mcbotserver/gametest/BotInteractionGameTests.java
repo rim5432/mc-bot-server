@@ -1,6 +1,7 @@
 package com.mcbot.mcbotserver.gametest;
 
 import static com.mcbot.mcbotserver.gametest.GametestRig.check;
+import static com.mcbot.mcbotserver.gametest.GametestRig.checkEquals;
 import static com.mcbot.mcbotserver.gametest.GametestRig.localToCell;
 import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
 
@@ -117,6 +118,65 @@ public final class BotInteractionGameTests {
                             stairs.getValue(StairBlock.FACING) == net.minecraft.core.Direction.WEST,
                             "stairs must face the placer (the facade's mirrored yaw), got "
                                     + stairs.getValue(StairBlock.FACING));
+                })
+                .thenSucceed();
+    }
+    /**
+     * Scenario: the sleep verb's observable contract, all four
+     * branches. Sleep as shipped is a bed-anchored time skip (the
+     * deviation from vanilla's in-bed wait is BindingActor's
+     * documented ruling: no player respawn flow to bind), so the
+     * pins are the refusal reasons - daytime, non-bed, out of reach
+     * - and the morning advance: success lands the day time exactly
+     * on a multiple of 24000 with isDay true.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void sleepVerbSkipsToMorningOnlyFromABed(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(5, GametestRig.WALK_Y, 8));
+        BlockPos bedLocal = new BlockPos(6, GametestRig.WALK_Y, 8);
+        helper.setBlock(bedLocal, Blocks.RED_BED);
+        // The out-of-reach branch needs a real BED far away: a plain
+        // air cell trips the not-a-bed guard first.
+        helper.setBlock(new BlockPos(14, GametestRig.WALK_Y, 8), Blocks.RED_BED);
+        var level = helper.getLevel();
+
+        helper.startSequence()
+                .thenExecuteFor(GametestRig.SETTLE_TICKS, GametestRig.driveOnly(rig))
+                // The daytime branch: skyDarken samples the day time
+                // only every 20 ticks, so the refusal needs settle
+                // ticks AFTER the time write to read the new phase.
+                .thenExecuteAfter(0, () -> level.setDayTime(1000L))
+                .thenExecuteFor(30, GametestRig.driveOnly(rig))
+                .thenExecuteAfter(
+                        0,
+                        () -> checkEquals(
+                                "already daytime",
+                                rig.actor().sleepAt(GametestRig.localToCell(helper, bedLocal)),
+                                "daytime must refuse with the structured reason"))
+                .thenExecuteAfter(0, () -> level.setDayTime(13000L))
+                .thenExecuteFor(30, GametestRig.driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    checkEquals(
+                            "not a bed",
+                            rig.actor()
+                                    .sleepAt(GametestRig.localToCell(helper, new BlockPos(8, GametestRig.WALK_Y, 8))),
+                            "a non-bed cell must refuse");
+                    checkEquals(
+                            "out of reach",
+                            rig.actor()
+                                    .sleepAt(GametestRig.localToCell(helper, new BlockPos(14, GametestRig.WALK_Y, 8))),
+                            "a distant bed must refuse");
+                    check(
+                            rig.actor().sleepAt(GametestRig.localToCell(helper, bedLocal)) == null,
+                            "night + bed in reach must succeed");
+                    checkEquals(0L, level.getDayTime() % 24000L, "success must land exactly on a morning tick");
+                })
+                // isDay reads skyDarken, which samples the day time
+                // only every 20 ticks - give it the settle window.
+                .thenExecuteFor(30, GametestRig.driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    check(level.isDay(), "the skipped-to morning must read as daytime");
+                    rig.body().discard();
                 })
                 .thenSucceed();
     }

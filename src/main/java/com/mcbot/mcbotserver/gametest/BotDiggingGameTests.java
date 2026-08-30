@@ -344,4 +344,38 @@ public final class BotDiggingGameTests {
         rig.arbiter().requestControl(mission);
         return mission;
     }
+    /**
+     * Scenario: the mission tool selector swaps the held slot to the
+     * right class of tool. Sword in slot 0 (selected), iron pickaxe
+     * in slot 1; a dig mission on stone must flip the selection to
+     * the pickaxe mid-flight and land the wear there - the selector
+     * runs per mission tick ahead of the executor (BotController's
+     * mission-dig hook).
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
+    public static void toolSelectorPicksThePickaxeForStone(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
+        var container = rig.body().getInventory().container();
+        container.setItem(0, new ItemStack(Items.DIAMOND_SWORD));
+        container.setItem(1, new ItemStack(Items.IRON_PICKAXE));
+        rig.body().selectedSlot = 0;
+        BlockPos stoneLocal = new BlockPos(6, GametestRig.WALK_Y, 8);
+        helper.setBlock(stoneLocal, Blocks.STONE);
+        DigProcess mission = submitDig(rig, localToCell(helper, stoneLocal));
+
+        helper.startSequence()
+                .thenWaitUntil(driveUntil(rig, () -> check(!mission.isActive(), "waiting for the break")))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    check(mission.missionSucceeded(), "the dig must succeed, failure=" + mission.failureReasonOrNull());
+                    checkEquals(1, rig.body().selectedSlot, "the selector must swap to the pickaxe slot");
+                    checkEquals(
+                            1,
+                            container.getItem(1).getDamageValue(),
+                            "the wear must land on the pickaxe (1 for the digger class)");
+                    checkEquals(0, container.getItem(0).getDamageValue(), "the sword must stay unworn");
+                    rig.body().discard();
+                })
+                .thenSucceed();
+    }
 }

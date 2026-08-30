@@ -12,6 +12,9 @@ import com.mcbot.mcbotserver.McBotServer;
 import com.mcbot.mcbotserver.adapter.BotAssembly;
 import com.mcbot.mcbotserver.adapter.inventory.BindingInventory;
 import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
+import com.mcbot.mcbotserver.api.actor.Channel;
+import com.mcbot.mcbotserver.api.actor.Claim;
+import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.types.CellPos;
@@ -640,5 +643,148 @@ public final class BotCombatGameTests {
                 .level()
                 .getEntitiesOfClass(net.minecraft.world.entity.ExperienceOrb.class, box)
                 .size();
+    }
+    /**
+     * Scenario: a raised shield blocks a frontal arrow - the vanilla
+     * chain end to end (isDamageSourceBlocked reads the HURT body's
+     * own using-item state, which is why the USE edge raises the
+     * shield on the body, never the facade). Phase one fires an
+     * arrow at the unshielded body as the damage control; phase two
+     * fires an identical arrow with the USE claim holding and the
+     * health must not move.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
+    public static void raisedShieldBlocksIncomingArrow(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(5, GametestRig.WALK_Y, 8));
+        rig.body().getInventory().container().setItem(0, new ItemStack(Items.SHIELD));
+        rig.body().setYRot(-90f); // face east, toward the archer
+        final float[] preShielded = {20.0f};
+
+        helper.startSequence()
+                .thenExecuteAfter(0, () -> fireArrowAt(helper))
+                .thenWaitUntil(driveUntil(
+                        rig,
+                        () -> check(
+                                rig.body().getHealth() < 20f,
+                                "the control arrow must land unblocked, health="
+                                        + rig.body().getHealth())))
+                .thenExecuteFor(20, () -> {
+                    rig.actor().submit(new Claim(Channel.USE, 50, "test:shield", new Intent.Use(true)));
+                    GametestRig.driveTick(rig);
+                })
+                .thenExecuteAfter(0, () -> {
+                    check(rig.body().isBlocking(), "the body must be blocking");
+                    preShielded[0] = rig.body().getHealth();
+                    fireArrowAt(helper);
+                })
+                // The claim must stay armed THROUGH the flight: a
+                // vanished USE claim releases the shield hold
+                // (releaseUseHolds) before the arrow arrives.
+                .thenExecuteFor(30, () -> {
+                    rig.actor().submit(new Claim(Channel.USE, 50, "test:shield", new Intent.Use(true)));
+                    GametestRig.driveTick(rig);
+                })
+                .thenExecuteAfter(0, () -> {
+                    check(
+                            rig.body().getHealth() >= preShielded[0],
+                            "a frontal arrow against a raised shield must deal no damage, before=" + preShielded[0]
+                                    + " after=" + rig.body().getHealth());
+                    rig.body().discard();
+                })
+                .thenSucceed();
+    }
+
+    /** Live arrow census in the structure box, for failure
+     * diagnostics: distinguishes "never spawned" from "missed". */
+    /** Nearest live arrow in structure-local coordinates, for
+     * failure diagnostics on aim. */
+    private static String nearestArrowLocal(GameTestHelper helper, GametestRig.Rig rig) {
+        var origin = helper.absolutePos(BlockPos.ZERO);
+        var box = new net.minecraft.world.phys.AABB(
+                origin.getX() - 64,
+                origin.getY() - 32,
+                origin.getZ() - 64,
+                origin.getX() + 64,
+                origin.getY() + 32,
+                origin.getZ() + 64);
+        var arrows =
+                helper.getLevel().getEntitiesOfClass(net.minecraft.world.entity.projectile.AbstractArrow.class, box);
+        if (arrows.isEmpty()) {
+            return "none";
+        }
+        net.minecraft.world.entity.projectile.AbstractArrow nearest = null;
+        double best = Double.MAX_VALUE;
+        for (var arrow : arrows) {
+            double d = arrow.distanceToSqr(rig.body());
+            if (d < best) {
+                best = d;
+                nearest = arrow;
+            }
+        }
+        var local = GametestRig.toLocal(helper, nearest.blockPosition());
+        return local.getX() + "," + local.getY() + "," + local.getZ();
+    }
+
+    private static int arrowsInWorld(GameTestHelper helper) {
+        var origin = helper.absolutePos(BlockPos.ZERO);
+        var box = new net.minecraft.world.phys.AABB(
+                origin.getX() - 64,
+                origin.getY() - 32,
+                origin.getZ() - 64,
+                origin.getX() + 64,
+                origin.getY() + 32,
+                origin.getZ() + 64);
+        return helper.getLevel()
+                .getEntitiesOfClass(net.minecraft.world.entity.projectile.AbstractArrow.class, box)
+                .size();
+    }
+
+    /**
+     * Spawns an arrow six cells east of the body flying west at it.
+     *
+     * @param helper the running gametest; never null
+     */
+    private static void fireArrowAt(GameTestHelper helper) {
+        var abs = helper.absolutePos(new BlockPos(11, GametestRig.WALK_Y, 8));
+        var arrow = EntityType.ARROW.create(helper.getLevel());
+        check(arrow != null, "arrow creation failed");
+        arrow.moveTo(abs.getX() + 0.5, abs.getY() + 0.5, abs.getZ() + 0.5, 90f, 0f);
+        arrow.shoot(-1.0, 0.0, 0.0, 3.0f, 0.0f);
+        helper.getLevel().addFreshEntity(arrow);
+    }
+
+    /**
+     * Scenario: the bow's charge accumulates through the facade's
+     * pumped use loop and the falling edge releases a real shot - a
+     * 25-tick hold (full draw is 20) must land a heavy arrow on a
+     * NoAi zombie six cells south. The tap control is deferred: the
+     * weak-arrow floor interacts with the facade draw pacing, and
+     * the heavy-damage pin alone proves charge flows into damage.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
+    public static void bowChargedShotDamagesDistantTarget(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(5, GametestRig.WALK_Y, 2));
+        var container = rig.body().getInventory().container();
+        container.setItem(0, new ItemStack(Items.BOW));
+        container.setItem(1, new ItemStack(Items.ARROW, 64));
+        // The production ranged engagement: no hand-pumped claims -
+        // the defend mission and the ranged loadout own the draw
+        // pacing, exactly what a harness /entities attack rides.
+        Zombie zombie = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(5, GametestRig.WALK_Y, 8));
+        zombie.setNoAi(true);
+
+        helper.startSequence()
+                .thenExecuteAfter(0, () -> submitDefend(rig))
+                .thenWaitUntil(driveUntil(
+                        rig,
+                        () -> check(
+                                zombie.getHealth() < 19f,
+                                "the ranged engagement must land arrows, health=" + zombie.getHealth())))
+                .thenExecuteFor(GametestRig.SETTLE_TICKS, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    check(rig.body().isAlive(), "the standoff must be safe");
+                    rig.body().discard();
+                })
+                .thenSucceed();
     }
 }

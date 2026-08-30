@@ -37,8 +37,9 @@ class GametestInventoryCheck {
     /** Every scenario that must stay registered, keyed by simple
      * class name. Must match the {@code @GameTest} methods under
      * the gametest package exactly; any diff fails this test. */
-    private static final Map<String, Set<String>> EXPECTED = Map.of(
-            "BotLocomotionGameTests",
+    private static final Map<String, Set<String>> EXPECTED = Map.ofEntries(
+            Map.entry(
+                    "BotLocomotionGameTests",
                     Set.of(
                             "walksToBlock",
                             "crossesWaterTrench",
@@ -48,9 +49,12 @@ class GametestInventoryCheck {
                             "failsCleanlyWhenUnwalkable",
                             "sneakCrawlFitsThroughGap",
                             "sneakingHoldsTheLedge",
-                            "sneakingInWaterSlidesDown"),
-            "BotInteractionGameTests", Set.of("doorOpensThroughUseChain", "stairsFaceTheirPlacer"),
-            "BotCombatGameTests",
+                            "sneakingInWaterSlidesDown")),
+            Map.entry(
+                    "BotInteractionGameTests",
+                    Set.of("doorOpensThroughUseChain", "stairsFaceTheirPlacer", "sleepVerbSkipsToMorningOnlyFromABed")),
+            Map.entry(
+                    "BotCombatGameTests",
                     Set.of(
                             "refusesRangedItCannotAnswer",
                             "defendsByKillingZombie",
@@ -61,8 +65,11 @@ class GametestInventoryCheck {
                             "swordCooldownSpacesTheHits",
                             "killsGrantXpLevels",
                             "sweepClipsBystanders",
-                            "underwaterSwingsNeverCrit"),
-            "BotHazardReflexGameTests",
+                            "underwaterSwingsNeverCrit",
+                            "raisedShieldBlocksIncomingArrow",
+                            "bowChargedShotDamagesDistantTarget")),
+            Map.entry(
+                    "BotHazardReflexGameTests",
                     Set.of(
                             "surfacesWhenAirRunsLow",
                             "escapesLavaToShore",
@@ -71,8 +78,9 @@ class GametestInventoryCheck {
                             "digsFreeWhenSuffocating",
                             "regeneratesHealthWhenBelowMax",
                             "eatsWhenHungry",
-                            "waterBucketBreaksAFall"),
-            "BotInventoryGameTests",
+                            "waterBucketBreaksAFall")),
+            Map.entry(
+                    "BotInventoryGameTests",
                     Set.of(
                             "dropsSelectedItem",
                             "placesBlockOnInteract",
@@ -89,8 +97,9 @@ class GametestInventoryCheck {
                             "enchantsThroughMenuButton",
                             "xpSurvivesMenuCycles",
                             "xpNeededPerLevelMatchesVanilla",
-                            "villagerTradeMenuOpens"),
-            "BotCraftingGameTests",
+                            "villagerTradeMenuOpens")),
+            Map.entry(
+                    "BotCraftingGameTests",
                     Set.of(
                             "craftsDiamondBlockAtTable",
                             "returnsCraftingGridOnClose",
@@ -102,11 +111,13 @@ class GametestInventoryCheck {
                             "catalogsShapedRecipes",
                             "pullsCraftsAndBanksByRecipeId",
                             "paginatesRecipesSorted",
-                            "craftsShapelessPlanksFromLogs"),
-            "GauntletGameTests", Set.of("gauntletEndToEnd", "routesThroughFenceGap"),
-            "CrashRecoveryGameTests", Set.of("latchesAndRecoversAfterCrash"),
-            "ProductionWiringGameTests", Set.of("walksViaCommandAndServerTick"),
-            "BotDiggingGameTests",
+                            "craftsShapelessPlanksFromLogs")),
+            Map.entry("GauntletGameTests", Set.of("gauntletEndToEnd", "routesThroughFenceGap")),
+            Map.entry("CrashRecoveryGameTests", Set.of("latchesAndRecoversAfterCrash")),
+            Map.entry("ProductionWiringGameTests", Set.of("walksViaCommandAndServerTick")),
+            Map.entry("BotFishingGameTests", Set.of("rodCastsAndReelsTheBobber")),
+            Map.entry(
+                    "BotDiggingGameTests",
                     Set.of(
                             "pickaxeDigsStoneIntoCobblestone",
                             "bareHandedStoneLeavesNoDrop",
@@ -114,8 +125,8 @@ class GametestInventoryCheck {
                             "diamondOreSeedsXpOrbs",
                             "digWearsThePickaxeOncePerBlock",
                             "swordDigsAtDoubleWear",
-                            "breakingBlocksBuildsExhaustion"));
-
+                            "breakingBlocksBuildsExhaustion",
+                            "toolSelectorPicksThePickaxeForStone")));
     /** Pulls the method name out of each
      * {@code @GameTest(...)} declaration in a source file. */
     private static final Pattern GAME_TEST_METHOD =
