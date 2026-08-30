@@ -20,6 +20,19 @@ import net.minecraft.world.level.Level;
  * {@code ServerPlayerGameMode.useItemOn} needs a Player but the bot's
  * real body is a PathfinderMob.
  *
+ * <p>PRIVATE-FIELD TRAP MAP (surveyed 2026-08-30, 35 this.inventory
+ * reads in decompiled Player): vanilla Player bypasses the
+ * overridable accessors on internal paths. Bridged and green:
+ * getInventory (menus), getMainHandItem/getItemBySlot (the use
+ * chain, Item.use contexts), getProjectile (bow ammo),
+ * closeContainer's menu revert. LATENT - never call these on the
+ * facade, use the stack-level forms instead:
+ * hasCorrectToolForDrops (reads this.inventory.getSelected(),
+ * Player:788 - call stack.isCorrectToolForDrops(state)) and
+ * getDestroySpeed (Player:753 - call stack.getDestroySpeed(state)).
+ * New Player-surface calls must be checked against this map before
+ * landing.
+ *
  * <p>Contract: see issue 0007 §4 (Path A) and §7 risk "facade blast
  * radius". Player declares exactly two abstract methods
  * ({@code isSpectator}, {@code isCreative}); the risk is not "implement
