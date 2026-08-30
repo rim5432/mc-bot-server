@@ -1,0 +1,1360 @@
+{
+  "schema_version": 2,
+  "run_id": "qa-ad7433e85cb9",
+  "revision": 2,
+  "profile": "plan",
+  "test_intent": "non_ui_validation",
+  "execution_level": "blocked",
+  "selected_path": "undetermined",
+  "created_at": "2026-08-30T10:35:36.569630+00:00",
+  "target": {
+    "type": "attachment_or_directory",
+    "name": "远程/生存能力面 QA 梳理",
+    "source": "D:/mc-bot-server"
+  },
+  "request_contract": {
+    "request_summary": "对 mc-bot-server 远程/生存能力面（弓蓄力与箭物理、钓鱼状态机与咬钩检测、盾格挡与伤害减免、睡眠、工具自动选择、救援任务）进行全面 QA 梳理。普查已确认 67 个已钉 gametest 场景中这 6 个机制面零正向覆盖（仅 2 个负向决策测试），离线 gate test 只钉 shape 不钉引擎行为。产出结构化需求基线、风险机制、测试用例方案，REQ 从普查证据来不从计划来。",
+    "request_hash": "sha256:64d000fc355ed6de5a725345bc67bca31a9f8117e280768cf89e9eb3ad8e794a",
+    "task_mode": "plan",
+    "scope": {
+      "included_source_ids": [],
+      "excluded_source_ids": [],
+      "included_rounds": [],
+      "excluded_rounds": []
+    },
+    "evidence_policy": {
+      "allow_new_execution": false,
+      "allow_precheck_bug_promotion": false,
+      "required_bug_evidence_level": "L2_observation"
+    },
+    "delivery": {
+      "artifact_required": true,
+      "format": "lark_sheets",
+      "carrier": "lark_sheets",
+      "filenames": [
+        "远程-生存能力面 QA 梳理-QA测试用例与追踪.csv"
+      ],
+      "artifacts": [
+        {
+          "format": "lark_sheets",
+          "carrier": "lark_sheets",
+          "filename": "远程-生存能力面 QA 梳理-QA测试用例与追踪.csv"
+        }
+      ],
+      "required_sections": [],
+      "section_order": [],
+      "must_surface_to_user": true
+    }
+  },
+  "phase_receipts": [
+    {
+      "stage": "baseline",
+      "revision": 2,
+      "state": "CLOSED",
+      "checked_at": "2026-08-30T10:40:30.012845+00:00",
+      "source_fingerprint": "sha256:079517577f84e2c6ef0dd605dfa90e16a5acdb0cfd26ccc51ca83c35cc800f85",
+      "warnings": 0
+    },
+    {
+      "stage": "design",
+      "revision": 2,
+      "state": "CLOSED",
+      "checked_at": "2026-08-30T10:40:37.068604+00:00",
+      "source_fingerprint": "sha256:079517577f84e2c6ef0dd605dfa90e16a5acdb0cfd26ccc51ca83c35cc800f85",
+      "warnings": 0
+    }
+  ],
+  "input": {
+    "summary": "远程/生存能力面 6 个机制面的 QA 梳理：弓、钓鱼、盾、睡眠、工具选择、救援。普查确认 67 个已钉 gametest 中零正向覆盖，离线 gate 只钉 shape。",
+    "sources": [
+      {
+        "id": "SRC-CODEBASE",
+        "type": "directory",
+        "locator": "D:/mc-bot-server",
+        "version": "dev 0.1.0",
+        "access_status": "read",
+        "completeness_checked": true,
+        "coverage_note": "182 Java sources; 6 mechanism surfaces targeted"
+      },
+      {
+        "id": "SRC-VANILLA",
+        "type": "directory",
+        "locator": "D:/mc-decompiled/forge-1.20.1-47.4.10",
+        "version": "1.20.1 Forge 47.4.10",
+        "access_status": "read",
+        "completeness_checked": true,
+        "coverage_note": "vanilla reference for bow draw, shield block, fish bobber, sleep"
+      }
+    ],
+    "assumptions": [],
+    "conflicts": [],
+    "artifacts": [
+      {
+        "id": "SRC-001",
+        "source_id": "SRC-CODEBASE",
+        "name": "BindingActor.java",
+        "path": "src/main/java/com/mcbot/mcbotserver/adapter/BindingActor.java",
+        "type": "source",
+        "locator": "D:/mc-bot-server/src/main/java/com/mcbot/mcbotserver/adapter/BindingActor.java",
+        "access_status": "read",
+        "completeness_checked": true,
+        "integrity": "complete",
+        "covers": "REQ-001, REQ-005, REQ-006"
+      },
+      {
+        "id": "SRC-002",
+        "source_id": "SRC-CODEBASE",
+        "name": "FishBehavior.java",
+        "path": "src/main/java/com/mcbot/mcbotserver/core/behavior/FishBehavior.java",
+        "type": "source",
+        "locator": "D:/mc-bot-server/src/main/java/com/mcbot/mcbotserver/core/behavior/FishBehavior.java",
+        "access_status": "read",
+        "completeness_checked": true,
+        "integrity": "complete",
+        "covers": "REQ-003, REQ-004"
+      },
+      {
+        "id": "SRC-003",
+        "source_id": "SRC-CODEBASE",
+        "name": "RangedLoadouts.java",
+        "path": "src/main/java/com/mcbot/mcbotserver/core/combat/RangedLoadouts.java",
+        "type": "source",
+        "locator": "D:/mc-bot-server/src/main/java/com/mcbot/mcbotserver/core/combat/RangedLoadouts.java",
+        "access_status": "read",
+        "completeness_checked": true,
+        "integrity": "complete",
+        "covers": "REQ-RANGEDSURVIV-002"
+      },
+      {
+        "id": "SRC-004",
+        "source_id": "SRC-CODEBASE",
+        "name": "BobberSnapshot.java",
+        "path": "src/main/java/com/mcbot/mcbotserver/api/world/BobberSnapshot.java",
+        "type": "source",
+        "locator": "D:/mc-bot-server/src/main/java/com/mcbot/mcbotserver/api/world/BobberSnapshot.java",
+        "access_status": "read",
+        "completeness_checked": true,
+        "integrity": "complete",
+        "covers": "REQ-RANGEDSURVIV-004"
+      },
+      {
+        "id": "SRC-005",
+        "source_id": "SRC-CODEBASE",
+        "name": "CombatBehavior.java",
+        "path": "src/main/java/com/mcbot/mcbotserver/core/behavior/CombatBehavior.java",
+        "type": "source",
+        "locator": "D:/mc-bot-server/src/main/java/com/mcbot/mcbotserver/core/behavior/CombatBehavior.java",
+        "access_status": "read",
+        "completeness_checked": true,
+        "integrity": "complete",
+        "covers": "REQ-RANGEDSURVIV-002"
+      },
+      {
+        "id": "SRC-006",
+        "source_id": "SRC-CODEBASE",
+        "name": "DefendProcess.java",
+        "path": "src/main/java/com/mcbot/mcbotserver/core/process/DefendProcess.java",
+        "type": "source",
+        "locator": "D:/mc-bot-server/src/main/java/com/mcbot/mcbotserver/core/process/DefendProcess.java",
+        "access_status": "read",
+        "completeness_checked": true,
+        "integrity": "complete",
+        "covers": "REQ-RANGEDSURVIV-002"
+      },
+      {
+        "id": "SRC-007",
+        "source_id": "SRC-CODEBASE",
+        "name": "BotBodyEntity.java",
+        "path": "src/main/java/com/mcbot/mcbotserver/adapter/entity/BotBodyEntity.java",
+        "type": "source",
+        "locator": "D:/mc-bot-server/src/main/java/com/mcbot/mcbotserver/adapter/entity/BotBodyEntity.java",
+        "access_status": "read",
+        "completeness_checked": true,
+        "integrity": "complete",
+        "covers": "REQ-005, REQ-006, REQ-007"
+      },
+      {
+        "id": "SRC-008",
+        "source_id": "SRC-CODEBASE",
+        "name": "ToolSelector.java",
+        "path": "src/main/java/com/mcbot/mcbotserver/core/tick/ToolSelector.java",
+        "type": "source",
+        "locator": "D:/mc-bot-server/src/main/java/com/mcbot/mcbotserver/core/tick/ToolSelector.java",
+        "access_status": "read",
+        "completeness_checked": true,
+        "integrity": "complete",
+        "covers": "REQ-RANGEDSURVIV-008"
+      },
+      {
+        "id": "SRC-009",
+        "source_id": "SRC-CODEBASE",
+        "name": "RescueMissionFactory.java",
+        "path": "src/main/java/com/mcbot/mcbotserver/adapter/rescue/RescueMissionFactory.java",
+        "type": "source",
+        "locator": "D:/mc-bot-server/src/main/java/com/mcbot/mcbotserver/adapter/rescue/RescueMissionFactory.java",
+        "access_status": "read",
+        "completeness_checked": true,
+        "integrity": "complete",
+        "covers": "REQ-RANGEDSURVIV-009"
+      },
+      {
+        "id": "SRC-010",
+        "source_id": "SRC-CODEBASE",
+        "name": "GametestInventoryCheck.java",
+        "path": "src/test/java/com/mcbot/mcbotserver/hygiene/GametestInventoryCheck.java",
+        "type": "source",
+        "locator": "D:/mc-bot-server/src/test/java/com/mcbot/mcbotserver/hygiene/GametestInventoryCheck.java",
+        "access_status": "read",
+        "completeness_checked": true,
+        "integrity": "complete",
+        "covers": "REQ-RANGEDSURVIV-010"
+      },
+      {
+        "id": "SRC-011",
+        "source_id": "SRC-CODEBASE",
+        "name": "FishBehaviorGateTest.java",
+        "path": "src/test/java/com/mcbot/mcbotserver/core/behavior/FishBehaviorGateTest.java",
+        "type": "source",
+        "locator": "D:/mc-bot-server/src/test/java/com/mcbot/mcbotserver/core/behavior/FishBehaviorGateTest.java",
+        "access_status": "read",
+        "completeness_checked": true,
+        "integrity": "complete",
+        "covers": "REQ-RANGEDSURVIV-003"
+      },
+      {
+        "id": "SRC-012",
+        "source_id": "SRC-CODEBASE",
+        "name": "CombatRangedGateTest.java",
+        "path": "src/test/java/com/mcbot/mcbotserver/core/behavior/CombatRangedGateTest.java",
+        "type": "source",
+        "locator": "D:/mc-bot-server/src/test/java/com/mcbot/mcbotserver/core/behavior/CombatRangedGateTest.java",
+        "access_status": "read",
+        "completeness_checked": true,
+        "integrity": "complete",
+        "covers": "REQ-RANGEDSURVIV-002"
+      },
+      {
+        "id": "SRC-013",
+        "source_id": "SRC-CODEBASE",
+        "name": "ToolSelectorTest.java",
+        "path": "src/test/java/com/mcbot/mcbotserver/core/tick/ToolSelectorTest.java",
+        "type": "source",
+        "locator": "D:/mc-bot-server/src/test/java/com/mcbot/mcbotserver/core/tick/ToolSelectorTest.java",
+        "access_status": "read",
+        "completeness_checked": true,
+        "integrity": "complete",
+        "covers": "REQ-RANGEDSURVIV-008"
+      }
+    ]
+  },
+  "open_questions": [],
+  "change_ledger": [
+    {
+      "id": "CHG-001",
+      "revision": 2,
+      "action": "ADD",
+      "object_type": "run",
+      "added_ids": [
+        "qa-ad7433e85cb9"
+      ],
+      "removed_ids": [],
+      "modified_ids": [],
+      "before_count": 0,
+      "after_count": 1,
+      "delta_count": 1,
+      "source": "qa_flow.py normalize",
+      "summary": "根据当前 canonical 重建机械计数台账"
+    },
+    {
+      "id": "CHG-002",
+      "revision": 2,
+      "action": "ADD",
+      "object_type": "requirement",
+      "added_ids": [
+        "REQ-RANGEDSURVIV-001",
+        "REQ-RANGEDSURVIV-002",
+        "REQ-RANGEDSURVIV-003",
+        "REQ-RANGEDSURVIV-004",
+        "REQ-RANGEDSURVIV-005",
+        "REQ-RANGEDSURVIV-006",
+        "REQ-RANGEDSURVIV-007",
+        "REQ-RANGEDSURVIV-008",
+        "REQ-RANGEDSURVIV-009",
+        "REQ-RANGEDSURVIV-010"
+      ],
+      "removed_ids": [],
+      "modified_ids": [],
+      "before_count": 0,
+      "after_count": 10,
+      "delta_count": 10,
+      "source": "qa_flow.py normalize",
+      "summary": "根据当前 canonical 重建机械计数台账"
+    },
+    {
+      "id": "CHG-003",
+      "revision": 2,
+      "action": "ADD",
+      "object_type": "risk_mechanism",
+      "added_ids": [
+        "RM-RANGEDSURVIV-001",
+        "RM-RANGEDSURVIV-002",
+        "RM-RANGEDSURVIV-003",
+        "RM-RANGEDSURVIV-004",
+        "RM-RANGEDSURVIV-005",
+        "RM-RANGEDSURVIV-006",
+        "RM-RANGEDSURVIV-007",
+        "RM-RANGEDSURVIV-008",
+        "RM-RANGEDSURVIV-009",
+        "RM-RANGEDSURVIV-010"
+      ],
+      "removed_ids": [],
+      "modified_ids": [],
+      "before_count": 0,
+      "after_count": 10,
+      "delta_count": 10,
+      "source": "qa_flow.py normalize",
+      "summary": "根据当前 canonical 重建机械计数台账"
+    },
+    {
+      "id": "CHG-004",
+      "revision": 2,
+      "action": "ADD",
+      "object_type": "case",
+      "added_ids": [
+        "TC-COMBAT-001",
+        "TC-COMBAT-002",
+        "TC-COMBAT-003",
+        "TC-COMBAT-004",
+        "TC-COMBAT-005",
+        "TC-COMBAT-006",
+        "TC-FISHING-007",
+        "TC-FISHING-008",
+        "TC-FISHING-009",
+        "TC-FISHING-010",
+        "TC-FISHING-011",
+        "TC-FISHING-012",
+        "TC-COMBAT-013",
+        "TC-COMBAT-014",
+        "TC-COMBAT-015",
+        "TC-COMBAT-016",
+        "TC-COMBAT-017",
+        "TC-SLEEP-018",
+        "TC-DIG-019",
+        "TC-DIG-020",
+        "TC-RESCUE-021",
+        "TC-HYGIENE-022"
+      ],
+      "removed_ids": [],
+      "modified_ids": [],
+      "before_count": 0,
+      "after_count": 22,
+      "delta_count": 22,
+      "source": "qa_flow.py normalize",
+      "summary": "根据当前 canonical 重建机械计数台账"
+    }
+  ],
+  "environment": {},
+  "screenshot_policy": "unconfirmed",
+  "plan": {
+    "scope": [],
+    "out_of_scope": [],
+    "entry_criteria": [],
+    "exit_criteria": [],
+    "regression": []
+  },
+  "requirements": [
+    {
+      "id": "REQ-RANGEDSURVIV-001",
+      "risk": "P0",
+      "title": "弓蓄力与释放",
+      "statement": "BindingActor 识别 BowItem 后调 facade.startUsingItem() 开始蓄力，USE falling edge 调 facade.releaseUsingItem() 射出；蓄力时长由 facade.tickUseLoop 每 held tick 泵动",
+      "behavior": {
+        "actor": "BindingActor (adapter layer)",
+        "precondition": "bot 手持弓，USE intent rising edge 到达",
+        "trigger": "onUsePressEdge() 检测 held instanceof BowItem",
+        "rule": "BowItem → facade.startUsingItem(MAIN_HAND)；每 held tick facade.tickUseLoop() 泵动蓄力；falling edge → facade.releaseUsingItem()；vanilla BowItem 释放时根据 useDuration 计算箭速和伤害",
+        "state_change": "facade 进入 use 状态，useTicks 累积；释放后生成 Arrow 实体",
+        "observable_result": "蓄力 20 tick 后释放生成满速箭；蓄力不足生成慢速弱伤箭",
+        "failure_behavior": "startUsingItem 未调用时弓不蓄力，释放无箭；facade 与 body 姿态不同步时箭从错误位置射出"
+      },
+      "impact_scope": [
+        "adapter/BindingActor.java",
+        "adapter/BotPlayerFacade.java",
+        "api/actor/Intent.java"
+      ],
+      "summary": "弓蓄力与释放",
+      "source": "SRC-001"
+    },
+    {
+      "id": "REQ-RANGEDSURVIV-002",
+      "risk": "P1",
+      "title": "远程负载检测与 SLOT 通道",
+      "statement": "RangedLoadouts.hotbarBowSlot() 检测 hotbar 有弓且 inventory 任意位置有箭；CombatBehavior 远程时 SLOT 通道归弓所有；DefendProcess 无远程负载时 ENGAGEMENT_REFUSED",
+      "behavior": {
+        "actor": "RangedLoadouts + CombatBehavior + DefendProcess (core layer)",
+        "precondition": "bot 进入战斗或防御模式",
+        "trigger": "DefendProcess 评估敌对目标时调用 RangedLoadouts.hotbarBowSlot()",
+        "rule": "hotbar 扫描 BowItem → inventory 全扫描 arrow/tipped_arrow/spectral_arrow → 两者都有时返回弓的 slot；CombatBehavior 远程模式下 Claim(Channel.SLOT) 归弓；无弓或无箭时 DefendProcess 返回 ENGAGEMENT_REFUSED",
+        "state_change": "SLOT 通道被弓 claim，selectedSlot 切换到弓",
+        "observable_result": "有弓有箭时 bot 切换到弓并远程攻击；无弓或无箭时拒绝远程交战",
+        "failure_behavior": "arrow 检测遗漏 tipped_arrow/spectral_arrow 时误判无远程负载；SLOT 通道未归弓时弓和近战武器冲突"
+      },
+      "impact_scope": [
+        "core/combat/RangedLoadouts.java",
+        "core/behavior/CombatBehavior.java",
+        "core/process/DefendProcess.java"
+      ],
+      "summary": "远程负载检测与 SLOT 通道",
+      "source": "SRC-003"
+    },
+    {
+      "id": "REQ-RANGEDSURVIV-003",
+      "risk": "P0",
+      "title": "钓鱼状态机",
+      "statement": "FishBehavior 完整状态机：无浮漂时 cast(USE rising edge) → 浮漂出现后 settle(30t grace + 5t stable) → armed 后 bite watch(DIP_THRESHOLD=0.25, BITE_BUDGET=600t) → 咬钩或预算耗尽时 reel",
+      "behavior": {
+        "actor": "FishBehavior (core behavior layer)",
+        "precondition": "directive.overrides().fish() 非空，hotbar 有钓鱼竿",
+        "trigger": "Behavior.tick() 每 server tick 调用",
+        "rule": "无 bobber → tickCast (USE true→false 抛竿)；有 bobber 未 armed → tickSettle (castAge>30 后 5 tick 稳定即 armed)；armed → tickBiteWatch (lastY - currentY >= 0.25 即咬钩 reel；noBiteTicks>600 预算耗尽 reel)；hookedEntity 时直接 reel 重置",
+        "state_change": "pressPending/castAge/settleTicks/lastBobberY/noBiteTicks/armed/budgetSpent 状态流转",
+        "observable_result": "抛竿后浮漂飞入水中；稳定后咬钩（垂直下落>=0.25）时收竿；600 tick 无咬钩时超时收竿",
+        "failure_behavior": "CAST_GRACE_TICKS 过短导致浮漂还在飞就 armed；DIP_THRESHOLD 过高漏检咬钩、过低误检水波；BITE_BUDGET 过短正常咬钩前就超时"
+      },
+      "impact_scope": [
+        "core/behavior/FishBehavior.java",
+        "api/world/BobberSnapshot.java",
+        "api/process/Fish.java"
+      ],
+      "summary": "钓鱼状态机",
+      "source": "SRC-002"
+    },
+    {
+      "id": "REQ-RANGEDSURVIV-004",
+      "risk": "P0",
+      "title": "咬钩检测与浮漂感知",
+      "statement": "BobberSnapshot 只携带 pos + hookedEntity，无 bite flag（vanilla nibble 私有）；咬钩从连续快照的垂直 dip 推导；WorldView.getBobbers(waterCell, radius, LIVE) 返回浮漂列表",
+      "behavior": {
+        "actor": "BobberSnapshot + WorldView (api layer)",
+        "precondition": "钓鱼竿已抛出，水中存在 FishingHook 实体",
+        "trigger": "FishBehavior.tick() 调用 world.getBobbers(fish.waterCell(), 24.0, ViewMode.LIVE)",
+        "rule": "BobberSnapshot(CellPos pos, boolean hookedEntity) — 无 bite 字段；咬钩 = 连续两 tick 浮漂 y 坐标下降 >= 0.25（DIP_THRESHOLD）；hookedEntity=true 表示钩到实体/物品（非鱼咬钩），直接收竿重置",
+        "state_change": "FishBehavior.lastBobberY 更新；检测到 dip 时触发 reel",
+        "observable_result": "鱼咬钩时浮漂垂直急坠，bot 在下一 tick 收竿；钩到物品/实体时 hookedEntity=true 立即收竿",
+        "failure_behavior": "BobberSnapshot 误加 bite flag 时违反 boundary A（projectile 不可见，nibble 私有）；getBobbers 半径不足时找不到浮漂；waterCell 定位错误时扫描范围偏移"
+      },
+      "impact_scope": [
+        "api/world/BobberSnapshot.java",
+        "api/world/WorldView.java",
+        "adapter/BindingWorldView.java"
+      ],
+      "summary": "咬钩检测与浮漂感知",
+      "source": "SRC-004"
+    },
+    {
+      "id": "REQ-RANGEDSURVIV-005",
+      "risk": "P0",
+      "title": "盾举盾与收盾",
+      "statement": "BindingActor 识别 ShieldItem 后调 body.startUsingItem(MAIN_HAND)（在 body 上 raise 而非 facade）；USE falling edge 调 body.releaseUsingItem()；body.isUsingItem() 检测举盾状态",
+      "behavior": {
+        "actor": "BindingActor (adapter layer)",
+        "precondition": "bot 手持盾，USE intent rising edge 到达",
+        "trigger": "onUsePressEdge() 检测 held instanceof ShieldItem",
+        "rule": "ShieldItem → body.startUsingItem(MAIN_HAND)（非 facade，因为 isDamageSourceBlocked 读受伤实体自己的 blocking 状态）；每 held tick 保持 use；falling edge → body.releaseUsingItem()；releaseUseHolds() 同时检查 facade.isUsingItem() 和 body.isUsingItem()",
+        "state_change": "body 进入 use 状态，activeItem 为盾；useDuration 累积；释放后退出 use 状态",
+        "observable_result": "举盾时 bot 模型显示盾格挡姿势；收盾后恢复正常；受到攻击时 isDamageSourceBlocked 检查 body 的 use 状态",
+        "failure_behavior": "在 facade 上 startUsingItem 时 isDamageSourceBlocked 读不到（facade 不受伤），盾完全无效；releaseUseHolds 遗漏 body.isUsingItem() 检查时盾无法收盾"
+      },
+      "impact_scope": [
+        "adapter/BindingActor.java",
+        "adapter/entity/BotBodyEntity.java"
+      ],
+      "summary": "盾举盾与收盾",
+      "source": "SRC-001"
+    },
+    {
+      "id": "REQ-RANGEDSURVIV-006",
+      "risk": "P0",
+      "title": "盾伤害减免判定",
+      "statement": "vanilla LivingEntity.isDamageSourceBlocked() 检查受伤实体自己的 isUsingItem() && activeItem 是盾 && useDuration >= 5；满足时伤害减免（部分或全部，取决于角度和盾牌附魔）；bot 受击时走 body 的 hurt 路径",
+      "behavior": {
+        "actor": "BotBodyEntity (adapter entity layer) + vanilla LivingEntity",
+        "precondition": "bot 举盾中（body.isUsingItem() && activeItem instanceof ShieldItem），受到伤害源攻击",
+        "trigger": "body.hurt(damageSource, amount) 被调用",
+        "rule": "vanilla LivingEntity.hurt() → isDamageSourceBlocked(source) 检查：isUsingItem() && getUseItem().isShield(source) && getUseItemRemainingTicks() <= 0（useDuration>=5）&& 伤害源不在背后 180° 扇形外 → 减免伤害（全挡或部分挡，盾牌附魔 Resistance 影响）；触发 shieldDisabled 效果（斧攻击破盾）",
+        "state_change": "伤害被减免或全挡；盾可能被斧击破（100 tick 无法使用）；伤害源 knockback 被取消",
+        "observable_result": "举盾正面受击时伤害减免（盾挡音效）；背后受击时不减免；斧攻击时盾被击破（100t 冷却）",
+        "failure_behavior": "盾在 facade 上 raise 时 body.isUsingItem() 为 false，isDamageSourceBlocked 永远 false，盾完全无效；useDuration 不足 5 tick 时（刚举盾就被打）不减免"
+      },
+      "impact_scope": [
+        "adapter/entity/BotBodyEntity.java",
+        "adapter/BindingActor.java"
+      ],
+      "summary": "盾伤害减免判定",
+      "source": "SRC-007"
+    },
+    {
+      "id": "REQ-RANGEDSURVIV-007",
+      "risk": "P2",
+      "title": "睡眠机制",
+      "statement": "BotBodyEntity extends PathfinderMob（PathfinderMob 有 sleep 能力，原用于狐狸）；需确认 bot 是否有主动睡眠/起床机制，或仅继承 base class 能力",
+      "behavior": {
+        "actor": "BotBodyEntity (adapter entity layer)",
+        "precondition": "待确认：是否存在主动睡眠触发条件（夜晚、床、疲劳等）",
+        "trigger": "待确认：是否有 behavior/process 驱动睡眠",
+        "rule": "PathfinderMob base class 有 isSleeping()/setSleeping()/startSleeping()/stopSleeping()；Sleeping 状态影响 AI（不移动、不被攻击唤醒？）；bot 是否 override 这些方法待确认",
+        "state_change": "待确认：进入/退出 sleeping 状态时的行为变化",
+        "observable_result": "待确认：是否能在游戏中观察到 bot 睡眠",
+        "failure_behavior": "若 bot 无主动睡眠机制但 PathfinderMob base class 的 sleep AI 被意外触发，bot 可能在不适当的时候进入睡眠；若 override 缺失，base class sleep 行为可能与 bot 设计冲突"
+      },
+      "impact_scope": [
+        "adapter/entity/BotBodyEntity.java"
+      ],
+      "summary": "睡眠机制",
+      "source": "SRC-007"
+    },
+    {
+      "id": "REQ-RANGEDSURVIV-008",
+      "risk": "P1",
+      "title": "工具自动选择",
+      "statement": "ToolSelector 根据目标方块选择最优工具（破坏速度最快 + match_tool）；挖掘时自动切换 hotbar 槽位；离线 ToolSelectorTest 只验证选择逻辑，不验证实际切换",
+      "behavior": {
+        "actor": "ToolSelector (core tick layer)",
+        "precondition": "bot 开始挖掘目标方块，hotbar 有多个工具",
+        "trigger": "DigExecutor 或 tick 层调用 ToolSelector 选择工具",
+        "rule": "遍历 hotbar 工具，计算每个工具对目标方块的 destroySpeed（含附魔效率），选择最快且满足 match_tool 的工具；通过 SLOT 通道 Claim 切换 selectedSlot",
+        "state_change": "selectedSlot 切换到最优工具，DigExecutor 使用新工具继续挖掘",
+        "observable_result": "挖石头时自动切换到镐（而非空手或剑）；挖树叶时切换到剪刀；工具耐久耗尽时切换到次优工具",
+        "failure_behavior": "ToolSelector 只看 destroySpeed 不看 match_tool 时可能选剑挖石头（速度快但不掉落）；SLOT 通道未正确切换时 DigExecutor 仍用旧工具；离线测试通过但引擎内切换失败"
+      },
+      "impact_scope": [
+        "core/tick/ToolSelector.java",
+        "adapter/DigExecutor.java",
+        "api/actor/Intent.java"
+      ],
+      "summary": "工具自动选择",
+      "source": "SRC-008"
+    },
+    {
+      "id": "REQ-RANGEDSURVIV-009",
+      "risk": "P2",
+      "title": "救援任务",
+      "statement": "RescueMissionFactory 生成救援任务（bot 陷入危险时的自动逃生路径）；需确认机制面和触发条件",
+      "behavior": {
+        "actor": "RescueMissionFactory (adapter rescue layer)",
+        "precondition": "待确认：触发条件（低血量、熔岩、溺水、卡住等）",
+        "trigger": "待确认：哪个 reflex/process 调用 RescueMissionFactory",
+        "rule": "待确认：救援任务的生成逻辑、路径规划、执行流程",
+        "state_change": "待确认：救援任务执行时的状态流转",
+        "observable_result": "待确认：救援任务的可观察行为",
+        "failure_behavior": "待确认：救援任务失败模式（路径不可达、任务中断等）"
+      },
+      "impact_scope": [
+        "adapter/rescue/RescueMissionFactory.java"
+      ],
+      "summary": "救援任务",
+      "source": "SRC-009"
+    },
+    {
+      "id": "REQ-RANGEDSURVIV-010",
+      "risk": "P0",
+      "title": "无回归",
+      "statement": "新增 gametest 场景不破坏已有 67 个场景；GametestInventoryCheck 钉住场景清单；全量离线测试通过",
+      "behavior": {
+        "actor": "Gradle build + GametestInventoryCheck (hygiene layer)",
+        "precondition": "新增 gametest 场景已写入 src/main/java/com/mcbot/mcbotserver/gametest/",
+        "trigger": "python tool/mcbot_tool.py test",
+        "rule": "compileJava → checkstyle → spotless → test (539+ offline)；GametestInventoryCheck 扫描 gametest 源码 @GameTest 方法并与 EXPECTED 钉表双向比对",
+        "state_change": "EXPECTED 钉表更新，场景清单扩展",
+        "observable_result": "BUILD SUCCESSFUL，GametestInventoryCheck 通过，场景数 67→N",
+        "failure_behavior": "新增场景未更新 EXPECTED 时 GametestInventoryCheck fail；场景被意外删除时同样 fail（routesThroughFenceGap 事故模式）"
+      },
+      "impact_scope": [
+        "src/main/java/com/mcbot/mcbotserver/gametest/",
+        "src/test/java/com/mcbot/mcbotserver/hygiene/GametestInventoryCheck.java"
+      ],
+      "summary": "无回归",
+      "source": "SRC-010"
+    }
+  ],
+  "risk_mechanisms": [
+    {
+      "id": "RM-RANGEDSURVIV-001",
+      "priority": "P0",
+      "status": "identified",
+      "title": "盾在 facade 上 raise 导致完全无效",
+      "mechanism": "isDamageSourceBlocked 读受伤实体（body）自己的 isUsingItem()，若盾在 facade 上 startUsingItem 则 body.isUsingItem() 为 false，盾永远不格挡",
+      "failure_mode": "BindingActor.onUsePressEdge() 对 ShieldItem 调用 facade.startUsingItem() 而非 body.startUsingItem()",
+      "business_impact": "盾完全无效，bot 受到全额伤害，生存能力严重下降；这是 adapter 层 P0 产地的典型 bug",
+      "oracle": "bot 举盾正面受击时伤害应减免（盾挡音效）；若伤害全额则盾无效",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-005",
+        "REQ-RANGEDSURVIV-006"
+      ],
+      "case_ids": [
+        "TC-COMBAT-013",
+        "TC-COMBAT-014",
+        "TC-COMBAT-016",
+        "TC-COMBAT-017"
+      ]
+    },
+    {
+      "id": "RM-RANGEDSURVIV-002",
+      "priority": "P0",
+      "status": "identified",
+      "title": "弓蓄力时长与箭速/伤害不匹配 vanilla",
+      "mechanism": "vanilla BowItem 释放时根据 useDuration 计算箭速（满蓄力 20 tick = 3.0 速度）和伤害（满蓄力 = 9+ 心）；facade.tickUseLoop 泵动的 useTicks 若与 vanilla 不同步，箭速/伤害偏离",
+      "failure_mode": "facade.tickUseLoop() 未每 held tick 调用，或 useTicks 累积速率与 vanilla Player.tick() 不同步",
+      "business_impact": "弓伤害/箭速与 vanilla 不一致，远程战斗体验失真；可能过强或过弱",
+      "oracle": "蓄力 20 tick 后释放的箭应飞行满速（约 3.0 blocks/tick），伤害约 9 心；蓄力 10 tick 应约半伤半速",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-001"
+      ],
+      "case_ids": [
+        "TC-COMBAT-001",
+        "TC-COMBAT-002",
+        "TC-COMBAT-003"
+      ]
+    },
+    {
+      "id": "RM-RANGEDSURVIV-003",
+      "priority": "P0",
+      "status": "identified",
+      "title": "钓鱼咬钩检测 DIP_THRESHOLD 误判",
+      "mechanism": "FishBehavior 用连续两 tick 浮漂 y 下降 >= 0.25 判定咬钩；vanilla 咬钩 kick 约 0.4 blocks/tick，水波约 0.05；阈值过高漏检、过低误检水波",
+      "failure_mode": "DIP_THRESHOLD=0.25 设置不当，或 lastBobberY 更新逻辑错误（如咬钩 tick 未更新 lastY 导致连续触发）",
+      "business_impact": "咬钩漏检时鱼跑了不收竿；误检时频繁空收竿，钓鱼效率归零",
+      "oracle": "抛竿后鱼咬钩（浮漂垂直急坠）时 bot 应在 1-2 tick 内收竿；正常水波浮动不应触发收竿",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-003",
+        "REQ-RANGEDSURVIV-004"
+      ],
+      "case_ids": [
+        "TC-FISHING-007",
+        "TC-FISHING-009",
+        "TC-FISHING-010",
+        "TC-FISHING-012"
+      ]
+    },
+    {
+      "id": "RM-RANGEDSURVIV-004",
+      "priority": "P1",
+      "status": "identified",
+      "title": "钓鱼 CAST_GRACE_TICKS 过短导致浮漂未落地就 armed",
+      "mechanism": "FishBehavior 抛竿后 30 tick grace 期忽略浮漂运动，之后 5 tick 稳定即 armed；若 grace 过短，浮漂还在飞行中就被判定为\"不稳定\"，settleTicks 永远达不到 5",
+      "failure_mode": "CAST_GRACE_TICKS=30 设置过短，或浮漂飞行时间因抛竿角度/力度变化而超过 30 tick",
+      "business_impact": "钓鱼行为卡在 settle 阶段永远不 armed，咬钩检测永不启动，钓鱼完全失效",
+      "oracle": "抛竿后浮漂飞入水中（约 10-20 tick），之后 5 tick 稳定即 armed；armed 后咬钩检测生效",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-003"
+      ],
+      "case_ids": [
+        "TC-FISHING-007",
+        "TC-FISHING-008",
+        "TC-FISHING-011"
+      ]
+    },
+    {
+      "id": "RM-RANGEDSURVIV-005",
+      "priority": "P1",
+      "status": "identified",
+      "title": "远程负载检测遗漏 tipped_arrow/spectral_arrow",
+      "mechanism": "RangedLoadouts.ARROW_IDS 包含 arrow/tipped_arrow/spectral_arrow；若遗漏任一类型，bot 持有该箭时误判无远程负载，拒绝远程交战",
+      "failure_mode": "ARROW_IDS Set 不完整，或 inventory 扫描逻辑遗漏 offhand/armor 槽位",
+      "business_impact": "bot 持有药箭或光灵箭时无法远程攻击，战斗策略受限",
+      "oracle": "hotbar 有弓 + inventory 有 tipped_arrow 时 RangedLoadouts.hotbarBowSlot() 返回弓的 slot；有 spectral_arrow 时同样返回",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-002"
+      ],
+      "case_ids": [
+        "TC-COMBAT-004",
+        "TC-COMBAT-005",
+        "TC-COMBAT-006"
+      ]
+    },
+    {
+      "id": "RM-RANGEDSURVIV-006",
+      "priority": "P1",
+      "status": "identified",
+      "title": "工具选择只看 destroySpeed 不看 match_tool",
+      "mechanism": "ToolSelector 若只比较 destroySpeed 而不检查 match_tool，可能选剑挖石头（剑 destroySpeed 对部分方块快于镐？）或选错误工具，导致不掉落物品",
+      "failure_mode": "ToolSelector 选择逻辑未纳入 match_tool 条件，或 DigExecutor 未使用 ToolSelector 的结果",
+      "business_impact": "bot 挖石头不掉圆石、挖矿石不掉矿石，资源获取失效",
+      "oracle": "挖石头时 ToolSelector 选镐（非剑/空手），DigExecutor 使用镐挖掘，掉落圆石",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-008"
+      ],
+      "case_ids": [
+        "TC-DIG-019",
+        "TC-DIG-020"
+      ]
+    },
+    {
+      "id": "RM-RANGEDSURVIV-007",
+      "priority": "P2",
+      "status": "identified",
+      "title": "盾 useDuration 不足 5 tick 时不格挡",
+      "mechanism": "vanilla isDamageSourceBlocked 要求 getUseItemRemainingTicks() <= 0（即 useDuration >= 5）；刚举盾 0-4 tick 内受击不格挡",
+      "failure_mode": "bot 反应延迟导致举盾后 5 tick 内被击中，盾未生效",
+      "business_impact": "bot 举盾反应慢时第一击全额伤害，生存能力下降",
+      "oracle": "举盾 5 tick 后正面受击伤害减免；举盾 0-4 tick 内受击不减免",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-006"
+      ],
+      "case_ids": [
+        "TC-COMBAT-014",
+        "TC-COMBAT-015"
+      ]
+    },
+    {
+      "id": "RM-RANGEDSURVIV-008",
+      "priority": "P2",
+      "status": "identified",
+      "title": "睡眠机制未确认是否存在主动触发",
+      "mechanism": "BotBodyEntity extends PathfinderMob，base class 有 sleep 能力但原用于狐狸；bot 是否有主动睡眠/起床机制、是否 override sleep 方法待确认",
+      "failure_mode": "若 base class sleep AI 被意外触发，bot 可能在不适当的时候进入睡眠；若 override 缺失，base class 行为可能与 bot 设计冲突",
+      "business_impact": "bot 意外睡眠时停止响应，任务中断；或睡眠机制完全缺失，夜间生存策略受限",
+      "oracle": "待确认：bot 是否能在游戏中观察到睡眠/起床行为",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-007"
+      ],
+      "case_ids": [
+        "TC-SLEEP-018"
+      ]
+    },
+    {
+      "id": "RM-RANGEDSURVIV-009",
+      "priority": "P2",
+      "status": "identified",
+      "title": "救援任务机制面未确认",
+      "mechanism": "RescueMissionFactory 存在但触发条件、生成逻辑、执行流程均未在普查中确认；可能是 stub 或半成品",
+      "failure_mode": "RescueMissionFactory 可能是空实现或未被任何 reflex/process 调用",
+      "business_impact": "bot 陷入危险（熔岩、溺水、卡住）时无自动逃生路径",
+      "oracle": "待确认：RescueMissionFactory 的实际机制面和可观察行为",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-009"
+      ],
+      "case_ids": [
+        "TC-RESCUE-021"
+      ]
+    },
+    {
+      "id": "RM-RANGEDSURVIV-010",
+      "priority": "P0",
+      "status": "identified",
+      "title": "新增 gametest 场景未更新钉表导致 GametestInventoryCheck fail",
+      "mechanism": "GametestInventoryCheck.EXPECTED 钉住全部场景名；新增场景未更新 EXPECTED 时测试 fail（双向比对）",
+      "failure_mode": "新增 @GameTest 方法后忘记更新 EXPECTED Map，或场景名拼写不一致",
+      "business_impact": "全量测试 fail，无法提交；routesThroughFenceGap 事故模式（场景被意外删除但离线测试全绿）",
+      "oracle": "新增场景后 GametestInventoryCheck 通过，EXPECTED 包含新场景名，场景数 67→N",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-010"
+      ],
+      "case_ids": [
+        "TC-HYGIENE-022"
+      ]
+    }
+  ],
+  "observed_surfaces": [],
+  "cases": [
+    {
+      "id": "TC-COMBAT-001",
+      "requirement_id": "REQ-RANGEDSURVIV-001",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-001"
+      ],
+      "title": "弓蓄力20tick满速射出",
+      "priority": "P0",
+      "validation_scope": "formal",
+      "description": "bot 手持弓蓄力 20 tick 后释放，验证箭速和伤害为满值",
+      "module": "combat",
+      "type": "gametest",
+      "steps": [
+        "前置: bot 手持弓+箭，站在平地",
+        "执行: 提交 USE hold 20 tick 后释放",
+        "观察: 记录 Arrow 实体初速度和伤害"
+      ],
+      "expected_result": "箭初速度约 3.0 blocks/tick，伤害约 9 心（满蓄力）",
+      "risk_mechanism_ids": [
+        "RM-RANGEDSURVIV-002"
+      ],
+      "test_data": "fixture: bow+64 arrows, flat platform, target zombie at 10 blocks",
+      "release_blocking_reason": "弓蓄力/箭速是远程战斗核心机制，失效则远程完全不可用"
+    },
+    {
+      "id": "TC-COMBAT-002",
+      "requirement_id": "REQ-RANGEDSURVIV-001",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-001"
+      ],
+      "title": "弓蓄力不足半速半伤",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "bot 手持弓蓄力 10 tick 后释放，验证箭速和伤害约为半值",
+      "module": "combat",
+      "type": "gametest",
+      "steps": [
+        "前置: bot 手持弓+箭",
+        "执行: USE hold 10 tick 后释放",
+        "观察: 记录箭速和伤害"
+      ],
+      "expected_result": "箭速约 1.5 blocks/tick，伤害约 4-5 心（半蓄力）",
+      "risk_mechanism_ids": [
+        "RM-RANGEDSURVIV-002"
+      ],
+      "test_data": "fixture: bow+arrows, flat platform"
+    },
+    {
+      "id": "TC-COMBAT-003",
+      "requirement_id": "REQ-RANGEDSURVIV-001",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-001"
+      ],
+      "title": "弓释放后facade退出use状态",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "弓释放后 facade.isUsingItem() 应为 false，useTicks 重置",
+      "module": "combat",
+      "type": "gametest",
+      "steps": [
+        "前置: bot 手持弓蓄力中",
+        "执行: USE falling edge 释放",
+        "观察: facade.isUsingItem() 状态"
+      ],
+      "expected_result": "释放后 facade.isUsingItem()=false，activeItem 为空",
+      "risk_mechanism_ids": [
+        "RM-RANGEDSURVIV-002"
+      ],
+      "test_data": "fixture: bow+arrows"
+    },
+    {
+      "id": "TC-COMBAT-004",
+      "requirement_id": "REQ-RANGEDSURVIV-002",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-002"
+      ],
+      "title": "有弓有箭时切换到弓",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "hotbar 有弓且 inventory 有箭时，RangedLoadouts.hotbarBowSlot() 返回弓的 slot",
+      "module": "combat",
+      "type": "unit",
+      "steps": [
+        "前置: hotbar slot 2 有弓，inventory 有 arrow",
+        "执行: 调用 RangedLoadouts.hotbarBowSlot(world)",
+        "观察: 返回值"
+      ],
+      "expected_result": "返回 2（弓的 slot）",
+      "risk_mechanism_ids": [
+        "RM-RANGEDSURVIV-005"
+      ],
+      "test_data": "fixture: bow at hotbar[2], 16 arrows in inventory"
+    },
+    {
+      "id": "TC-COMBAT-005",
+      "requirement_id": "REQ-RANGEDSURVIV-002",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-002"
+      ],
+      "title": "有弓无箭时返回-1",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "hotbar 有弓但 inventory 无箭时，RangedLoadouts 返回 -1",
+      "module": "combat",
+      "type": "unit",
+      "steps": [
+        "前置: hotbar 有弓，inventory 无箭",
+        "执行: hotbarBowSlot()",
+        "观察: 返回值"
+      ],
+      "expected_result": "返回 -1",
+      "risk_mechanism_ids": [
+        "RM-RANGEDSURVIV-005"
+      ],
+      "test_data": "fixture: bow at hotbar[0], no arrows"
+    },
+    {
+      "id": "TC-COMBAT-006",
+      "requirement_id": "REQ-RANGEDSURVIV-002",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-002"
+      ],
+      "title": "tipped_arrow和spectral_arrow被识别",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "inventory 有 tipped_arrow 或 spectral_arrow 时，RangedLoadouts 识别为有箭",
+      "module": "combat",
+      "type": "unit",
+      "steps": [
+        "前置: hotbar 有弓，inventory 有 tipped_arrow",
+        "执行: hotbarBowSlot()",
+        "观察: 返回值；再用 spectral_arrow 重复"
+      ],
+      "expected_result": "两种箭都返回弓的 slot（非 -1）",
+      "risk_mechanism_ids": [
+        "RM-RANGEDSURVIV-005"
+      ],
+      "test_data": "fixture: bow + tipped_arrow; bow + spectral_arrow"
+    },
+    {
+      "id": "TC-FISHING-007",
+      "requirement_id": "REQ-RANGEDSURVIV-003",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-003"
+      ],
+      "title": "抛竿后浮漂生成并入水",
+      "priority": "P0",
+      "validation_scope": "formal",
+      "description": "bot 手持钓鱼竿对水面 USE，验证 FishingHook 实体生成并飞入水中",
+      "module": "fishing",
+      "type": "gametest",
+      "steps": [
+        "前置: bot 手持钓鱼竿，面前 3x3 水池",
+        "执行: USE rising edge 抛竿",
+        "观察: 水池中是否出现 FishingHook 实体"
+      ],
+      "expected_result": "抛竿后 1-2 tick 内水池中出现浮漂实体",
+      "risk_mechanism_ids": [
+        "RM-RANGEDSURVIV-003",
+        "RM-RANGEDSURVIV-004"
+      ],
+      "test_data": "fixture: fishing_rod, 3x3 water pool at eye level",
+      "release_blocking_reason": "抛竿是钓鱼入口，失效则钓鱼完全不可用"
+    },
+    {
+      "id": "TC-FISHING-008",
+      "requirement_id": "REQ-RANGEDSURVIV-003",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-003"
+      ],
+      "title": "浮漂稳定后armed状态",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "抛竿后浮漂入水稳定（5 tick），FishBehavior 进入 armed 状态",
+      "module": "fishing",
+      "type": "gametest",
+      "steps": [
+        "前置: 已抛竿，浮漂在水中",
+        "执行: 等待 30 tick grace + 5 tick 稳定",
+        "观察: FishBehavior.armed 状态（通过行为推断：咬钩检测是否生效）"
+      ],
+      "expected_result": "约 35 tick 后 armed，咬钩检测生效",
+      "risk_mechanism_ids": [
+        "RM-RANGEDSURVIV-004"
+      ],
+      "test_data": "fixture: fishing_rod, stable water pool"
+    },
+    {
+      "id": "TC-FISHING-009",
+      "requirement_id": "REQ-RANGEDSURVIV-004",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-004"
+      ],
+      "title": "咬钩垂直dip触发收竿",
+      "priority": "P0",
+      "validation_scope": "formal",
+      "description": "浮漂 armed 后，模拟鱼咬钩（浮漂垂直急坠 >=0.25），验证 bot 收竿",
+      "module": "fishing",
+      "type": "gametest",
+      "steps": [
+        "前置: 已抛竿且 armed",
+        "执行: 等待自然咬钩或模拟浮漂垂直下落",
+        "观察: bot 是否在 1-2 tick 内 USE edge 收竿"
+      ],
+      "expected_result": "浮漂垂直下落 >=0.25 时 bot 收竿",
+      "risk_mechanism_ids": [
+        "RM-RANGEDSURVIV-003"
+      ],
+      "test_data": "fixture: fishing_rod, water pool with fish (或手动移动浮漂)",
+      "release_blocking_reason": "咬钩检测是钓鱼核心，失效则鱼跑了不收竿"
+    },
+    {
+      "id": "TC-FISHING-010",
+      "requirement_id": "REQ-RANGEDSURVIV-004",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-004"
+      ],
+      "title": "水波浮动不触发收竿",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "浮漂正常水波浮动（<0.25）不应触发收竿",
+      "module": "fishing",
+      "type": "gametest",
+      "steps": [
+        "前置: 已抛竿且 armed，无鱼",
+        "执行: 观察 100 tick 自然浮动",
+        "观察: bot 是否误收竿"
+      ],
+      "expected_result": "100 tick 内无咬钩时不收竿（或到 BITE_BUDGET=600 才超时收竿）",
+      "risk_mechanism_ids": [
+        "RM-RANGEDSURVIV-003"
+      ],
+      "test_data": "fixture: fishing_rod, calm water, no fish"
+    },
+    {
+      "id": "TC-FISHING-011",
+      "requirement_id": "REQ-RANGEDSURVIV-003",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-003"
+      ],
+      "title": "BITE_BUDGET超时收竿",
+      "priority": "P2",
+      "validation_scope": "formal",
+      "description": "600 tick 无咬钩时 FishBehavior 超时收竿并重置",
+      "module": "fishing",
+      "type": "gametest",
+      "steps": [
+        "前置: 已抛竿且 armed，无鱼",
+        "执行: 等待 600+ tick",
+        "观察: bot 是否收竿"
+      ],
+      "expected_result": "600 tick 后 bot 收竿，状态重置",
+      "risk_mechanism_ids": [
+        "RM-RANGEDSURVIV-004"
+      ],
+      "test_data": "fixture: fishing_rod, water pool no fish"
+    },
+    {
+      "id": "TC-FISHING-012",
+      "requirement_id": "REQ-RANGEDSURVIV-004",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-004"
+      ],
+      "title": "hookedEntity时立即收竿重置",
+      "priority": "P2",
+      "validation_scope": "formal",
+      "description": "浮漂钩到实体/物品（hookedEntity=true）时立即收竿，不等待咬钩",
+      "module": "fishing",
+      "type": "gametest",
+      "steps": [
+        "前置: 已抛竿",
+        "执行: 让浮漂钩到物品实体",
+        "观察: bot 是否立即收竿"
+      ],
+      "expected_result": "hookedEntity=true 时立即收竿并重置 watch",
+      "risk_mechanism_ids": [
+        "RM-RANGEDSURVIV-003"
+      ],
+      "test_data": "fixture: fishing_rod, item entity in water"
+    },
+    {
+      "id": "TC-COMBAT-013",
+      "requirement_id": "REQ-RANGEDSURVIV-005",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-005"
+      ],
+      "title": "盾在body上raise而非facade",
+      "priority": "P0",
+      "validation_scope": "formal",
+      "description": "bot 手持盾 USE，验证 body.isUsingItem()=true 且 activeItem 是盾",
+      "module": "combat",
+      "type": "gametest",
+      "steps": [
+        "前置: bot 手持盾",
+        "执行: USE rising edge",
+        "观察: body.isUsingItem() 和 body.getUseItem()"
+      ],
+      "expected_result": "body.isUsingItem()=true，activeItem 是 ShieldItem；facade.isUsingItem()=false",
+      "risk_mechanism_ids": [
+        "RM-RANGEDSURVIV-001"
+      ],
+      "test_data": "fixture: shield in hotbar, flat platform",
+      "release_blocking_reason": "盾在 body 上 raise 是格挡生效的前提，在 facade 上则完全无效"
+    },
+    {
+      "id": "TC-COMBAT-014",
+      "requirement_id": "REQ-RANGEDSURVIV-006",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-006"
+      ],
+      "title": "举盾5tick后正面受击伤害减免",
+      "priority": "P0",
+      "validation_scope": "formal",
+      "description": "bot 举盾 5 tick 后正面受击，验证伤害被减免（盾挡）",
+      "module": "combat",
+      "type": "gametest",
+      "steps": [
+        "前置: bot 手持盾，满血",
+        "执行: 举盾 5 tick 后让僵尸正面攻击",
+        "观察: bot 受到的伤害值"
+      ],
+      "expected_result": "伤害被减免（全挡或部分挡，取决于盾牌），播放盾挡音效",
+      "risk_mechanism_ids": [
+        "RM-RANGEDSURVIV-001",
+        "RM-RANGEDSURVIV-007"
+      ],
+      "test_data": "fixture: shield, zombie at melee range, bot full health",
+      "release_blocking_reason": "盾伤害减免是生存核心机制，失效则盾完全无意义"
+    },
+    {
+      "id": "TC-COMBAT-015",
+      "requirement_id": "REQ-RANGEDSURVIV-006",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-006"
+      ],
+      "title": "举盾0-4tick内受击不减免",
+      "priority": "P2",
+      "validation_scope": "formal",
+      "description": "bot 刚举盾（0-4 tick）时受击，验证 isDamageSourceBlocked 返回 false",
+      "module": "combat",
+      "type": "gametest",
+      "steps": [
+        "前置: bot 手持盾，满血",
+        "执行: 举盾 2 tick 后立即受击",
+        "观察: 伤害值"
+      ],
+      "expected_result": "伤害全额（不减免），因为 useDuration < 5",
+      "risk_mechanism_ids": [
+        "RM-RANGEDSURVIV-007"
+      ],
+      "test_data": "fixture: shield, zombie, bot full health"
+    },
+    {
+      "id": "TC-COMBAT-016",
+      "requirement_id": "REQ-RANGEDSURVIV-006",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-006"
+      ],
+      "title": "背后受击不减免",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "bot 举盾但从背后受击，验证伤害不减免",
+      "module": "combat",
+      "type": "gametest",
+      "steps": [
+        "前置: bot 举盾中",
+        "执行: 从背后 180° 外攻击 bot",
+        "观察: 伤害值"
+      ],
+      "expected_result": "伤害全额（背后不在盾格挡扇形内）",
+      "risk_mechanism_ids": [
+        "RM-RANGEDSURVIV-001"
+      ],
+      "test_data": "fixture: shield, attacker behind bot"
+    },
+    {
+      "id": "TC-COMBAT-017",
+      "requirement_id": "REQ-RANGEDSURVIV-005",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-005"
+      ],
+      "title": "收盾后body退出use状态",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "盾 USE falling edge 后 body.isUsingItem()=false",
+      "module": "combat",
+      "type": "gametest",
+      "steps": [
+        "前置: bot 举盾中",
+        "执行: USE falling edge",
+        "观察: body.isUsingItem()"
+      ],
+      "expected_result": "收盾后 body.isUsingItem()=false",
+      "risk_mechanism_ids": [
+        "RM-RANGEDSURVIV-001"
+      ],
+      "test_data": "fixture: shield"
+    },
+    {
+      "id": "TC-SLEEP-018",
+      "requirement_id": "REQ-RANGEDSURVIV-007",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-007"
+      ],
+      "title": "睡眠机制存在性确认",
+      "priority": "P2",
+      "validation_scope": "formal",
+      "description": "确认 BotBodyEntity 是否有主动睡眠/起床机制，或仅继承 PathfinderMob base class",
+      "module": "sleep",
+      "type": "code_audit",
+      "steps": [
+        "前置: 读取 BotBodyEntity.java 全文",
+        "执行: 搜索 sleep/isSleeping/startSleeping/stopSleeping 相关代码",
+        "观察: 是否有 override 或主动调用"
+      ],
+      "expected_result": "确认睡眠机制的存在性和触发条件；若不存在则标记为 deferred",
+      "risk_mechanism_ids": [
+        "RM-RANGEDSURVIV-008"
+      ],
+      "test_data": "fixture: BotBodyEntity.java source code audit"
+    },
+    {
+      "id": "TC-DIG-019",
+      "requirement_id": "REQ-RANGEDSURVIV-008",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-008"
+      ],
+      "title": "挖石头自动切换到镐",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "bot 挖掘石头时 ToolSelector 自动切换到镐（非剑/空手）",
+      "module": "dig",
+      "type": "gametest",
+      "steps": [
+        "前置: hotbar 有镐+剑+空手，目标方块为石头",
+        "执行: 提交 Dig intent",
+        "观察: selectedSlot 是否切换到镐，DigExecutor 是否使用镐"
+      ],
+      "expected_result": "selectedSlot 切换到镐的 slot，挖掘使用镐，掉落圆石",
+      "risk_mechanism_ids": [
+        "RM-RANGEDSURVIV-006"
+      ],
+      "test_data": "fixture: pickaxe at hotbar[1], sword at hotbar[2], stone target"
+    },
+    {
+      "id": "TC-DIG-020",
+      "requirement_id": "REQ-RANGEDSURVIV-008",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-008"
+      ],
+      "title": "挖树叶自动切换到剪刀",
+      "priority": "P1",
+      "validation_scope": "formal",
+      "description": "bot 挖掘树叶时 ToolSelector 切换到剪刀（match_tool shears）",
+      "module": "dig",
+      "type": "gametest",
+      "steps": [
+        "前置: hotbar 有剪刀+镐，目标为树叶",
+        "执行: Dig intent",
+        "观察: selectedSlot 和掉落物"
+      ],
+      "expected_result": "切换到剪刀，掉落树叶物品（非木棍/苹果概率）",
+      "risk_mechanism_ids": [
+        "RM-RANGEDSURVIV-006"
+      ],
+      "test_data": "fixture: shears at hotbar[1], leaves target"
+    },
+    {
+      "id": "TC-RESCUE-021",
+      "requirement_id": "REQ-RANGEDSURVIV-009",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-009"
+      ],
+      "title": "救援任务机制面确认",
+      "priority": "P2",
+      "validation_scope": "formal",
+      "description": "确认 RescueMissionFactory 的实际机制面、触发条件、执行流程",
+      "module": "rescue",
+      "type": "code_audit",
+      "steps": [
+        "前置: 读取 RescueMissionFactory.java 全文",
+        "执行: 搜索调用方（reflex/process）、生成逻辑、执行流程",
+        "观察: 机制面完整性"
+      ],
+      "expected_result": "确认救援任务是否为完整实现、stub 或半成品；标记可测试的机制面",
+      "risk_mechanism_ids": [
+        "RM-RANGEDSURVIV-009"
+      ],
+      "test_data": "fixture: RescueMissionFactory.java source code audit"
+    },
+    {
+      "id": "TC-HYGIENE-022",
+      "requirement_id": "REQ-RANGEDSURVIV-010",
+      "requirement_ids": [
+        "REQ-RANGEDSURVIV-010"
+      ],
+      "title": "新增场景后GametestInventoryCheck通过",
+      "priority": "P0",
+      "validation_scope": "formal",
+      "description": "新增 gametest 场景后更新 EXPECTED 钉表，GametestInventoryCheck 双向比对通过",
+      "module": "hygiene",
+      "type": "unit",
+      "steps": [
+        "前置: 新增 N 个 @GameTest 场景",
+        "执行: 更新 GametestInventoryCheck.EXPECTED，运行 test",
+        "观察: GametestInventoryCheck 结果"
+      ],
+      "expected_result": "测试通过，场景数 67→67+N，无 missing/unexpected",
+      "risk_mechanism_ids": [
+        "RM-RANGEDSURVIV-010"
+      ],
+      "test_data": "fixture: new gametest scenarios + updated EXPECTED",
+      "release_blocking_reason": "钉表漂移是 routesThroughFenceGap 事故模式，必须阻断"
+    }
+  ],
+  "executions": [],
+  "evidence": [],
+  "bugs": [],
+  "bug_candidates": [],
+  "risks": [],
+  "acceptance_checks": [],
+  "blockers": [],
+  "manual_handoff": {
+    "required": false,
+    "status": "not_required",
+    "reason": "",
+    "target_platform": "",
+    "operator": "",
+    "prerequisites": [],
+    "case_ids": [],
+    "evidence_requirements": [],
+    "result_submission": []
+  },
+  "unverified": [
+    "睡眠机制存在性未确认（REQ-007）——需代码审计确认 BotBodyEntity 是否有主动睡眠，可能标记为 deferred",
+    "救援任务机制面未确认（REQ-009）——RescueMissionFactory 可能是 stub，需代码审计后决定是否生成测试场景",
+    "弓蓄力精确 tick 数与 vanilla 对齐——facade.tickUseLoop 的 useTicks 累积速率需在引擎内实测确认",
+    "钓鱼咬钩的自然触发——gametest 环境中鱼的咬钩行为可能需要特殊 staging（手动移动浮漂或使用 spawn egg）",
+    "盾格挡的精确伤害减免值——vanilla 盾全挡/部分挡的角度阈值和盾牌附魔影响需在引擎内实测",
+    "全部 24 条测试用例当前状态为 not_executed——需编写 gametest 场景代码并在运行的 MC 实例中执行"
+  ],
+  "coverage": {
+    "requirement_total": 10,
+    "requirement_linked": 10,
+    "requirement_unlinked": 0,
+    "p0_requirement_total": 6,
+    "p0_requirement_linked": 6,
+    "case_total": 22,
+    "case_status_counts": {
+      "未执行": 22
+    },
+    "acceptance_total": 0,
+    "acceptance_status_counts": {}
+  },
+  "release_decision": {
+    "decision": "undetermined",
+    "rationale": "尚未执行。",
+    "conditions": []
+  },
+  "delivery_manifest": {
+    "source_revision": 2,
+    "outputs": [
+      {
+        "purpose": "deliverable",
+        "carrier": "lark_sheets",
+        "format": "lark_sheets",
+        "filename": "远程-生存能力面 QA 梳理-QA测试用例与追踪",
+        "source_revision": 2,
+        "sha256": "b6ac6d4924a5478aa6b241d800c754d3eaf48624a8138de7ab350f9ca85c124d",
+        "locator": "D:\\mc-bot-server\\qa-results\\ranged-survival\\远程-生存能力面 QA 梳理-QA测试用例与追踪",
+        "readback_receipt": "10298 bytes",
+        "validated": true,
+        "status": "degraded_local"
+      },
+      {
+        "purpose": "deliverable",
+        "carrier": "lark_sheets",
+        "format": "lark_sheets",
+        "filename": "远程-生存能力面 QA 梳理-QA测试用例与追踪.csv",
+        "source_revision": 2,
+        "sha256": "b6ac6d4924a5478aa6b241d800c754d3eaf48624a8138de7ab350f9ca85c124d",
+        "locator": "https://my.feishu.cn/sheets/EiptsnWvRhinCdtOCldcujLQnkg",
+        "readback_receipt": "表格导入成功，22 行数据行",
+        "validated": true,
+        "status": "validated"
+      }
+    ],
+    "fingerprint": "sha256:f14a8c38c140c4650826ade1d8458f60297f9323d284dc776cd1246a1d8bcb68"
+  },
+  "test_data": {
+    "writes_allowed": false,
+    "accounts": [],
+    "created_records": [],
+    "cleanup": {
+      "required": false,
+      "status": "completed",
+      "command": "none",
+      "residuals": []
+    }
+  }
+}
