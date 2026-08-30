@@ -1,6 +1,6 @@
 package com.mcbot.mcbotserver.api.world;
 
-import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.api.types.Vec3;
 
 /**
  * Read-only copy of a fishing bobber's model-relevant facts.
@@ -15,11 +15,13 @@ import com.mcbot.mcbotserver.api.types.CellPos;
  * hooked onto a mob or item (a different state than a fish bite)
  * surfaces through {@code hookedEntity}.
  *
- * @param pos          block cell the bobber occupies; never null
+ * @param pos          exact bobber position; the bite watch needs
+ *                     the sub-block y, a block-cell truncation
+ *                     would hide half the bites (phase-dependent)
  * @param hookedEntity true when the bobber has reeled-into something
  *                     solid (a mob or item entity, not a fish bite)
  */
-public record BobberSnapshot(CellPos pos, boolean hookedEntity) {
+public record BobberSnapshot(Vec3 pos, boolean hookedEntity) {
 
     /**
      * Creates a validated snapshot.

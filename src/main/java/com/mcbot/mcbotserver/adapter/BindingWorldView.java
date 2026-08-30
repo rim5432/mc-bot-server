@@ -159,7 +159,8 @@ public final class BindingWorldView implements WorldView {
                 continue;
             }
             out.add(new BobberSnapshot(
-                    new CellPos(hook.getBlockX(), hook.getBlockY(), hook.getBlockZ()), hook.getHookedIn() != null));
+                    new com.mcbot.mcbotserver.api.types.Vec3(hook.getX(), hook.getY(), hook.getZ()),
+                    hook.getHookedIn() != null));
         }
         return out;
     }

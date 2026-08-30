@@ -14,6 +14,7 @@ import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.Fish;
 import com.mcbot.mcbotserver.api.process.Overrides;
 import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.api.types.Vec3;
 import com.mcbot.mcbotserver.api.world.BobberSnapshot;
 import com.mcbot.mcbotserver.core.tick.RecordingActor;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
@@ -70,20 +71,20 @@ class FishBehaviorGateTest {
         // Bobber flying: it descends during the grace window, which
         // must not read as a bite.
         for (int y = 70; y > 63; y--) {
-            world.addBobber(new BobberSnapshot(new CellPos(5, y, 5), false));
+            world.addBobber(new BobberSnapshot(new Vec3(5, y, 5), false));
             fish.tick(world, order(), actor);
         }
         // Settled bobber: stable long enough to arm the watch
         // (grace 30 + settle 5).
         for (int i = 0; i < 40; i++) {
-            world.addBobber(new BobberSnapshot(new CellPos(5, 63, 5), false));
+            world.addBobber(new BobberSnapshot(new Vec3(5, 63, 5), false));
             fish.tick(world, order(), actor);
         }
         assertEquals(2, useClaims(actor).size(), "settling must not reel - only the cast pair exists");
         int claimsBeforeDip = useClaims(actor).size();
 
         // The bite: one sharp drop reels the rod in.
-        world.addBobber(new BobberSnapshot(new CellPos(5, 62, 5), false));
+        world.addBobber(new BobberSnapshot(new Vec3(5, 62, 5), false));
         fish.tick(world, order(), actor);
         fish.tick(world, order(), actor);
 
@@ -101,14 +102,14 @@ class FishBehaviorGateTest {
 
         fish.tick(world, order(), actor);
         fish.tick(world, order(), actor);
-        world.addBobber(new BobberSnapshot(new CellPos(5, 63, 5), false));
+        world.addBobber(new BobberSnapshot(new Vec3(5, 63, 5), false));
         for (int i = 0; i < FishBehavior.BITE_BUDGET_TICKS + 10; i++) {
-            world.addBobber(new BobberSnapshot(new CellPos(5, 63, 5), false));
+            world.addBobber(new BobberSnapshot(new Vec3(5, 63, 5), false));
             fish.tick(world, order(), actor);
         }
         int claimsAtEnd = useClaims(actor).size();
         for (int i = 0; i < 20; i++) {
-            world.addBobber(new BobberSnapshot(new CellPos(5, 63, 5), false));
+            world.addBobber(new BobberSnapshot(new Vec3(5, 63, 5), false));
             fish.tick(world, order(), actor);
         }
         assertEquals(claimsAtEnd, useClaims(actor).size(), "a spent budget claims nothing");
@@ -127,6 +128,58 @@ class FishBehaviorGateTest {
         fish.tick(world, Directive.of(new GoalNear(WATER, 1)), actor);
 
         assertEquals(2, useClaims(actor).size(), "only the original cast edge pair remains");
+    }
+
+    @Test
+    void thresholdEdgesAndPostReelReset() {
+        FishBehavior fish = new FishBehavior("fish");
+        RecordingActor actor = new RecordingActor();
+        MockWorldView world = world(inventory(3, null, null, null, ROD));
+
+        // Cast pair, then a long settle at y 63 arms the watch.
+        fish.tick(world, order(), actor);
+        fish.tick(world, order(), actor);
+        for (int i = 0; i < 45; i++) {
+            world.addBobber(new BobberSnapshot(new Vec3(5, 63, 5), false));
+            fish.tick(world, order(), actor);
+        }
+        int armed = useClaims(actor).size();
+
+        // Natural bob jitter (0.05) and a near-threshold drop (0.2)
+        // must NOT reel: the armed watch only fires on >= 0.25.
+        world.addBobber(new BobberSnapshot(new Vec3(5, 62.95, 5), false));
+        fish.tick(world, order(), actor);
+        world.addBobber(new BobberSnapshot(new Vec3(5, 62.80, 5), false));
+        fish.tick(world, order(), actor);
+        world.addBobber(new BobberSnapshot(new Vec3(5, 62.85, 5), false));
+        fish.tick(world, order(), actor);
+        assertEquals(armed, useClaims(actor).size(), "sub-threshold noise must not reel");
+
+        // A rise is never a bite either.
+        world.addBobber(new BobberSnapshot(new Vec3(5, 63.5, 5), false));
+        fish.tick(world, order(), actor);
+        assertEquals(armed, useClaims(actor).size(), "a rising bobber must not reel");
+
+        // The bite (0.6 drop) reels exactly once...
+        world.addBobber(new BobberSnapshot(new Vec3(5, 62.25, 5), false));
+        fish.tick(world, order(), actor);
+        fish.tick(world, order(), actor);
+        int afterReel = useClaims(actor).size();
+        assertEquals(armed + 2, afterReel, "the bite reels as one edge pair");
+
+        // ...and the watch RESETS: the bobber sitting at the dipped
+        // depth must re-settle before re-arming, and a second drop
+        // after that re-settle reels again - never a double trigger
+        // from the stale pre-dip baseline.
+        for (int i = 0; i < 40; i++) {
+            world.addBobber(new BobberSnapshot(new Vec3(5, 62.25, 5), false));
+            fish.tick(world, order(), actor);
+        }
+        assertEquals(afterReel, useClaims(actor).size(), "a still bobber at the dipped depth must not re-reel");
+        world.addBobber(new BobberSnapshot(new Vec3(5, 61.9, 5), false));
+        fish.tick(world, order(), actor);
+        fish.tick(world, order(), actor);
+        assertEquals(afterReel + 2, useClaims(actor).size(), "a second bite after re-settle reels again");
     }
 
     private static Directive order() {
