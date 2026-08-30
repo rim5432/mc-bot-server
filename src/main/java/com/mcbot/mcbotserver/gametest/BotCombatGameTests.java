@@ -855,10 +855,13 @@ public final class BotCombatGameTests {
         var container = rig.body().getInventory().container();
         container.setItem(0, new ItemStack(Items.BOW));
         container.setItem(1, new ItemStack(Items.ARROW, 64));
+        // ONE target straight south, both shots down the same column:
+        // a second target at an angle sends stray tap arrows out of
+        // the structure into neighbouring pooled scenarios (the lava
+        // trench cross-contamination class, ledger 46).
         Zombie fullDraw = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(4, GametestRig.WALK_Y, 8));
-        Zombie tap = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(7, GametestRig.WALK_Y, 8));
         fullDraw.setNoAi(true);
-        tap.setNoAi(true);
+        final float[] afterFull = {20.0f};
 
         helper.startSequence()
                 .thenExecuteFor(25, () -> {
@@ -874,7 +877,7 @@ public final class BotCombatGameTests {
                         () -> check(
                                 fullDraw.getHealth() < 14f,
                                 "the full draw must land heavy damage, health=" + fullDraw.getHealth())))
-                .thenExecuteAfter(0, () -> rig.body().setYRot(-60f))
+                .thenExecuteAfter(0, () -> afterFull[0] = fullDraw.getHealth())
                 .thenExecuteFor(4, () -> {
                     rig.actor().submit(new Claim(Channel.USE, 50, "test:tap", new Intent.Use(true)));
                     GametestRig.driveTick(rig);
@@ -885,7 +888,11 @@ public final class BotCombatGameTests {
                 })
                 .thenExecuteFor(60, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
-                    check(tap.getHealth() > 15f, "a 4-tick tap must stay in the weak band, health=" + tap.getHealth());
+                    float tapDelta = afterFull[0] - fullDraw.getHealth();
+                    check(
+                            tapDelta <= 4.0f,
+                            "a 4-tick tap must stay in the weak band (<=4 damage, or no arrow at all"
+                                    + " below the 0.1 charge floor), delta=" + tapDelta);
                     rig.body().discard();
                 })
                 .thenSucceed();
