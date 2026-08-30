@@ -387,6 +387,22 @@
       "delta_count": 21,
       "source": "repo session R2 batch 1 write-back",
       "summary": "20/22 case verdicts (5 scenarios green twice + offline pins); rescue (021) + 4 partials deferred to batch 2; 3 product defects fixed (09ad5ae/5f422fa/1ba8a6c)"
+    },
+    {
+      "id": "CHG-R2-2",
+      "revision": 2,
+      "action": "ADD",
+      "object_type": "execution",
+      "added_ids": [
+        "EXE-RESCUE-021"
+      ],
+      "removed_ids": [],
+      "modified_ids": [],
+      "before_count": 21,
+      "after_count": 22,
+      "delta_count": 1,
+      "source": "repo session R2 batch 2 write-back",
+      "summary": "Round closed: 22/22 verdicts (75 scenarios green twice; 1 N/A-by-citation; rescue residual deferred)"
     }
   ],
   "environment": {},
@@ -1321,7 +1337,9 @@
       "risk_mechanism_ids": [
         "RM-RANGEDSURVIV-009"
       ],
-      "test_data": "fixture: RescueMissionFactory.java source code audit"
+      "test_data": "fixture: RescueMissionFactory.java source code audit",
+      "status": "passed_partial",
+      "execution_note": "escapesLavaToShore + findsWaterWhenBurning: rescue surface engine-backed by the two existing hazard-reflex pins over RescueMissionFactory; uncovered residual: the null-to-FREEZE no-route degradation path (deferred)"
     },
     {
       "id": "TC-HYGIENE-022",
@@ -1602,6 +1620,18 @@
       "evidence_ids": [
         "EV-RANGEDSURVIV-ENGINE-1"
       ]
+    },
+    {
+      "id": "EXE-RESCUE-021",
+      "case_id": "TC-RESCUE-021",
+      "status": "passed_partial",
+      "executed_at": "2026-08-30T14:05:00+00:00",
+      "environment": "runGameTestServer pooled 75 / decompiled-tree citation audit",
+      "verification_level": "L2_citation_audit",
+      "backing": "escapesLavaToShore + findsWaterWhenBurning: rescue surface engine-backed by the two existing hazard-reflex pins over RescueMissionFactory; uncovered residual: the null-to-FREEZE no-route degradation path (deferred)",
+      "evidence_ids": [
+        "EV-RANGEDSURVIV-ENGINE-2"
+      ]
     }
   ],
   "evidence": [
@@ -1633,6 +1663,16 @@
         "TC-DIG-019",
         "TC-DIG-020",
         "TC-HYGIENE-022"
+      ]
+    },
+    {
+      "id": "EV-RANGEDSURVIV-ENGINE-2",
+      "type": "gametest_run_receipt",
+      "locator": "qa-results/engine-runs/ (newest GREEN receipts, 75/75, two consecutive runs)",
+      "captured_at": "2026-08-30T14:05:00+00:00",
+      "summary": "Batch 2 closes the round: rear-shield direction gate, bow tap band, shears select (3 new scenarios); shield warmup N/A-1.20.1 and rescue covered-by-existing closed by citation audit. Stray-projectile containment hardening after one pooled cross-contamination (ledger 46 class, third sighting).",
+      "related_case_ids": [
+        "TC-RESCUE-021"
       ]
     }
   ],

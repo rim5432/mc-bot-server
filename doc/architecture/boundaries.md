@@ -402,6 +402,7 @@ ordering-critical numbers sit behind test gates, not behind prose.
 | 46 | Anvil/XP surface + sneak steering gate + combat attributes + dig tool awareness; 52 gametests green | 2026-08-29 |
 | 47 | Mechanics QA execution: engine suite 67 green (two consecutive runs), DigExecutor harvest gate fixed, gametest receipts + status currency line | 2026-08-30 |
 | 48 | Ranged/survival QA batch 1: facade getItemBySlot/getProjectile bridging (private-field trap family), eye-line ballistics, bobber Vec3; 72 green twice | 2026-08-30 |
+| 49 | Ranged/survival batch 2: rear-shield direction gate, bow tap band, shears select; rescue covered by existing pins, shield warmup N/A in 1.20.1; 75 green | 2026-08-30 |
 
 ## Deferred, with reopen conditions
 
