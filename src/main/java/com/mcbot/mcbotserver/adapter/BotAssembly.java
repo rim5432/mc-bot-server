@@ -157,7 +157,12 @@ public final class BotAssembly {
         // engage reflex submits defend missions whose Attack overrides
         // nobody executes - the production gap behind the idle
         // night-cave death.
-        Behavior combat = new CombatBehavior("combat", () -> finePoseOf(body), new VanillaWeaponCatalog());
+        // The combat aim origin is the EYE, not the feet: arrows
+        // launch from eye height (shootFromRotation), and a feet-level
+        // dy overstates the target elevation by the full eye height -
+        // every ranged shot sailed high over close targets until this
+        // split from the pathing supplier.
+        Behavior combat = new CombatBehavior("combat", () -> eyePoseOf(body), new VanillaWeaponCatalog());
         Behavior fisher = new com.mcbot.mcbotserver.core.behavior.FishBehavior("fish");
 
         // One fresh reflex-owned defend per engage submission; the
@@ -445,6 +450,16 @@ public final class BotAssembly {
 
     private static com.mcbot.mcbotserver.api.types.Vec3 finePoseOf(BotBodyEntity body) {
         return new com.mcbot.mcbotserver.api.types.Vec3(body.getX(), body.getY(), body.getZ());
+    }
+
+    /** The combat aim origin: feet lifted to the eye line, matching
+     * where projectiles actually launch from.
+     *
+     * @param body the carrier; never null
+     * @return the eye position; never null
+     */
+    private static com.mcbot.mcbotserver.api.types.Vec3 eyePoseOf(BotBodyEntity body) {
+        return new com.mcbot.mcbotserver.api.types.Vec3(body.getX(), body.getY() + body.getEyeHeight(), body.getZ());
     }
 
     private static BotController.GameClock clockOf(ServerLevel level) {
