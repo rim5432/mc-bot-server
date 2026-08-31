@@ -45,6 +45,11 @@ import net.minecraftforge.registries.ForgeRegistries;
  * GameTestAssertException - GameTestSequence retries a thrown
  * waitUntil each tick and treats a thrown execute as test failure.
  */
+// The rig is the scenario library's shared helper surface: one
+// method per assertion/coordinate/drive helper the scenario classes
+// reach for - helper breadth is its charter, not god-class drift
+// (same ruling shape as MineProcess).
+@SuppressWarnings("PMD.TooManyMethods")
 final class GametestRig {
 
     /** Paved floor level inside the empty template. */

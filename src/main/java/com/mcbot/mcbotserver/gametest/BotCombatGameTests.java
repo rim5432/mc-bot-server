@@ -50,6 +50,11 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
  */
 @GameTestHolder(McBotServer.MODID)
 @PrefixGameTestTemplate(false)
+// One @GameTest scenario = one method, plus the shared private
+// assertion helpers; the method count tracks scenario coverage the
+// workplan owns as one combat slice, not god-class drift (same
+// ruling shape as MineProcess).
+@SuppressWarnings("PMD.TooManyMethods")
 public final class BotCombatGameTests {
 
     /**
@@ -692,51 +697,6 @@ public final class BotCombatGameTests {
                     rig.body().discard();
                 })
                 .thenSucceed();
-    }
-
-    /** Live arrow census in the structure box, for failure
-     * diagnostics: distinguishes "never spawned" from "missed". */
-    /** Nearest live arrow in structure-local coordinates, for
-     * failure diagnostics on aim. */
-    private static String nearestArrowLocal(GameTestHelper helper, GametestRig.Rig rig) {
-        var origin = helper.absolutePos(BlockPos.ZERO);
-        var box = new net.minecraft.world.phys.AABB(
-                origin.getX() - 64,
-                origin.getY() - 32,
-                origin.getZ() - 64,
-                origin.getX() + 64,
-                origin.getY() + 32,
-                origin.getZ() + 64);
-        var arrows =
-                helper.getLevel().getEntitiesOfClass(net.minecraft.world.entity.projectile.AbstractArrow.class, box);
-        if (arrows.isEmpty()) {
-            return "none";
-        }
-        net.minecraft.world.entity.projectile.AbstractArrow nearest = null;
-        double best = Double.MAX_VALUE;
-        for (var arrow : arrows) {
-            double d = arrow.distanceToSqr(rig.body());
-            if (d < best) {
-                best = d;
-                nearest = arrow;
-            }
-        }
-        var local = GametestRig.toLocal(helper, nearest.blockPosition());
-        return local.getX() + "," + local.getY() + "," + local.getZ();
-    }
-
-    private static int arrowsInWorld(GameTestHelper helper) {
-        var origin = helper.absolutePos(BlockPos.ZERO);
-        var box = new net.minecraft.world.phys.AABB(
-                origin.getX() - 64,
-                origin.getY() - 32,
-                origin.getZ() - 64,
-                origin.getX() + 64,
-                origin.getY() + 32,
-                origin.getZ() + 64);
-        return helper.getLevel()
-                .getEntitiesOfClass(net.minecraft.world.entity.projectile.AbstractArrow.class, box)
-                .size();
     }
 
     /**
