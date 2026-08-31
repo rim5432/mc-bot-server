@@ -204,6 +204,29 @@ _MIGRATIONS: list[tuple[int, str, list[str]]] = [
             "CREATE INDEX idx_capabilities_axis ON capabilities(axis)",
         ],
     ),
+    (
+        6,
+        "reference_actions: machine-generated vanilla item-action inventory",
+        [
+            # Enumerated from the decompiled tree by ref_inventory.py
+            # (capability ref-generate / ref-import). Rows carry their
+            # own file anchor; mapped_face comes from the curated
+            # face-map.json. The inventory JSON owns this table's
+            # lifecycle - import prunes rows whose class left the tree.
+            """
+            CREATE TABLE reference_actions (
+                class_name TEXT PRIMARY KEY,
+                methods TEXT NOT NULL,
+                file TEXT NOT NULL,
+                mapped_face TEXT,
+                note TEXT DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """,
+            "CREATE INDEX idx_ref_actions_face ON reference_actions(mapped_face)",
+        ],
+    ),
 ]
 
 

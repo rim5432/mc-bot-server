@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "note": "Curated class -> capability-face relation over the COMPLETE machine-generated inventory (inventory.json). Keys must be classes present in the inventory; import surfaces dangling keys via broken_mappings. This is the only hand-written layer: the denominator is generated, never typed.",
+  "map": {
+    "BowItem": {"face": "combat.bow_draw"},
+    "ShieldItem": {"face": "combat.shield", "note": "adapter raises shield on USE claim; no combat behavior claims USE during combat"},
+    "FishingRodItem": {"face": "perception.projectiles", "note": "bobber cast/reel seam; the fishing action face"},
+    "BucketItem": {"face": "interaction.bucket_rod"},
+    "SolidBucketItem": {"face": "interaction.bucket_rod", "note": "powder-snow bucket variant"},
+    "FlintAndSteelItem": {"face": "interaction.blockitem_place", "note": "ignition rides the block-place seam; fire combat use uncovered"},
+    "MilkBucketItem": {"face": "hunger.eat_chain", "note": "finishUsingItem drink clears effects"},
+    "PotionItem": {"face": "hunger.eat_chain", "note": "drinking base; buff/tracking uncovered"},
+    "ArmorItem": {"face": "inventory.equipment_mirror", "note": "right-click equip swap"},
+    "BlockItem": {"face": "interaction.blockitem_place"},
+    "BoatItem": {"face": "interaction.right_click_order"},
+    "BottleItem": {"face": "interaction.right_click_order"},
+    "BundleItem": {"face": "inventory.menu_clicks"},
+    "EnderpearlItem": {"face": "interaction.drop", "note": "throw seam only; teleport landing uncovered"}
+  }
+}

@@ -1,0 +1,408 @@
+{
+  "schema": 1,
+  "scope": "net/minecraft/world/item classes overriding use / useOn / releaseUsing / finishUsingItem (base Item/ItemStack excluded)",
+  "generated_at": "2026-09-01T00:36:39",
+  "git_rev": "5384611",
+  "classes": [
+    {
+      "class": "ArmorItem",
+      "methods": [
+        "use"
+      ],
+      "file": "net/minecraft/world/item/ArmorItem.java"
+    },
+    {
+      "class": "ArmorStandItem",
+      "methods": [
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/ArmorStandItem.java"
+    },
+    {
+      "class": "AxeItem",
+      "methods": [
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/AxeItem.java"
+    },
+    {
+      "class": "BlockItem",
+      "methods": [
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/BlockItem.java"
+    },
+    {
+      "class": "BoatItem",
+      "methods": [
+        "use"
+      ],
+      "file": "net/minecraft/world/item/BoatItem.java"
+    },
+    {
+      "class": "BoneMealItem",
+      "methods": [
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/BoneMealItem.java"
+    },
+    {
+      "class": "BottleItem",
+      "methods": [
+        "use"
+      ],
+      "file": "net/minecraft/world/item/BottleItem.java"
+    },
+    {
+      "class": "BowItem",
+      "methods": [
+        "use",
+        "releaseUsing"
+      ],
+      "file": "net/minecraft/world/item/BowItem.java"
+    },
+    {
+      "class": "BowlFoodItem",
+      "methods": [
+        "finishUsingItem"
+      ],
+      "file": "net/minecraft/world/item/BowlFoodItem.java"
+    },
+    {
+      "class": "BrushItem",
+      "methods": [
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/BrushItem.java"
+    },
+    {
+      "class": "BucketItem",
+      "methods": [
+        "use"
+      ],
+      "file": "net/minecraft/world/item/BucketItem.java"
+    },
+    {
+      "class": "BundleItem",
+      "methods": [
+        "use"
+      ],
+      "file": "net/minecraft/world/item/BundleItem.java"
+    },
+    {
+      "class": "ChorusFruitItem",
+      "methods": [
+        "finishUsingItem"
+      ],
+      "file": "net/minecraft/world/item/ChorusFruitItem.java"
+    },
+    {
+      "class": "CompassItem",
+      "methods": [
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/CompassItem.java"
+    },
+    {
+      "class": "CrossbowItem",
+      "methods": [
+        "use",
+        "releaseUsing"
+      ],
+      "file": "net/minecraft/world/item/CrossbowItem.java"
+    },
+    {
+      "class": "DebugStickItem",
+      "methods": [
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/DebugStickItem.java"
+    },
+    {
+      "class": "EggItem",
+      "methods": [
+        "use"
+      ],
+      "file": "net/minecraft/world/item/EggItem.java"
+    },
+    {
+      "class": "ElytraItem",
+      "methods": [
+        "use"
+      ],
+      "file": "net/minecraft/world/item/ElytraItem.java"
+    },
+    {
+      "class": "EmptyMapItem",
+      "methods": [
+        "use"
+      ],
+      "file": "net/minecraft/world/item/EmptyMapItem.java"
+    },
+    {
+      "class": "EndCrystalItem",
+      "methods": [
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/EndCrystalItem.java"
+    },
+    {
+      "class": "EnderEyeItem",
+      "methods": [
+        "use",
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/EnderEyeItem.java"
+    },
+    {
+      "class": "EnderpearlItem",
+      "methods": [
+        "use"
+      ],
+      "file": "net/minecraft/world/item/EnderpearlItem.java"
+    },
+    {
+      "class": "ExperienceBottleItem",
+      "methods": [
+        "use"
+      ],
+      "file": "net/minecraft/world/item/ExperienceBottleItem.java"
+    },
+    {
+      "class": "FireChargeItem",
+      "methods": [
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/FireChargeItem.java"
+    },
+    {
+      "class": "FireworkRocketItem",
+      "methods": [
+        "use",
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/FireworkRocketItem.java"
+    },
+    {
+      "class": "FishingRodItem",
+      "methods": [
+        "use"
+      ],
+      "file": "net/minecraft/world/item/FishingRodItem.java"
+    },
+    {
+      "class": "FlintAndSteelItem",
+      "methods": [
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/FlintAndSteelItem.java"
+    },
+    {
+      "class": "FoodOnAStickItem",
+      "methods": [
+        "use"
+      ],
+      "file": "net/minecraft/world/item/FoodOnAStickItem.java"
+    },
+    {
+      "class": "HangingEntityItem",
+      "methods": [
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/HangingEntityItem.java"
+    },
+    {
+      "class": "HoeItem",
+      "methods": [
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/HoeItem.java"
+    },
+    {
+      "class": "HoneyBottleItem",
+      "methods": [
+        "use",
+        "finishUsingItem"
+      ],
+      "file": "net/minecraft/world/item/HoneyBottleItem.java"
+    },
+    {
+      "class": "HoneycombItem",
+      "methods": [
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/HoneycombItem.java"
+    },
+    {
+      "class": "InstrumentItem",
+      "methods": [
+        "use"
+      ],
+      "file": "net/minecraft/world/item/InstrumentItem.java"
+    },
+    {
+      "class": "KnowledgeBookItem",
+      "methods": [
+        "use"
+      ],
+      "file": "net/minecraft/world/item/KnowledgeBookItem.java"
+    },
+    {
+      "class": "LeadItem",
+      "methods": [
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/LeadItem.java"
+    },
+    {
+      "class": "LingeringPotionItem",
+      "methods": [
+        "use"
+      ],
+      "file": "net/minecraft/world/item/LingeringPotionItem.java"
+    },
+    {
+      "class": "MapItem",
+      "methods": [
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/MapItem.java"
+    },
+    {
+      "class": "MilkBucketItem",
+      "methods": [
+        "use",
+        "finishUsingItem"
+      ],
+      "file": "net/minecraft/world/item/MilkBucketItem.java"
+    },
+    {
+      "class": "MinecartItem",
+      "methods": [
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/MinecartItem.java"
+    },
+    {
+      "class": "PlaceOnWaterBlockItem",
+      "methods": [
+        "use",
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/PlaceOnWaterBlockItem.java"
+    },
+    {
+      "class": "PotionItem",
+      "methods": [
+        "use",
+        "useOn",
+        "finishUsingItem"
+      ],
+      "file": "net/minecraft/world/item/PotionItem.java"
+    },
+    {
+      "class": "RecordItem",
+      "methods": [
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/RecordItem.java"
+    },
+    {
+      "class": "ShearsItem",
+      "methods": [
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/ShearsItem.java"
+    },
+    {
+      "class": "ShieldItem",
+      "methods": [
+        "use"
+      ],
+      "file": "net/minecraft/world/item/ShieldItem.java"
+    },
+    {
+      "class": "ShovelItem",
+      "methods": [
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/ShovelItem.java"
+    },
+    {
+      "class": "SnowballItem",
+      "methods": [
+        "use"
+      ],
+      "file": "net/minecraft/world/item/SnowballItem.java"
+    },
+    {
+      "class": "SolidBucketItem",
+      "methods": [
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/SolidBucketItem.java"
+    },
+    {
+      "class": "SpawnEggItem",
+      "methods": [
+        "use",
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/SpawnEggItem.java"
+    },
+    {
+      "class": "SplashPotionItem",
+      "methods": [
+        "use"
+      ],
+      "file": "net/minecraft/world/item/SplashPotionItem.java"
+    },
+    {
+      "class": "SpyglassItem",
+      "methods": [
+        "use",
+        "releaseUsing",
+        "finishUsingItem"
+      ],
+      "file": "net/minecraft/world/item/SpyglassItem.java"
+    },
+    {
+      "class": "SuspiciousStewItem",
+      "methods": [
+        "finishUsingItem"
+      ],
+      "file": "net/minecraft/world/item/SuspiciousStewItem.java"
+    },
+    {
+      "class": "ThrowablePotionItem",
+      "methods": [
+        "use"
+      ],
+      "file": "net/minecraft/world/item/ThrowablePotionItem.java"
+    },
+    {
+      "class": "TridentItem",
+      "methods": [
+        "use",
+        "releaseUsing"
+      ],
+      "file": "net/minecraft/world/item/TridentItem.java"
+    },
+    {
+      "class": "WritableBookItem",
+      "methods": [
+        "use",
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/WritableBookItem.java"
+    },
+    {
+      "class": "WrittenBookItem",
+      "methods": [
+        "use",
+        "useOn"
+      ],
+      "file": "net/minecraft/world/item/WrittenBookItem.java"
+    }
+  ]
+}

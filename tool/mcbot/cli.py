@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import json
 import os
 import re
 import subprocess
@@ -412,6 +413,9 @@ def cmd_capability(args) -> int:
         "diff": cmd_cap_diff,
         "domain": cmd_cap_domain,
         "paths": cmd_cap_paths,
+        "ref-generate": cmd_cap_ref_generate,
+        "ref-import": cmd_cap_ref_import,
+        "ref-coverage": cmd_cap_ref_coverage,
         "restore": cmd_cap_restore,
         "qa-import": cmd_cap_qa_import,
         "scan-gametest": cmd_cap_scan_gametest,
@@ -677,43 +681,12 @@ def cmd_cap_domain(args) -> int:
     print()
 
     # --- coverage analysis (player-behavior reference baseline) ---
-    cov = rep.get("coverage")
-    if cov is not None:
-        bv = cov["by_verdict"]
-        print(f"--- player-behavior coverage: {cov['reference_total']} reference behaviors "
-              f"({bv['covered']} covered, {bv['partial']} partial, "
-              f"{bv['gap']} no-face, {bv['untested']} untested) ---")
+    inv = rep.get("inventory")
+    if inv:
+        print(f"--- vanilla action inventory: {inv['mapped']}/{inv['total']} "
+              f"engine actions mapped to faces, {inv['unmapped']} unmapped "
+              f"(see `capability ref-coverage`) ---")
         print()
-        print(f"  {'AXIS':<14} {'TOTAL':>5} {'COVERED':>7} {'PARTIAL':>7} "
-              f"{'NO-FACE':>7} {'UNTESTED':>8}")
-        print("  " + "-" * 66)
-        for ax, data in cov["by_axis"].items():
-            print(f"  {ax:<14} {data['total']:>5} {data['covered']:>7} "
-                  f"{data['partial']:>7} {data['gap']:>7} {data['untested']:>8}")
-        print()
-        if cov["gaps"]:
-            print(f"  coverage gaps ({len(cov['gaps'])}):")
-            for b in cov["gaps"]:
-                face_info = f" -> {b['mapped_face']}({b['face_status']})" if b["mapped_face"] else " (no matrix face)"
-                print(f"    [{b['axis']:<11}] {b['name']}{face_info}")
-                if b["verdict_reason"]:
-                    print(f"      {b['verdict_reason']}")
-            print()
-        if cov["untested"]:
-            print(f"  untested behaviors ({len(cov['untested'])}):")
-            for b in cov["untested"]:
-                print(f"    [{b['axis']:<11}] {b['name']} -> {b['mapped_face']}")
-                if b["verdict_reason"]:
-                    print(f"      {b['verdict_reason']}")
-            print()
-        if cov["partials"]:
-            print(f"  partial coverage ({len(cov['partials'])}):")
-            for b in cov["partials"]:
-                print(f"    [{b['axis']:<11}] {b['name']} -> {b['mapped_face']}")
-                if b["verdict_reason"]:
-                    print(f"      {b['verdict_reason']}")
-            print()
-
     if rep.get("faces_shipped_untested"):
         print(f"  WARN: shipped but UNTESTED (no impl anchor): "
               f"{', '.join(rep['faces_shipped_untested'])}")
@@ -797,6 +770,53 @@ def cmd_cap_restore(args) -> int:
     if result["missing_faces"] or result["missing_cases"]:
         print(f"  WARN: overlay references {result['missing_faces']} unknown faces, "
               f"{result['missing_cases']} unknown cases (skipped)", file=sys.stderr)
+    return 0
+
+
+def cmd_cap_ref_generate(args) -> int:
+    from pathlib import Path
+    from mcbot.capability.ref_inventory import write_inventory
+    root = Path(args.decompiled_root) if args.decompiled_root else None
+    path = write_inventory(root)
+    from mcbot.capability.ref_inventory import generate_inventory
+    inv = generate_inventory(root)
+    print(f"[mcbot] vanilla action inventory generated: {path}")
+    print(f"  scope    : {inv['scope']}")
+    print(f"  classes  : {len(inv['classes'])} (machine-enumerated, file-anchored)")
+    print("  commit it; `capability ref-import` folds it into the DB")
+    return 0
+
+
+def cmd_cap_ref_import(args) -> int:
+    from mcbot.capability.ref_inventory import import_inventory
+    result = import_inventory()
+    print("[mcbot] vanilla action inventory imported (inventory owns the table lifecycle)")
+    print(f"  entries : {result['inventory_entries']}")
+    print(f"  inserted: {result['inserted']}  updated: {result['updated']}  "
+          f"pruned: {result['pruned']}")
+    print(f"  mapped  : {result['mapped']} (via face-map.json - the curated layer)")
+    return 0
+
+
+def cmd_cap_ref_coverage(args) -> int:
+    from mcbot.capability.ref_inventory import inventory_coverage
+    cov = inventory_coverage()
+    if cov is None:
+        print("[mcbot] no inventory imported yet - run `capability ref-import`")
+        return 0
+    print(f"[mcbot] vanilla action coverage (scope: {cov['scope']})")
+    print(f"  {cov['mapped']}/{cov['total']} mapped, {cov['unmapped']} unmapped")
+    by_cat = "  ".join(f"{c}={n}" for c, n in cov["by_category"].items())
+    print(f"  mapped by face category: {by_cat or '-'}")
+    if cov["broken_mappings"]:
+        print(f"  WARN face-map keys pointing at missing faces: "
+              f"{', '.join(cov['broken_mappings'])}", file=sys.stderr)
+    unmapped = [e for e in cov["entries"] if not e["mapped_face"]]
+    if unmapped:
+        print(f"  unmapped engine actions ({len(unmapped)}) - each is a real gap "
+              f"with a real anchor:")
+        for e in unmapped:
+            print(f"    {e['class_name']:<22} {'+'.join(json.loads(e['methods'])):<40} {e['file']}")
     return 0
 
 
@@ -1297,6 +1317,16 @@ def main() -> int:
     p_cap_sub.add_parser(
         "paths",
         help="face -> boundary-D path axis + wire-run evidence + pathless review list")
+    p_cap_ref_gen = p_cap_sub.add_parser(
+        "ref-generate",
+        help="enumerate the vanilla item-action inventory from the decompiled tree -> JSON")
+    p_cap_ref_gen.add_argument("--decompiled-root", help="override the decompiled tree path")
+    p_cap_sub.add_parser(
+        "ref-import",
+        help="fold the generated inventory + face-map into the DB (idempotent, prunes)")
+    p_cap_sub.add_parser(
+        "ref-coverage",
+        help="action surface x face map: mapped/unmapped with anchors (falsifiable denominator)")
     p_cap_qa = p_cap_sub.add_parser("qa-import", help="import QA test cases from a CSV file")
     p_cap_qa.add_argument("csv_file", help="path to QA CSV file (UTF-8 with BOM supported)")
     p_cap_scan = p_cap_sub.add_parser("scan-gametest", help="scan gametest source for @GameTest methods and auto-link")

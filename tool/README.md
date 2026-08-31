@@ -98,6 +98,7 @@ declared-shipped faces carry green evidence.
 | `capability unlinked` | split by kind: unlinked specs vs unlinked impls are two different problems |
 | `capability backfill` | mirror committed receipts into the DB (idempotent): engine-runs (gametest; re-parses surviving logs for failed names lost to the pre-6583cd4 regex bug) + boundary-d wire runs |
 | `capability paths` | face → boundary-D path axis (18/35 mapped, curated in seed), pathless review list, wire-run evidence streak |
+| `capability ref-generate` / `ref-import` / `ref-coverage` | the vanilla action baseline: **machine-enumerated** from the decompiled tree (every item class overriding use/useOn/releaseUsing/finishUsingItem — 55 classes, file-anchored, complete by construction) → `qa-results/vanilla-reference/inventory.json` → DB; face-map.json is the one curated layer (class → face); coverage = mapped/unmapped with a falsifiable denominator (currently 14/55 mapped, 41 unmapped engine actions) |
 | `capability diff [--since YYYY-MM-DD]` | what changed: status transitions, run green/red split + scenario growth, RED details with per-scenario failures, new faces |
 | `capability domain <category>` | per-face evidence: status, SPECS/IMPLS counts, NO-SPEC / NO-IMPL / DEVIATION flags, failure history, domain green streak |
 | `capability restore` | apply the committed overlay after a rebuild |

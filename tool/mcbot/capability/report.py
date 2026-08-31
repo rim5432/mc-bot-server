@@ -20,11 +20,7 @@ from typing import Optional
 
 from mcbot.capability.db import get_connection, init_db
 from mcbot.capability.queries import overview
-from mcbot.capability.player_behavior_reference import (
-    ReferenceBehavior,
-    axis_order_for,
-    reference_for,
-)
+from mcbot.capability.ref_inventory import inventory_coverage
 
 TRANSITIONS_BORN = "2026-08-31"
 
@@ -461,126 +457,6 @@ def _detect_weak_mapping(face_id: str, source_paths: list[str]) -> Optional[str]
     return None
 
 
-def coverage_analysis(category: str, *, db_path: Optional[Path] = None) -> Optional[dict]:
-    """Diff the player-behavior reference baseline against matrix faces.
-
-    For each reference behavior (what a vanilla player can do), resolve
-    its mapped face (if any) and that face's implementation status +
-    evidence state. Coverage verdicts:
-
-    - ``covered``: mapped face is shipped, evidence is green, and the
-      implementation is invoked by the core decision layer (not
-      adapter-only)
-    - ``partial``: mapped face is shipped but evidence is RED, or the
-      face is adapter-only (auto-detected from source_paths layering),
-      or the face status itself is partial
-    - ``gap``: no mapped face exists, or the face is gap/deferred
-    - ``untested``: mapped face is shipped but has no impl test anchor
-
-    No single coverage percentage is computed — the reference behavior
-    set is an open, human-curated enumeration, so a "100% covered"
-    state is not meaningful. Raw counts per verdict and per axis are
-    returned instead; consumers render them directly.
-
-    Weak-mapping detection (adapter-only) is derived from each face's
-    source_paths, not from handwritten notes. When a face has only
-    adapter/ source paths and no core/ source paths, it is auto-flagged
-    as adapter-only.
-
-    Returns None when no reference baseline is defined for the category.
-    """
-    refs = reference_for(category)
-    if not refs:
-        return None
-    init_db(db_path)
-    evidence = evidence_for_faces(db_path)
-    with get_connection(db_path) as conn:
-        face_rows = {
-            r["id"]: dict(r)
-            for r in conn.execute(
-                "SELECT id, name, implementation_status, axis, source_paths "
-                "FROM capabilities WHERE category = ?",
-                (category,),
-            ).fetchall()
-        }
-    behaviors = []
-    for ref in refs:
-        face = face_rows.get(ref.mapped_face) if ref.mapped_face else None
-        face_status = face["implementation_status"] if face else None
-        face_evidence = evidence.get(ref.mapped_face, {}).get("state") if ref.mapped_face else None
-        face_source_paths = (
-            json.loads(face["source_paths"] or "[]") if face else []
-        )
-        # Verdict logic (order matters: hardest deficiency first)
-        if face is None:
-            verdict = "gap"
-            verdict_reason = "no matrix face"
-        elif face_status in ("gap", "deferred"):
-            verdict = "gap"
-            verdict_reason = f"face is {face_status}"
-        elif face_evidence == "untested":
-            verdict = "untested"
-            verdict_reason = "shipped but no impl test anchor"
-        elif face_evidence == "red":
-            verdict = "partial"
-            verdict_reason = "shipped but newest engine run is RED"
-        else:
-            weak_reason = _detect_weak_mapping(ref.mapped_face, face_source_paths)
-            if weak_reason:
-                verdict = "partial"
-                verdict_reason = weak_reason
-            elif face_status == "partial":
-                verdict = "partial"
-                verdict_reason = "face is partial"
-            else:
-                verdict = "covered"
-                verdict_reason = ""
-        behaviors.append({
-            "id": ref.id,
-            "name": ref.name,
-            "axis": ref.axis,
-            "description": ref.description,
-            "vanilla_ref": ref.vanilla_ref,
-            "mapped_face": ref.mapped_face,
-            "face_status": face_status,
-            "face_evidence": face_evidence,
-            "face_source_paths": face_source_paths,
-            "coverage_note": ref.coverage_note,
-            "verdict": verdict,
-            "verdict_reason": verdict_reason,
-        })
-    # Per-axis rollup (raw counts only — no percentage)
-    axes = {}
-    for ax in axis_order_for(category):
-        ax_behaviors = [b for b in behaviors if b["axis"] == ax]
-        if not ax_behaviors:
-            continue
-        counts = {"covered": 0, "partial": 0, "gap": 0, "untested": 0}
-        for b in ax_behaviors:
-            counts[b["verdict"]] += 1
-        axes[ax] = {
-            "total": len(ax_behaviors),
-            **counts,
-        }
-    total = len(behaviors)
-    counts = {"covered": 0, "partial": 0, "gap": 0, "untested": 0}
-    for b in behaviors:
-        counts[b["verdict"]] += 1
-    gaps = [b for b in behaviors if b["verdict"] == "gap"]
-    untested = [b for b in behaviors if b["verdict"] == "untested"]
-    partials = [b for b in behaviors if b["verdict"] == "partial"]
-    return {
-        "category": category,
-        "reference_total": total,
-        "by_verdict": counts,
-        "by_axis": axes,
-        "behaviors": behaviors,
-        "gaps": gaps,
-        "untested": untested,
-        "partials": partials,
-    }
-
-
 def domain_report(category: str, *, db_path: Optional[Path] = None) -> Optional[dict]:
     """One capability domain: per-face evidence, coverage, deficiencies.
 
@@ -684,7 +560,7 @@ def domain_report(category: str, *, db_path: Optional[Path] = None) -> Optional[
         ],
         "last_red_in_domain": dict(last_red) if last_red else None,
         "green_streak_since": green_streak,
-        "coverage": coverage_analysis(category, db_path=db_path),
+        "inventory": inventory_coverage(db_path),
     }
 
 
@@ -693,9 +569,8 @@ def _group_faces_by_axis(faces: list[dict], category: str) -> dict[str, list[dic
 
     Faces with no axis (legacy rows) land under ``_unclassified``.
     """
-    from mcbot.capability.player_behavior_reference import axis_order_for
-    order = axis_order_for(category)
-    grouped: dict[str, list[dict]] = {ax: [] for ax in order}
+    axes = sorted({f.get("axis") or "" for f in faces} - {""})
+    grouped: dict[str, list[dict]] = {ax: [] for ax in axes}
     grouped["_unclassified"] = []
     for f in faces:
         ax = f.get("axis") or "_unclassified"

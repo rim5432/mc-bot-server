@@ -759,5 +759,89 @@ class EvidenceDerivationTest(unittest.TestCase):
         self.assertEqual(summary["scenarios_total"], 52)
 
 
+class RefInventoryTest(unittest.TestCase):
+    """The generated baseline: machine anchors, falsifiable denominator."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self._tmp.name)
+        # a fake decompiled tree with two action classes and one base
+        pkg = self.dir / "net" / "minecraft" / "world" / "item"
+        pkg.mkdir(parents=True)
+        (pkg / "BowItem.java").write_text(
+            "public class BowItem { "
+            "public InteractionResultHolder<ItemStack> use(Level p, Player p2, InteractionHand h) {} "
+            "public void releaseUsing(Level p, Player p2, int i) {} }",
+            encoding="utf-8")
+        (pkg / "EggItem.java").write_text(
+            "public class EggItem { "
+            "public InteractionResultHolder<ItemStack> use(Level p, Player p2, InteractionHand h) {} }",
+            encoding="utf-8")
+        (pkg / "Item.java").write_text(
+            "public class Item { "
+            "public InteractionResultHolder<ItemStack> use(Level p, Player p2, InteractionHand h) {} }",
+            encoding="utf-8")
+        (pkg / "PlainItem.java").write_text(
+            "public class PlainItem { }", encoding="utf-8")
+        self.db = self.dir / "test.db"
+        # inventory json in the reference dir layout
+        self.refdir = self.dir / "vanilla-reference"
+        self.refdir.mkdir()
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _generate_and_import(self):
+        from mcbot.capability.ref_inventory import generate_inventory, import_inventory
+        payload = generate_inventory(self.dir)
+        inv = self.refdir / "inventory.json"
+        inv.write_text(json.dumps(payload), encoding="utf-8")
+        return import_inventory(inv, db_path=self.db)
+
+    def test_generation_is_complete_and_anchored(self):
+        from mcbot.capability.ref_inventory import generate_inventory
+        inv = generate_inventory(self.dir)
+        classes = {c["class"]: c for c in inv["classes"]}
+        # base class excluded, non-action class excluded, actions in
+        self.assertEqual(sorted(classes), ["BowItem", "EggItem"])
+        self.assertEqual(classes["BowItem"]["methods"], ["use", "releaseUsing"])
+        # every entry carries a real file that exists under the tree
+        for c in inv["classes"]:
+            self.assertTrue((self.dir / c["file"]).exists())
+
+    def test_import_idempotent_and_prunes(self):
+        first = self._generate_and_import()
+        self.assertEqual(first["inserted"], 2)
+        second = self._generate_and_import()
+        self.assertEqual(second["inserted"], 0)
+        self.assertEqual(second["updated"], 0)
+        # a class leaving the tree is pruned on re-import
+        (self.dir / "net" / "minecraft" / "world" / "item" / "EggItem.java").unlink()
+        third = self._generate_and_import()
+        self.assertEqual(third["pruned"], 1)
+
+    def test_coverage_counts_and_dangling_mapping(self):
+        from mcbot.capability.ref_inventory import inventory_coverage
+        seed_database(self.db)
+        self._generate_and_import()
+        cov = inventory_coverage(self.db)
+        self.assertEqual(cov["total"], 2)
+        # the real committed face-map maps BowItem -> combat.bow_draw,
+        # and seed_database created that face: mapped=1, unmapped=1
+        self.assertEqual(cov["mapped"], 1)
+        self.assertEqual(cov["unmapped"], 1)
+        self.assertEqual(cov["by_category"], {"combat": 1})
+        # a face-map key pointing at a nonexistent face surfaces as broken
+        from unittest import mock
+        from mcbot.capability import ref_inventory
+        with mock.patch.object(ref_inventory, "load_face_map",
+                               return_value={"EggItem": {"face": "nope.nope"}}):
+            ref_inventory.import_inventory(
+                self.refdir / "inventory.json", db_path=self.db)
+        cov = inventory_coverage(self.db)
+        self.assertEqual(cov["broken_mappings"], ["EggItem"])
+        self.assertEqual(cov["mapped"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()
