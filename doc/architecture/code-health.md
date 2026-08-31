@@ -1,6 +1,6 @@
 ---
 title: Code Health Ledger
-last_verified: 2026-08-30
+last_verified: 2026-08-31
 covers:
   - build.gradle
   - config/checkstyle/checkstyle.xml
@@ -294,6 +294,19 @@ without an anchor is a workplan item, not a row here.
   HungryProcess, MenuFixtures, MenuPlannerCountedRoleTest) carry
   sanctioned rulings - flat tables and engine-shaped entities, not
   debt.
+- **CLOSED 2026-08-31 - PMD red-wall restore round.** Seven
+  findings that crept in behind the capability/QA batches (no -Plint
+  pass before landing) cleared without softening any threshold:
+  MeleeResolver's sweep sub-chain extracted to
+  `performSweepAttack`; BotBodyEntity's XP arithmetic moved to
+  `ExperienceMirror` and its edge-guard algorithm to
+  `SneakEdgeGuard` (same state-vs-math split as HungerTicker - the
+  carrier keeps only overrides and delegation, class CC 97 -> ~69
+  against the 80 wall); two dead arrow-diagnostic helpers dropped
+  from BotCombatGameTests. Two new sanctioned TooManyMethods rulings
+  extend the inline-exemption inventory (BotCombatGameTests,
+  GametestRig - scenario-per-method and shared-rig-helper shapes).
+  -Plint green again: PMD 0, CPD 0.
 - **OPEN - SpotBugs first-triage queue.** api/core-scope first
   pass flagged ThreatBlackboard's six suspected dead fields
   (UrF/UwF), GotoCommandHandler's internal-representation exposure
