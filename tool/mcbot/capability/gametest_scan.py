@@ -1,20 +1,20 @@
 """Gametest source scanner and capability auto-linking.
 
 Scans ``src/main/java/.../gametest/`` for ``@GameTest``-annotated
-methods, registers each as a QA test case (test_type='gametest',
-source='gametest_scan'), and auto-links to a capability face via:
+methods, registers each as an implementation case (kind='impl',
+test_type='gametest'), and auto-links to a capability face via:
 
 1. **Class map** — the test class name maps to a capability category
    (BotCombatGameTests→combat, BotDiggingGameTests→digging, ...).
 2. **Method keywords** — the camelCase method name is split into
-   tokens, lowercased, and matched against the same keyword rule
-   table the CSV importer uses. Methods that match nothing fall back
-   to the class's category if that category has exactly one
-   capability; otherwise they stay unlinked.
+   tokens, lowercased, and matched against the keyword rule table
+   in qa_import (scanner-only fallback; specs never pass through it).
 
-Re-scanning is idempotent on the generated case id
-(``GT-<ClassName>-<methodName>``); existing manual links are
-preserved.
+The scanner OWNS the impl lifecycle: re-scanning is idempotent on
+the generated case id (``GT-<ClassName>-<methodName>``), existing
+links are preserved (with their link_source - manual triage sticks),
+and impl rows whose method vanished from source are pruned. Spec
+(TC-*) rows are never touched.
 """
 from __future__ import annotations
 
@@ -23,11 +23,9 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from mcbot.capability.db import init_db
+from mcbot.capability.db import init_db, get_connection
 from mcbot.capability.qa_import import (
-    EXCLUDED_MODULES,
     KEYWORD_RULES,
-    MODULE_CATEGORY_MAP,
     _get_case,
     _insert_case,
     _update_case,
@@ -133,6 +131,7 @@ def scan_gametests(
     unlinked = 0
     skipped_classes = 0
     total_methods = 0
+    seen_ids: set[str] = set()
 
     for java_file in sorted(root.glob("*.java")):
         class_name = java_file.stem
@@ -158,19 +157,24 @@ def scan_gametests(
             total_methods += 1
 
             case_id = f"GT-{class_name}-{method_name}"
+            seen_ids.add(case_id)
             title = _split_camel(method_name).title()
             description = (
                 f"Gametest scenario in {class_name}.java: {method_name}. "
                 f"Auto-discovered from source by gametest scanner."
             )
 
-            # Auto-link (preserve existing manual links)
+            # Auto-link (preserve existing links AND their source:
+            # manual triage sticks, fresh guesses are marked 'auto')
             existing = _get_case(db_path, case_id)
-            cap_id = None
+            link_fields: dict = {}
             if existing and existing.capability_id:
-                cap_id = existing.capability_id
+                link_fields["capability_id"] = existing.capability_id
+                link_fields["link_source"] = existing.link_source or "auto"
             else:
                 cap_id = _method_to_capability(method_name, class_name, repo)
+                link_fields["capability_id"] = cap_id
+                link_fields["link_source"] = "auto" if cap_id else None
                 if cap_id:
                     auto_linked += 1
                 else:
@@ -181,24 +185,39 @@ def scan_gametests(
             if existing:
                 _update_case(
                     db_path, case_id,
-                    capability_id=cap_id, title=title, module=category,
+                    title=title, module=category,
                     test_type="gametest", description=description,
-                    updated_at=now,
+                    kind="impl", updated_at=now,
+                    **link_fields,
                 )
                 updated += 1
             else:
                 _insert_case(
                     db_path,
                     QATestCase(
-                        id=case_id, capability_id=cap_id, title=title,
-                        requirement="", priority="", module=category,
+                        id=case_id, title=title, module=category,
                         test_type="gametest", description=description,
-                        steps="", expected_result="", related_risk="",
-                        test_data="", status="not_executed", block_reason="",
-                        created_at=now, updated_at=now,
+                        kind="impl", created_at=now, updated_at=now,
+                        **link_fields,
                     ),
                 )
                 inserted += 1
+
+    # Prune impl rows whose method no longer exists in source. The
+    # scanner owns the impl lifecycle; specs are never pruned here.
+    with get_connection(db_path) as conn:
+        if seen_ids:
+            placeholders = ", ".join("?" for _ in seen_ids)
+            pruned = conn.execute(
+                f"DELETE FROM qa_test_cases WHERE kind = 'impl' "
+                f"AND id NOT IN ({placeholders})",
+                tuple(seen_ids),
+            ).rowcount
+        else:
+            pruned = conn.execute(
+                "DELETE FROM qa_test_cases WHERE kind = 'impl'"
+            ).rowcount
+        conn.commit()
 
     # Count total cases in DB
     from mcbot.capability.qa_import import _count_cases
@@ -212,5 +231,6 @@ def scan_gametests(
         "updated": updated,
         "auto_linked": auto_linked,
         "unlinked": unlinked,
+        "pruned": pruned,
         "total_cases": total,
     }

@@ -694,6 +694,8 @@ def cmd_cap_scan_gametest(args) -> int:
     print(f"  updated       : {result['updated']}")
     print(f"  auto_linked   : {result['auto_linked']}")
     print(f"  unlinked      : {result['unlinked']}")
+    if result["pruned"]:
+        print(f"  pruned        : {result['pruned']} (impl rows whose method left the source)")
     print(f"  total cases   : {result['total_cases']}")
     return 0
 
@@ -714,14 +716,20 @@ def cmd_cap_link(args) -> int:
 def cmd_cap_unlinked(args) -> int:
     cases = list_unlinked()
     if not cases:
-        print("[mcbot] all QA cases are linked to a capability")
+        print("[mcbot] every case is linked to a capability")
         return 0
-    print(f"{'CASE ID':<45} {'TYPE':<10} {'MODULE':<12} TITLE")
-    print("-" * 120)
-    for c in cases:
-        print(f"{c.id:<45} {c.test_type:<10} {c.module:<12} {c.title}")
-    print(f"\n{len(cases)} unlinked cases")
-    print("  hint: use `capability link <case_id> <capability_id>` to link manually")
+    specs = [c for c in cases if c.kind == "spec"]
+    impls = [c for c in cases if c.kind != "spec"]
+    if specs:
+        print("spec (test specifications) — declare capability_id in the CSV, re-import:")
+        for c in specs:
+            print(f"  {c.id:<45} {c.title}")
+    if impls:
+        print("impl (gametest methods the auto-anchor missed) — "
+              "`capability link <case> <cap>` or accept as uncovered:")
+        for c in impls:
+            print(f"  {c.id:<45} {c.title}")
+    print(f"\n{len(specs)} unlinked specs, {len(impls)} unlinked impls")
     return 0
 
 

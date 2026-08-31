@@ -17,6 +17,7 @@ from pathlib import Path
 
 from mcbot.capability.backfill import backfill_receipts
 from mcbot.capability.db import get_connection, init_db
+from mcbot.capability.gametest_scan import scan_gametests
 from mcbot.capability.models import Capability
 from mcbot.capability.qa_import import import_csv, link_case
 from mcbot.capability.report import diff_since, domain_report
@@ -421,6 +422,94 @@ class ImportCsvV2Test(unittest.TestCase):
         p = self._csv("用例ID,需求,标题\nTC-1,弓,弓测试\n")
         with self.assertRaises(ValueError):
             import_csv(p, db_path=self.db)
+
+
+class GametestScanTest(unittest.TestCase):
+    """Scanner owns the impl lifecycle: kind, link sources, prune."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self._tmp.name)
+        self.db = self.dir / "test.db"
+        self.src = self.dir / "gametest"
+        self.src.mkdir()
+        init_db(self.db)
+        now = "2026-08-31T12:00:00"
+        CapabilityRepository(self.db).upsert(Capability(
+            id="motion.sprint", name="Sprint", category="motion",
+            implementation_status="shipped", created_at=now, updated_at=now,
+        ))
+        (self.src / "BotLocomotionGameTests.java").write_text(
+            "public class BotLocomotionGameTests {\n"
+            "    @GameTest\n"
+            "    public static void sprintAwayFromDanger() {}\n"
+            "}\n",
+            encoding="utf-8",
+        )
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _seed_stale_and_manual(self):
+        with get_connection(self.db) as conn:
+            # a zombie impl row: method no longer in source
+            conn.execute(
+                "INSERT INTO qa_test_cases (id, title, kind, test_type, status, "
+                "capability_id, link_source, created_at, updated_at) VALUES "
+                "('GT-BotLocomotionGameTests-removedMethod', 'zombie', 'impl', 'gametest', "
+                "'not_executed', 'motion.sprint', 'manual', 'x', 'x')"
+            )
+            # a spec row that must never be pruned by the scanner
+            conn.execute(
+                "INSERT INTO qa_test_cases (id, title, kind, test_type, status, "
+                "capability_id, link_source, created_at, updated_at) VALUES "
+                "('TC-MOTION-001', 'spec row', 'spec', 'gametest', 'not_executed', "
+                "'motion.sprint', 'csv', 'x', 'x')"
+            )
+            conn.commit()
+
+    def test_scan_kinds_links_and_prunes_only_impls(self):
+        self._seed_stale_and_manual()
+        result = scan_gametests(self.src, db_path=self.db)
+        self.assertEqual(result["pruned"], 1)
+        self.assertEqual(result["inserted"], 1)  # sprintAwayFromDanger
+        with get_connection(self.db) as conn:
+            # zombie gone, spec survives, new impl linked auto
+            self.assertIsNone(conn.execute(
+                "SELECT id FROM qa_test_cases WHERE id = "
+                "'GT-BotLocomotionGameTests-removedMethod'"
+            ).fetchone())
+            self.assertIsNotNone(conn.execute(
+                "SELECT id FROM qa_test_cases WHERE id = 'TC-MOTION-001'"
+            ).fetchone())
+            r = conn.execute(
+                "SELECT kind, capability_id, link_source FROM qa_test_cases "
+                "WHERE id = 'GT-BotLocomotionGameTests-sprintAwayFromDanger'"
+            ).fetchone()
+            self.assertEqual(r["kind"], "impl")
+            self.assertEqual(r["capability_id"], "motion.sprint")
+            self.assertEqual(r["link_source"], "auto")
+
+    def test_rescan_preserves_manual_link_and_source(self):
+        scan_gametests(self.src, db_path=self.db)
+        from mcbot.capability.qa_import import link_case
+        # re-triaged by hand to a different face
+        link_case("GT-BotLocomotionGameTests-sprintAwayFromDanger",
+                  "motion.sprint", db_path=self.db)
+        with get_connection(self.db) as conn:
+            conn.execute(
+                "UPDATE qa_test_cases SET capability_id = 'motion.sprint', "
+                "link_source = 'manual' WHERE id = "
+                "'GT-BotLocomotionGameTests-sprintAwayFromDanger'"
+            )
+            conn.commit()
+        scan_gametests(self.src, db_path=self.db)
+        with get_connection(self.db) as conn:
+            r = conn.execute(
+                "SELECT link_source FROM qa_test_cases WHERE id = "
+                "'GT-BotLocomotionGameTests-sprintAwayFromDanger'"
+            ).fetchone()
+        self.assertEqual(r["link_source"], "manual")
 
 
 if __name__ == "__main__":
