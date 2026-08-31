@@ -3,6 +3,11 @@
 # game instance and stay a local step (python tool/mcbot_tool.py build
 # runGameTest).
 #
+# A parallel static-analysis job runs the full qualityCheck verdict
+# (-Plint): PMD, CPD, SpotBugs, and the Error Prone + NullAway compile
+# pass - findings surface on the mirror instead of waiting for the next
+# local promotion round.
+#
 # The toolbox's gradle wrapper is invoked directly here: the local
 # cross-process lock layer (tool/mcbot_tool.py) exists to serialize
 # concurrent agents on one checkout, which CI does not have.
@@ -36,3 +41,17 @@ jobs:
           python tool/mcbot_tool.py capability qa-import qa-results/ranged-survival/qa-test-cases-ranged-survival.csv
           python tool/mcbot_tool.py capability scan-gametest --strict
           python tool/mcbot_tool.py capability validate
+
+  static-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Full static-analysis verdict
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon qualityCheck -Plint --continue

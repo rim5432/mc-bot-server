@@ -1,6 +1,6 @@
 ---
 title: Build & Run Guide
-last_verified: 2026-08-31
+last_verified: 2026-09-01
 covers:
   - tool/mcbot_tool.py
   - tool/mcbot/
@@ -100,7 +100,11 @@ cycle exceptions left; a new one is a design regression.
 The public mirror at `github.com/rim5432/mc-bot-server` runs the
 offline gate on every push and PR (`.github/workflows/ci.yml`):
 `compileJava` + the default `test` flow, meaning offline JUnit plus
-the checkstyle/spotlessCheck hard gates. CI invokes `gradlew`
+the checkstyle/spotlessCheck hard gates. A second, parallel job runs
+the full static-analysis verdict (`qualityCheck -Plint`): PMD, CPD,
+SpotBugs, and the Error Prone + NullAway compile pass ride every push
+too, so `-Plint` findings surface on the mirror instead of waiting
+for the next local promotion round. CI invokes `gradlew`
 directly on purpose - the toolbox lock exists to serialize
 concurrent agents on this one checkout, which a fresh CI runner
 does not have. Engine gametests stay local-only
