@@ -1,0 +1,174 @@
+{
+ "schema": 1,
+ "task": "boundary-d-qa",
+ "finished_at": "2026-08-31T08:12:45.103501+00:00",
+ "cases": [
+  {
+   "batch": "D1",
+   "id": "D1-1",
+   "desc": "scan discovers the placed chests",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  },
+  {
+   "batch": "D1",
+   "id": "D1-2",
+   "desc": "full snapshot carries the L0 field shape",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  },
+  {
+   "batch": "D1",
+   "id": "D1-3",
+   "desc": "pre-filled items visible in their slots",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  },
+  {
+   "batch": "D1",
+   "id": "D1-4",
+   "desc": "container role filter returns the chest region",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.2
+  },
+  {
+   "batch": "D1",
+   "id": "D1-5",
+   "desc": "absent role filter returns empty (read has no role mapping)",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  },
+  {
+   "batch": "D1",
+   "id": "D1-6",
+   "desc": "role filter is case-insensitive",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.2
+  },
+  {
+   "batch": "D1",
+   "id": "D1-7",
+   "desc": "take output from a chest lands on CONTAINER",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.3
+  },
+  {
+   "batch": "D1",
+   "id": "D1-8",
+   "desc": "deposit input into the empty sink lands on CONTAINER",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.2
+  },
+  {
+   "batch": "D1",
+   "id": "D1-9",
+   "desc": "stateless session: second station opens after first closes",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.2
+  },
+  {
+   "batch": "D1",
+   "id": "D1-10",
+   "desc": "typed error: station path without an @",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  },
+  {
+   "batch": "D1",
+   "id": "D1-11",
+   "desc": "typed error: write without a role segment",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  },
+  {
+   "batch": "D1",
+   "id": "D1-12",
+   "desc": "typed error: deposit value missing item:count",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  },
+  {
+   "batch": "D1",
+   "id": "D1-13",
+   "desc": "typed error: unknown role segment",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  },
+  {
+   "batch": "D1",
+   "id": "D1-14",
+   "desc": "cat /player/menu is explicitly unsupported",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  },
+  {
+   "batch": "D1",
+   "id": "D1-15",
+   "desc": "open at an unreachable coordinate rejects",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  }
+ ],
+ "evidence": [
+  "[D1-1] PASS: contract held",
+  "    scan=minecraft:chest@2,78,0\nminecraft:chest@4,78,0",
+  "[D1-2] PASS: contract held",
+  "    type=chest size=63 slots=63",
+  "[D1-3] PASS: contract held",
+  "    slot0={'id': 'minecraft:cobblestone', 'count': 32} slot5={'id': 'minecraft:oak_log', 'count': 16}",
+  "[D1-4] PASS: contract held",
+  "    container slots=27 roles={'CONTAINER'}",
+  "[D1-5] PASS: contract held",
+  "    fuel filter empty as designed",
+  "[D1-6] PASS: contract held",
+  "    both 27 slots",
+  "[D1-7] PASS: contract held",
+  "    taken=48 bag={\"minecraft:oak_log\": 16, \"minecraft:cobblestone\": 32}",
+  "[D1-8] PASS: contract held",
+  "    placed=16 sink total=16",
+  "[D1-9] PASS: contract held",
+  "    sequential opens both ok",
+  "[D1-10] PASS: contract held",
+  "    rejected: cat: invalid station path (expected /stations/<type>@<x,y,z>/[<role>]): /stations/chest/",
+  "[D1-11] PASS: contract held",
+  "    rejected: write: station path needs a role segment (input/fuel/output/recipe): /stations/chest@.../input",
+  "[D1-12] PASS: contract held",
+  "    rejected pre-open: write: deposit value must be 'item:count': nocolon",
+  "[D1-13] PASS: contract held",
+  "    rejected: write: unknown role 'bogus' (input/fuel/output/recipe)",
+  "[D1-14] PASS: contract held",
+  "    rejected: cat /player/menu: unsupported (menu wire pending, issue 0012 D1)",
+  "[D1-15] PASS: contract held",
+  "    rejected far open: cat: cannot open chest@40,78,0: open rejected: out of reach, unsupported kind, missing container, or blocked"
+ ]
+}
