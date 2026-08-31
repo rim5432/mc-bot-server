@@ -442,11 +442,262 @@ def batch_c2_post(led: Ledger) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Batch D1 - menu fields surface (expect green)
+# Generic container snapshot / role-filter / typed-error surface over
+# the real menu command batch (issue 0012 D1). Furnace-specific
+# INPUT/FUEL/OUTPUT roles plus burn/cook progress are the D2 batch; D1
+# uses a chest (an undifferentiated CONTAINER region) and the error
+# paths.
+#
+# Fixtures are built by RCON setblock - the bot has no /give verb, so
+# the deposit round-trip first TAKES from a pre-filled source chest
+# (resolveRole maps OUTPUT->CONTAINER on an undifferentiated chest) and
+# then deposits into an empty sink. Both chests sit inside the 4.5-block
+# interaction reach and are kept an air block apart so they never merge
+# into a double chest.
+#
+# Manifest (self-describing id/desc/expect, definition order = run order):
+#   D1-1  scan discovers the placed chests               GREEN
+#   D1-2  full snapshot carries the L0 field shape       GREEN
+#   D1-3  pre-filled items visible in their slots        GREEN
+#   D1-4  container role filter returns the chest region GREEN
+#   D1-5  absent role filter returns empty (read has no  GREEN
+#         resolveRole mapping - pins the read/write split)
+#   D1-6  role filter is case-insensitive                GREEN
+#   D1-7  take output from a chest lands on CONTAINER    GREEN
+#   D1-8  deposit input into the empty sink lands        GREEN
+#   D1-9  stateless session: a second station opens      GREEN
+#         right after the first closes
+#   D1-10 typed error: station path without an @         GREEN
+#   D1-11 typed error: write without a role segment      GREEN
+#   D1-12 typed error: deposit value missing item:count  GREEN
+#         (rejected before any menu opens)
+#   D1-13 typed error: unknown role segment              GREEN
+#   D1-14 cat /player/menu is explicitly unsupported     GREEN
+#   D1-15 open at an unreachable coordinate rejects      GREEN
+# ---------------------------------------------------------------------------
+
+def setup_d1_fixtures(ev: list[str]):
+    """Place a pre-filled source chest and an empty sink chest within
+    reach of the body. Returns (source, sink) as (x,y,z) tuples.
+    Idempotent: setblock replace overwrites any prior fixture."""
+    _, body = mc("cat", "/player/pos")
+    bx, by, bz = int(body[0]), int(body[1]), int(body[2])
+    # Both on the prologue platform's center line (z strip bz-1..bz+1),
+    # east of the body: source at +2 (dist ~2.3), sink at +4 (dist ~4.15,
+    # still inside the 4.5 interaction reach). One air block at +3 keeps
+    # them from merging into a double chest.
+    src = (bx + 2, by, bz)
+    sink = (bx + 4, by, bz)
+    sx, sy, sz = src
+    qx, qy, qz = sink
+    # Clear a pocket so neither chest is embedded (open rejects blocked)
+    # and no leftover fixture block occupies the cells.
+    rcon(f"fill {sx - 1} {sy} {sz - 1} {qx + 1} {sy + 1} {qz + 1} minecraft:air")
+    # Pre-fill the source: slot 0 = 32 cobblestone, slot 5 = 16 oak logs.
+    # src_nbt is a plain string so its braces stay literal.
+    src_nbt = ('{Items:[{Slot:0b,id:"minecraft:cobblestone",Count:32b},'
+               '{Slot:5b,id:"minecraft:oak_log",Count:16b}]}')
+    rcon(f"setblock {sx} {sy} {sz} minecraft:chest[facing=north]{src_nbt} replace")
+    rcon(f"setblock {qx} {qy} {qz} minecraft:chest[facing=north] replace")
+    time.sleep(1)
+    ev.append(f"fixtures source={src} sink={sink}")
+    return src, sink
+
+
+def station_path(kind: str, pos: tuple, role: str | None = None) -> str:
+    """Build a /stations/<kind>@<x,y,z>[/<role>] path."""
+    x, y, z = pos
+    base = f"/stations/{kind}@{x},{y},{z}"
+    return f"{base}/{role}" if role else f"{base}/"
+
+
+def _slot_empty(slot: dict) -> bool:
+    """A snapshot slot is empty when its item reports count 0."""
+    return slot.get("item", {}).get("count", 0) == 0
+
+
+def batch_d1(led: Ledger) -> None:
+    print("Batch D1: menu fields surface")
+    setup_ev: list[str] = []
+    source, sink = setup_d1_fixtures(setup_ev)
+    sx, sy, sz = source
+
+    @led.case("D1", "D1-1", "scan discovers the placed chests", "GREEN")
+    def _(ev):
+        code, out = mc("ls", "/stations/")
+        assert code == 0, f"scan exit {code}: {out}"
+        text = out.get("raw", "") if isinstance(out, dict) else str(out)
+        assert f"chest@{sx},{sy},{sz}" in text, f"source chest missing: {text}"
+        ev.append(f"scan={text[:200]}")
+
+    @led.case("D1", "D1-2", "full snapshot carries the L0 field shape", "GREEN")
+    def _(ev):
+        code, menu = mc("cat", station_path("chest", source))
+        assert code == 0 and isinstance(menu, dict), f"cat exit {code}: {menu}"
+        for key in ("type", "sourcePos", "carried", "containerSize", "slots"):
+            assert key in menu, f"missing L0 key {key}: {menu}"
+        assert menu["type"] == "chest", f"type={menu['type']}"
+        assert menu["sourcePos"] == [sx, sy, sz], f"sourcePos={menu['sourcePos']}"
+        assert isinstance(menu["slots"], list) and menu["slots"], "empty slots"
+        for slot in menu["slots"]:
+            for key in ("index", "role", "item"):
+                assert key in slot, f"slot missing {key}: {slot}"
+            assert set(slot["item"]) >= {"id", "count"}, f"item shape: {slot['item']}"
+        ev.append(f"type={menu['type']} size={menu['containerSize']} "
+                  f"slots={len(menu['slots'])}")
+
+    @led.case("D1", "D1-3", "pre-filled items visible in their slots", "GREEN")
+    def _(ev):
+        code, menu = mc("cat", station_path("chest", source))
+        assert code == 0, f"cat exit {code}: {menu}"
+        by_index = {s["index"]: s["item"] for s in menu["slots"]}
+        cobble = by_index.get(0)
+        logs = by_index.get(5)
+        assert cobble and cobble["id"].endswith("cobblestone") and cobble["count"] == 32, \
+            f"slot0={cobble}"
+        assert logs and logs["id"].endswith("oak_log") and logs["count"] == 16, \
+            f"slot5={logs}"
+        ev.append(f"slot0={cobble} slot5={logs}")
+
+    @led.case("D1", "D1-4", "container role filter returns the chest region", "GREEN")
+    def _(ev):
+        code, full = mc("cat", station_path("chest", source))
+        assert code == 0, f"full cat exit {code}: {full}"
+        # Vanilla single-chest menu = 27 storage + 36 player slots.
+        assert full["containerSize"] == 63, \
+            f"chest menu size={full['containerSize']} (expected 63)"
+        code, filtered = mc("cat", station_path("chest", source, "container"))
+        assert code == 0, f"role cat exit {code}: {filtered}"
+        roles = {s["role"] for s in filtered["slots"]}
+        assert roles <= {"CONTAINER"}, f"non-container role leaked: {roles}"
+        # The 36 player-region slots (MAIN/HOTBAR) must be filtered out,
+        # leaving exactly the 27-slot storage region.
+        assert len(filtered["slots"]) == 27, \
+            f"filtered {len(filtered['slots'])} (expected 27 storage slots)"
+        idxs = {s["index"] for s in filtered["slots"]}
+        assert {0, 5} <= idxs, f"filled slots missing: {idxs}"
+        ev.append(f"container slots={len(filtered['slots'])} roles={roles}")
+
+    @led.case("D1", "D1-5", "absent role filter returns empty (read has no role mapping)",
+              "GREEN")
+    def _(ev):
+        # Read-side filtering is literal (no resolveRole fallback), so a
+        # chest - whose slots are CONTAINER, never FUEL - answers empty.
+        # This pins the deliberate read/write split: write output maps
+        # onto CONTAINER, but cat fuel does not.
+        code, filtered = mc("cat", station_path("chest", source, "fuel"))
+        assert code == 0, f"role cat exit {code}: {filtered}"
+        assert filtered["slots"] == [], f"chest answered FUEL slots: {filtered}"
+        ev.append("fuel filter empty as designed")
+
+    @led.case("D1", "D1-6", "role filter is case-insensitive", "GREEN")
+    def _(ev):
+        code, lower = mc("cat", station_path("chest", source, "container"))
+        code_mixed, mixed = mc("cat", station_path("chest", source, "CoNtAiNeR"))
+        assert code == 0 and code_mixed == 0, f"{code}/{code_mixed}"
+        assert len(mixed["slots"]) == len(lower["slots"]), \
+            f"mixed-case diverged: {len(lower['slots'])} vs {len(mixed['slots'])}"
+        ev.append(f"both {len(lower['slots'])} slots")
+
+    @led.case("D1", "D1-7", "take output from a chest lands on CONTAINER", "GREEN")
+    def _(ev):
+        code, reply = mc("write", station_path("chest", source, "output"), "all")
+        assert code == 0 and reply.get("ok") is True, f"take exit {code}: {reply}"
+        taken = reply.get("taken", 0)
+        assert taken >= 48, f"expected 32+16=48 taken, got {taken}: {reply}"
+        # Source chest region is now empty.
+        _, after = mc("cat", station_path("chest", source, "container"))
+        left = sum(s["item"]["count"] for s in after["slots"] if not _slot_empty(s))
+        assert left == 0, f"source not drained: {left}"
+        # The items moved into the bot's own inventory.
+        _, bag = mc("cat", "/player/inventory")
+        bag_dump = json.dumps(bag)
+        assert "cobblestone" in bag_dump and "oak_log" in bag_dump, \
+            f"bot did not receive items: {bag_dump[:200]}"
+        ev.append(f"taken={taken} bag={bag_dump[:160]}")
+
+    @led.case("D1", "D1-8", "deposit input into the empty sink lands on CONTAINER", "GREEN")
+    def _(ev):
+        code, reply = mc("write", station_path("chest", sink, "input"),
+                         "minecraft:cobblestone:16")
+        assert code == 0 and reply.get("ok") is True, f"deposit exit {code}: {reply}"
+        assert reply.get("placed") == 16, f"placed={reply.get('placed')}"
+        _, menu = mc("cat", station_path("chest", sink, "container"))
+        total = sum(s["item"]["count"] for s in menu["slots"]
+                    if not _slot_empty(s) and s["item"]["id"].endswith("cobblestone"))
+        assert total == 16, f"sink holds {total} cobblestone, expected 16"
+        ev.append(f"placed=16 sink total={total}")
+
+    @led.case("D1", "D1-9", "stateless session: second station opens after first closes",
+              "GREEN")
+    def _(ev):
+        # Every cat is a complete open-read-close transaction (finally
+        # block), so back-to-back different stations never collide with
+        # a dangling "menu already open".
+        code_a, _ = mc("cat", station_path("chest", source))
+        code_b, _ = mc("cat", station_path("chest", sink))
+        assert code_a == 0 and code_b == 0, f"{code_a} / {code_b}"
+        ev.append("sequential opens both ok")
+
+    @led.case("D1", "D1-10", "typed error: station path without an @", "GREEN")
+    def _(ev):
+        code, out = mc("cat", "/stations/chest/")
+        assert code == 1, f"expected reject, exit {code}: {out}"
+        err = out.get("stderr", "") if isinstance(out, dict) else str(out)
+        assert "invalid station path" in err, f"wrong error: {err}"
+        ev.append(f"rejected: {err[:120]}")
+
+    @led.case("D1", "D1-11", "typed error: write without a role segment", "GREEN")
+    def _(ev):
+        code, out = mc("write", station_path("chest", sink), "x")
+        assert code == 1, f"expected reject, exit {code}: {out}"
+        err = out.get("stderr", "") if isinstance(out, dict) else str(out)
+        assert "role segment" in err, f"wrong error: {err}"
+        ev.append(f"rejected: {err[:120]}")
+
+    @led.case("D1", "D1-12", "typed error: deposit value missing item:count", "GREEN")
+    def _(ev):
+        # Fails value validation BEFORE opening the menu (wire call
+        # count stays honest).
+        code, out = mc("write", station_path("chest", sink, "input"), "nocolon")
+        assert code == 1, f"expected reject, exit {code}: {out}"
+        err = out.get("stderr", "") if isinstance(out, dict) else str(out)
+        assert "item:count" in err, f"wrong error: {err}"
+        ev.append(f"rejected pre-open: {err[:120]}")
+
+    @led.case("D1", "D1-13", "typed error: unknown role segment", "GREEN")
+    def _(ev):
+        code, out = mc("write", station_path("chest", sink, "bogus"), "x")
+        assert code == 1, f"expected reject, exit {code}: {out}"
+        err = out.get("stderr", "") if isinstance(out, dict) else str(out)
+        assert "unknown role" in err, f"wrong error: {err}"
+        ev.append(f"rejected: {err[:120]}")
+
+    @led.case("D1", "D1-14", "cat /player/menu is explicitly unsupported", "GREEN")
+    def _(ev):
+        code, out = mc("cat", "/player/menu")
+        assert code == 1, f"expected reject, exit {code}: {out}"
+        err = out.get("stderr", "") if isinstance(out, dict) else str(out)
+        assert "unsupported" in err, f"wrong error: {err}"
+        ev.append(f"rejected: {err[:120]}")
+
+    @led.case("D1", "D1-15", "open at an unreachable coordinate rejects", "GREEN")
+    def _(ev):
+        far = (sx + 38, sy, sz)
+        code, out = mc("cat", station_path("chest", far))
+        assert code == 1, f"expected reject, exit {code}: {out}"
+        err = out.get("stderr", "") if isinstance(out, dict) else str(out)
+        assert err.strip(), "reject carried no reason"
+        ev.append(f"rejected far open: {err[:120]}")
+
+
+# ---------------------------------------------------------------------------
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--only", default="a,b",
-                        help="comma list from a,b,c1,c2-pre,c2-post")
+                        help="comma list from a,b,c1,c2b,c2-pre,c2-post,d1")
     args = parser.parse_args()
     selected = set(args.only.split(","))
 
@@ -485,8 +736,8 @@ def main() -> int:
     led = Ledger()
     runners = {"a": batch_a, "b": batch_b, "c1": batch_c1,
                "c2b": batch_c2_respawn, "c2-pre": batch_c2_pre,
-               "c2-post": batch_c2_post}
-    for key in ("a", "b", "c1", "c2b", "c2-pre", "c2-post"):
+               "c2-post": batch_c2_post, "d1": batch_d1}
+    for key in ("a", "b", "c1", "c2b", "c2-pre", "c2-post", "d1"):
         if key in selected:
             runners[key](led)
 
