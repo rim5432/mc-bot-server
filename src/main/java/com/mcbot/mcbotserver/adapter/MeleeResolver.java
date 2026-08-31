@@ -205,13 +205,9 @@ final class MeleeResolver {
      * manual break sequence, where the engine's one-size-fits-all call
      * loses context the bot needs.
      *
-     * <p>Sweep attack: when the hit is fully charged, not a crit, not
-     * sprinting, on ground, and the held item can perform SWORD_SWEEP,
-     * the attack also hits every LivingEntity in the sword's sweep hit
-     * box (excluding self and the main target, non-allied only). Sweep
-     * damage = 1.0 + SweepingEdge ratio * main damage; knockback = 0.4;
-     * plays PLAYER_ATTACK_SWEEP. Mirrors vanilla Player.attack lines
-     * 1219-1274 (decompiled 1.20.1).
+     * <p>Sweep attack: non-crit fully-charged hits additionally sweep
+     * bystanders - see {@link #performSweepAttack} for the vanilla
+     * conditions and formulas.
      *
      * @param target the hurt entity; never null
      */
@@ -251,48 +247,59 @@ final class MeleeResolver {
                 // Player.attack spawns it at the target's block pos).
                 body.level().levelEvent(2002, target.blockPosition(), 0);
             }
-            // Sweep attack (vanilla Player.attack lines 1219-1274):
-            // fully charged (always true here), not crit, not sprinting,
-            // on ground, holding a sword (SWORD_SWEEP tool action).
-            // Sweep damage = 1.0 + SweepingEdge ratio * main damage;
-            // knockback 0.4; hits every LivingEntity in the sword's
-            // sweep hit box except self and the main target.
-            if (!crit
-                    && !body.isSprinting()
-                    && body.onGround()
-                    && body.getMainHandItem().canPerformAction(net.minecraftforge.common.ToolActions.SWORD_SWEEP)) {
-                float sweepDamage = 1.0F + EnchantmentHelper.getSweepingDamageRatio(body) * damage;
-                // getSweepHitBox requires a Player (Forge extension); sync
-                // the facade position to the body so the box lands in front
-                // of the actual body, not the facade's stale construction pos.
-                var facade = body.playerFacade();
-                facade.syncPosition();
-                var sweepBox = body.getMainHandItem().getSweepHitBox(facade, target);
-                for (LivingEntity bystander : body.level().getEntitiesOfClass(LivingEntity.class, sweepBox)) {
-                    if (bystander != body && bystander != target && !body.isAlliedTo(bystander)) {
-                        bystander.knockback(
-                                0.4F,
-                                Mth.sin(body.getYRot() * ((float) Math.PI / 180F)),
-                                -Mth.cos(body.getYRot() * ((float) Math.PI / 180F)));
-                        bystander.hurt(body.damageSources().mobAttack(body), sweepDamage);
-                    }
-                }
-                body.level()
-                        .playSound(
-                                null,
-                                body.getX(),
-                                body.getY(),
-                                body.getZ(),
-                                net.minecraft.sounds.SoundEvents.PLAYER_ATTACK_SWEEP,
-                                body.getSoundSource(),
-                                1.0F,
-                                1.0F);
-            }
+            performSweepAttack(target, damage, crit);
             body.setLastHurtMob(target);
         }
         // doPostDamageEffects runs on hit or miss (vanilla doHurtTarget
         // calls it unconditionally after the hurt attempt).
         EnchantmentHelper.doPostDamageEffects(body, target);
+    }
+
+    /**
+     * Sword sweep (vanilla Player.attack lines 1219-1274, decompiled
+     * 1.20.1): when the hit is fully charged (always true here), not
+     * a crit, not sprinting, on ground, and the held item performs
+     * SWORD_SWEEP, the attack also hits every LivingEntity in the
+     * sword's sweep hit box (excluding self and the main target,
+     * non-allied only). Sweep damage = 1.0 + SweepingEdge ratio *
+     * main damage; knockback = 0.4; plays PLAYER_ATTACK_SWEEP.
+     *
+     * @param target the main hit target, excluded from the sweep; never null
+     * @param damage the main-hit damage after the crit multiplier
+     * @param crit   whether the main hit was a critical strike
+     */
+    private void performSweepAttack(LivingEntity target, float damage, boolean crit) {
+        if (!crit
+                && !body.isSprinting()
+                && body.onGround()
+                && body.getMainHandItem().canPerformAction(net.minecraftforge.common.ToolActions.SWORD_SWEEP)) {
+            float sweepDamage = 1.0F + EnchantmentHelper.getSweepingDamageRatio(body) * damage;
+            // getSweepHitBox requires a Player (Forge extension); sync
+            // the facade position to the body so the box lands in front
+            // of the actual body, not the facade's stale construction pos.
+            var facade = body.playerFacade();
+            facade.syncPosition();
+            var sweepBox = body.getMainHandItem().getSweepHitBox(facade, target);
+            for (LivingEntity bystander : body.level().getEntitiesOfClass(LivingEntity.class, sweepBox)) {
+                if (bystander != body && bystander != target && !body.isAlliedTo(bystander)) {
+                    bystander.knockback(
+                            0.4F,
+                            Mth.sin(body.getYRot() * ((float) Math.PI / 180F)),
+                            -Mth.cos(body.getYRot() * ((float) Math.PI / 180F)));
+                    bystander.hurt(body.damageSources().mobAttack(body), sweepDamage);
+                }
+            }
+            body.level()
+                    .playSound(
+                            null,
+                            body.getX(),
+                            body.getY(),
+                            body.getZ(),
+                            net.minecraft.sounds.SoundEvents.PLAYER_ATTACK_SWEEP,
+                            body.getSoundSource(),
+                            1.0F,
+                            1.0F);
+        }
     }
 
     /**
