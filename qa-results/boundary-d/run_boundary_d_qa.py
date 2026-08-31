@@ -263,8 +263,21 @@ def batch_b(led: Ledger) -> None:
     @led.case("B", "B4", "cancel is terminal and wait does not burn timeout", "GREEN")
     def _(ev):
         pos = current_pos()
+        # Engine quirk (open observation, 2026-08-31): the mission
+        # directly after a NO_PATH failure can itself NO_PATH
+        # instantly - a cross-mission poisoning window this case is
+        # not about. Retry the liveness submit within a small bound.
+        # Healing move: a goto-to-self COMPLETES and breaks the
+        # chain (retrying the far goto just re-arms the window - each
+        # NO_PATH re-poisons the next submit, pinned live 2026-08-31).
+        spot = f"{int(pos['x'])},{int(pos['y'])},{int(pos['z'])}"
+        healer = submit_goto(spot, ev, tol="1", timeout="200")
+        mc("wait", healer, "--timeout", "30")
         tid = submit_goto(f"{int(pos['x']) + 30},{int(pos['y'])},{int(pos['z'])}",
                           ev, tol="1", timeout="4000")
+        time.sleep(0.8)
+        _, check_task = mc("cat", f"/tasks/{tid}")
+        assert check_task.get("status") != "failed",             f"mission still poisoned after a completed healer: {check_task}"
         code, out = mc("write", f"/tasks/{tid}/cancel", "qa-cancel")
         assert code == 0 and out.get("ok") is True, f"cancel exit {code}: {out}"
         started = time.time()
@@ -351,69 +364,25 @@ def batch_b(led: Ledger) -> None:
 # ---------------------------------------------------------------------------
 
 def batch_c1(led: Ledger) -> None:
-    print("Batch C1: entity-ticking ticket gap")
+    print("Batch C1: body keeps ticking away from every framework ticket")
 
-    @led.case("C", "C1", "unticketed chunk freezes the body; forceload wakes it",
-              "RED")
+    # Contract after the 0015 fix (forceload-backed BotChunkTicket):
+    # the body NEVER freezes on a bare server. The original gap shape
+    # (body frozen, queue honest) is preserved as the 2026-08-31 red
+    # receipts in git history; this case pins the fixed behavior.
+    @led.case("C", "C1", "far-tp body keeps entity-ticking (ticket fix)", "GREEN")
     def _(ev):
-        # Park the body mid-air far outside any spawn-chunk ticket. A
-        # ticking chunk would make it fall within seconds, so the y
-        # read after the settle window doubles as a liveness probe.
         tp = rcon("tp @e[type=mcbotserver:bot_body,limit=1] 350.5 120 350.5")
         ev.append(f"tp: {tp[:120]}")
-        assert "Teleported" in tp, \
-            f"tp missed - body not selectable (unloaded chunk?): {tp}"
-        time.sleep(3)
-        _, park = mc("cat", "/player/pos")
-        ev.append(f"parked at {json.dumps(park)[:120]}")
-        assert park[1] == 120, f"body already moved: {park}"
+        assert "Teleported" in tp,             f"tp missed - body not selectable (unloaded chunk?): {tp}"
         time.sleep(30)
         _, settle = mc("cat", "/player/pos")
-        ev.append(f"after 30s settle: {json.dumps(settle)[:120]}")
-        assert settle[1] >= 119, \
-            f"body fell - chunk still entity-ticking: {settle}"
-
-        # Frozen body proven. Now prove the documented unblock path:
-        # forceload (BLOCK coords; 336,336 sits inside chunk 21,21).
-        load = rcon("forceload add 336 336")
-        ev.append(f"forceload: {load[:120]}")
-        fell = False
-        for _ in range(15):
-            time.sleep(1)
-            _, live = mc("cat", "/player/pos")
-            if live[1] < 119:
-                fell = True
-                break
-        rcon("forceload remove all")
-        assert fell, "even forceload did not wake the body"
-        ev.append(f"awake at {live}")
-        ev.append("gap pinned: body frozen until forceload, queue alive")
-
-    @led.case("C", "C1b", "goto against a frozen body fails honestly, no hang",
-              "GREEN")
-    def _(ev):
-        # The consumer-facing shape of the same gap: the mission
-        # burns its budget and returns a terminal verdict while the
-        # body never moves - the harness gets an honest failure, not
-        # a hang, and the receipt pipeline stays usable.
-        tp = rcon("tp @e[type=mcbotserver:bot_body,limit=1] 360.5 120 360.5")
-        ev.append(f"tp: {tp[:120]}")
-        assert "Teleported" in tp, f"tp missed: {tp}"
-        time.sleep(30)
-        _, frozen = mc("cat", "/player/pos")
-        ev.append(f"frozen at {json.dumps(frozen)[:120]}")
-        assert frozen[1] >= 119, "setup failed: chunk is ticking"
-        code, out = mc("write", "/tasks/goto", "366,120,360",
-                       "--tol", "1", "--timeout", "200")
-        assert code == 0 and out.get("task"), f"submit failed: {out}"
-        tid = out["task"]
-        code, verdict = mc("wait", tid, "--timeout", "60")
-        _, after = mc("cat", "/player/pos")
-        assert code == 1, f"wait exit {code}, expected 1: {verdict}"
-        assert "TASK_FAILED" in json.dumps(verdict), f"verdict: {verdict}"
-        assert after[1] >= 119 and abs(after[0] - 360) < 1, \
-            f"body moved while frozen: {after}"
-        ev.append(f"honest failure pinned: {json.dumps(verdict)[:160]}")
+        ev.append(f"after 30s: {json.dumps(settle)[:120]}")
+        # A frozen body parks mid-air at y=120; a ticking body falls
+        # to terrain well within the window.
+        assert settle[1] < 119,             f"body still parked mid-air - chunk not entity-ticking: {settle}"
+        load = rcon("forceload query")
+        ev.append(f"forceload: {load[:160]}")
 
 
 # ---------------------------------------------------------------------------
@@ -425,6 +394,24 @@ def read_reset_at(ev: list[str]) -> int:
     epoch = out["batch"]["resetAt"]
     ev.append(f"resetAt={epoch}")
     return int(epoch)
+
+
+def batch_c2_respawn(led: Ledger) -> None:
+    print("Batch C2 respawn: epoch must grow within one boot too")
+
+    @led.case("C", "C2b", "botdespawn+botspawn mints a beyond-head epoch",
+              "GREEN")
+    def _(ev):
+        _, before = mc("events")
+        before_epoch = before["batch"]["resetAt"]
+        rcon("botdespawn")
+        time.sleep(1)
+        rcon("botspawn")
+        time.sleep(2)
+        _, after = mc("events")
+        after_epoch = after["batch"]["resetAt"]
+        ev.append(f"respawn epoch {before_epoch} -> {after_epoch}")
+        assert after_epoch > before_epoch,             f"respawn collided epochs: {before_epoch} -> {after_epoch}"
 
 
 def batch_c2_pre(led: Ledger) -> None:
@@ -442,15 +429,16 @@ def batch_c2_pre(led: Ledger) -> None:
 def batch_c2_post(led: Ledger) -> None:
     print("Batch C2 post-restart: epoch must be beyond-head")
 
-    @led.case("C", "C2-post", "resetAt after restart is beyond pre-restart head",
-              "RED")
+    # Contract after the 0015 fix (SavedData epoch store): every boot
+    # draws strictly beyond the persisted watermark, so a client
+    # bookmark from before the restart always sees the reset signal.
+    @led.case("C", "C2-post", "resetAt after restart is beyond pre-restart head", "GREEN")
     def _(ev):
         state = json.loads(STATE.read_text())
         before = int(state["reset_at_before"])
         after = read_reset_at(ev)
-        assert after <= before, \
-            f"epoch is honest (before={before} after={after}) - gap closed?"
-        ev.append(f"beyond-head violated: before={before} after={after}")
+        assert after > before,             f"epoch not beyond-head: before={before} after={after}"
+        ev.append(f"beyond-head holds: {before} -> {after}")
 
 
 # ---------------------------------------------------------------------------
@@ -475,13 +463,30 @@ def main() -> int:
     # world spawn without any selector.
     rcon("botdespawn")
     time.sleep(1)
-    rcon("botspawn")
+    spawn = rcon("botspawn")
     time.sleep(3)
+    # Deterministic walkway: every world wipe rolls a new seed, and a
+    # spawn hemmed in by water/cliff makes the +30/-30 liveness targets
+    # NO_PATH instantly (B4/B7 lost rounds to that lottery). Build a
+    # TERRAIN-INDEPENDENT platform instead: a 3-wide, 81-long slab with
+    # 3 blocks of headroom carved above it, floating over whatever the
+    # seed generated. Width 3 matters - a 1-wide corridor carved
+    # through a mountainside fails move primitives' flanking checks
+    # (+5 NO_PATH even on smooth stone, pinned live 2026-08-31).
+    body = mc("cat", "/player/pos")[1]
+    bx, by, bz = int(body[0]), int(body[1]), int(body[2])
+    rcon(f"fill {bx-40} {by-1} {bz-1} {bx+40} {by-1} {bz+1} minecraft:smooth_stone")
+    rcon(f"fill {bx-40} {by} {bz-1} {bx+40} {by+2} {bz+1} minecraft:air")
+    # Re-seat the body on the platform (the air carve may have left it
+    # inside terrain at its spawn column).
+    rcon(f"tp @e[type=mcbotserver:bot_body,limit=1] {bx}.5 {by} {bz}.5")
+    print(f"  [prologue] platform built at ({bx},{by},{bz})")
 
     led = Ledger()
     runners = {"a": batch_a, "b": batch_b, "c1": batch_c1,
-               "c2-pre": batch_c2_pre, "c2-post": batch_c2_post}
-    for key in ("a", "b", "c1", "c2-pre", "c2-post"):
+               "c2b": batch_c2_respawn, "c2-pre": batch_c2_pre,
+               "c2-post": batch_c2_post}
+    for key in ("a", "b", "c1", "c2b", "c2-pre", "c2-post"):
         if key in selected:
             runners[key](led)
 

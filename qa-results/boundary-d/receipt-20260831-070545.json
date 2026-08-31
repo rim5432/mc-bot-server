@@ -1,0 +1,21 @@
+{
+ "schema": 1,
+ "task": "boundary-d-qa",
+ "finished_at": "2026-08-31T07:05:45.888890+00:00",
+ "cases": [
+  {
+   "batch": "C",
+   "id": "C2-post",
+   "desc": "resetAt after restart is beyond pre-restart head",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.2
+  }
+ ],
+ "evidence": [
+  "[C2-post] PASS: contract held",
+  "    resetAt=5",
+  "    beyond-head holds: 3 -> 5"
+ ]
+}

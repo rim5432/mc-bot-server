@@ -1,0 +1,242 @@
+{
+ "schema": 1,
+ "task": "boundary-d-qa",
+ "finished_at": "2026-08-31T07:01:16.691675+00:00",
+ "cases": [
+  {
+   "batch": "A",
+   "id": "A1",
+   "desc": "ls / answers the canonical roots",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.2
+  },
+  {
+   "batch": "A",
+   "id": "A2",
+   "desc": "help carries usage",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.2
+  },
+  {
+   "batch": "A",
+   "id": "A3",
+   "desc": "cat /player/status -> flat state face",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.2
+  },
+  {
+   "batch": "A",
+   "id": "A4",
+   "desc": "cat /player/pos -> [x, y, z]",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.2
+  },
+  {
+   "batch": "A",
+   "id": "A5",
+   "desc": "cat /player/inventory -> items map",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.2
+  },
+  {
+   "batch": "A",
+   "id": "A6",
+   "desc": "events -> batch shape with stream-truth keys",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.2
+  },
+  {
+   "batch": "A",
+   "id": "A7",
+   "desc": "piped stdout is one JSON line (stream discipline)",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.2
+  },
+  {
+   "batch": "A",
+   "id": "A8",
+   "desc": "read on any path suggests cat (typed error)",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.3
+  },
+  {
+   "batch": "A",
+   "id": "A9",
+   "desc": "ls /blocks is a typed reject (not enumerable)",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.2
+  },
+  {
+   "batch": "A",
+   "id": "A10",
+   "desc": "ls /stations/ scans nearby containers",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.3
+  },
+  {
+   "batch": "B",
+   "id": "B1",
+   "desc": "goto receipt carries the id under 'task'",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.5
+  },
+  {
+   "batch": "B",
+   "id": "B2",
+   "desc": "wait exits 0 on TASK_COMPLETED (goto-to-self)",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 1.0
+  },
+  {
+   "batch": "B",
+   "id": "B3",
+   "desc": "wait exits 1 on TASK_FAILED (deep unreachable)",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.7
+  },
+  {
+   "batch": "B",
+   "id": "B4",
+   "desc": "cancel is terminal and wait does not burn timeout",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 2.2
+  },
+  {
+   "batch": "B",
+   "id": "B5",
+   "desc": "admin stop sweeps every live mission",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 1.2
+  },
+  {
+   "batch": "B",
+   "id": "B6",
+   "desc": "events cursor advances; --since 0 re-anchors",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 1.3
+  },
+  {
+   "batch": "B",
+   "id": "B7",
+   "desc": "idempotency key dedupes while the task is live",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 1.0
+  },
+  {
+   "batch": "B",
+   "id": "B8",
+   "desc": "status pos matches the completed goto target",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.8
+  },
+  {
+   "batch": "C",
+   "id": "C1",
+   "desc": "far-tp body keeps entity-ticking (ticket fix)",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 30.9
+  },
+  {
+   "batch": "C",
+   "id": "C2b",
+   "desc": "botdespawn+botspawn mints a beyond-head epoch",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 3.9
+  }
+ ],
+ "evidence": [
+  "[A1] PASS: contract held",
+  "    roots={\"raw\": \"/tasks/\\n/player/\\n/blocks/\\n/entities/\\n/nearby/\\n/recipes/\\n/stations/\\n/events\", \"stderr\": \"\"}",
+  "[A2] PASS: contract held",
+  "    help ok",
+  "[A3] PASS: contract held",
+  "    status face=['dim', 'effects', 'food', 'freeSlots', 'healthHearts', 'items', 'pitch', 'pos', 'slot', 'task', 'xp', 'yaw']",
+  "[A4] PASS: contract held",
+  "    pos=[0, 78, 0]",
+  "[A5] PASS: contract held",
+  "    inventory={}",
+  "[A6] PASS: contract held",
+  "    latest=14 resetAt=1",
+  "[A7] PASS: contract held",
+  "    single-line JSON ok",
+  "[A8] PASS: contract held",
+  "    typed redirect ok",
+  "[A9] PASS: contract held",
+  "    reject={\"raw\": \"\", \"stderr\": \"ls /blocks: address-based, not enumerable - cat /blocks/<x,y,z>, write /blocks/<x,y,z> <blockid>|air\"}",
+  "[A10] PASS: contract held",
+  "    scan={\"raw\": \"\", \"stderr\": \"\"}",
+  "[B1] PASS: contract held",
+  "    submit 0,78,0 -> task-1",
+  "    receipt task=task-1",
+  "[B2] PASS: contract held",
+  "    submit 0,78,0 -> task-2",
+  "    wait verdict={\"kind\": \"TASK_COMPLETED\", \"day\": 0, \"t\": 304, \"urgent\": false, \"text\": \"task-2: goal reached\", \"attrs\": {\"task\": \"task-2\", \"taskId\": \"task-2\"}}",
+  "[B3] PASS: contract held",
+  "    submit 0,48,0 -> task-3",
+  "    failed verdict={\"kind\": \"TASK_FAILED\", \"day\": 0, \"t\": 329, \"urgent\": false, \"text\": \"task-3: failed: NO_PATH\", \"attrs\": {\"reason\": \"NO_PATH\", \"taskId\": \"task-3\", \"task\": \"task-3\"}}",
+  "[B4] PASS: contract held",
+  "    submit 0,78,0 -> task-4",
+  "    submit 30,78,0 -> task-5",
+  "    cancelled in 0.2s",
+  "[B5] PASS: contract held",
+  "    submit 43,78,0 -> task-6",
+  "    submit -17,78,0 -> task-7",
+  "    stop={\"ok\": true, \"cancelled\": 2}",
+  "    task-6 terminal={\"kind\": \"TASK_CANCELLED\", \"day\": 0, \"t\": 390, \"urgent\": false, \"text\": \"goto:task-6: cancelled by harness\", \"attrs\": {\"",
+  "    task-7 terminal={\"kind\": \"TASK_CANCELLED\", \"day\": 0, \"t\": 390, \"urgent\": false, \"text\": \"goto:task-7: cancelled by harness\", \"attrs\": {\"",
+  "[B6] PASS: contract held",
+  "    submit 15,78,0 -> task-8",
+  "    latest 69 -> 73, drain ok",
+  "[B7] PASS: contract held",
+  "    first={'ok': True, 'task': 'task-9', 'replay': False} again={'ok': True, 'task': 'task-9', 'replay': True}",
+  "[B8] PASS: contract held",
+  "    submit 19,78,0 -> task-10",
+  "    arrived {'x': 18, 'y': 78, 'z': 0}",
+  "[C1] PASS: contract held",
+  "    tp: Teleported entity.mcbotserver.bot_body to 350.500000, 120.000000, 350.500000",
+  "    after 30s: [350, 73, 350]",
+  "    forceload: No force loaded chunks were found in minecraft:overworld",
+  "[C2b] PASS: contract held",
+  "    respawn epoch 1 -> 2"
+ ]
+}
