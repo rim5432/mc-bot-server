@@ -18,6 +18,7 @@ from pathlib import Path
 from mcbot.capability.backfill import backfill_receipts
 from mcbot.capability.db import get_connection, init_db
 from mcbot.capability.models import Capability
+from mcbot.capability.report import diff_since, domain_report
 from mcbot.capability.repository import CapabilityRepository
 from mcbot.engine import parse_run_log
 
@@ -187,6 +188,73 @@ class StatusTransitionTest(unittest.TestCase):
 
     def test_unknown_id_returns_false(self):
         self.assertFalse(self.repo.update_status("nope.nope", "shipped"))
+
+
+class ReportTest(unittest.TestCase):
+    """diff_since + domain_report fold receipts, case runs, transitions."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self._tmp.name)
+        self.db = self.dir / "test.db"
+        init_db(self.db)
+        now = "2026-08-31T12:00:00"
+        CapabilityRepository(self.db).upsert(Capability(
+            id="motion.sprint", name="Sprint", category="motion",
+            implementation_status="partial", created_at=now, updated_at=now,
+        ))
+        with get_connection(self.db) as conn:
+            conn.execute(
+                "INSERT INTO qa_test_cases (id, title, status, created_at, updated_at) "
+                "VALUES ('GT-BotLocomotionGameTests-walksToBlock', 't', "
+                "'not_executed', 'x', 'x')"
+            )
+            conn.execute(
+                "INSERT INTO test_receipts (run_id, test_type, finished_at, git_rev, "
+                "total, passed, failed, green, created_at) VALUES "
+                "('gametest-20260830-1','runGameTest','2026-08-30T10:00:00','r1',52,50,2,0,'x'),"
+                "('gametest-20260831-1','runGameTest','2026-08-31T11:00:00','r2',52,52,0,1,'x')"
+            )
+            conn.execute(
+                "INSERT INTO test_case_runs (test_case_id, receipt_id, result, created_at) "
+                "VALUES ('GT-BotLocomotionGameTests-walksToBlock', 1, 'failed', 'x')"
+            )
+            conn.commit()
+        # link the case so the failure is attributed to motion.sprint
+        with get_connection(self.db) as conn:
+            conn.execute(
+                "UPDATE qa_test_cases SET capability_id = 'motion.sprint' "
+                "WHERE id = 'GT-BotLocomotionGameTests-walksToBlock'"
+            )
+            conn.commit()
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_diff_since_folds_runs_and_reds(self):
+        d = diff_since("2026-08-30", db_path=self.db)
+        self.assertEqual(d["runs"]["count"], 2)
+        self.assertEqual(d["runs"]["red"], 1)
+        self.assertEqual(len(d["red_details"]), 1)
+        self.assertEqual(d["red_details"][0]["scenarios"][0]["test_case_id"],
+                         "GT-BotLocomotionGameTests-walksToBlock")
+
+    def test_diff_excludes_older_window(self):
+        d = diff_since("2026-08-31", db_path=self.db)
+        self.assertEqual(d["runs"]["count"], 1)
+        self.assertEqual(d["runs"]["green"], 1)
+
+    def test_domain_report_flags_and_streak(self):
+        rep = domain_report("motion", db_path=self.db)
+        face = rep["faces"][0]
+        self.assertEqual(face["id"], "motion.sprint")
+        self.assertEqual(face["case_count"], 1)
+        self.assertEqual(len(face["failures"]), 1)
+        self.assertIsNotNone(rep["last_red_in_domain"])
+        self.assertEqual(rep["green_streak_since"], 1)
+
+    def test_domain_report_unknown_category(self):
+        self.assertIsNone(domain_report("nope", db_path=self.db))
 
 
 if __name__ == "__main__":

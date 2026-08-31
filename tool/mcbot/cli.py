@@ -53,6 +53,7 @@ from mcbot.capability import db as cap_db
 from mcbot.capability import queries as cap_queries
 from mcbot.capability.backfill import backfill_receipts
 from mcbot.capability.gametest_scan import scan_gametests
+from mcbot.capability.report import diff_since, domain_report
 from mcbot.capability.qa_import import import_csv, link_case, list_unlinked
 from mcbot.capability.receipt import latest_receipt_summary
 from mcbot.capability.repository import CapabilityRepository, VALID_STATUSES
@@ -387,6 +388,8 @@ def cmd_capability(args) -> int:
         "gaps": cmd_cap_gaps,
         "db-status": cmd_cap_db_status,
         "backfill": cmd_cap_backfill,
+        "diff": cmd_cap_diff,
+        "domain": cmd_cap_domain,
         "qa-import": cmd_cap_qa_import,
         "scan-gametest": cmd_cap_scan_gametest,
         "link": cmd_cap_link,
@@ -549,6 +552,77 @@ def cmd_cap_backfill(args) -> int:
               f"were re-parsed from surviving logs")
     if result["unreadable"]:
         print(f"  WARN: {result['unreadable']} unreadable JSON files", file=sys.stderr)
+    return 0
+
+
+def cmd_cap_diff(args) -> int:
+    since = args.since or (_dt.date.today() - _dt.timedelta(days=7)).isoformat()
+    d = diff_since(since)
+    print(f"[mcbot] capability diff since {since}")
+    runs = d["runs"]
+    growth = ""
+    if runs["count"]:
+        growth = f", scenarios {runs['first_total']} -> {runs['last_total']}"
+    print(f"engine runs: {runs['count']} ({runs['green']} GREEN, {runs['red']} RED){growth}")
+    print(f"status transitions: {len(d['transitions'])}  [{d['transitions_note']}]")
+    for t in d["transitions"]:
+        name = f"  {t['name']}" if t.get("name") else ""
+        print(f"  {t['changed_at']}  {t['capability_id']}{name}: "
+              f"{t['old_status']} -> {t['new_status']}  ({t['source']})")
+    if d["red_details"]:
+        shown = d["red_details"][:10]
+        print(f"RED runs ({len(d['red_details'])}, showing first 10):")
+        for run in shown:
+            print(f"  {run['finished_at']} @{run['git_rev'] or '?'} "
+                  f"{run['total']} scenarios, {run['failed']} failed  [{run['run_id']}]")
+            for s in run["scenarios"]:
+                print(f"      - {s['test_case_id'] or '(unlinked scenario)'}")
+    if d["faces_added"]:
+        print(f"faces added: {len(d['faces_added'])}")
+        for f in d["faces_added"]:
+            print(f"  {f['created_at']}  {f['id']}  ({f['category']})")
+    cur = d["current"]
+    bs = cur["by_status"]
+    print(f"current: {cur['total']} faces, {bs.get('shipped', 0)} shipped, "
+          f"{bs.get('partial', 0)} partial, {bs.get('gap', 0)} gap, "
+          f"{bs.get('deferred', 0)} deferred")
+    return 0
+
+
+def cmd_cap_domain(args) -> int:
+    rep = domain_report(args.category)
+    if rep is None:
+        print(f"[mcbot] no capability category named: {args.category}", file=sys.stderr)
+        print("  hint: `capability overview` lists the categories", file=sys.stderr)
+        return 1
+    lr = rep["last_red_in_domain"]
+    streak = (
+        f"last RED {lr['finished_at']} [{lr['run_id']}], {rep['green_streak_since']} green runs since"
+        if lr else "no red run ever failed a scenario in this domain (in DB history)"
+    )
+    print(f"=== domain: {rep['category']} ===")
+    print(f"  {streak}")
+    print()
+    print(f"{'FACE':<28} {'STATUS':<10} {'VERIFIED':<12} {'CASES':>5}  FLAGS")
+    print("-" * 90)
+    for f in rep["faces"]:
+        flags = []
+        if f["no_coverage"]:
+            flags.append("NO-COVERAGE")
+        if f["has_deviation"]:
+            flags.append("DEVIATION")
+        print(f"{f['id']:<28} {f['implementation_status']:<10} {f['verified_at'] or '-':<12} "
+              f"{f['case_count']:>5}  {' '.join(flags)}")
+    if rep["faces_no_coverage"]:
+        print(f"\n  no QA coverage: {', '.join(rep['faces_no_coverage'])}")
+    failures_shown = 0
+    for f in rep["faces"]:
+        for fail in f["failures"][:2]:
+            if failures_shown == 0:
+                print("\n  recent failures (from mirrored receipts):")
+            print(f"    {f['id']}: {fail['finished_at']} @{fail['git_rev'] or '?'} "
+                  f"[{fail['run_id']}] {fail['test_case_id']}")
+            failures_shown += 1
     return 0
 
 
@@ -909,6 +983,12 @@ def main() -> int:
     p_cap_sub.add_parser(
         "backfill",
         help="mirror committed qa-results/engine-runs JSON receipts into the DB (idempotent)")
+    p_cap_diff = p_cap_sub.add_parser(
+        "diff", help="what changed since a date: transitions, runs, reds, new faces")
+    p_cap_diff.add_argument("--since", help="YYYY-MM-DD (default: 7 days ago)")
+    p_cap_domain = p_cap_sub.add_parser(
+        "domain", help="per-face evidence + deficiency report for one category")
+    p_cap_domain.add_argument("category", help="capability category, e.g. combat, digging")
     p_cap_qa = p_cap_sub.add_parser("qa-import", help="import QA test cases from a CSV file")
     p_cap_qa.add_argument("csv_file", help="path to QA CSV file (UTF-8 with BOM supported)")
     p_cap_sub.add_parser("scan-gametest", help="scan gametest source for @GameTest methods and auto-link")
