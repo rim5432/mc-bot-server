@@ -11,6 +11,7 @@ recorded in ``schema_migrations``.
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import sqlite3
 import datetime as _dt
@@ -28,14 +29,15 @@ def _now_iso() -> str:
     return _dt.datetime.now().isoformat(timespec="seconds")
 
 
-def get_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
-    """Open a connection with WAL, busy-timeout, and foreign keys.
+@contextlib.contextmanager
+def get_connection(db_path: Optional[Path] = None):
+    """Yield a connection with WAL, busy-timeout, and foreign keys.
 
-    Callers should use this as a context manager (``with
-    get_connection() as conn:``) so the transaction commits and the
-    connection closes promptly — long-held connections are the #1
-    cause of SQLITE_BUSY in WAL mode.
-    """
+    Use as ``with get_connection() as conn:`` — the block is the
+    transaction scope (commit on clean exit, rollback on exception)
+    and the connection is always closed afterward. Closing matters on
+    Windows + WAL: a leaked connection pins the db file and leaves
+    -wal/-shm residue behind."""
     path = db_path or DB_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(path), timeout=BUSY_TIMEOUT_MS / 1000.0)
@@ -43,7 +45,11 @@ def get_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=%d" % BUSY_TIMEOUT_MS)
     conn.execute("PRAGMA foreign_keys=ON")
-    return conn
+    try:
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------
