@@ -1,6 +1,6 @@
 {
-  "schema": 1,
-  "exported_at": "2026-08-31T21:52:46",
+  "schema": 2,
+  "exported_at": "2026-08-31T22:18:32",
   "statuses": [
     {
       "id": "combat.bow_draw",
@@ -216,291 +216,263 @@
   "links": [
     {
       "case_id": "GT-BotCombatGameTests-bowChargedShotDamagesDistantTarget",
-      "capability_id": "combat.bow_draw"
+      "capability_id": "combat.bow_draw",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotCombatGameTests-bowTapShotDealsWeakDamage",
-      "capability_id": "combat.bow_draw"
+      "capability_id": "combat.bow_draw",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotCombatGameTests-equipmentMirrorFeedsAttributes",
-      "capability_id": "inventory.equipment_mirror"
+      "capability_id": "inventory.equipment_mirror",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotCombatGameTests-hostilesAggroOnSight",
-      "capability_id": "combat.hostile_acquisition"
+      "capability_id": "combat.hostile_acquisition",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotCombatGameTests-raisedShieldBlocksFrontalMelee",
-      "capability_id": "combat.shield"
+      "capability_id": "combat.shield",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotCombatGameTests-raisedShieldBlocksIncomingArrow",
-      "capability_id": "combat.shield"
+      "capability_id": "combat.shield",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotCombatGameTests-rearArrowBypassesTheRaisedShield",
-      "capability_id": "combat.shield"
+      "capability_id": "combat.shield",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotCombatGameTests-refusesRangedItCannotAnswer",
-      "capability_id": "interaction.right_click_order"
+      "capability_id": "interaction.right_click_order",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotCraftingGameTests-catalogsShapedRecipes",
-      "capability_id": "inventory.menu_clicks"
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotCraftingGameTests-craftsDiamondBlockAtTable",
-      "capability_id": "inventory.menu_clicks"
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotCraftingGameTests-craftsShapelessPlanksFromLogs",
-      "capability_id": "inventory.menu_clicks"
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotCraftingGameTests-craftsViaMenuTransactions",
-      "capability_id": "inventory.menu_clicks"
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotCraftingGameTests-dropsGridMaterialsWhenInventoryFull",
-      "capability_id": "inventory.shape"
+      "capability_id": "inventory.shape",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotCraftingGameTests-paginatesRecipesSorted",
-      "capability_id": "inventory.menu_clicks"
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotCraftingGameTests-pullsCraftsAndBanksByRecipeId",
-      "capability_id": "inventory.menu_clicks"
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotCraftingGameTests-returnsCraftingGridOnClose",
-      "capability_id": "inventory.menu_clicks"
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotCraftingGameTests-returnsGridWithoutCorruptingOccupiedSlot0",
-      "capability_id": "combat.bow_slot"
+      "capability_id": "combat.bow_slot",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotCraftingGameTests-returnsInventoryMenuGridOnClose",
-      "capability_id": "inventory.shape"
+      "capability_id": "inventory.shape",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotCraftingGameTests-walksToTableAndCrafts",
-      "capability_id": "inventory.menu_clicks"
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotDiggingGameTests-bareHandedStoneLeavesNoDrop",
-      "capability_id": "interaction.drop"
+      "capability_id": "interaction.drop",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotDiggingGameTests-breakingBlocksBuildsExhaustion",
-      "capability_id": "hunger.movement_exhaustion"
+      "capability_id": "hunger.movement_exhaustion",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotDiggingGameTests-digWearsThePickaxeOncePerBlock",
-      "capability_id": "dig.pacing"
+      "capability_id": "dig.pacing",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotDiggingGameTests-pickaxeDigsStoneIntoCobblestone",
-      "capability_id": "dig.pacing"
+      "capability_id": "dig.pacing",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotDiggingGameTests-swordDigsAtDoubleWear",
-      "capability_id": "dig.pacing"
+      "capability_id": "dig.pacing",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotDiggingGameTests-toolSelectorPicksThePickaxeForStone",
-      "capability_id": "dig.tool_speed"
+      "capability_id": "dig.tool_speed",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotFishingGameTests-biteDipTriggersReel",
-      "capability_id": "perception.projectiles"
+      "capability_id": "perception.projectiles",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotFishingGameTests-rodCastsAndReelsTheBobber",
-      "capability_id": "interaction.bucket_rod"
+      "capability_id": "interaction.bucket_rod",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotHazardReflexGameTests-climbsOutOfPowderSnow",
-      "capability_id": "vitals.powder_snow"
+      "capability_id": "vitals.powder_snow",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotHazardReflexGameTests-digsFreeWhenSuffocating",
-      "capability_id": "dig.pacing"
+      "capability_id": "dig.pacing",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotHazardReflexGameTests-eatsWhenHungry",
-      "capability_id": "hunger.eat_chain"
+      "capability_id": "hunger.eat_chain",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotHazardReflexGameTests-escapesLavaToShore",
-      "capability_id": "combat.line_of_sight"
+      "capability_id": "combat.line_of_sight",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotHazardReflexGameTests-surfacesWhenAirRunsLow",
-      "capability_id": "vitals.air_supply"
+      "capability_id": "vitals.air_supply",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotHazardReflexGameTests-waterBucketBreaksAFall",
-      "capability_id": "vitals.mlg_water"
+      "capability_id": "vitals.mlg_water",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotInteractionGameTests-doorOpensThroughUseChain",
-      "capability_id": "interaction.right_click_order"
+      "capability_id": "interaction.right_click_order",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotInteractionGameTests-sleepVerbSkipsToMorningOnlyFromABed",
-      "capability_id": "perception.sleepers"
+      "capability_id": "perception.sleepers",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotInteractionGameTests-stairsFaceTheirPlacer",
-      "capability_id": "vitals.air_supply"
+      "capability_id": "vitals.air_supply",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotInventoryGameTests-clickThrowsWhenBotWalksAway",
-      "capability_id": "inventory.menu_clicks"
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotInventoryGameTests-dropsSelectedItem",
-      "capability_id": "interaction.drop"
+      "capability_id": "interaction.drop",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotInventoryGameTests-enchantsThroughMenuButton",
-      "capability_id": "dig.enchantment_loot"
+      "capability_id": "dig.enchantment_loot",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotInventoryGameTests-equipsArmorThroughMenuClicks",
-      "capability_id": "inventory.equipment_mirror"
+      "capability_id": "inventory.equipment_mirror",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotInventoryGameTests-openingNewMenuClosesPrevious",
-      "capability_id": "inventory.menu_clicks"
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotInventoryGameTests-picksUpFromBackpackSlot",
-      "capability_id": "combat.bow_slot"
+      "capability_id": "combat.bow_slot",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotInventoryGameTests-placesBlockOnInteract",
-      "capability_id": "interaction.blockitem_place"
+      "capability_id": "interaction.blockitem_place",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotInventoryGameTests-rejectsMenuBeyondReach",
-      "capability_id": "inventory.menu_clicks"
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotInventoryGameTests-villagerTradeMenuOpens",
-      "capability_id": "inventory.menu_clicks"
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotInventoryGameTests-wearsBestArmorThroughPlanner",
-      "capability_id": "inventory.equipment_mirror"
+      "capability_id": "inventory.equipment_mirror",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotInventoryGameTests-xpSurvivesMenuCycles",
-      "capability_id": "inventory.menu_clicks"
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotLocomotionGameTests-climbsLadderToPlatform",
-      "capability_id": "motion.ladders_vines"
+      "capability_id": "motion.ladders_vines",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotLocomotionGameTests-crossesLavaTrench",
-      "capability_id": "combat.line_of_sight"
+      "capability_id": "combat.line_of_sight",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotLocomotionGameTests-sneakCrawlFitsThroughGap",
-      "capability_id": "motion.sneak"
+      "capability_id": "motion.sneak",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotLocomotionGameTests-sneakingHoldsTheLedge",
-      "capability_id": "motion.sneak"
+      "capability_id": "motion.sneak",
+      "link_source": "auto"
     },
     {
       "case_id": "GT-BotLocomotionGameTests-sneakingInWaterSlidesDown",
-      "capability_id": "motion.sneak"
-    },
-    {
-      "case_id": "TC-COMBAT-001",
-      "capability_id": "combat.bow_draw"
-    },
-    {
-      "case_id": "TC-COMBAT-002",
-      "capability_id": "combat.bow_draw"
-    },
-    {
-      "case_id": "TC-COMBAT-003",
-      "capability_id": "combat.bow_draw"
-    },
-    {
-      "case_id": "TC-COMBAT-004",
-      "capability_id": "combat.bow_draw"
-    },
-    {
-      "case_id": "TC-COMBAT-005",
-      "capability_id": "combat.bow_draw"
-    },
-    {
-      "case_id": "TC-COMBAT-006",
-      "capability_id": "combat.bow_slot"
-    },
-    {
-      "case_id": "TC-COMBAT-013",
-      "capability_id": "combat.shield"
-    },
-    {
-      "case_id": "TC-COMBAT-014",
-      "capability_id": "combat.shield"
-    },
-    {
-      "case_id": "TC-COMBAT-015",
-      "capability_id": "combat.shield"
-    },
-    {
-      "case_id": "TC-COMBAT-016",
-      "capability_id": "combat.shield"
-    },
-    {
-      "case_id": "TC-COMBAT-017",
-      "capability_id": "combat.shield"
-    },
-    {
-      "case_id": "TC-DIG-019",
-      "capability_id": "dig.pacing"
-    },
-    {
-      "case_id": "TC-DIG-020",
-      "capability_id": "dig.pacing"
-    },
-    {
-      "case_id": "TC-FISHING-007",
-      "capability_id": "perception.projectiles"
-    },
-    {
-      "case_id": "TC-FISHING-008",
-      "capability_id": "perception.projectiles"
-    },
-    {
-      "case_id": "TC-FISHING-009",
-      "capability_id": "perception.projectiles"
-    },
-    {
-      "case_id": "TC-FISHING-010",
-      "capability_id": "perception.projectiles"
-    },
-    {
-      "case_id": "TC-FISHING-011",
-      "capability_id": "perception.projectiles"
-    },
-    {
-      "case_id": "TC-FISHING-012",
-      "capability_id": "perception.projectiles"
-    },
-    {
-      "case_id": "TC-SLEEP-018",
-      "capability_id": "perception.sleepers"
+      "capability_id": "motion.sneak",
+      "link_source": "auto"
     }
   ]
 }

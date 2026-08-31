@@ -54,7 +54,7 @@ from mcbot.capability import queries as cap_queries
 from mcbot.capability.backfill import backfill_receipts
 from mcbot.capability.gametest_scan import scan_gametests
 from mcbot.capability.report import diff_since, domain_report
-from mcbot.capability.state_export import export_state, restore_state
+from mcbot.capability.state_export import restore_state, write_state_through
 from mcbot.capability.qa_import import import_csv, link_case, list_unlinked
 from mcbot.capability.receipt import latest_receipt_summary
 from mcbot.capability.repository import CapabilityRepository, VALID_STATUSES
@@ -391,7 +391,6 @@ def cmd_capability(args) -> int:
         "backfill": cmd_cap_backfill,
         "diff": cmd_cap_diff,
         "domain": cmd_cap_domain,
-        "export": cmd_cap_export,
         "restore": cmd_cap_restore,
         "qa-import": cmd_cap_qa_import,
         "scan-gametest": cmd_cap_scan_gametest,
@@ -512,6 +511,8 @@ def cmd_cap_set(args) -> int:
         print(f"  deviation   : {cap.deviation or '(cleared)'}")
     if verified_at:
         print(f"  verified_at : {cap.verified_at}")
+    write_state_through()
+    print("  state file  : qa-results/capability-state.json regenerated - commit it with your change")
     return 0
 
 
@@ -629,15 +630,6 @@ def cmd_cap_domain(args) -> int:
     return 0
 
 
-def cmd_cap_export(args) -> int:
-    result = export_state()
-    print(f"[mcbot] capability state exported: {result['path']}")
-    print(f"  statuses : {result['statuses']}")
-    print(f"  links    : {result['links']}")
-    print("  commit it - the overlay is the durable copy of manual triage")
-    return 0
-
-
 def cmd_cap_restore(args) -> int:
     try:
         result = restore_state()
@@ -709,7 +701,17 @@ def cmd_cap_link(args) -> int:
     if not ok:
         print(f"[mcbot] case not found: {args.case_id}", file=sys.stderr)
         return 1
-    print(f"[mcbot] linked {args.case_id} -> {args.capability_id}")
+    print(f"[mcbot] linked {args.case_id} -> {args.capability_id} (link_source=manual)")
+    from mcbot.capability.db import get_connection
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT kind FROM qa_test_cases WHERE id = ?", (args.case_id,)
+        ).fetchone()
+    if row and row["kind"] == "spec":
+        print("  note: spec links are CSV-owned - the next qa-import overwrites "
+              "this; edit the CSV instead", file=sys.stderr)
+    write_state_through()
+    print("  state file  : qa-results/capability-state.json regenerated - commit it with your change")
     return 0
 
 
@@ -1035,11 +1037,9 @@ def main() -> int:
         "domain", help="per-face evidence + deficiency report for one category")
     p_cap_domain.add_argument("category", help="capability category, e.g. combat, digging")
     p_cap_sub.add_parser(
-        "export",
-        help="write manual state (statuses + links) to qa-results/capability-state.json; commit it")
-    p_cap_sub.add_parser(
         "restore",
-        help="apply the committed overlay after a rebuild (init/import/scan/backfill)")
+        help="apply the committed overlay after a rebuild (init/import/scan/backfill); "
+             "set/link maintain it write-through")
     p_cap_qa = p_cap_sub.add_parser("qa-import", help="import QA test cases from a CSV file")
     p_cap_qa.add_argument("csv_file", help="path to QA CSV file (UTF-8 with BOM supported)")
     p_cap_sub.add_parser("scan-gametest", help="scan gametest source for @GameTest methods and auto-link")

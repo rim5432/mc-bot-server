@@ -317,10 +317,11 @@ class StateOverlayTest(unittest.TestCase):
         self.assertEqual(cap.implementation_status, "shipped")
         with get_connection(self.db) as conn:
             row = conn.execute(
-                "SELECT capability_id FROM qa_test_cases "
+                "SELECT capability_id, link_source FROM qa_test_cases "
                 "WHERE id = 'GT-BotDiggingGameTests-digsStoneFast'"
             ).fetchone()
             self.assertEqual(row["capability_id"], "dig.tool_speed")
+            self.assertEqual(row["link_source"], "manual")
             # the restore flip is auditable as a transition
             t = conn.execute(
                 "SELECT source FROM capability_status_transitions"
@@ -333,6 +334,23 @@ class StateOverlayTest(unittest.TestCase):
         second = restore_state(self.overlay, db_path=self.db)
         self.assertEqual(second["statuses_applied"], 0)
         self.assertEqual(second["links_applied"], 0)
+
+    def test_csv_links_stay_out_of_the_overlay(self):
+        # a CSV-owned spec link (its home is the CSV, not the overlay)
+        with get_connection(self.db) as conn:
+            conn.execute(
+                "INSERT INTO qa_test_cases (id, title, kind, test_type, status, "
+                "capability_id, link_source, created_at, updated_at) VALUES "
+                "('TC-DIG-001', 'csv case', 'spec', 'gametest', 'not_executed', "
+                "'dig.tool_speed', 'csv', 'x', 'x')"
+            )
+            conn.commit()
+        result = export_state(self.overlay, db_path=self.db)
+        import json as _json
+        payload = _json.loads(self.overlay.read_text(encoding="utf-8"))
+        case_ids = [l["case_id"] for l in payload["links"]]
+        self.assertNotIn("TC-DIG-001", case_ids)
+        self.assertEqual(payload["schema"], 2)
 
 
 class ImportCsvV2Test(unittest.TestCase):
