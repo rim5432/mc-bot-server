@@ -141,6 +141,25 @@ _MIGRATIONS: list[tuple[int, str, list[str]]] = [
             "CREATE INDEX idx_case_runs_receipt ON test_case_runs(receipt_id)",
         ],
     ),
+    (
+        2,
+        "capability_status_transitions: append-only audit of status changes",
+        [
+            """
+            CREATE TABLE capability_status_transitions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                capability_id TEXT NOT NULL,
+                old_status TEXT,
+                new_status TEXT NOT NULL,
+                source TEXT NOT NULL DEFAULT 'manual',
+                note TEXT DEFAULT '',
+                changed_at TEXT NOT NULL
+            )
+            """,
+            "CREATE INDEX idx_transitions_capability ON capability_status_transitions(capability_id)",
+            "CREATE INDEX idx_transitions_changed ON capability_status_transitions(changed_at)",
+        ],
+    ),
 ]
 
 
@@ -182,7 +201,10 @@ def db_status(db_path: Optional[Path] = None) -> dict:
         ).fetchone()
         version = version_row["v"] if version_row else 0
         counts = {}
-        for table in ["capabilities", "qa_test_cases", "test_receipts", "test_case_runs"]:
+        for table in [
+            "capabilities", "qa_test_cases", "test_receipts",
+            "test_case_runs", "capability_status_transitions",
+        ]:
             try:
                 row = conn.execute(f"SELECT COUNT(*) as c FROM {table}").fetchone()
                 counts[table] = row["c"]

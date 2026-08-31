@@ -17,6 +17,8 @@ from pathlib import Path
 
 from mcbot.capability.backfill import backfill_receipts
 from mcbot.capability.db import get_connection, init_db
+from mcbot.capability.models import Capability
+from mcbot.capability.repository import CapabilityRepository
 from mcbot.engine import parse_run_log
 
 
@@ -144,6 +146,47 @@ class BackfillTest(unittest.TestCase):
             ).fetchone()
             self.assertEqual(row["finished_at"], "2026-08-30T10:00:00")
             self.assertEqual(row["green"], 0)
+
+
+class StatusTransitionTest(unittest.TestCase):
+    """update_status appends transitions; unchanged statuses do not."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.db = Path(self._tmp.name) / "test.db"
+        init_db(self.db)
+        self.repo = CapabilityRepository(self.db)
+        now = "2026-08-31T12:00:00"
+        self.repo.upsert(Capability(
+            id="combat.melee", name="Melee", category="combat",
+            implementation_status="gap", created_at=now, updated_at=now,
+        ))
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _transitions(self) -> list[dict]:
+        with get_connection(self.db) as conn:
+            return [
+                dict(r) for r in conn.execute(
+                    "SELECT * FROM capability_status_transitions ORDER BY id"
+                ).fetchall()
+            ]
+
+    def test_change_records_one_transition_with_source(self):
+        self.repo.update_status("combat.melee", "partial", source="manual")
+        rows = self._transitions()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["old_status"], "gap")
+        self.assertEqual(rows[0]["new_status"], "partial")
+        self.assertEqual(rows[0]["source"], "manual")
+
+    def test_same_status_records_nothing(self):
+        self.repo.update_status("combat.melee", "gap")
+        self.assertEqual(self._transitions(), [])
+
+    def test_unknown_id_returns_false(self):
+        self.assertFalse(self.repo.update_status("nope.nope", "shipped"))
 
 
 if __name__ == "__main__":
