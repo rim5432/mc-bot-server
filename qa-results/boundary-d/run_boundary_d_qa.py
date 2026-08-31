@@ -953,6 +953,20 @@ def batch_d3(led: Ledger) -> None:
         rcon(f"item replace block {furnace_2[0]} {furnace_2[1]} {furnace_2[2]} container.0 with minecraft:iron_ore 8")
         rcon(f"item replace block {furnace_2[0]} {furnace_2[1]} {furnace_2[2]} container.1 with minecraft:coal 4")
         time.sleep(1.0)
+        # Setup self-check: verify Chest A was pre-filled correctly before
+        # any test runs. A mismatch here means setblock/item replace failed
+        # silently — fail loud with the actual counts, not a confusing
+        # "container missing" error in D3-1.
+        code, verify = mc("cat", station_path("chest", chest_a, "container"))
+        if code != 0:
+            raise RuntimeError(f"setup: cannot read chest_a for verification: {verify}")
+        v_cobble = count_role_items(verify, "CONTAINER", "cobblestone")
+        v_ore = count_role_items(verify, "CONTAINER", "iron_ore")
+        v_coal = count_role_items(verify, "CONTAINER", "coal")
+        if v_cobble != 64 or v_ore != 32 or v_coal != 16:
+            raise RuntimeError(
+                f"setup fixture mismatch: chest_a has cobble={v_cobble}, "
+                f"ore={v_ore}, coal={v_coal} (expected 64/32/16)")
         return chest_a, chest_b, chest_c, furnace_1, furnace_2
 
     def count_role_items(menu: dict, role: str, item_id: str) -> int:
@@ -1088,10 +1102,15 @@ def batch_d3(led: Ledger) -> None:
         p2 = menu_f2.get("progress", {})
         assert p2.get("burnTime", 0) > 0, f"Furnace2 not lit: burnTime={p2.get('burnTime')}"
         assert p2.get("cookProgress", 0) > 0, f"Furnace2 not cooking: cookProgress={p2.get('cookProgress')}"
-        # Both furnaces have been smelting for different durations (F2 since
-        # setup, F1 since D3-5), so their cookProgress should differ.
-        assert p1["cookProgress"] != p2["cookProgress"], (
-            f"both furnaces have identical cookProgress={p1['cookProgress']} — not independent?")
+        # Independence proof: F2 started burning at setup, F1 at D3-5.
+        # burnTime decreases monotonically from totalBurnTime (1600 ticks
+        # for coal) to 0 over the fuel's lifetime. F2 has been burning
+        # longer, so its remaining burnTime is strictly lower.
+        # (cookProgress resets per item and can coincide; INPUT consumption
+        # requires a full 10s smelt cycle — both are flakier than burnTime.)
+        assert p2["burnTime"] < p1["burnTime"], (
+            f"F2 burnTime={p2['burnTime']} not < F1 burnTime={p1['burnTime']} — "
+            f"F2 started earlier and should have less remaining fuel")
         ev.append(f"F1: burn={p1['burnTime']}/{p1['totalBurnTime']} cook={p1['cookProgress']}/{p1['cookTotal']}; "
                   f"F2: burn={p2['burnTime']}/{p2['totalBurnTime']} cook={p2['cookProgress']}/{p2['cookTotal']}")
 
@@ -1136,8 +1155,10 @@ def batch_d3(led: Ledger) -> None:
         # Deposit the mixed items to C (keeps bot inventory clean)
         code, dep_ore = mc("write", station_path("chest", chest_c, "input"), "iron_ore:24")
         assert code == 0, f"deposit ore to C failed: {dep_ore}"
+        assert dep_ore.get("placed") == 24, f"ore placed={dep_ore.get('placed')}, expected 24"
         code, dep_coal = mc("write", station_path("chest", chest_c, "input"), "coal:12")
         assert code == 0, f"deposit coal to C failed: {dep_coal}"
+        assert dep_coal.get("placed") == 12, f"coal placed={dep_coal.get('placed')}, expected 12"
         # Now A is truly empty. Take all -> taken=0, no error.
         code, take_empty = mc("write", station_path("chest", chest_a, "output"), "all")
         assert code == 0, f"take from empty A should not error: {take_empty}"
@@ -1177,7 +1198,15 @@ def batch_d3(led: Ledger) -> None:
         # Conservation: total cobblestone across A+B+C = 64 (original in A)
         total_cobble = a_total + b_cobble + c_cobble
         assert total_cobble == 64, f"cobblestone conservation: {total_cobble}, expected 64"
-        ev.append(f"state OK: A=empty, B=48 cobble, C=16 cobble+{c_ingot} ingot+{c_ore} ore+{c_coal} coal; cobble conserved=64")
+        # Bot main inventory must be empty — every prior case deposited all
+        # taken items. A silent deposit failure would leave items here and
+        # escape the container-only conservation check above.
+        code, inv = mc("cat", "/player/inventory")
+        assert code == 0, f"cat /player/inventory failed: {inv}"
+        bot_items = inv.get("items", {}) if isinstance(inv, dict) else {}
+        bot_total = sum(v for v in bot_items.values() if isinstance(v, (int, float)))
+        assert bot_total == 0, f"bot inventory not empty (total={bot_total}): {bot_items}"
+        ev.append(f"state OK: A=empty, B=48 cobble, C=16 cobble+{c_ingot} ingot+{c_ore} ore+{c_coal} coal; cobble conserved=64; bot inv empty")
 
     @led.case("D3", "D3-10", "Furnace 2 independent output: produced iron_ingot without direct menu ops", "GREEN")
     def _(ev):
@@ -1191,7 +1220,7 @@ def batch_d3(led: Ledger) -> None:
         assert ingot_count >= 1, f"Furnace2 OUTPUT empty after ~60s: count={ingot_count}"
         # INPUT should have decreased (ore consumed)
         s0 = next(s for s in menu_f2["slots"] if s["index"] == 0)
-        ore_remaining = s0["item"].get("count", 0) if s0.get("item") else 8
+        ore_remaining = s0["item"].get("count", 0) if s0.get("item") else 0
         assert ore_remaining < 8, f"Furnace2 INPUT still has {ore_remaining} ore (expected <8 after smelting)"
         ev.append(f"Furnace2 independent: OUTPUT={ingot_count} iron_ingot, INPUT={ore_remaining} ore (was 8)")
 

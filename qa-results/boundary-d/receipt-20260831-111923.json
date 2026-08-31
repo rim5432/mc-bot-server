@@ -1,0 +1,146 @@
+{
+ "schema": 1,
+ "task": "boundary-d-qa",
+ "finished_at": "2026-08-31T11:19:23.058923+00:00",
+ "cases": [
+  {
+   "batch": "D3",
+   "id": "D3-1",
+   "desc": "scan discovers all 5 containers with correct types",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  },
+  {
+   "batch": "D3",
+   "id": "D3-2",
+   "desc": "chained A->B transfer: take 32, deposit 32, carried empty",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.2
+  },
+  {
+   "batch": "D3",
+   "id": "D3-3",
+   "desc": "partial take leaves remainder: A 32->16, deposit 16 to C",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.3
+  },
+  {
+   "batch": "D3",
+   "id": "D3-4",
+   "desc": "deposit stacks into existing slot: B 32->48 in one slot",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.4
+  },
+  {
+   "batch": "D3",
+   "id": "D3-5",
+   "desc": "cross-container smelting setup: ore+coal from A -> Furnace 1",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.7
+  },
+  {
+   "batch": "D3",
+   "id": "D3-6",
+   "desc": "dual furnace progress: both burning, independent values",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 5.2
+  },
+  {
+   "batch": "D3",
+   "id": "D3-7",
+   "desc": "smelt completes: OUTPUT has iron_ingot, take 1, deposit to C",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 6.8
+  },
+  {
+   "batch": "D3",
+   "id": "D3-8",
+   "desc": "empty container take returns taken=0, no error",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.5
+  },
+  {
+   "batch": "D3",
+   "id": "D3-9",
+   "desc": "state consistency: verify accumulated contents across all containers",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.4
+  },
+  {
+   "batch": "D3",
+   "id": "D3-10",
+   "desc": "Furnace 2 independent output: produced iron_ingot without direct menu ops",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  },
+  {
+   "batch": "D3",
+   "id": "D3-11",
+   "desc": "session hygiene: 5 open/close cycles, no leak, no carried residue",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.7
+  },
+  {
+   "batch": "D3",
+   "id": "D3-12",
+   "desc": "unknown item deposit reports precise 'item not found' error",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  }
+ ],
+ "evidence": [
+  "[D3-1] PASS: contract held",
+  "    stations: 3 chests, 2 furnaces, all 5 fixtures present",
+  "[D3-2] PASS: contract held",
+  "    A took=32, B placed=32, carried=empty",
+  "[D3-3] PASS: contract held",
+  "    A 32->16 (remainder verified), C placed=16",
+  "[D3-4] PASS: contract held",
+  "    B: 48 cobblestone in 1 slot (stacking verified), A cobblestone emptied",
+  "[D3-5] PASS: contract held",
+  "    took all from A: 48 items",
+  "    deposited iron_ore:8 to Furnace1 INPUT",
+  "    deposited coal:4 to Furnace1 FUEL",
+  "    returned iron_ore:24 to A",
+  "    returned coal:12 to A",
+  "    Furnace1 verified: INPUT=iron_orex8, FUEL=coalx4",
+  "[D3-6] PASS: contract held",
+  "    F1: burn=1491/1600 cook=110/200; F2: burn=1438/1600 cook=163/200",
+  "[D3-7] PASS: contract held",
+  "    Furnace1 OUTPUT: 1 ingot(s), took 1, remainder=0, deposited to C",
+  "[D3-8] PASS: contract held",
+  "    emptied A (took 36), deposited to C, empty take: taken=0 (graceful)",
+  "[D3-9] PASS: contract held",
+  "    state OK: A=empty, B=48 cobble, C=16 cobble+1 ingot+24 ore+12 coal; cobble conserved=64; bot inv empty",
+  "[D3-10] PASS: contract held",
+  "    Furnace2 independent: OUTPUT=1 iron_ingot, INPUT=7 ore (was 8)",
+  "[D3-11] PASS: contract held",
+  "    5 open/close cycles + 6th verify: no session leak, carried always empty",
+  "[D3-12] PASS: contract held",
+  "    unknown item deposit: precise error='item not found in player region: minecraft:unobtainium'"
+ ]
+}
