@@ -518,7 +518,7 @@ class GametestScanTest(unittest.TestCase):
             ).fetchone()
             self.assertEqual(r["kind"], "impl")
             self.assertEqual(r["capability_id"], "motion.sprint")
-            self.assertEqual(r["link_source"], "auto")
+            self.assertEqual(r["link_source"], "auto_keyword")
 
     def test_empty_scan_never_prunes(self):
         # zero methods found = wrong root or broken pattern, not a

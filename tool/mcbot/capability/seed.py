@@ -135,6 +135,7 @@ SEED_CAPABILITIES: list[Capability] = [
         id="combat.melee",
         name="Mob melee: no attack-speed scaling or crits",
         category="combat",
+        axis="offense",
         description="Per-hit damage is the whole ranking, so an axe beats a same-tier sword. The vanilla doHurtTarget path carries enchant bonus, knockback, Fire Aspect, and shield-disable for free.",
         implementation_status="shipped",
         vanilla_ref="Mob.doHurtTarget; ItemStack.getAttributeModifiers (decompiled 1.20.1)",
@@ -143,6 +144,7 @@ SEED_CAPABILITIES: list[Capability] = [
         id="combat.bow_slot",
         name="Bow: no attack-damage modifier, owns SLOT channel",
         category="combat",
+        axis="offense",
         description="Bows carry no attack-damage modifier — any strength-comparing auto-weapon would switch off a drawn bow every tick, so the bow owns the SLOT channel while ranging.",
         implementation_status="shipped",
         vanilla_ref="BowItem; ItemStack.getAttributeModifiers (decompiled 1.20.1)",
@@ -151,6 +153,7 @@ SEED_CAPABILITIES: list[Capability] = [
         id="combat.bow_draw",
         name="Bow draw/release: USE hold window, falling-edge fire",
         category="combat",
+        axis="offense",
         description="Holding USE for the draw window (BOW_CHARGE_TICKS) then one USE release fires BowItem.releaseUsing with the accumulated charge; arrow-drop lift is 0.0028 * range^2. The facade is never player-ticked, so the adapter pumps tickUseLoop every held tick and releases on the falling edge or USE claim loss.",
         implementation_status="shipped",
         vanilla_ref="BowItem.releaseUsing; BowItem.use (decompiled 1.20.1)",
@@ -159,6 +162,7 @@ SEED_CAPABILITIES: list[Capability] = [
         id="combat.shield",
         name="Shield blocking: evaluated on the hurt entity",
         category="combat",
+        axis="defense",
         description="isDamageSourceBlocked reads the hurt entity's own blocking stack at hurt time, so the shield must be raised on the body taking the hit, not on a facade. Raise on the rising edge, release on the falling edge or USE claim loss.",
         implementation_status="shipped",
         vanilla_ref="LivingEntity.isDamageSourceBlocked; ShieldItem (decompiled 1.20.1)",
@@ -167,6 +171,7 @@ SEED_CAPABILITIES: list[Capability] = [
         id="combat.line_of_sight",
         name="Melee line of sight: lava counts as opaque",
         category="combat",
+        axis="perception",
         description="Eye-to-surface ray in which lava counts as opaque. The bot splits this into two independent checks in MeleeResolver: sightBlocked() runs a vanilla ClipContext with Block.COLLIDER / Fluid.NONE (solid terrain only — lava is transparent to this clip), and lavaBetween() is a separate 0.5-block point-sample along the segment that flags lava. Both must pass for a swing to connect.",
         implementation_status="shipped",
         vanilla_ref="MobEntity.hasLineOfSight; ClipContext (decompiled 1.20.1)",
@@ -175,6 +180,7 @@ SEED_CAPABILITIES: list[Capability] = [
         id="combat.hostile_acquisition",
         name="Hostile acquisition: their own AI",
         category="combat",
+        axis="perception",
         description="Follow range, line of sight, and free target slots. A carrier-side presence pass is enough for hostiles to acquire the body on sight (pinned by hostilesAggroOnSight).",
         implementation_status="shipped",
         vanilla_ref="MobEntity.checkDespawn; Monster (decompiled 1.20.1)",
@@ -349,6 +355,10 @@ HARNESS_PATHS: dict[str, list[str]] = {
     "interaction.blockitem_place": ["write /player/held/use"],
     "interaction.bucket_rod": ["write /player/held/use"],
     "interaction.use_item_deviations": ["write /player/held/use"],
+    # hunger: eating is held-item use; fooddata/exhaustion are internal
+    "hunger.eat_chain": ["write /player/held/use"],
+    # perception: fishing rod use exercises the projectile/bobber sense
+    "perception.projectiles": ["write /player/held/use"],
     # inventory: bag/free reads + station menu crafting
     "inventory.shape": ["cat /player/bag", "cat /player/inventory/free"],
     "inventory.menu_clicks": ["/stations", "/recipes/<slug>"],
@@ -584,6 +594,9 @@ def seed_database(db_path: Optional[Path] = None) -> dict:
                 changed = True
             if existing.source_paths != spaths:
                 existing.source_paths = spaths
+                changed = True
+            if existing.axis != cap.axis:
+                existing.axis = cap.axis
                 changed = True
             if changed:
                 repo.upsert(existing)

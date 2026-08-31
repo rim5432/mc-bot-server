@@ -77,6 +77,33 @@ _CLASS_RE = re.compile(r"public\s+(?:final\s+)?class\s+(\w+)")
 #   MLGWaterBucket → mlg water bucket
 _CAMEL_SPLIT_RE = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|\d+")
 
+# Explicit capability declaration in a comment above a @GameTest method:
+#   // capability: combat.bow_draw
+# This is the highest-priority link source (annotated), above keyword
+# matching and class fallback. The终局 is @GameTest(capability=...) but
+# that requires Java source changes; comments are non-invasive and work
+# with the current Forge @GameTest annotation signature.
+_CAPABILITY_COMMENT_RE = re.compile(
+    r"//\s*capability\s*:\s*([a-z_]+\.[a-z_]+)",
+    re.IGNORECASE,
+)
+
+
+def _extract_capability_comment(content: str, method_start: int) -> Optional[str]:
+    """Walk backward from the method start to find a // capability: <id>
+    comment in the immediately preceding lines (within 5 lines, so a
+    stray comment elsewhere in the file does not hijack the link)."""
+    lines_before = content[:method_start].splitlines()
+    for line in reversed(lines_before[-6:]):  # 5 lines + the @GameTest line
+        m = _CAPABILITY_COMMENT_RE.search(line)
+        if m:
+            return m.group(1).lower()
+        # Stop walking if we hit a blank line or code (not a comment)
+        stripped = line.strip()
+        if stripped and not stripped.startswith("//") and not stripped.startswith("@"):
+            break
+    return None
+
 
 def _split_camel(name: str) -> str:
     """Convert camelCase/PascalCase to lowercase space-separated tokens."""
@@ -88,15 +115,21 @@ def _method_to_capability(
     method_name: str,
     class_name: str,
     repo: CapabilityRepository,
-) -> Optional[str]:
-    """Match a gametest method to a capability via keywords, then class fallback."""
+) -> tuple[Optional[str], Optional[str]]:
+    """Match a gametest method to a capability via keywords, then class fallback.
+
+    Returns (capability_id, link_source) where link_source distinguishes
+    confidence: 'auto_keyword' (explicit keyword hit) vs 'auto_class'
+    (ambiguous class-name fallback). Callers should prefer 'annotated'
+    from an explicit comment declaration above either of these.
+    """
     haystack = _split_camel(method_name)
 
     # Stage 1: keyword rules (same table as CSV import)
     for keywords, cap_id in KEYWORD_RULES:
         if any(kw.lower() in haystack for kw in keywords):
             if repo.get(cap_id):
-                return cap_id
+                return cap_id, "auto_keyword"
 
     # Stage 2: class → category fallback (only if exactly one capability
     # exists in that category — otherwise ambiguous, leave unlinked)
@@ -104,9 +137,9 @@ def _method_to_capability(
     if category:
         caps_in_cat = repo.list(category=category)
         if len(caps_in_cat) == 1:
-            return caps_in_cat[0].id
+            return caps_in_cat[0].id, "auto_class"
 
-    return None
+    return None, None
 
 
 def scan_gametests(
@@ -165,20 +198,28 @@ def scan_gametests(
             )
 
             # Auto-link (preserve existing links AND their source:
-            # manual triage sticks, fresh guesses are marked 'auto')
+            # manual triage sticks, fresh guesses are marked by confidence)
             existing = _get_case(db_path, case_id)
             link_fields: dict = {}
             if existing and existing.capability_id:
                 link_fields["capability_id"] = existing.capability_id
                 link_fields["link_source"] = existing.link_source or "auto"
             else:
-                cap_id = _method_to_capability(method_name, class_name, repo)
-                link_fields["capability_id"] = cap_id
-                link_fields["link_source"] = "auto" if cap_id else None
-                if cap_id:
+                # Priority 1: explicit // capability: <id> comment above the method
+                annotated = _extract_capability_comment(content, method_match.start())
+                if annotated and repo.get(annotated):
+                    link_fields["capability_id"] = annotated
+                    link_fields["link_source"] = "annotated"
                     auto_linked += 1
                 else:
-                    unlinked += 1
+                    # Priority 2: keyword match, then class fallback
+                    cap_id, link_src = _method_to_capability(method_name, class_name, repo)
+                    link_fields["capability_id"] = cap_id
+                    link_fields["link_source"] = link_src
+                    if cap_id:
+                        auto_linked += 1
+                    else:
+                        unlinked += 1
 
             now = _dt.datetime.now().isoformat(timespec="seconds")
 

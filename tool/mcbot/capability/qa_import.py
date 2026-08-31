@@ -155,18 +155,21 @@ def import_csv(
 
             notes_raw = (row.get("notes") or "").strip()
             notes = "{}"
+            no_face = False
             if notes_raw:
                 try:
-                    json.loads(notes_raw)
+                    parsed = json.loads(notes_raw)
                     notes = notes_raw
+                    no_face = bool(parsed.get("no_face", False))
                 except ValueError:
                     notes = json.dumps({"_raw": notes_raw})
                     bad_notes.append(case_id)
 
             now = _now_iso()
+            link_source = "csv" if cap_id else ("no_face" if no_face else None)
             common = dict(
                 capability_id=cap_id,
-                link_source="csv" if cap_id else None,
+                link_source=link_source,
                 title=(row.get("title") or "").strip(),
                 priority=(row.get("priority") or "").strip(),
                 test_type=(row.get("test_type") or "").strip(),
@@ -213,11 +216,15 @@ def list_unlinked(db_path: Optional[Path] = None) -> list[QATestCase]:
     """Cases missing a capability link, specs and impls together (the
     CLI splits them by kind - two different problems). kind='wire'
     rows (boundary-d contract cases) are excluded: they anchor to the
-    wire contract, not to behavior faces, by design."""
+    wire contract, not to behavior faces, by design. link_source=
+    'no_face' rows (CSV-declared non-behavior cases like code audits
+    and test hygiene) are also excluded: they deliberately carry no
+    face link."""
     with get_connection(db_path) as conn:
         rows = conn.execute(
             "SELECT * FROM qa_test_cases "
-            "WHERE capability_id IS NULL AND kind != 'wire' ORDER BY id"
+            "WHERE capability_id IS NULL AND kind != 'wire' "
+            "AND link_source != 'no_face' ORDER BY id"
         ).fetchall()
     return [_row_to_case(r) for r in rows]
 

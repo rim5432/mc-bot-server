@@ -59,6 +59,8 @@ from mcbot.capability.report import (
     evidence_for_faces,
     evidence_rollup,
     harness_axis,
+    staleness_for_faces,
+    status_suggestions,
 )
 from mcbot.capability.state_export import restore_state, write_state_through
 from mcbot.capability.qa_import import import_csv, link_case, list_unlinked
@@ -446,6 +448,14 @@ def cmd_cap_overview(args) -> int:
           f"{ev['untested']} untested")
     print(f"  honest convergence: {ev['shipped_green']}/{ev['shipped']} shipped faces "
           f"carry green evidence*")
+    suggestions = status_suggestions()
+    if suggestions:
+        print(f"  review suggestions: {len(suggestions)} face(s) where declared status "
+              f"disagrees with evidence:")
+        for s in suggestions[:10]:
+            print(f"    {s['face']:<30} [{s['status']:<8}] {s['suggestion']:<18} {s['reason']}")
+        if len(suggestions) > 10:
+            print(f"    ... and {len(suggestions) - 10} more")
     print("  * statuses are DECLARED (human rulings), not derived; evidence is derived "
           "from receipts on every read")
     print()
@@ -488,6 +498,8 @@ def cmd_cap_status(args) -> int:
     print(f"=== {cap.id} ===")
     print(f"  name        : {cap.name}")
     print(f"  category    : {cap.category}")
+    if cap.axis:
+        print(f"  axis        : {cap.axis}")
     print(f"  status      : {cap.implementation_status}")
     print(f"  verified_at : {cap.verified_at or 'never'}")
     print(f"  created     : {cap.created_at}")
@@ -520,6 +532,16 @@ def cmd_cap_status(args) -> int:
             print(f"    last green: {ev['last_green_at']}")
         if ev["last_red_at"]:
             print(f"    last red  : {ev['last_red_at']}")
+    st = staleness_for_faces().get(cap.id)
+    if st:
+        stale_label = st["state"].upper()
+        if st["state"] == "stale" and st["days_stale"] is not None:
+            stale_label += f" ({st['days_stale']:.1f}d since last green after code change)"
+        print(f"\n  staleness   : {stale_label}")
+        if st["last_code_change"]:
+            print(f"    code change: {st['last_code_change']}")
+        if st["last_green_at"]:
+            print(f"    last green : {st['last_green_at']}")
     return 0
 
 
@@ -650,21 +672,103 @@ def cmd_cap_domain(args) -> int:
     print(f"  evidence: {ev_counts['green']} green, {ev_counts['red']} red, "
           f"{ev_counts['untested']} untested (from the newest engine run)")
     print()
-    print(f"{'FACE':<28} {'STATUS':<10} {'EVID':<9} {'VERIFIED':<12} {'SPECS':>5} {'IMPLS':>5}  FLAGS")
-    print("-" * 105)
-    for f in rep["faces"]:
-        flags = []
-        if f["no_spec"]:
-            flags.append("NO-SPEC")
-        if f["no_impl"]:
-            flags.append("NO-IMPL")
-        if f["has_deviation"]:
-            flags.append("DEVIATION")
-        ev = f["evidence"]["state"].upper()
-        if f["evidence"]["state"] == "green" and f["evidence"]["red_runs"]:
-            ev += f"(x{f['evidence']['red_runs']})"
-        print(f"{f['id']:<28} {f['implementation_status'] + '*':<10} {ev:<9} {f['verified_at'] or '-':<12} "
-              f"{f['spec_count']:>5} {f['impl_count']:>5}  {' '.join(flags)}")
+
+    # --- coverage analysis (player-behavior reference baseline) ---
+    cov = rep.get("coverage")
+    if cov is not None:
+        bv = cov["by_verdict"]
+        print(f"--- player-behavior coverage: {cov['coverage_pct']}% "
+              f"({bv['covered']} covered, {bv['partial']} partial, "
+              f"{bv['gap']} gap, {bv['untested']} untested "
+              f"of {cov['reference_total']} reference behaviors) ---")
+        print()
+        print(f"  {'AXIS':<14} {'TOTAL':>5} {'COVERED':>7} {'PARTIAL':>7} "
+              f"{'GAP':>4} {'UNTESTED':>8}  {'COVERAGE':>8}")
+        print("  " + "-" * 78)
+        for ax, data in cov["by_axis"].items():
+            print(f"  {ax:<14} {data['total']:>5} {data['covered']:>7} "
+                  f"{data['partial']:>7} {data['gap']:>4} {data['untested']:>8}  "
+                  f"{data['coverage_pct']:>7.1f}%")
+        print()
+        if cov["gaps"]:
+            print(f"  coverage gaps ({len(cov['gaps'])}):")
+            for b in cov["gaps"]:
+                face_info = f" -> {b['mapped_face']}({b['face_status']})" if b["mapped_face"] else " (no matrix face)"
+                print(f"    [{b['axis']:<11}] {b['name']}{face_info}")
+                if b["verdict_reason"]:
+                    print(f"      {b['verdict_reason']}")
+            print()
+        if cov["untested"]:
+            print(f"  untested behaviors ({len(cov['untested'])}):")
+            for b in cov["untested"]:
+                print(f"    [{b['axis']:<11}] {b['name']} -> {b['mapped_face']}")
+                if b["verdict_reason"]:
+                    print(f"      {b['verdict_reason']}")
+            print()
+        if cov["partials"]:
+            print(f"  partial coverage ({len(cov['partials'])}):")
+            for b in cov["partials"]:
+                print(f"    [{b['axis']:<11}] {b['name']} -> {b['mapped_face']}")
+                if b["coverage_note"]:
+                    note = b["coverage_note"]
+                    if len(note) > 120:
+                        note = note[:117] + "..."
+                    print(f"      {note}")
+            print()
+
+    if rep.get("faces_shipped_untested"):
+        print(f"  WARN: shipped but UNTESTED (no impl anchor): "
+              f"{', '.join(rep['faces_shipped_untested'])}")
+        print()
+
+    staleness = staleness_for_faces()
+    stale_count = sum(1 for s in staleness.values() if s["state"] == "stale")
+    if stale_count:
+        print(f"  staleness: {stale_count} face(s) changed code since last green test")
+    print(f"{'FACE':<28} {'STATUS':<10} {'EVID':<9} {'STALE':<8} {'VERIFIED':<12} {'SPECS':>5} {'IMPLS':>5}  FLAGS")
+    print("-" * 115)
+    faces_by_axis = rep.get("faces_by_axis", {})
+    if faces_by_axis:
+        for ax, faces in faces_by_axis.items():
+            label = ax if ax != "_unclassified" else "(unclassified)"
+            print(f"  [{label}]")
+            for f in faces:
+                flags = []
+                if f["no_spec"]:
+                    flags.append("NO-SPEC")
+                if f["no_impl"]:
+                    flags.append("NO-IMPL")
+                if f["has_deviation"]:
+                    flags.append("DEVIATION")
+                ev = f["evidence"]["state"].upper()
+                if f["evidence"]["state"] == "green" and f["evidence"]["red_runs"]:
+                    ev += f"(x{f['evidence']['red_runs']})"
+                st = staleness.get(f["id"], {})
+                stale_str = st.get("state", "-").upper()
+                if st.get("state") == "stale" and st.get("days_stale") is not None:
+                    stale_str += f"({st['days_stale']:.0f}d)"
+                print(f"{f['id']:<28} {f['implementation_status'] + '*':<10} {ev:<9} {stale_str:<8} "
+                      f"{f['verified_at'] or '-':<12} "
+                      f"{f['spec_count']:>5} {f['impl_count']:>5}  {' '.join(flags)}")
+    else:
+        for f in rep["faces"]:
+            flags = []
+            if f["no_spec"]:
+                flags.append("NO-SPEC")
+            if f["no_impl"]:
+                flags.append("NO-IMPL")
+            if f["has_deviation"]:
+                flags.append("DEVIATION")
+            ev = f["evidence"]["state"].upper()
+            if f["evidence"]["state"] == "green" and f["evidence"]["red_runs"]:
+                ev += f"(x{f['evidence']['red_runs']})"
+            st = staleness.get(f["id"], {})
+            stale_str = st.get("state", "-").upper()
+            if st.get("state") == "stale" and st.get("days_stale") is not None:
+                stale_str += f"({st['days_stale']:.0f}d)"
+            print(f"{f['id']:<28} {f['implementation_status'] + '*':<10} {ev:<9} {stale_str:<8} "
+                  f"{f['verified_at'] or '-':<12} "
+                  f"{f['spec_count']:>5} {f['impl_count']:>5}  {' '.join(flags)}")
     if rep["faces_no_spec"]:
         print(f"\n  no specs (no declared testing intent): {', '.join(rep['faces_no_spec'])}")
     if rep["faces_no_impl"]:

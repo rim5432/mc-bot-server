@@ -20,6 +20,11 @@ from typing import Optional
 
 from mcbot.capability.db import get_connection, init_db
 from mcbot.capability.queries import overview
+from mcbot.capability.player_behavior_reference import (
+    ReferenceBehavior,
+    axis_order_for,
+    reference_for,
+)
 
 TRANSITIONS_BORN = "2026-08-31"
 
@@ -257,6 +262,288 @@ def evidence_rollup(db_path: Optional[Path] = None) -> dict:
     return counts
 
 
+def status_suggestions(db_path: Optional[Path] = None) -> list[dict]:
+    """Evidence-driven status review suggestions (never auto-applied).
+
+    The implementation_status field is a human ruling on vanilla
+    alignment - receipts cannot derive it. What receipts CAN do is
+    flag faces where the declared status and the evidence disagree,
+    so a human reviewer knows where to look. Suggestions are read-only;
+    applying them is `capability set <id> <status>` with a reason.
+
+    Rules:
+    - shipped + RED in newest run -> recheck (possible regression)
+    - shipped + UNTESTED -> add test anchor (shipped but no impl)
+    - shipped + NO-SPEC -> add spec (shipped but no declared test intent)
+    - partial/gap + GREEN + spec + impl -> consider promote
+    - deferred faces are excluded (by design)
+    """
+    init_db(db_path)
+    evidence = evidence_for_faces(db_path)
+    with get_connection(db_path) as conn:
+        caps = {
+            r["id"]: r
+            for r in conn.execute(
+                "SELECT id, implementation_status FROM capabilities"
+            ).fetchall()
+        }
+        counts = {
+            r["capability_id"]: {"spec": r["spec"], "impl": r["impl"]}
+            for r in conn.execute(
+                """
+                SELECT capability_id,
+                       SUM(CASE WHEN kind = 'spec' THEN 1 ELSE 0 END) as spec,
+                       SUM(CASE WHEN kind = 'impl' THEN 1 ELSE 0 END) as impl
+                FROM qa_test_cases
+                WHERE capability_id IS NOT NULL AND kind IN ('spec', 'impl')
+                GROUP BY capability_id
+                """
+            ).fetchall()
+        }
+    suggestions: list[dict] = []
+    for face, cap in caps.items():
+        status = cap["implementation_status"]
+        if status == "deferred":
+            continue
+        ev = evidence.get(face, {"state": "untested"})
+        c = counts.get(face, {"spec": 0, "impl": 0})
+        if status == "shipped":
+            if ev["state"] == "red":
+                suggestions.append({"face": face, "status": status, "suggestion": "recheck",
+                                    "reason": "shipped but RED in newest engine run (possible regression)"})
+            elif ev["state"] == "untested":
+                suggestions.append({"face": face, "status": status, "suggestion": "add_test_anchor",
+                                    "reason": "shipped but no impl (no automated test anchor)"})
+            elif c["spec"] == 0:
+                suggestions.append({"face": face, "status": status, "suggestion": "add_spec",
+                                    "reason": "shipped but no spec (no declared testing intent in CSV)"})
+        elif status in ("partial", "gap"):
+            if ev["state"] == "green" and c["spec"] > 0 and c["impl"] > 0:
+                suggestions.append({"face": face, "status": status, "suggestion": "consider_promote",
+                                    "reason": f"{status} but GREEN evidence with spec({c['spec']})+impl({c['impl']})"})
+    return suggestions
+
+
+def staleness_for_faces(db_path: Optional[Path] = None, *, repo_root: Optional[Path] = None) -> dict:
+    """Per-face staleness: source code last changed vs. last green test.
+
+    Read-model that DOES touch git (the only report function that does) -
+    source_paths from the DB are fed to `git log -1` per file, then
+    compared against the most recent runGameTest receipt where this face's
+    linked impl cases did not fail. Faces with no impls are UNTESTED;
+    faces whose code changed after their last green are STALE.
+
+    Returns {face_id: {state, last_code_change, last_green_at, days_stale}}.
+    state in {fresh, stale, untested, no_green_ever}.
+    """
+    import subprocess
+    if repo_root is None:
+        repo_root = Path(__file__).resolve().parents[3]  # tool/mcbot/capability/ -> repo root
+    init_db(db_path)
+    with get_connection(db_path) as conn:
+        rows = conn.execute(
+            "SELECT id, source_paths FROM capabilities ORDER BY id"
+        ).fetchall()
+        impl_counts = {
+            r["capability_id"]: r["c"]
+            for r in conn.execute(
+                "SELECT capability_id, COUNT(*) as c FROM qa_test_cases "
+                "WHERE kind = 'impl' AND capability_id IS NOT NULL "
+                "GROUP BY capability_id"
+            ).fetchall()
+        }
+    result: dict[str, dict] = {}
+    for r in rows:
+        face = r["id"]
+        paths = json.loads(r["source_paths"] or "[]")
+        if impl_counts.get(face, 0) == 0:
+            result[face] = {"state": "untested", "last_code_change": None,
+                             "last_green_at": None, "days_stale": None}
+            continue
+        # Last code change: newest git commit touching any source_path
+        last_code_ts = None
+        for p in paths:
+            full = repo_root / "src/main/java/com/mcbot/mcbotserver" / p
+            if not full.exists():
+                continue
+            try:
+                out = subprocess.run(
+                    ["git", "log", "-1", "--format=%ct", "--", str(full)],
+                    cwd=repo_root, capture_output=True, text=True, timeout=10,
+                )
+                ts = out.stdout.strip()
+                if ts:
+                    last_code_ts = max(last_code_ts or 0, int(ts))
+            except (subprocess.TimeoutExpired, ValueError):
+                continue
+        last_code_dt = _dt.datetime.fromtimestamp(last_code_ts, _dt.timezone.utc) if last_code_ts else None
+        # Last green: most recent runGameTest receipt where this face's impls did not fail
+        with get_connection(db_path) as conn:
+            green_row = conn.execute(
+                """
+                SELECT MAX(r.finished_at) as last_green_at
+                FROM test_receipts r
+                WHERE r.test_type = 'runGameTest'
+                AND r.id NOT IN (
+                    SELECT cr.receipt_id
+                    FROM test_case_runs cr
+                    JOIN qa_test_cases c ON c.id = cr.test_case_id
+                    WHERE c.kind = 'impl' AND c.capability_id = ?
+                )
+                """,
+                (face,),
+            ).fetchone()
+        last_green_str = green_row["last_green_at"] if green_row else None
+        if not last_green_str:
+            result[face] = {"state": "no_green_ever", "last_code_change": last_code_dt.isoformat() if last_code_dt else None,
+                             "last_green_at": None, "days_stale": None}
+            continue
+        # Parse last_green_at (ISO format with or without timezone)
+        try:
+            last_green_dt = _dt.datetime.fromisoformat(last_green_str.replace("Z", "+00:00"))
+            if last_green_dt.tzinfo is None:
+                last_green_dt = last_green_dt.replace(tzinfo=_dt.timezone.utc)
+        except ValueError:
+            last_green_dt = None
+        if last_code_dt and last_green_dt:
+            days_stale = (last_code_dt - last_green_dt).total_seconds() / 86400
+            state = "stale" if days_stale > 0 else "fresh"
+        else:
+            days_stale = None
+            state = "fresh" if last_green_dt else "no_green_ever"
+        result[face] = {
+            "state": state,
+            "last_code_change": last_code_dt.isoformat() if last_code_dt else None,
+            "last_green_at": last_green_str,
+            "days_stale": round(days_stale, 1) if days_stale is not None else None,
+        }
+    return result
+
+
+def coverage_analysis(category: str, *, db_path: Optional[Path] = None) -> Optional[dict]:
+    """Diff the player-behavior reference baseline against matrix faces.
+
+    For each reference behavior (what a vanilla player can do), resolve
+    its mapped face (if any) and that face's implementation status +
+    evidence state. Coverage verdicts:
+
+    - ``covered``: mapped face exists and is shipped or partial
+    - ``partial``: mapped face is partial, or the coverage_note flags
+      a structural weakness (adapter-only, untested, mechanic-only)
+    - ``gap``: mapped face is gap or deferred, or no mapped face exists
+    - ``untested``: mapped face is shipped but evidence state is untested
+
+    Per-axis rollups answer "how much of the player's combat action set
+    does the design cover, by sub-domain?" This is the number the old
+    domain report could not produce — it only listed faces that existed,
+    never the behaviors that were missing.
+
+    Returns None when no reference baseline is defined for the category.
+    """
+    refs = reference_for(category)
+    if not refs:
+        return None
+    init_db(db_path)
+    evidence = evidence_for_faces(db_path)
+    with get_connection(db_path) as conn:
+        face_rows = {
+            r["id"]: dict(r)
+            for r in conn.execute(
+                "SELECT id, name, implementation_status, axis FROM capabilities "
+                "WHERE category = ?",
+                (category,),
+            ).fetchall()
+        }
+        impl_counts = {
+            r["capability_id"]: r["c"]
+            for r in conn.execute(
+                "SELECT capability_id, COUNT(*) as c FROM qa_test_cases "
+                "WHERE kind = 'impl' AND capability_id IS NOT NULL "
+                "GROUP BY capability_id"
+            ).fetchall()
+        }
+    behaviors = []
+    for ref in refs:
+        face = face_rows.get(ref.mapped_face) if ref.mapped_face else None
+        face_status = face["implementation_status"] if face else None
+        face_evidence = evidence.get(ref.mapped_face, {}).get("state") if ref.mapped_face else None
+        # Verdict logic (order matters: hardest deficiency first)
+        if face is None:
+            verdict = "gap"
+            verdict_reason = "no matrix face"
+        elif face_status in ("gap", "deferred"):
+            verdict = "gap"
+            verdict_reason = f"face is {face_status}"
+        elif face_evidence == "untested":
+            verdict = "untested"
+            verdict_reason = "shipped but no impl test anchor"
+        elif face_evidence == "red":
+            verdict = "partial"
+            verdict_reason = "shipped but newest engine run is RED"
+        elif ref.coverage_note and any(
+            kw in ref.coverage_note.lower()
+            for kw in ("adapter", "no behavior", "not combat", "mechanic", "passively", "does not")
+        ):
+            verdict = "partial"
+            verdict_reason = "weak mapping: " + ref.coverage_note.split(".")[0][:80]
+        elif face_status == "partial":
+            verdict = "partial"
+            verdict_reason = "face is partial"
+        else:
+            verdict = "covered"
+            verdict_reason = ""
+        behaviors.append({
+            "id": ref.id,
+            "name": ref.name,
+            "axis": ref.axis,
+            "description": ref.description,
+            "vanilla_ref": ref.vanilla_ref,
+            "mapped_face": ref.mapped_face,
+            "face_status": face_status,
+            "face_evidence": face_evidence,
+            "coverage_note": ref.coverage_note,
+            "verdict": verdict,
+            "verdict_reason": verdict_reason,
+        })
+    # Per-axis rollup
+    axes = {}
+    for ax in axis_order_for(category):
+        ax_behaviors = [b for b in behaviors if b["axis"] == ax]
+        if not ax_behaviors:
+            continue
+        counts = {"covered": 0, "partial": 0, "gap": 0, "untested": 0}
+        for b in ax_behaviors:
+            counts[b["verdict"]] += 1
+        total = len(ax_behaviors)
+        axes[ax] = {
+            "total": total,
+            **counts,
+            "coverage_pct": round(
+                (counts["covered"] + 0.5 * counts["partial"]) / total * 100, 1
+            ) if total else 0.0,
+        }
+    total = len(behaviors)
+    counts = {"covered": 0, "partial": 0, "gap": 0, "untested": 0}
+    for b in behaviors:
+        counts[b["verdict"]] += 1
+    gaps = [b for b in behaviors if b["verdict"] == "gap"]
+    untested = [b for b in behaviors if b["verdict"] == "untested"]
+    partials = [b for b in behaviors if b["verdict"] == "partial"]
+    return {
+        "category": category,
+        "reference_total": total,
+        "by_verdict": counts,
+        "coverage_pct": round(
+            (counts["covered"] + 0.5 * counts["partial"]) / total * 100, 1
+        ) if total else 0.0,
+        "by_axis": axes,
+        "behaviors": behaviors,
+        "gaps": gaps,
+        "untested": untested,
+        "partials": partials,
+    }
+
+
 def domain_report(category: str, *, db_path: Optional[Path] = None) -> Optional[dict]:
     """One capability domain: per-face evidence, coverage, deficiencies.
 
@@ -277,7 +564,7 @@ def domain_report(category: str, *, db_path: Optional[Path] = None) -> Optional[
         caps = [
             dict(r) for r in conn.execute(
                 "SELECT id, name, implementation_status, verified_at, "
-                "deviation, updated_at FROM capabilities WHERE category = ? ORDER BY id",
+                "deviation, axis, updated_at FROM capabilities WHERE category = ? ORDER BY id",
                 (category,),
             ).fetchall()
         ]
@@ -310,6 +597,7 @@ def domain_report(category: str, *, db_path: Optional[Path] = None) -> Optional[
             ]
             faces.append({
                 **cap,
+                "axis": cap.get("axis") or "",
                 "has_deviation": bool(cap["deviation"]),
                 "cases": [r["id"] for r in case_rows],
                 "case_count": len(case_rows),
@@ -348,9 +636,31 @@ def domain_report(category: str, *, db_path: Optional[Path] = None) -> Optional[
     return {
         "category": category,
         "faces": faces,
+        "faces_by_axis": _group_faces_by_axis(faces, category),
         "faces_no_spec": [f["id"] for f in faces if f["no_spec"]],
         "faces_no_impl": [f["id"] for f in faces if f["no_impl"]],
         "faces_with_deviation": [f["id"] for f in faces if f["has_deviation"]],
+        "faces_shipped_untested": [
+            f["id"] for f in faces
+            if f["implementation_status"] == "shipped"
+            and f["evidence"]["state"] == "untested"
+        ],
         "last_red_in_domain": dict(last_red) if last_red else None,
         "green_streak_since": green_streak,
+        "coverage": coverage_analysis(category, db_path=db_path),
     }
+
+
+def _group_faces_by_axis(faces: list[dict], category: str) -> dict[str, list[dict]]:
+    """Group faces by their axis field, using the canonical axis order.
+
+    Faces with no axis (legacy rows) land under ``_unclassified``.
+    """
+    from mcbot.capability.player_behavior_reference import axis_order_for
+    order = axis_order_for(category)
+    grouped: dict[str, list[dict]] = {ax: [] for ax in order}
+    grouped["_unclassified"] = []
+    for f in faces:
+        ax = f.get("axis") or "_unclassified"
+        grouped.setdefault(ax, []).append(f)
+    return {k: v for k, v in grouped.items() if v}
