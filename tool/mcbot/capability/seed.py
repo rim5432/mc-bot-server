@@ -355,13 +355,218 @@ HARNESS_PATHS: dict[str, list[str]] = {
 }
 
 
+# Source path axis (implementation files that realize each face).
+#
+# Catalog data, curated alongside HARNESS_PATHS. Paths are relative to
+# src/main/java/com/mcbot/mcbotserver/. A face with no paths renders
+# SOURCELESS in `capability paths`; the per-face staleness metric needs
+# this axis populated (0/35 before this seed landed).
+# ---------------------------------------------------------------------------
+SOURCE_PATHS: dict[str, list[str]] = {
+    # combat
+    "combat.bow_draw": [
+        "core/combat/RangedLoadouts.java",
+        "adapter/BotPlayerFacade.java",
+        "adapter/entity/BotBodyEntity.java",
+        "core/tick/BotController.java",
+    ],
+    "combat.bow_slot": [
+        "core/combat/RangedLoadouts.java",
+        "core/tick/ToolSelector.java",
+        "adapter/inventory/BindingInventory.java",
+    ],
+    "combat.shield": [
+        "adapter/entity/BotBodyEntity.java",
+        "adapter/BotPlayerFacade.java",
+        "core/tick/BotController.java",
+    ],
+    "combat.melee": [
+        "adapter/MeleeResolver.java",
+        "core/process/AttackProcess.java",
+        "core/command/AttackCommandHandler.java",
+        "adapter/VanillaWeaponCatalog.java",
+    ],
+    "combat.line_of_sight": [
+        "adapter/sensing/LevelThreatSensor.java",
+        "core/process/TargetTracker.java",
+        "core/world/SnapshotWorldView.java",
+    ],
+    "combat.hostile_acquisition": [
+        "adapter/sensing/LevelThreatSensor.java",
+        "core/reflex/EngageOnHostileProximityRule.java",
+        "core/process/TargetTracker.java",
+    ],
+    # digging
+    "dig.pacing": [
+        "core/actor/DigPacing.java",
+        "adapter/DigExecutor.java",
+        "core/process/DigProcess.java",
+        "core/command/DigCommandHandler.java",
+    ],
+    "dig.tool_speed": [
+        "core/tick/ToolSelector.java",
+        "adapter/VanillaToolCatalog.java",
+        "adapter/DigExecutor.java",
+    ],
+    "dig.enchantment_loot": [
+        "adapter/DigExecutor.java",
+        "core/world/MapBlockTraitsRegistry.java",
+        "adapter/VanillaToolCatalog.java",
+    ],
+    # hunger
+    "hunger.fooddata": [
+        "adapter/VanillaFoodCatalog.java",
+        "adapter/entity/HungerTicker.java",
+        "core/process/HungryProcess.java",
+    ],
+    "hunger.movement_exhaustion": [
+        "adapter/entity/HungerTicker.java",
+        "core/behavior/PathingBehavior.java",
+        "adapter/entity/BotBodyEntity.java",
+    ],
+    "hunger.eat_chain": [
+        "core/reflex/EatWhenHungryRule.java",
+        "core/reflex/AcquireFoodWhenHungryRule.java",
+        "core/process/HungryProcess.java",
+        "adapter/entity/BotBodyEntity.java",
+        "adapter/VanillaFoodCatalog.java",
+    ],
+    # interaction
+    "interaction.right_click_order": [
+        "adapter/InteractBlockExecutor.java",
+        "core/command/VerbTaskHandler.java",
+        "adapter/BotPlayerFacade.java",
+        "adapter/ReachPolicy.java",
+    ],
+    "interaction.blockitem_place": [
+        "adapter/InteractBlockExecutor.java",
+        "core/command/VerbTaskHandler.java",
+        "core/world/SnapshotWorldView.java",
+    ],
+    "interaction.bucket_rod": [
+        "core/behavior/FishBehavior.java",
+        "adapter/InteractBlockExecutor.java",
+        "adapter/BotPlayerFacade.java",
+    ],
+    "interaction.drop": [
+        "adapter/MenuVerbs.java",
+        "adapter/inventory/BindingInventory.java",
+        "core/menu/TransferPlanner.java",
+    ],
+    "interaction.menu_provider_skip": [
+        "adapter/MenuOpener.java",
+        "adapter/ActorMenuTransactions.java",
+        "core/menu/MenuPlanner.java",
+    ],
+    "interaction.use_item_deviations": [
+        "adapter/BotPlayerFacade.java",
+        "adapter/entity/BotBodyEntity.java",
+        "core/tick/BotController.java",
+    ],
+    # inventory
+    "inventory.shape": [
+        "adapter/inventory/BindingInventory.java",
+        "adapter/MenuSlotLayouts.java",
+        "core/menu/PlayerRegion.java",
+    ],
+    "inventory.equipment_mirror": [
+        "adapter/entity/BotBodyEntity.java",
+        "adapter/VanillaArmorCatalog.java",
+        "adapter/WearVerbs.java",
+        "core/menu/WearPlanner.java",
+    ],
+    "inventory.menu_clicks": [
+        "adapter/MenuVerbs.java",
+        "adapter/BotCraftingMenu.java",
+        "adapter/BotInventoryMenu.java",
+        "core/menu/CraftingPlanner.java",
+        "core/menu/TransferPlanner.java",
+        "adapter/RecipeCatalog.java",
+    ],
+    "inventory.armor_classification": [
+        "adapter/VanillaArmorCatalog.java",
+        "adapter/WearVerbs.java",
+        "core/menu/WearPlanner.java",
+    ],
+    # motion
+    "motion.sneak": [
+        "adapter/entity/SneakEdgeGuard.java",
+        "adapter/entity/BotBodyEntity.java",
+        "core/pathing/BasicMoves.java",
+    ],
+    "motion.sprint": [
+        "adapter/entity/BotBodyEntity.java",
+        "core/pathing/BasicMoves.java",
+        "core/behavior/PathingBehavior.java",
+    ],
+    "motion.ladders_vines": [
+        "core/pathing/BasicMoves.java",
+        "core/pathing/AStarPathFinder.java",
+        "core/behavior/PathingBehavior.java",
+        "core/behavior/WaypointCursor.java",
+    ],
+    # perception
+    "perception.projectiles": [
+        "core/behavior/FishBehavior.java",
+        "adapter/sensing/LevelThreatSensor.java",
+        "core/world/SnapshotWorldView.java",
+    ],
+    "perception.death_flag": [
+        "adapter/entity/BotBodyEntity.java",
+        "core/tick/BotController.java",
+        "adapter/BotStateSnapshots.java",
+    ],
+    "perception.sleepers": [
+        "adapter/entity/BotBodyEntity.java",
+        "core/tick/BotController.java",
+        "adapter/BotStateSnapshots.java",
+    ],
+    # vitals
+    "vitals.lava": [
+        "core/reflex/EscapeLavaRule.java",
+        "adapter/entity/BotBodyEntity.java",
+        "adapter/sensing/LevelThreatSensor.java",
+    ],
+    "vitals.air_supply": [
+        "core/reflex/SurfaceOnLowAirRule.java",
+        "adapter/entity/BotBodyEntity.java",
+        "adapter/sensing/LevelThreatSensor.java",
+    ],
+    "vitals.swimming": [
+        "adapter/entity/BotBodyEntity.java",
+        "core/pathing/BasicMoves.java",
+        "core/behavior/PathingBehavior.java",
+    ],
+    "vitals.powder_snow": [
+        "core/reflex/ClimbOutOfPowderSnowRule.java",
+        "adapter/entity/BotBodyEntity.java",
+        "adapter/sensing/LevelThreatSensor.java",
+    ],
+    "vitals.fire": [
+        "core/reflex/ExtinguishFireRule.java",
+        "adapter/entity/BotBodyEntity.java",
+        "adapter/sensing/LevelThreatSensor.java",
+    ],
+    "vitals.suffocation": [
+        "core/reflex/DigOnSuffocationRule.java",
+        "adapter/entity/BotBodyEntity.java",
+        "adapter/sensing/LevelThreatSensor.java",
+    ],
+    "vitals.mlg_water": [
+        "core/reflex/WaterBucketOnFallRule.java",
+        "adapter/entity/BotBodyEntity.java",
+        "adapter/InteractBlockExecutor.java",
+    ],
+}
+
+
 def seed_database(db_path: Optional[Path] = None) -> dict:
     """Initialize the DB and insert any seed capabilities not yet present.
 
     Idempotent on statuses - existing rows keep their status /
     verified_at (those live in the state overlay) - but CATALOG
-    fields refresh: harness_paths from HARNESS_PATHS always
-    re-applies, so a new mapping lands on the next init.
+    fields refresh: harness_paths and source_paths from their seed
+    tables always re-apply, so a new mapping lands on the next init.
     """
     init_db(db_path)
     repo = CapabilityRepository(db_path)
@@ -371,13 +576,21 @@ def seed_database(db_path: Optional[Path] = None) -> dict:
         existing = repo.get(cap.id)
         if existing:
             skipped += 1
-            paths = HARNESS_PATHS.get(cap.id, [])
-            if existing.harness_paths != paths:
-                existing.harness_paths = paths
+            hpaths = HARNESS_PATHS.get(cap.id, [])
+            spaths = SOURCE_PATHS.get(cap.id, [])
+            changed = False
+            if existing.harness_paths != hpaths:
+                existing.harness_paths = hpaths
+                changed = True
+            if existing.source_paths != spaths:
+                existing.source_paths = spaths
+                changed = True
+            if changed:
                 repo.upsert(existing)
             continue
         cap.verified_at = cap.verified_at or VERIFIED_AT
         cap.harness_paths = HARNESS_PATHS.get(cap.id, [])
+        cap.source_paths = SOURCE_PATHS.get(cap.id, [])
         repo.upsert(cap)
         inserted += 1
     total = len(repo.list())

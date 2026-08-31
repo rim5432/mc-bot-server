@@ -699,6 +699,7 @@ def cmd_cap_restore(args) -> int:
 
 
 def cmd_cap_paths(args) -> int:
+    import json as _json
     axis = harness_axis()
     print(f"[mcbot] harness axis: {axis['mapped_faces']}/{axis['total_faces']} faces "
           f"mapped to boundary-D paths")
@@ -712,6 +713,14 @@ def cmd_cap_paths(args) -> int:
           f"reflex/sense faces are pathless by design; the rest are review candidates:")
     for category, faces in axis["pathless_by_category"].items():
         print(f"  {category:<14} {', '.join(faces)}")
+    # source path axis coverage (staleness prerequisite)
+    from mcbot.capability.db import get_connection
+    with get_connection() as conn:
+        rows = conn.execute("SELECT id, source_paths FROM capabilities").fetchall()
+    src_filled = sum(1 for r in rows if _json.loads(r["source_paths"] or "[]"))
+    src_total = sum(len(_json.loads(r["source_paths"] or "[]")) for r in rows)
+    print(f"\nsource axis: {src_filled}/{len(rows)} faces mapped to implementation files "
+          f"({src_total} path references) — prerequisite for per-face staleness")
     wire = axis["wire"]
     if wire and wire["runs"]:
         verdicts = ", ".join(f"{v} {c}" for v, c in sorted(axis["wire_verdicts"].items()))
