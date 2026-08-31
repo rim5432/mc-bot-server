@@ -118,13 +118,17 @@ def diff_since(since: str, *, db_path: Optional[Path] = None) -> dict:
 def domain_report(category: str, *, db_path: Optional[Path] = None) -> Optional[dict]:
     """One capability domain: per-face evidence, coverage, deficiencies.
 
-    Per face: status, verified_at, deviation flag, linked QA cases,
-    failure history (from test_case_runs via linked cases). Domain
-    level: green-run streak since the last run that failed a scenario
-    in this domain, plus faces flagged NO-COVERAGE (zero linked cases)
-    and UNVERIFIED-EVIDENCE (no failure history at all is normal for
-    green domains - absence of evidence is not marked; only missing
-    QA coverage is)."""
+    Per face: status, verified_at, deviation flag, linked cases split
+    into SPECS (kind='spec', human TC rows) and IMPLS (kind='impl',
+    gametest methods) - the what-to-test vs what-actually-tests
+    comparison on one axis - plus failure history from test_case_runs
+    via linked cases. NO-SPEC faces carry no declared testing intent;
+    NO-IMPL faces have no automated anchor. Domain level: green-run
+    streak since the last run that failed a scenario in this domain.
+
+    Statuses in the output are DECLARED human rulings - derivation
+    from receipts is a separate, future layer; every consumer must
+    render them as such."""
     init_db(db_path)
     with get_connection(db_path) as conn:
         caps = [
@@ -138,15 +142,15 @@ def domain_report(category: str, *, db_path: Optional[Path] = None) -> Optional[
             return None
         faces = []
         for cap in caps:
-            cases = [
-                dict(r) for r in conn.execute(
-                    """
-                    SELECT id, title, test_type FROM qa_test_cases
-                    WHERE capability_id = ? ORDER BY id
-                    """,
-                    (cap["id"],),
-                ).fetchall()
-            ]
+            case_rows = conn.execute(
+                """
+                SELECT id, kind FROM qa_test_cases
+                WHERE capability_id = ? ORDER BY id
+                """,
+                (cap["id"],),
+            ).fetchall()
+            spec_count = sum(1 for r in case_rows if r["kind"] == "spec")
+            impl_count = sum(1 for r in case_rows if r["kind"] != "spec")
             failures = [
                 dict(r) for r in conn.execute(
                     """
@@ -164,9 +168,12 @@ def domain_report(category: str, *, db_path: Optional[Path] = None) -> Optional[
             faces.append({
                 **cap,
                 "has_deviation": bool(cap["deviation"]),
-                "cases": [c["id"] for c in cases],
-                "case_count": len(cases),
-                "no_coverage": len(cases) == 0,
+                "cases": [r["id"] for r in case_rows],
+                "case_count": len(case_rows),
+                "spec_count": spec_count,
+                "impl_count": impl_count,
+                "no_spec": spec_count == 0,
+                "no_impl": impl_count == 0,
                 "failures": failures,
             })
         # last receipt that failed a scenario belonging to this domain
@@ -195,7 +202,8 @@ def domain_report(category: str, *, db_path: Optional[Path] = None) -> Optional[
     return {
         "category": category,
         "faces": faces,
-        "faces_no_coverage": [f["id"] for f in faces if f["no_coverage"]],
+        "faces_no_spec": [f["id"] for f in faces if f["no_spec"]],
+        "faces_no_impl": [f["id"] for f in faces if f["no_impl"]],
         "faces_with_deviation": [f["id"] for f in faces if f["has_deviation"]],
         "last_red_in_domain": dict(last_red) if last_red else None,
         "green_streak_since": green_streak,

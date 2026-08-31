@@ -206,8 +206,8 @@ def cmd_status(args) -> int:
                     f"{receipt['failed_count']} failed ({verdict}) @{receipt.get('git_rev') or '?'}"
                 )
             print(
-                f"capabilities: {ov['total']} faces, {shipped} shipped ({shipped_pct:.0f}%), "
-                f"{total_cases} QA cases ({linked_cases} linked, {unlinked} unlinked){receipt_str}"
+                f"capabilities: {ov['total']} faces, {shipped} shipped* ({shipped_pct:.0f}%), "
+                f"{total_cases} cases ({linked_cases} linked, {unlinked} unlinked){receipt_str}"
             )
     except Exception:
         pass  # capability DB not initialized yet — silent
@@ -423,7 +423,8 @@ def cmd_cap_overview(args) -> int:
     print(f"  shipped={bs.get('shipped', 0)}  partial={bs.get('partial', 0)}  "
           f"gap={bs.get('gap', 0)}  deferred={bs.get('deferred', 0)}")
     shipped_pct = (bs.get('shipped', 0) / ov['total'] * 100) if ov['total'] else 0
-    print(f"  shipped rate: {shipped_pct:.1f}%")
+    print(f"  shipped rate: {shipped_pct:.1f}%*")
+    print("  * statuses are DECLARED (human rulings), not yet derived from receipts")
     print()
     print(f"{'CATEGORY':<16} {'TOTAL':>6} {'SHIP':>5} {'PART':>5} {'GAP':>5} {'DEF':>5}")
     print("-" * 50)
@@ -607,18 +608,23 @@ def cmd_cap_domain(args) -> int:
     print(f"=== domain: {rep['category']} ===")
     print(f"  {streak}")
     print()
-    print(f"{'FACE':<28} {'STATUS':<10} {'VERIFIED':<12} {'CASES':>5}  FLAGS")
-    print("-" * 90)
+    print(f"{'FACE':<28} {'STATUS':<10} {'VERIFIED':<12} {'SPECS':>5} {'IMPLS':>5}  FLAGS")
+    print("-" * 95)
     for f in rep["faces"]:
         flags = []
-        if f["no_coverage"]:
-            flags.append("NO-COVERAGE")
+        if f["no_spec"]:
+            flags.append("NO-SPEC")
+        if f["no_impl"]:
+            flags.append("NO-IMPL")
         if f["has_deviation"]:
             flags.append("DEVIATION")
-        print(f"{f['id']:<28} {f['implementation_status']:<10} {f['verified_at'] or '-':<12} "
-              f"{f['case_count']:>5}  {' '.join(flags)}")
-    if rep["faces_no_coverage"]:
-        print(f"\n  no QA coverage: {', '.join(rep['faces_no_coverage'])}")
+        print(f"{f['id']:<28} {f['implementation_status'] + '*':<10} {f['verified_at'] or '-':<12} "
+              f"{f['spec_count']:>5} {f['impl_count']:>5}  {' '.join(flags)}")
+    if rep["faces_no_spec"]:
+        print(f"\n  no specs (no declared testing intent): {', '.join(rep['faces_no_spec'])}")
+    if rep["faces_no_impl"]:
+        print(f"  no impls (no automated anchor): {', '.join(rep['faces_no_impl'])}")
+    print("  * statuses are DECLARED (human rulings), not yet derived from receipts")
     failures_shown = 0
     for f in rep["faces"]:
         for fail in f["failures"][:2]:

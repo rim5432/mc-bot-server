@@ -208,9 +208,9 @@ class ReportTest(unittest.TestCase):
         ))
         with get_connection(self.db) as conn:
             conn.execute(
-                "INSERT INTO qa_test_cases (id, title, status, created_at, updated_at) "
-                "VALUES ('GT-BotLocomotionGameTests-walksToBlock', 't', "
-                "'not_executed', 'x', 'x')"
+                "INSERT INTO qa_test_cases (id, title, kind, test_type, status, created_at, updated_at) "
+                "VALUES ('GT-BotLocomotionGameTests-walksToBlock', 't', 'impl', "
+                "'gametest', 'not_executed', 'x', 'x')"
             )
             conn.execute(
                 "INSERT INTO test_receipts (run_id, test_type, finished_at, git_rev, "
@@ -252,6 +252,10 @@ class ReportTest(unittest.TestCase):
         face = rep["faces"][0]
         self.assertEqual(face["id"], "motion.sprint")
         self.assertEqual(face["case_count"], 1)
+        self.assertEqual(face["impl_count"], 1)
+        self.assertEqual(face["spec_count"], 0)
+        self.assertIn(face["id"], rep["faces_no_spec"])
+        self.assertNotIn(face["id"], rep["faces_no_impl"])
         self.assertEqual(len(face["failures"]), 1)
         self.assertIsNotNone(rep["last_red_in_domain"])
         self.assertEqual(rep["green_streak_since"], 1)
