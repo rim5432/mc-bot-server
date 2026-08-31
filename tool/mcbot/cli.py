@@ -1065,7 +1065,7 @@ def main() -> int:
     p_cap_sub.add_parser("db-status", help="show database health and row counts")
     p_cap_sub.add_parser(
         "backfill",
-        help="mirror committed qa-results/engine-runs JSON receipts into the DB (idempotent)")
+        help="mirror committed receipts into the DB (engine-runs + boundary-d; idempotent)")
     p_cap_diff = p_cap_sub.add_parser(
         "diff", help="what changed since a date: transitions, runs, reds, new faces")
     p_cap_diff.add_argument("--since", help="YYYY-MM-DD (default: 7 days ago)")

@@ -72,10 +72,11 @@ parse committed text.
 
 | Fact class | Home (committed) | Collector |
 |---|---|---|
-| capability catalog | seed (from `player-behavior-RE.md`) | `init` |
+| capability catalog + harness path axis | seed (from `player-behavior-RE.md` + `HARNESS_PATHS`) | `init` (refreshes catalog, never statuses) |
 | test SPECIFICATIONS (TC-*) + their links | `qa-results/ranged-survival/qa-test-cases-ranged-survival.csv` (10-col, explicit `capability_id`) | `qa-import` |
 | test IMPLEMENTATIONS (GT-*) | gametest source | `scan-gametest` (owns lifecycle incl. pruning) |
-| run evidence | `qa-results/engine-runs/*.json` (H-R5 currency) | auto-record + `backfill` |
+| engine run evidence | `qa-results/engine-runs/*.json` (H-R5 currency) | auto-record + `backfill` |
+| wire-surface evidence (BD-*) | `qa-results/boundary-d/receipt-*.json` | `backfill` (kind='wire' rows; PASS/RED-CONFIRMED green, FAIL red) |
 | status rulings + non-CSV links | `qa-results/capability-state.json` | write-through via `set`/`link`; `restore` for rebuilds |
 
 Vocabulary everywhere: **faces** (capabilities) / **specs** (TC) /
@@ -91,7 +92,8 @@ Vocabulary everywhere: **faces** (capabilities) / **specs** (TC) /
 | `capability scan-gametest` | sync impl rows from source: insert/update/prune; manual links and their `link_source` survive |
 | `capability link <case> <cap>` | manual triage (impls mainly; spec links belong in the CSV) — write-through |
 | `capability unlinked` | split by kind: unlinked specs vs unlinked impls are two different problems |
-| `capability backfill` | mirror every committed engine-run JSON into the DB (idempotent; re-parses surviving logs to recover failed names lost to the pre-6583cd4 regex bug) |
+| `capability backfill` | mirror committed receipts into the DB (idempotent): engine-runs (gametest; re-parses surviving logs for failed names lost to the pre-6583cd4 regex bug) + boundary-d wire runs |
+| `capability paths` | face → boundary-D path axis (18/35 mapped, curated in seed), pathless review list, wire-run evidence streak |
 | `capability diff [--since YYYY-MM-DD]` | what changed: status transitions, run green/red split + scenario growth, RED details with per-scenario failures, new faces |
 | `capability domain <category>` | per-face evidence: status, SPECS/IMPLS counts, NO-SPEC / NO-IMPL / DEVIATION flags, failure history, domain green streak |
 | `capability restore` | apply the committed overlay after a rebuild |
