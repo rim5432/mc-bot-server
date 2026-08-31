@@ -229,7 +229,13 @@ public class McBotServer {
                             // body. The old ENTITY must leave the world too, not
                             // just the wiring - leaving it turned every extra
                             // /botspawn into an orphaned zombie standing around.
+                            // The old session's chunk ticket is released HERE,
+                            // not via the self-release tick: after the swap
+                            // below nothing ticks the old assembly again, so a
+                            // skipped release would leak an entity-ticking
+                            // chunk forever (issue 0015 ticket lifecycle).
                             if (active != null && active.pipeline().body().isAlive()) {
+                                active.pipeline().chunkTicket().release();
                                 active.pipeline().body().discard();
                             }
                             BotBodyEntity body = BOT_BODY.get().create(level);
@@ -261,6 +267,12 @@ public class McBotServer {
                         .requires(src -> src.hasPermission(2))
                         .executes(ctx -> {
                             var level = ctx.getSource().getLevel();
+                            // Release before nulling: a nulled session never
+                            // ticks again, so the ticket's self-release would
+                            // starve (issue 0015 ticket lifecycle).
+                            if (active != null) {
+                                active.pipeline().chunkTicket().release();
+                            }
                             var bodies = level.getEntities(BOT_BODY.get(), b -> true);
                             bodies.forEach(BotBodyEntity::discard);
                             this.active = null;

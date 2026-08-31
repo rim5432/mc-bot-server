@@ -62,6 +62,7 @@ public final class InMemoryEventQueue implements EventQueue {
     private final ArrayDeque<Entry> entries = new ArrayDeque<>();
     private final LongSupplier daySupplier;
     private final LongSupplier timeOfDaySupplier;
+    private final LongSupplier epochAllocator;
     private long lastEventId;
     private long resetMarker = 1L;
     private int droppedSinceLastPoll;
@@ -70,17 +71,51 @@ public final class InMemoryEventQueue implements EventQueue {
     private record Entry(long id, BotEvent event) {}
 
     /**
-     * Creates a queue whose synthetic drop notices carry live stamps.
+     * Creates a queue whose synthetic drop notices carry live stamps,
+     * with a session-local epoch allocator (marker starts at 1 and
+     * increments per reset) - the offline/test shape.
      *
      * @param daySupplier       in-game day counter accessor; never null
      * @param timeOfDaySupplier time-of-day ticks accessor; never null
      */
     public InMemoryEventQueue(LongSupplier daySupplier, LongSupplier timeOfDaySupplier) {
-        if (daySupplier == null || timeOfDaySupplier == null) {
+        this(daySupplier, timeOfDaySupplier, sessionLocalEpochAllocator());
+    }
+
+    /**
+     * Creates a queue whose reset marker draws from a shared epoch
+     * allocator at construction AND on every reset, so the marker is
+     * strictly increasing across queue recreations when the allocator
+     * outlives the queue (the production shape: a SavedData-backed
+     * store, issue 0015 resetAt epoch honesty - every /botspawn and
+     * every /bot reset used to mint a fresh marker at 1, colliding
+     * with client bookmarks whose stored epoch was also 1).
+     *
+     * @param daySupplier       in-game day counter accessor; never null
+     * @param timeOfDaySupplier time-of-day ticks accessor; never null
+     * @param epochAllocator    strictly-increasing epoch source drawn
+     *                          from at construction and on reset; never
+     *                          null
+     */
+    public InMemoryEventQueue(LongSupplier daySupplier, LongSupplier timeOfDaySupplier, LongSupplier epochAllocator) {
+        if (daySupplier == null || timeOfDaySupplier == null || epochAllocator == null) {
             throw new IllegalArgumentException("suppliers must not be null");
         }
         this.daySupplier = daySupplier;
         this.timeOfDaySupplier = timeOfDaySupplier;
+        this.epochAllocator = epochAllocator;
+        this.resetMarker = epochAllocator.getAsLong();
+    }
+
+    /**
+     * Session-local default allocator: 1, 2, 3... - the pre-allocator
+     * behavior, for queues that live alone (tests, rigs).
+     *
+     * @return a fresh monotonic source; never null
+     */
+    private static LongSupplier sessionLocalEpochAllocator() {
+        java.util.concurrent.atomic.AtomicLong seq = new java.util.concurrent.atomic.AtomicLong();
+        return seq::incrementAndGet;
     }
 
     @Override
@@ -151,11 +186,14 @@ public final class InMemoryEventQueue implements EventQueue {
     /**
      * Wipe entries for a simulated restart. Ids stay monotonic so stale
      * cursors can never replay pre-reset pages; only {@code resetAt}
-     * tells consumers their cursor is void.
+     * tells consumers their cursor is void. The new marker draws from
+     * the epoch allocator so it stays beyond every marker any queue
+     * has ever reported (beyond-head), not merely beyond this
+     * queue's own previous value.
      */
     @Override
     public void reset() {
         entries.clear();
-        resetMarker++;
+        resetMarker = epochAllocator.getAsLong();
     }
 }

@@ -102,7 +102,8 @@ public final class BotAssembly {
             CommandBus bus,
             List<VerbTaskHandler<?>> taskHandlers,
             GotoCommandHandler gotoHandler,
-            ChangeDetectingStateChannel state) {}
+            ChangeDetectingStateChannel state,
+            com.mcbot.mcbotserver.adapter.entity.BotChunkTicket chunkTicket) {}
 
     /**
      * Wires the full production pipeline around one spawned body.
@@ -112,8 +113,13 @@ public final class BotAssembly {
      * @return the assembled pipeline; never null
      */
     public static Assembled assemble(ServerLevel level, BotBodyEntity body) {
-        InMemoryEventQueue events =
-                new InMemoryEventQueue(() -> level.getDayTime() / 24000L, () -> level.getDayTime() % 24000L);
+        // Beyond-head resetAt across queue recreations (issue 0015):
+        // the epoch allocator lives in the overworld's SavedData, so
+        // every /botspawn draws a marker strictly beyond anything any
+        // prior queue ever reported.
+        var epochSource = EventEpochStore.of(level.getServer().overworld());
+        InMemoryEventQueue events = new InMemoryEventQueue(
+                () -> level.getDayTime() / 24000L, () -> level.getDayTime() % 24000L, epochSource::nextEpoch);
         TaskArbiter arbiter = new TaskArbiter();
         // Baseline trait annotations the swim vocabulary cannot work
         // without. Code-level floor for now; the datapack JSON pipeline
@@ -253,8 +259,20 @@ public final class BotAssembly {
                 () -> level.getDayTime() / 24000L,
                 () -> level.getDayTime() % 24000L);
 
+        var chunkTicket = new com.mcbot.mcbotserver.adapter.entity.BotChunkTicket(level);
         return new Assembled(
-                body, view, actor, events, arbiter, reflex, controller, bus, taskHandlers, gotoHandler, state);
+                body,
+                view,
+                actor,
+                events,
+                arbiter,
+                reflex,
+                controller,
+                bus,
+                taskHandlers,
+                gotoHandler,
+                state,
+                chunkTicket);
     }
 
     /**
@@ -267,6 +285,10 @@ public final class BotAssembly {
      * @param a the assembled pipeline; never null
      */
     public static void tickOnce(Assembled a) {
+        // Ticket first: a body that just crossed into an unticketed
+        // chunk must regain entity ticking before anything below
+        // reads or drives it (issue 0015 ticket gap).
+        a.chunkTicket().tick(a.body());
         for (VerbTaskHandler<?> handler : a.taskHandlers()) {
             handler.tick();
         }
