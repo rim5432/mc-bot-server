@@ -112,7 +112,7 @@ archived D1 table and its rulings:
 - [ ] S  D2 first L1 row - furnace INPUT / FUEL / OUTPUT roles +
          burn/cook progress disclosure (freeSlots already shipped
          via ledger 32).                            [dep: D1 batch]
-- [ ] S  Entity-ticking ticket gap found live: on a bare dedicated
+- [x] S  Entity-ticking ticket gap found live: on a bare dedicated
          server nothing grants the bot's chunks an entity-ticking
          ticket and the body freezes until `forceload add` -
          CompanionChunkLoader-class capability candidate, or runbook
@@ -120,16 +120,39 @@ archived D1 table and its rulings:
          Pinned by receipt 2026-08-31 (qa-results/boundary-d/
          receipt-20260831-051354.json, case C1/C1b): the queue is
          server-tick driven and keeps failing tasks honestly while
-         the body alone freezes; forceload wakes it.
+         the body alone freezes; forceload wakes it. RESOLVED same
+         day: adapter BotChunkTicket follows the body with a
+         forceload grant (setChunkForced; a custom region ticket
+         logged as granted yet never loaded its chunk - probe:
+         setblock kept answering "not loaded", while forceload
+         proved itself twice live), driven from BotAssembly.tickOnce
+         before the pipeline, released on despawn/replace/death and
+         re-granted while the body sits unloaded (UNLOADED_TO_CHUNK
+         is not a death: the chunk load re-materializes it). Closed
+         by receipt flip: case C1 green on the fix, frozen again on
+         the disabled-ticket bisect build.
                                                         [dep: none]
-- [ ] S  resetAt epoch honesty - EventQueue promises a monotonic
+- [x] S  resetAt epoch honesty - EventQueue promises a monotonic
          bot-restart marker but a fresh queue restarts it at 1;
          either seed from a persistent counter or amend the
          EventQueue doc to the beyond-head client rule (the CLI
          ships beyond-head today). Pinned by receipt 2026-08-31
          (qa-results/boundary-d/receipt-20260831-052015.json, case
          C2-post): clean stop + relaunch returned the same epoch,
-         violating beyond-head.                  [dep: none]
+         violating beyond-head. RESOLVED same day: the marker draws
+         from an allocator at construction AND on every reset
+         (InMemoryEventQueue epoch-allocation constructor), and the
+         production allocator is EventEpochStore - a SavedData
+         sequence in the overworld, one strictly-increasing grant
+         per queue recreation and per /bot reset. The collision
+         domain was wider than the receipt showed: every
+         botdespawn+botspawn minted marker 1 too (BotAssembly news
+         the queue per spawn). Crash window: grants persist on world
+         save, so a crash rewinds to the last save - the client's
+         id-space backstop (cursor beyond stream head) still detects
+         that shape. Pinned by ResetEpochGateTest and the receipt
+         flip: C2b (respawn, within one boot) and C2-post (clean
+         restart) both green on the fix.                [dep: none]
 
 Reopen triggers that live only inside the archived 0012 body
 (brewing / enchant cast overrides, L2 JSON role table, cast mixin,

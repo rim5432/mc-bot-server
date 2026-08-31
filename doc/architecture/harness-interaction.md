@@ -1,6 +1,6 @@
 ---
 title: Harness Interaction Model - the canonical architecture of the bot's command surface
-last_verified: 2026-08-30
+last_verified: 2026-08-31
 covers:
   - doc/architecture/boundaries.md
   - tool/harness/mc.py
@@ -169,6 +169,25 @@ when a second heavy read class actually hurts (YAGNI until then).
 - Terminal detection (isatty) may adjust human formatting
   (indentation, color) on stdout; when piped, output is one-line
   JSON per answer.
+
+## 7a. CLI presentation shapes (pinned by the 2026-08-31 black-box round)
+
+The `mc cat` verbs answer derived values, not raw wire objects -
+pinned live against runServer (qa-results/boundary-d):
+
+- `cat /player/pos` answers a bare `[x, y, z]` array;
+  `cat /player/inventory` answers the items map alone; `cat
+  /player/status` answers the flat state face (pos, yaw, pitch,
+  dim, items, slot, effects, task, healthHearts, freeSlots, food,
+  xp - the boundaries D1 table is the field authority).
+- Write receipts carry `ok`/`task`/`replay`; `replay:true` holds
+  exactly inside the live window - after a terminal verdict the
+  same key legitimately mints a new task.
+- Cancelling an already-terminal task is a typed `no such task`
+  error, never a silent success.
+- Ops note: `@e[type=mcbotserver:bot_body]` cannot see a body
+  parked in an unloaded chunk - reset through `/botdespawn` +
+  `/botspawn` (binding references), not selectors.
 
 ## 8. Fidelity rules
 
