@@ -224,7 +224,7 @@ def list_unlinked(db_path: Optional[Path] = None) -> list[QATestCase]:
         rows = conn.execute(
             "SELECT * FROM qa_test_cases "
             "WHERE capability_id IS NULL AND kind != 'wire' "
-            "AND link_source != 'no_face' ORDER BY id"
+            "AND link_source NOT IN ('no_face', 'annotated_none') ORDER BY id"
         ).fetchall()
     return [_row_to_case(r) for r in rows]
 

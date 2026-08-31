@@ -32,6 +32,7 @@ VALID_LINK_SOURCES = {
     "auto_keyword",   # impl: keyword rule matched
     "auto_class",     # impl: class->category fallback (single face in cat)
     "annotated",      # impl: explicit // capability: <id> comment above method
+    "annotated_none", # impl: explicit // capability: none (intentionally unlinked)
     "no_face",        # spec: non-behavior case (code audit, test hygiene)
 }
 VALID_STATUSES = {"not_executed", "passed", "failed", "blocked"}
