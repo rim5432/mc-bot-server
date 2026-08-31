@@ -110,7 +110,7 @@ public final class BotFishingGameTests {
         rig.body().setYRot(-90f); // face east, straight at the pool
 
         CellPos waterCell = GametestRig.localToCell(helper, new BlockPos(8, 1, 8));
-        var mission = submitFish(rig, waterCell);
+        submitFish(rig, waterCell);
 
         helper.startSequence()
                 // 1. Wait for the behavior to cast and a bobber to appear.

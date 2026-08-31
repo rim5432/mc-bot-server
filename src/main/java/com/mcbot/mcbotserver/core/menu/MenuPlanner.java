@@ -22,6 +22,12 @@ import java.util.Map;
  * {@link PlayerRegion}. All plans are computed before the first
  * click, so an invalid request performs none.
  */
+// GodClass suppressed: this is a stateless facade of static dispatch
+// methods (no instance fields, TCC=0% by construction). PMD's WMC+ATFD
+// heuristic flags any class with many public static methods, which is
+// the facade's job; the actual logic lives in CraftingPlanner,
+// TransferPlanner, WearPlanner, and PlayerRegion.
+@SuppressWarnings("PMD.GodClass")
 public final class MenuPlanner {
 
     /** One click for the executor: pass the triple straight to
@@ -223,6 +229,11 @@ public final class MenuPlanner {
      *         the item, or the target role's free capacity cannot
      *         hold the deposit
      */
+    // CyclomaticComplexity suppressed: CC is dominated by five
+    // guard clauses (null/blank/positive/supply/capacity), not by
+    // branching logic. The planning body after validation is linear.
+    // Extracting guards would only move the count to a helper.
+    @SuppressWarnings("PMD.CyclomaticComplexity")
     public static List<Step> planDepositCounted(MenuView menu, SlotRole target, String itemId, int count) {
         if (itemId == null || itemId.isBlank()) {
             throw new IllegalArgumentException("itemId must not be null or blank");
