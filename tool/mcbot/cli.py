@@ -54,6 +54,7 @@ from mcbot.capability import queries as cap_queries
 from mcbot.capability.backfill import backfill_receipts
 from mcbot.capability.gametest_scan import scan_gametests
 from mcbot.capability.report import diff_since, domain_report
+from mcbot.capability.state_export import export_state, restore_state
 from mcbot.capability.qa_import import import_csv, link_case, list_unlinked
 from mcbot.capability.receipt import latest_receipt_summary
 from mcbot.capability.repository import CapabilityRepository, VALID_STATUSES
@@ -390,6 +391,8 @@ def cmd_capability(args) -> int:
         "backfill": cmd_cap_backfill,
         "diff": cmd_cap_diff,
         "domain": cmd_cap_domain,
+        "export": cmd_cap_export,
+        "restore": cmd_cap_restore,
         "qa-import": cmd_cap_qa_import,
         "scan-gametest": cmd_cap_scan_gametest,
         "link": cmd_cap_link,
@@ -623,6 +626,32 @@ def cmd_cap_domain(args) -> int:
             print(f"    {f['id']}: {fail['finished_at']} @{fail['git_rev'] or '?'} "
                   f"[{fail['run_id']}] {fail['test_case_id']}")
             failures_shown += 1
+    return 0
+
+
+def cmd_cap_export(args) -> int:
+    result = export_state()
+    print(f"[mcbot] capability state exported: {result['path']}")
+    print(f"  statuses : {result['statuses']}")
+    print(f"  links    : {result['links']}")
+    print("  commit it - the overlay is the durable copy of manual triage")
+    return 0
+
+
+def cmd_cap_restore(args) -> int:
+    try:
+        result = restore_state()
+    except ValueError as e:
+        print(f"[mcbot] {e}", file=sys.stderr)
+        return 1
+    print("[mcbot] capability state restored from overlay")
+    print(f"  statuses : {result['statuses_applied']} applied, "
+          f"{result['statuses_unchanged']} already matching")
+    print(f"  links    : {result['links_applied']} applied, "
+          f"{result['links_unchanged']} already matching")
+    if result["missing_faces"] or result["missing_cases"]:
+        print(f"  WARN: overlay references {result['missing_faces']} unknown faces, "
+              f"{result['missing_cases']} unknown cases (skipped)", file=sys.stderr)
     return 0
 
 
@@ -989,6 +1018,12 @@ def main() -> int:
     p_cap_domain = p_cap_sub.add_parser(
         "domain", help="per-face evidence + deficiency report for one category")
     p_cap_domain.add_argument("category", help="capability category, e.g. combat, digging")
+    p_cap_sub.add_parser(
+        "export",
+        help="write manual state (statuses + links) to qa-results/capability-state.json; commit it")
+    p_cap_sub.add_parser(
+        "restore",
+        help="apply the committed overlay after a rebuild (init/import/scan/backfill)")
     p_cap_qa = p_cap_sub.add_parser("qa-import", help="import QA test cases from a CSV file")
     p_cap_qa.add_argument("csv_file", help="path to QA CSV file (UTF-8 with BOM supported)")
     p_cap_sub.add_parser("scan-gametest", help="scan gametest source for @GameTest methods and auto-link")

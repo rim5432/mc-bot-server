@@ -20,6 +20,7 @@ from mcbot.capability.db import get_connection, init_db
 from mcbot.capability.models import Capability
 from mcbot.capability.report import diff_since, domain_report
 from mcbot.capability.repository import CapabilityRepository
+from mcbot.capability.state_export import export_state, restore_state
 from mcbot.engine import parse_run_log
 
 
@@ -255,6 +256,81 @@ class ReportTest(unittest.TestCase):
 
     def test_domain_report_unknown_category(self):
         self.assertIsNone(domain_report("nope", db_path=self.db))
+
+
+class StateOverlayTest(unittest.TestCase):
+    """export/restore round-trip: the durable copy of manual triage."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self._tmp.name)
+        self.db = self.dir / "test.db"
+        self.overlay = self.dir / "capability-state.json"
+        init_db(self.db)
+        now = "2026-08-31T12:00:00"
+        repo = CapabilityRepository(self.db)
+        repo.upsert(Capability(
+            id="dig.tool_speed", name="Tool speed", category="digging",
+            implementation_status="shipped", created_at=now, updated_at=now,
+        ))
+        with get_connection(self.db) as conn:
+            conn.execute(
+                "INSERT INTO qa_test_cases (id, title, status, created_at, updated_at) "
+                "VALUES ('GT-BotDiggingGameTests-digsStoneFast', 't', 'not_executed', 'x', 'x')"
+            )
+            conn.execute(
+                "UPDATE qa_test_cases SET capability_id = 'dig.tool_speed' "
+                "WHERE id = 'GT-BotDiggingGameTests-digsStoneFast'"
+            )
+            conn.commit()
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _wipe_and_rebuild_without_triage(self):
+        """Simulate the cliff: fresh DB, seed + scan only."""
+        self.db.unlink()
+        init_db(self.db)
+        now = "2026-08-31T13:00:00"
+        CapabilityRepository(self.db).upsert(Capability(
+            id="dig.tool_speed", name="Tool speed", category="digging",
+            implementation_status="gap", created_at=now, updated_at=now,
+        ))
+        with get_connection(self.db) as conn:
+            conn.execute(
+                "INSERT INTO qa_test_cases (id, title, status, created_at, updated_at) "
+                "VALUES ('GT-BotDiggingGameTests-digsStoneFast', 't', 'not_executed', 'x', 'x')"
+            )
+            conn.commit()
+
+    def test_round_trip_recovers_manual_state(self):
+        export_state(self.overlay, db_path=self.db)
+        self._wipe_and_rebuild_without_triage()
+
+        result = restore_state(self.overlay, db_path=self.db)
+        self.assertEqual(result["statuses_applied"], 1)
+        self.assertEqual(result["links_applied"], 1)
+
+        cap = CapabilityRepository(self.db).get("dig.tool_speed")
+        self.assertEqual(cap.implementation_status, "shipped")
+        with get_connection(self.db) as conn:
+            row = conn.execute(
+                "SELECT capability_id FROM qa_test_cases "
+                "WHERE id = 'GT-BotDiggingGameTests-digsStoneFast'"
+            ).fetchone()
+            self.assertEqual(row["capability_id"], "dig.tool_speed")
+            # the restore flip is auditable as a transition
+            t = conn.execute(
+                "SELECT source FROM capability_status_transitions"
+            ).fetchone()
+            self.assertEqual(t["source"], "restore")
+
+    def test_restore_twice_is_idempotent(self):
+        export_state(self.overlay, db_path=self.db)
+        restore_state(self.overlay, db_path=self.db)
+        second = restore_state(self.overlay, db_path=self.db)
+        self.assertEqual(second["statuses_applied"], 0)
+        self.assertEqual(second["links_applied"], 0)
 
 
 if __name__ == "__main__":
