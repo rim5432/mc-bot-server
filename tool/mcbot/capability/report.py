@@ -165,6 +165,98 @@ def harness_axis(db_path: Optional[Path] = None) -> dict:
     }
 
 
+def evidence_for_faces(db_path: Optional[Path] = None) -> dict:
+    """Derived evidence axis: how the newest engine run treated each face.
+
+    Pure read-model over receipts + links - computed on read, never
+    stored, never a transition. Every gametest scenario runs in every
+    runGameTest, so a face's evidence in the newest receipt is: RED
+    when any linked impl case failed there, GREEN when it did not
+    (absence from the failure list IS a pass at run granularity).
+    Faces with no linked impls are UNTESTED. When the newest run is
+    red for a face, last_green_at stays None - walking back to older
+    runs would claim greens that predate the case existing.
+
+    Returns {face_id: {state, red_runs, last_red_at, last_green_at}}.
+    """
+    init_db(db_path)
+    with get_connection(db_path) as conn:
+        newest = conn.execute(
+            "SELECT id, finished_at FROM test_receipts "
+            "WHERE test_type = 'runGameTest' ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        impl_counts = {
+            r["capability_id"]: r["c"]
+            for r in conn.execute(
+                "SELECT capability_id, COUNT(*) as c FROM qa_test_cases "
+                "WHERE kind = 'impl' AND capability_id IS NOT NULL "
+                "GROUP BY capability_id"
+            ).fetchall()
+        }
+        red_stats: dict[str, dict] = {}
+        if newest:
+            for r in conn.execute(
+                """
+                SELECT c.capability_id as face,
+                       COUNT(DISTINCT r.id) as red_runs,
+                       MAX(r.finished_at) as last_red_at,
+                       MAX(CASE WHEN r.id = :newest_id THEN 1 ELSE 0 END) as failed_newest
+                FROM test_case_runs cr
+                JOIN qa_test_cases c ON c.id = cr.test_case_id
+                JOIN test_receipts r ON r.id = cr.receipt_id
+                WHERE c.kind = 'impl' AND c.capability_id IS NOT NULL
+                  AND r.test_type = 'runGameTest'
+                GROUP BY c.capability_id
+                """,
+                {"newest_id": newest["id"]},
+            ).fetchall():
+                red_stats[r["face"]] = dict(r)
+    result: dict[str, dict] = {}
+    faces = [r["id"] for r in _all_face_ids(db_path)]
+    for face in faces:
+        impls = impl_counts.get(face, 0)
+        if impls == 0:
+            result[face] = {"state": "untested", "red_runs": 0,
+                            "last_red_at": None, "last_green_at": None}
+            continue
+        stats = red_stats.get(face)
+        if stats and stats["failed_newest"]:
+            result[face] = {"state": "red", "red_runs": stats["red_runs"],
+                            "last_red_at": stats["last_red_at"], "last_green_at": None}
+        else:
+            result[face] = {"state": "green", "red_runs": stats["red_runs"] if stats else 0,
+                            "last_red_at": stats["last_red_at"] if stats else None,
+                            "last_green_at": newest["finished_at"] if newest else None}
+    return result
+
+
+def _all_face_ids(db_path: Optional[Path]) -> list:
+    with get_connection(db_path) as conn:
+        return conn.execute(
+            "SELECT id FROM capabilities ORDER BY id"
+        ).fetchall()
+
+
+def evidence_rollup(db_path: Optional[Path] = None) -> dict:
+    """Aggregate evidence counts + the honest convergence number:
+    how many DECLARED-shipped faces actually carry green evidence."""
+    evidence = evidence_for_faces(db_path)
+    with get_connection(db_path) as conn:
+        shipped = {
+            r["id"] for r in conn.execute(
+                "SELECT id FROM capabilities WHERE implementation_status = 'shipped'"
+            ).fetchall()
+        }
+    counts = {"green": 0, "red": 0, "untested": 0}
+    for ev in evidence.values():
+        counts[ev["state"]] += 1
+    counts["shipped_green"] = sum(
+        1 for face, ev in evidence.items() if face in shipped and ev["state"] == "green"
+    )
+    counts["shipped"] = len(shipped)
+    return counts
+
+
 def domain_report(category: str, *, db_path: Optional[Path] = None) -> Optional[dict]:
     """One capability domain: per-face evidence, coverage, deficiencies.
 
@@ -180,6 +272,7 @@ def domain_report(category: str, *, db_path: Optional[Path] = None) -> Optional[
     from receipts is a separate, future layer; every consumer must
     render them as such."""
     init_db(db_path)
+    evidence = evidence_for_faces(db_path)
     with get_connection(db_path) as conn:
         caps = [
             dict(r) for r in conn.execute(
@@ -225,6 +318,9 @@ def domain_report(category: str, *, db_path: Optional[Path] = None) -> Optional[
                 "no_spec": spec_count == 0,
                 "no_impl": impl_count == 0,
                 "failures": failures,
+                "evidence": evidence.get(cap["id"], {
+                    "state": "untested", "red_runs": 0,
+                    "last_red_at": None, "last_green_at": None}),
             })
         # last receipt that failed a scenario belonging to this domain
         last_red = conn.execute(

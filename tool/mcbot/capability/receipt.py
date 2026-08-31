@@ -189,8 +189,14 @@ def _match_case_id(conn, test_name: str) -> Optional[str]:
     return row["id"] if row else None
 
 
-def latest_receipt_summary(db_path: Optional[Path] = None) -> Optional[dict]:
-    """Return the most recent test receipt as a dict, or None."""
+def latest_receipt_summary(
+    db_path: Optional[Path] = None,
+    test_type: str = "runGameTest",
+) -> Optional[dict]:
+    """Return the most recent receipt of one family, or None.
+
+    test_type filters the family - the boundary-d wire receipts share
+    the table and must not answer for the engine runs."""
     init_db(db_path)
     with get_connection(db_path) as conn:
         row = conn.execute(
@@ -198,9 +204,11 @@ def latest_receipt_summary(db_path: Optional[Path] = None) -> Optional[dict]:
             SELECT id, run_id, test_type, finished_at, total,
                    failed, green, git_rev
             FROM test_receipts
+            WHERE test_type = ?
             ORDER BY id DESC
             LIMIT 1
-            """
+            """,
+            (test_type,),
         ).fetchone()
     if not row:
         return None

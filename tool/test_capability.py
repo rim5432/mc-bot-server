@@ -20,7 +20,13 @@ from mcbot.capability.db import get_connection, init_db
 from mcbot.capability.gametest_scan import scan_gametests
 from mcbot.capability.models import Capability
 from mcbot.capability.qa_import import import_csv, link_case
-from mcbot.capability.report import diff_since, domain_report, harness_axis
+from mcbot.capability.report import (
+    diff_since,
+    domain_report,
+    evidence_for_faces,
+    evidence_rollup,
+    harness_axis,
+)
 from mcbot.capability.repository import CapabilityRepository
 from mcbot.capability.seed import seed_database
 from mcbot.capability.state_export import export_state, restore_state
@@ -658,6 +664,99 @@ class HarnessAxisTest(unittest.TestCase):
         self.assertIn("vitals", axis["pathless_by_category"])
         self.assertEqual(axis["wire"]["runs"], 1)
         self.assertEqual(axis["wire_verdicts"], {"PASS": 1})
+
+
+class EvidenceDerivationTest(unittest.TestCase):
+    """Derived evidence axis: green / red / untested from receipts."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.db = Path(self._tmp.name) / "test.db"
+        init_db(self.db)
+        now = "2026-08-31T12:00:00"
+        repo = CapabilityRepository(self.db)
+        repo.upsert(Capability(
+            id="motion.sprint", name="Sprint", category="motion",
+            implementation_status="shipped", created_at=now, updated_at=now,
+        ))
+        repo.upsert(Capability(
+            id="vitals.lava", name="Lava", category="vitals",
+            implementation_status="shipped", created_at=now, updated_at=now,
+        ))
+        with get_connection(self.db) as conn:
+            # sprint has a linked impl; lava has none (untested)
+            conn.execute(
+                "INSERT INTO qa_test_cases (id, title, kind, test_type, status, "
+                "capability_id, link_source, created_at, updated_at) VALUES "
+                "('GT-BotLocomotionGameTests-sprintAway', 't', 'impl', 'gametest', "
+                "'not_executed', 'motion.sprint', 'auto', 'x', 'x')"
+            )
+            conn.execute(
+                "INSERT INTO test_receipts (run_id, test_type, finished_at, "
+                "total, passed, failed, green, created_at) VALUES "
+                "('gametest-20260830-1','runGameTest','2026-08-30T10:00:00',52,51,1,0,'x'),"
+                "('gametest-20260831-1','runGameTest','2026-08-31T11:00:00',52,52,0,1,'x')"
+            )
+            # sprint's case failed in the OLD run only (recovered)
+            conn.execute(
+                "INSERT INTO test_case_runs (test_case_id, receipt_id, result, created_at) "
+                "VALUES ('GT-BotLocomotionGameTests-sprintAway', 1, 'failed', 'x')"
+            )
+            conn.commit()
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_states_and_recovery(self):
+        ev = evidence_for_faces(self.db)
+        # newest run (id 2) is green and sprint's case is absent from
+        # its failures -> GREEN, with history intact
+        self.assertEqual(ev["motion.sprint"]["state"], "green")
+        self.assertEqual(ev["motion.sprint"]["red_runs"], 1)
+        self.assertEqual(ev["motion.sprint"]["last_green_at"], "2026-08-31T11:00:00")
+        # no linked impls -> untested
+        self.assertEqual(ev["vitals.lava"]["state"], "untested")
+
+    def test_newest_failure_makes_red_and_no_false_green(self):
+        with get_connection(self.db) as conn:
+            conn.execute(
+                "INSERT INTO test_receipts (run_id, test_type, finished_at, "
+                "total, passed, failed, green, created_at) VALUES "
+                "('gametest-20260831-2','runGameTest','2026-08-31T12:00:00',52,51,1,0,'x')"
+            )
+            conn.execute(
+                "INSERT INTO test_case_runs (test_case_id, receipt_id, result, created_at) "
+                "VALUES ('GT-BotLocomotionGameTests-sprintAway', 3, 'failed', 'x')"
+            )
+            conn.commit()
+        ev = evidence_for_faces(self.db)
+        self.assertEqual(ev["motion.sprint"]["state"], "red")
+        # no walking back to older greens - they predate nothing, but
+        # the newest verdict is red so last_green_at stays None
+        self.assertIsNone(ev["motion.sprint"]["last_green_at"])
+
+    def test_rollup_honest_convergence(self):
+        rollup = evidence_rollup(self.db)
+        self.assertEqual(rollup["green"], 1)
+        self.assertEqual(rollup["untested"], 1)
+        self.assertEqual(rollup["shipped"], 2)
+        # lava is declared shipped but carries no evidence
+        self.assertEqual(rollup["shipped_green"], 1)
+
+
+    def test_latest_summary_filters_family(self):
+        from mcbot.capability.receipt import latest_receipt_summary
+        with get_connection(self.db) as conn:
+            conn.execute(
+                "INSERT INTO test_receipts (run_id, test_type, finished_at, "
+                "total, passed, failed, green, created_at) VALUES "
+                "('receipt-w','boundary_d','2026-08-31T13:00:00',12,12,0,1,'x')"
+            )
+            conn.commit()
+        # the wire receipt is newer by id but must not answer for engine runs
+        summary = latest_receipt_summary(self.db)
+        self.assertEqual(summary["task_name"], "runGameTest")
+        self.assertEqual(summary["scenarios_total"], 52)
 
 
 if __name__ == "__main__":

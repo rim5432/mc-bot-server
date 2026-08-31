@@ -53,7 +53,13 @@ from mcbot.capability import db as cap_db
 from mcbot.capability import queries as cap_queries
 from mcbot.capability.backfill import backfill_receipts
 from mcbot.capability.gametest_scan import scan_gametests
-from mcbot.capability.report import diff_since, domain_report, harness_axis
+from mcbot.capability.report import (
+    diff_since,
+    domain_report,
+    evidence_for_faces,
+    evidence_rollup,
+    harness_axis,
+)
 from mcbot.capability.state_export import restore_state, write_state_through
 from mcbot.capability.qa_import import import_csv, link_case, list_unlinked
 from mcbot.capability.receipt import latest_receipt_summary
@@ -191,9 +197,12 @@ def cmd_status(args) -> int:
             # QA case counts
             from mcbot.capability.db import get_connection
             with get_connection() as conn:
-                total_cases = conn.execute("SELECT COUNT(*) c FROM qa_test_cases").fetchone()["c"]
+                total_cases = conn.execute(
+                    "SELECT COUNT(*) c FROM qa_test_cases WHERE kind != 'wire'"
+                ).fetchone()["c"]
                 linked_cases = conn.execute(
-                    "SELECT COUNT(*) c FROM qa_test_cases WHERE capability_id IS NOT NULL"
+                    "SELECT COUNT(*) c FROM qa_test_cases "
+                    "WHERE capability_id IS NOT NULL AND kind != 'wire'"
                 ).fetchone()["c"]
             unlinked = total_cases - linked_cases
             # latest test receipt
@@ -205,8 +214,15 @@ def cmd_status(args) -> int:
                     f"  last-run: {receipt['scenarios_total']} scenarios, "
                     f"{receipt['failed_count']} failed ({verdict}) @{receipt.get('git_rev') or '?'}"
                 )
+            try:
+                ev = evidence_rollup()
+                ev_str = (f", {ev['shipped_green']}/{ev['shipped']} shipped w/ green evidence"
+                          if ev["shipped"] else "")
+            except Exception:
+                ev_str = ""
             print(
-                f"capabilities: {ov['total']} faces, {shipped} shipped* ({shipped_pct:.0f}%), "
+                f"capabilities: {ov['total']} faces, {shipped} shipped* ({shipped_pct:.0f}%)"
+                f"{ev_str}, "
                 f"{total_cases} cases ({linked_cases} linked, {unlinked} unlinked){receipt_str}"
             )
     except Exception:
@@ -419,13 +435,19 @@ def cmd_cap_overview(args) -> int:
     if ov["total"] == 0:
         print("[mcbot] no capabilities yet — run `capability init` to seed")
         return 0
+    ev = evidence_rollup()
     print(f"Capabilities: {ov['total']} total")
     bs = ov["by_status"]
     print(f"  shipped={bs.get('shipped', 0)}  partial={bs.get('partial', 0)}  "
           f"gap={bs.get('gap', 0)}  deferred={bs.get('deferred', 0)}")
     shipped_pct = (bs.get('shipped', 0) / ov['total'] * 100) if ov['total'] else 0
     print(f"  shipped rate: {shipped_pct:.1f}%*")
-    print("  * statuses are DECLARED (human rulings), not yet derived from receipts")
+    print(f"  evidence (newest engine run): {ev['green']} green, {ev['red']} red, "
+          f"{ev['untested']} untested")
+    print(f"  honest convergence: {ev['shipped_green']}/{ev['shipped']} shipped faces "
+          f"carry green evidence*")
+    print("  * statuses are DECLARED (human rulings), not derived; evidence is derived "
+          "from receipts on every read")
     print()
     print(f"{'CATEGORY':<16} {'TOTAL':>6} {'SHIP':>5} {'PART':>5} {'GAP':>5} {'DEF':>5}")
     print("-" * 50)
@@ -490,6 +512,14 @@ def cmd_cap_status(args) -> int:
             print(f"    - {p}")
     else:
         print(f"\n  harness     : (no direct boundary-D path)")
+    ev = evidence_for_faces().get(cap.id)
+    if ev:
+        print(f"\n  evidence    : {ev['state'].upper()} "
+              f"(newest engine run; {ev['red_runs']} red run(s) in history)")
+        if ev["last_green_at"]:
+            print(f"    last green: {ev['last_green_at']}")
+        if ev["last_red_at"]:
+            print(f"    last red  : {ev['last_red_at']}")
     return 0
 
 
@@ -612,11 +642,16 @@ def cmd_cap_domain(args) -> int:
         f"last RED {lr['finished_at']} [{lr['run_id']}], {rep['green_streak_since']} green runs since"
         if lr else "no red run ever failed a scenario in this domain (in DB history)"
     )
+    ev_counts = {"green": 0, "red": 0, "untested": 0}
+    for f in rep["faces"]:
+        ev_counts[f["evidence"]["state"]] += 1
     print(f"=== domain: {rep['category']} ===")
     print(f"  {streak}")
+    print(f"  evidence: {ev_counts['green']} green, {ev_counts['red']} red, "
+          f"{ev_counts['untested']} untested (from the newest engine run)")
     print()
-    print(f"{'FACE':<28} {'STATUS':<10} {'VERIFIED':<12} {'SPECS':>5} {'IMPLS':>5}  FLAGS")
-    print("-" * 95)
+    print(f"{'FACE':<28} {'STATUS':<10} {'EVID':<9} {'VERIFIED':<12} {'SPECS':>5} {'IMPLS':>5}  FLAGS")
+    print("-" * 105)
     for f in rep["faces"]:
         flags = []
         if f["no_spec"]:
@@ -625,7 +660,10 @@ def cmd_cap_domain(args) -> int:
             flags.append("NO-IMPL")
         if f["has_deviation"]:
             flags.append("DEVIATION")
-        print(f"{f['id']:<28} {f['implementation_status'] + '*':<10} {f['verified_at'] or '-':<12} "
+        ev = f["evidence"]["state"].upper()
+        if f["evidence"]["state"] == "green" and f["evidence"]["red_runs"]:
+            ev += f"(x{f['evidence']['red_runs']})"
+        print(f"{f['id']:<28} {f['implementation_status'] + '*':<10} {ev:<9} {f['verified_at'] or '-':<12} "
               f"{f['spec_count']:>5} {f['impl_count']:>5}  {' '.join(flags)}")
     if rep["faces_no_spec"]:
         print(f"\n  no specs (no declared testing intent): {', '.join(rep['faces_no_spec'])}")

@@ -80,8 +80,12 @@ parse committed text.
 | status rulings + non-CSV links | `qa-results/capability-state.json` | write-through via `set`/`link`; `restore` for rebuilds |
 
 Vocabulary everywhere: **faces** (capabilities) / **specs** (TC) /
-**impls** (GT) / **runs** (receipts). Statuses render as `shipped*`
-— DECLARED human rulings, not yet derived from receipts.
+**impls** (GT) / **runs** (receipts). Two status axes per face:
+`implementation_status` is a DECLARED human ruling (renders
+`shipped*` — receipts cannot judge vanilla parity), and the
+**evidence axis** (GREEN / RED / UNTESTED) is DERIVED from receipts
+on every read, never stored. "Honest convergence" = how many
+declared-shipped faces carry green evidence.
 
 | Command | What it does |
 |---|---|
@@ -102,11 +106,15 @@ Rebuild recipe after losing `.runtime`:
 `capability init` → `qa-import` each CSV → `scan-gametest` →
 `backfill` → `restore`.
 
-Known honest limits: gametest logs list failures per scenario but
-never passes, so green evidence is run-granular, not per-face; the
-transitions table was born 2026-08-31 (older history lives in git);
-impl auto-links are keyword guesses — audit with
-`capability status <id>` before trusting per-face rollups.
+Known honest limits: green evidence is run-granular (Forge logs
+failures per scenario, never passes — a face absent from a run's
+failure list passed); the newest engine run decides a face's
+evidence state, and no false greens are claimed by walking back past
+a red newest; per-face staleness needs source_paths (0/35 curated
+today — deferred until the catalog grows them); the transitions
+table was born 2026-08-31; impl auto-links are keyword guesses —
+audit with `capability status <id>` before trusting per-face
+rollups.
 
 Implementation lives in `tool/mcbot/` (split from the old
 monolithic `mcbot_tool.py`): `paths/config/gradle/lock/proc/engine/
