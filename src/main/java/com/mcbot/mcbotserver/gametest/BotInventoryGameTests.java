@@ -370,6 +370,7 @@ public final class BotInventoryGameTests {
      * half, 27 of 54 slots, no error — was the silent half-open the
      * review flagged.
      */
+    // capability: inventory.menu_clicks
     @GameTest(template = "empty16x8x16", timeoutTicks = 100)
     public static void opensDoubleChestFullWidth(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
@@ -415,6 +416,7 @@ public final class BotInventoryGameTests {
      * the chest container is the real block entity, not a menu-side
      * copy, and that close/reopen is lossless.
      */
+    // capability: inventory.menu_clicks
     @GameTest(template = "empty16x8x16", timeoutTicks = 100)
     public static void storesAndRetrievesFromChest(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
@@ -566,6 +568,7 @@ public final class BotInventoryGameTests {
      * body rides the touch hook into the binding container; a fully
      * taken stack discards the entity.
      */
+    // capability: none
     @GameTest(template = "empty16x8x16", timeoutTicks = 100)
     public static void picksUpGroundItemsByTouch(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
@@ -605,6 +608,7 @@ public final class BotInventoryGameTests {
      * the facade's experienceLevel field, which only syncExperience
      * keeps truthful.
      */
+    // capability: inventory.menu_clicks
     @GameTest(template = "empty16x8x16", timeoutTicks = 200)
     public static void anvilRenamesAndChargesLevels(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
@@ -738,6 +742,7 @@ public final class BotInventoryGameTests {
      * getXpNeededForNextLevel is a BotBodyEntity method, so this is
      * the engine-side pin of a table the offline suite cannot reach.
      */
+    // capability: none
     @GameTest(template = "empty16x8x16", timeoutTicks = 100)
     public static void xpNeededPerLevelMatchesVanilla(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));

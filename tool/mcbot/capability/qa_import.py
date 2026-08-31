@@ -316,6 +316,7 @@ KEYWORD_RULES: list[tuple[list[str], str]] = [
     (["盾", "收盾"], "combat.shield"),
     (["近战", "melee"], "combat.melee"),
     (["攻击速度", "暴击"], "combat.melee"),
+    (["sword", "zombie", "kill", "cooldown", "sweep", "crit", "defend", "retaliate", "survive"], "combat.melee"),
     (["视线", "line_of_sight"], "combat.line_of_sight"),
     (["视线", "lava"], "combat.line_of_sight"),
     (["视线", "熔岩"], "combat.line_of_sight"),
@@ -328,8 +329,10 @@ KEYWORD_RULES: list[tuple[list[str], str]] = [
     (["挖树叶", "剪刀"], "dig.tool_speed"),
     (["工具", "自动切换"], "dig.tool_speed"),
     (["工具", "tool_speed"], "dig.tool_speed"),
+    (["shears", "leaves", "toolselector", "tool selector"], "dig.tool_speed"),
     (["附魔", "enchant"], "dig.enchantment_loot"),
     (["match_tool", "掉落"], "dig.enchantment_loot"),
+    (["diamond", "ore", "xp", "orb", "drop"], "dig.enchantment_loot"),
 
     # hunger
     (["饥饿", "hunger", "fooddata"], "hunger.fooddata"),
@@ -347,16 +350,19 @@ KEYWORD_RULES: list[tuple[list[str], str]] = [
     (["细雪", "powder", "freeze"], "vitals.powder_snow"),
     (["冰冻", "freeze"], "vitals.powder_snow"),
     (["火", "fire", "燃烧"], "vitals.fire"),
+    (["burning", "extinguish", "findwater", "regenerate", "health", "regen"], "vitals.fire"),
     (["窒息", "suffocation"], "vitals.suffocation"),
     (["窒息", "eye block"], "vitals.suffocation"),
     (["mlg", "水桶", "fall"], "vitals.mlg_water"),
     (["跌落", "fall damage"], "vitals.mlg_water"),
+    (["water", "trench", "pool", "deep", "cross"], "vitals.swimming"),
 
     # perception
     (["钓鱼", "fishing", "浮漂"], "perception.projectiles"),
     (["咬钩", "dip"], "perception.projectiles"),
     (["抛竿", "收竿"], "perception.projectiles"),
     (["投射物", "projectile"], "perception.projectiles"),
+    (["hooked", "reel", "bobber", "fish"], "perception.projectiles"),
     (["死亡", "death", "死亡标记"], "perception.death_flag"),
     (["睡眠", "sleep", "起床"], "perception.sleepers"),
     (["睡觉", "bed"], "perception.sleepers"),
@@ -368,6 +374,7 @@ KEYWORD_RULES: list[tuple[list[str], str]] = [
     (["护甲", "armor", "attribute"], "inventory.equipment_mirror"),
     (["菜单", "menu", "click"], "inventory.menu_clicks"),
     (["合成", "craft", "recipe"], "inventory.menu_clicks"),
+    (["chest", "store", "retrieve", "pickup", "anvil", "rename", "xp", "level", "double"], "inventory.menu_clicks"),
     (["护甲分类", "armor classification"], "inventory.armor_classification"),
     (["护甲", "保护", "protection"], "inventory.armor_classification"),
 

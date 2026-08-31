@@ -79,12 +79,14 @@ _CAMEL_SPLIT_RE = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|\d+")
 
 # Explicit capability declaration in a comment above a @GameTest method:
 #   // capability: combat.bow_draw
+#   // capability: none          (intentionally unlinked - e.g. test infra,
+#                                 non-behavior mechanics; not a strict failure)
 # This is the highest-priority link source (annotated), above keyword
 # matching and class fallback. The终局 is @GameTest(capability=...) but
 # that requires Java source changes; comments are non-invasive and work
 # with the current Forge @GameTest annotation signature.
 _CAPABILITY_COMMENT_RE = re.compile(
-    r"//\s*capability\s*:\s*([a-z_]+\.[a-z_]+)",
+    r"//\s*capability\s*:\s*([a-z_]+\.[a-z_]+|none)",
     re.IGNORECASE,
 )
 
@@ -219,7 +221,12 @@ def scan_gametests(
                 # Priority 1: explicit // capability: <id> comment above the method
                 annotated = _extract_capability_comment(content, method_match.start())
                 if annotated:
-                    if repo.get(annotated):
+                    if annotated == "none":
+                        # Intentionally unlinked (test infra, non-behavior mechanics)
+                        link_fields["capability_id"] = None
+                        link_fields["link_source"] = "annotated_none"
+                        ls = "annotated_none"
+                    elif repo.get(annotated):
                         link_fields["capability_id"] = annotated
                         link_fields["link_source"] = "annotated"
                         ls = "annotated"

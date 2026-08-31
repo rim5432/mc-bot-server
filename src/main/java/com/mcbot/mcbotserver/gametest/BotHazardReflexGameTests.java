@@ -208,6 +208,7 @@ public final class BotHazardReflexGameTests {
      * (isInWaterRainOrBubble) clears remainingFireTicks. Assert:
      * fire extinguished, body survives above the freeze threshold.
      */
+    // capability: vitals.fire
     @GameTest(template = "empty16x8x16", timeoutTicks = 200)
     public static void findsWaterWhenBurning(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
@@ -455,6 +456,7 @@ public final class BotHazardReflexGameTests {
      * full recovery (health == max), so a partial regen failure is
      * distinguishable from a total one.
      */
+    // capability: none
     @GameTest(template = "empty16x8x16", timeoutTicks = 400)
     public static void regeneratesHealthWhenBelowMax(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));

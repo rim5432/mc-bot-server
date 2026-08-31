@@ -125,6 +125,7 @@ public final class BotDiggingGameTests {
      * The leaves are set PERSISTENT so decay ticks cannot confound
      * the drop with a naturally-vanished block.
      */
+    // capability: dig.tool_speed
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void shearsClipLeavesIntoBlocks(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
@@ -164,6 +165,7 @@ public final class BotDiggingGameTests {
      * direct-arbiter submission path this scenario shares with every
      * other rig mission never emits it.
      */
+    // capability: dig.enchantment_loot
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void diamondOreSeedsXpOrbs(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
@@ -384,6 +386,7 @@ public final class BotDiggingGameTests {
      * at slot 0, shears at slot 1; a dig mission on persistent oak
      * leaves must swap the selection and leave the sword unworn.
      */
+    // capability: dig.tool_speed
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void toolSelectorPicksShearsForLeaves(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));

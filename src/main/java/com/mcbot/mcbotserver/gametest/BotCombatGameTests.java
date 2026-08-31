@@ -182,6 +182,7 @@ public final class BotCombatGameTests {
      * bot actually won the fight; the mission verdict is the honest
      * uncertainty signal, not a behavioral failure. See issue 0006.
      */
+    // capability: combat.melee
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void defendsByKillingZombie(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
@@ -259,6 +260,7 @@ public final class BotCombatGameTests {
      * sun-sensitive - without the roof the target burns instead of
      * fighting, which would test daylight, not retaliation.
      */
+    // capability: combat.melee
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void survivesRetaliatingZombie(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
@@ -434,6 +436,7 @@ public final class BotCombatGameTests {
      * crit, no sprint), so inter-drop gaps below 11 ticks can only
      * mean the cooldown gate regressed.
      */
+    // capability: combat.melee
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT + 100)
     public static void swordCooldownSpacesTheHits(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
@@ -488,6 +491,7 @@ public final class BotCombatGameTests {
      * xpNeededPerLevelMatchesVanilla. The roof keeps daylight from
      * burning the kill away from the bot.
      */
+    // capability: combat.melee
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void killsGrantXpLevels(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
@@ -610,6 +614,7 @@ public final class BotCombatGameTests {
      * the exact poll the main target's death is first seen, before
      * the rescan can engage the bystander as a fresh main target.
      */
+    // capability: combat.melee
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void sweepClipsBystanders(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
@@ -659,6 +664,7 @@ public final class BotCombatGameTests {
      * production path swings reliably mid-fall, and staging one
      * would pin bot-controlled physics, not the crit gate.
      */
+    // capability: combat.melee
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void underwaterSwingsNeverCrit(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(4, GametestRig.WALK_Y, 8));

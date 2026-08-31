@@ -154,6 +154,7 @@ public final class BotFishingGameTests {
      * <p>Kept as a placeholder documenting the coverage gap; the
      * hookedEntity and budget branches are pinned offline.
      */
+    // capability: perception.projectiles
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT, required = false)
     public static void hookedEntityTriggersImmediateReel(GameTestHelper helper) {
         // Deferred: in-engine hookedEntity requires spawning a FishingHook

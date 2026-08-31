@@ -27,3 +27,12 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon compileJava test
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Capability matrix validation
+        run: |
+          python tool/mcbot_tool.py capability init
+          python tool/mcbot_tool.py capability qa-import qa-results/ranged-survival/qa-test-cases-ranged-survival.csv
+          python tool/mcbot_tool.py capability scan-gametest --strict
+          python tool/mcbot_tool.py capability validate

@@ -59,6 +59,7 @@ public final class BotLocomotionGameTests {
     /**
      * Scenario 1: walks to a block on flat ground and reports success.
      */
+    // capability: none
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void walksToBlock(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
@@ -101,6 +102,7 @@ public final class BotLocomotionGameTests {
      * the spill falls into the void below the arena and cannot reach
      * the parallel structures.
      */
+    // capability: vitals.swimming
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void crossesWaterTrench(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
@@ -137,6 +139,7 @@ public final class BotLocomotionGameTests {
      * first (STUCK at the pool bottom), green once the binding
      * expresses jump-in-fluid as the jumping flag.
      */
+    // capability: vitals.swimming
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void crossesDeepPool(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
@@ -165,6 +168,7 @@ public final class BotLocomotionGameTests {
      * rather than an admin teleport. The body must actually displace
      * horizontally and the planner must re-route to the original goal.
      */
+    // capability: none
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void recoversWhenShoved(GameTestHelper helper) {
         BlockPos start = new BlockPos(3, GametestRig.WALK_Y, 8);
@@ -234,6 +238,7 @@ public final class BotLocomotionGameTests {
      * Scenario 3: unreachable goal fails cleanly with a reason - no
      * hang, no silent stall.
      */
+    // capability: none
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void failsCleanlyWhenUnwalkable(GameTestHelper helper) {
         BlockPos start = new BlockPos(3, GametestRig.WALK_Y, 8);
