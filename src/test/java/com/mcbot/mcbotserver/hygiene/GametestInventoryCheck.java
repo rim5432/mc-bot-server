@@ -49,7 +49,8 @@ class GametestInventoryCheck {
                             "failsCleanlyWhenUnwalkable",
                             "sneakCrawlFitsThroughGap",
                             "sneakingHoldsTheLedge",
-                            "sneakingInWaterSlidesDown")),
+                            "sneakingInWaterSlidesDown",
+                            "climbsLadderToPlatform")),
             Map.entry(
                     "BotInteractionGameTests",
                     Set.of("doorOpensThroughUseChain", "stairsFaceTheirPlacer", "sleepVerbSkipsToMorningOnlyFromABed")),
@@ -67,6 +68,7 @@ class GametestInventoryCheck {
                             "sweepClipsBystanders",
                             "underwaterSwingsNeverCrit",
                             "raisedShieldBlocksIncomingArrow",
+                            "raisedShieldBlocksFrontalMelee",
                             "bowChargedShotDamagesDistantTarget",
                             "rearArrowBypassesTheRaisedShield",
                             "bowTapShotDealsWeakDamage")),
@@ -117,7 +119,9 @@ class GametestInventoryCheck {
             Map.entry("GauntletGameTests", Set.of("gauntletEndToEnd", "routesThroughFenceGap")),
             Map.entry("CrashRecoveryGameTests", Set.of("latchesAndRecoversAfterCrash")),
             Map.entry("ProductionWiringGameTests", Set.of("walksViaCommandAndServerTick")),
-            Map.entry("BotFishingGameTests", Set.of("rodCastsAndReelsTheBobber")),
+            Map.entry(
+                    "BotFishingGameTests",
+                    Set.of("rodCastsAndReelsTheBobber", "biteDipTriggersReel", "hookedEntityTriggersImmediateReel")),
             Map.entry(
                     "BotDiggingGameTests",
                     Set.of(

@@ -538,6 +538,70 @@ public final class BotCombatGameTests {
     }
 
     /**
+     * Scenario: a raised shield blocks frontal MELEE damage, not just
+     * arrows. The vanilla isDamageSourceBlocked gate reads the same
+     * using-item state for every physical source (projectile or mob
+     * attack), so a shield held against an attacking zombie must zero
+     * the incoming hit. This pins the melee half that the arrow tests
+     * leave open: the damage control (unshielded) proves the source
+     * deals damage; the shielded phase proves the same source is
+     * fully absorbed when the body faces it with the USE hold active.
+     *
+     * <p>Discriminative facts: (1) the unshielded body loses health
+     * from a mobAttack source; (2) the shielded body loses zero health
+     * from the identical source; (3) isBlocking() is true during the
+     * shielded phase — a regression where the USE edge fails to raise
+     * the shield fails here before the damage check.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
+    public static void raisedShieldBlocksFrontalMelee(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(5, GametestRig.WALK_Y, 8));
+        rig.body().getInventory().container().setItem(0, new ItemStack(Items.SHIELD));
+        rig.body().setYRot(-90f); // face east, toward the damage source
+
+        Zombie attacker = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(8, GametestRig.WALK_Y, 8));
+        attacker.setNoAi(true);
+        net.minecraft.world.damagesource.DamageSource source =
+                helper.getLevel().damageSources().mobAttack(attacker);
+
+        helper.startSequence()
+                // Phase 1 (damage control): no shield, the mobAttack source
+                // must deal damage. This proves the source is live and the
+                // body is not invulnerable.
+                .thenExecuteAfter(0, () -> {
+                    float before = rig.body().getHealth();
+                    rig.body().hurt(source, 6.0f);
+                    check(
+                            rig.body().getHealth() < before,
+                            "the control melee hit must deal damage unshielded, before=" + before + " after="
+                                    + rig.body().getHealth());
+                })
+                // Phase 2: raise the shield and verify isBlocking is true.
+                .thenExecuteFor(20, () -> {
+                    rig.actor().submit(new Claim(Channel.USE, 50, "test:shield", new Intent.Use(true)));
+                    GametestRig.driveTick(rig);
+                })
+                .thenExecuteAfter(
+                        0, () -> check(rig.body().isBlocking(), "the body must be blocking before the melee hit"))
+                // Phase 3: the identical source must deal zero damage through
+                // the raised shield. Capture health before and after; the
+                // shielded hit must not move the health bar.
+                .thenExecuteAfter(0, () -> {
+                    float before = rig.body().getHealth();
+                    rig.body().hurt(source, 6.0f);
+                    check(
+                            rig.body().getHealth() >= before,
+                            "a frontal melee hit against a raised shield must deal no damage, before=" + before
+                                    + " after=" + rig.body().getHealth());
+                })
+                .thenExecuteAfter(0, () -> {
+                    rig.body().discard();
+                    attacker.discard();
+                })
+                .thenSucceed();
+    }
+
+    /**
      * Scenario: a grounded, non-sprinting sword swing sweeps - the
      * bystander one cell off the main target takes the sweep tick
      * (1.0 damage with no Sweeping Edge enchant, shaved to ~0.94 by

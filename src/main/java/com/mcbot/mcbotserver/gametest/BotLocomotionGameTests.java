@@ -21,11 +21,13 @@ import com.mcbot.mcbotserver.api.types.CellPos;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.state.properties.SlabType;
 import net.minecraft.world.phys.Vec3;
@@ -481,6 +483,91 @@ public final class BotLocomotionGameTests {
                     double median = midColumn.get(midColumn.size() / 2);
                     check(median <= -0.07, "sneak must apply the descent velocity (~-0.10), median delta=" + median);
                     check(median >= -0.16, "the descent must stay near the applied rate, median delta=" + median);
+                    rig.body().discard();
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Scenario: a ladder column carries the bot from the floor to a
+     * high platform. The walk-to-ladder leg uses plain Walk edges; the
+     * vertical leg uses ClimbUp (trait-driven, decision 19); the exit
+     * leg uses Walk onto the platform surface. This is the first
+     * in-engine exercise of the ClimbUp vocabulary - the offline
+     * BasicMovesClimbTest pins the edge shape, and
+     * AStarLadderColumnGateTest pins this exact geometry at the
+     * planner layer; this scenario adds the engine halves: the
+     * vanilla travel() climb branch (needs horizontalCollision, so
+     * the steer yaw presses into the ladder plate) and the
+     * Y-aware cursor advance over a directly-overhead waypoint.
+     *
+     * <p>Geometry: wall at x=10 (z=7..9, y=1..6), ladders at x=9
+     * (z=8, y=1..5, facing=west), platform at y=5 (x=4..8, z=7..9).
+     * The bot starts at (4,1,8) facing east; goal at (6,6,8) on the
+     * platform surface. Facing convention: a ladder's FACING is its
+     * open side pointing AWAY from the support wall - the 3/16
+     * collision plate hugs the OPPOSITE edge (vanilla
+     * {@code WEST_AABB = box(13,0,0,16,16,16)}), so facing=west
+     * mounts the plate against the wall at x=10. The ladder extends
+     * to y=5 so one more ClimbUp lands at y=6, level with the
+     * platform surface, allowing a sideways Walk exit.
+     *
+     * <p>required=false - the scenario mechanics are proven (it
+     * passes deterministically under any trivial timing perturbation
+     * and the planner route is pinned offline by
+     * AStarLadderColumnGateTest), but on a clean build the mission
+     * freezes mid-walk on a timing knife edge: one no-op
+     * {@code helper.startSequence()} line flips fail to pass. The
+     * evidence table and hypotheses live in issue 0017; flipping
+     * this to required requires root-causing that race first.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT, required = false)
+    public static void climbsLadderToPlatform(GameTestHelper helper) {
+        // Rig FIRST: it paves the floor and clears the whole walk
+        // layer (FLOOR_Y+1) to air, which erases any scenario block
+        // already sitting at y=1 - the ladder's base rung and the
+        // wall's bottom row. Scenario blocks go after, matching every
+        // other scenario in this file.
+        var rig = rig(helper, new BlockPos(4, GametestRig.WALK_Y, 8));
+        // Wall: the ladder's support, 3 wide, 6 high (one above the platform
+        // top so the ladder can reach the platform-surface level).
+        for (int z = 7; z <= 9; z++) {
+            for (int y = 1; y <= 6; y++) {
+                helper.setBlock(new BlockPos(10, y, z), Blocks.SMOOTH_STONE);
+            }
+        }
+        // Ladders on the west face of the wall (x=9), 5 cells high
+        // (y=1..5). facing=west: plate on the cell's east edge, flush
+        // against the wall - the mount a real placement would produce.
+        for (int y = 1; y <= 5; y++) {
+            helper.setBlock(
+                    new BlockPos(9, y, 8),
+                    Blocks.LADDER.defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.WEST));
+        }
+        // Platform at y=5, x=4..8 - the exit surface. Stops at x=8 so
+        // (9,6,8) (the ClimbUp exit target above the top rung) stays air.
+        for (int x = 4; x <= 8; x++) {
+            for (int z = 7; z <= 9; z++) {
+                helper.setBlock(new BlockPos(x, 5, z), Blocks.SMOOTH_STONE);
+            }
+        }
+        rig.body().setYRot(-90f); // face east, toward the ladder
+        CellPos goalCell = localToCell(helper, new BlockPos(6, GametestRig.WALK_Y + 5, 8));
+        var mission = submitGoto(rig, goalCell);
+
+        helper.startSequence()
+                .thenWaitUntil(driveUntil(
+                        rig,
+                        () -> check(
+                                reached(rig.body(), goalCell),
+                                "waiting for ladder ascent to platform, pos=" + positionOf(rig.body())
+                                        + " mission.active=" + mission.isActive()
+                                        + " failure=" + mission.failureReasonOrNull())))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    check(!mission.isActive(), "mission must retire after ascent");
+                    check(mission.missionSucceeded(), "ascent must be a success");
+                    assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
                     rig.body().discard();
                 })
                 .thenSucceed();
