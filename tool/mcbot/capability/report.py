@@ -701,3 +701,56 @@ def _group_faces_by_axis(faces: list[dict], category: str) -> dict[str, list[dic
         ax = f.get("axis") or "_unclassified"
         grouped.setdefault(ax, []).append(f)
     return {k: v for k, v in grouped.items() if v}
+
+
+def spec_impl_gap(db_path: Optional[Path] = None) -> dict:
+    """Per-face spec vs impl coverage matrix.
+
+    Answers the traceability question: which faces have a declared test
+    SPECIFICATION (TC-* from CSV) but no automated IMPLEMENTATION
+    (GT-* from gametest scan), and vice versa. A face with both is
+    'covered'; with neither is 'untested'.
+
+    This is the unified analysis that was impossible before the spec/impl
+    split was resolved as a kind discriminator on one table - now a single
+    query joins both kinds against the capability catalog.
+    """
+    init_db(db_path)
+    with get_connection(db_path) as conn:
+        faces = conn.execute("SELECT id, category, implementation_status FROM capabilities ORDER BY id").fetchall()
+        counts = {
+            r["capability_id"]: {"spec": r["spec"], "impl": r["impl"]}
+            for r in conn.execute(
+                """
+                SELECT capability_id,
+                       SUM(CASE WHEN kind = 'spec' THEN 1 ELSE 0 END) as spec,
+                       SUM(CASE WHEN kind = 'impl' THEN 1 ELSE 0 END) as impl
+                FROM qa_test_cases
+                WHERE capability_id IS NOT NULL AND kind IN ('spec', 'impl')
+                GROUP BY capability_id
+                """
+            ).fetchall()
+        }
+    result = {
+        "both": [],      # spec + impl (covered)
+        "spec_only": [], # declared but no automated anchor
+        "impl_only": [], # automated but no declared intent
+        "neither": [],   # no testing at all
+    }
+    for face in faces:
+        c = counts.get(face["id"], {"spec": 0, "impl": 0})
+        entry = {
+            "id": face["id"], "category": face["category"],
+            "status": face["implementation_status"],
+            "spec_count": c["spec"], "impl_count": c["impl"],
+        }
+        if c["spec"] > 0 and c["impl"] > 0:
+            result["both"].append(entry)
+        elif c["spec"] > 0:
+            result["spec_only"].append(entry)
+        elif c["impl"] > 0:
+            result["impl_only"].append(entry)
+        else:
+            result["neither"].append(entry)
+    result["summary"] = {k: len(v) for k, v in result.items() if k != "summary"}
+    return result

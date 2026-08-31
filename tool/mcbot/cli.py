@@ -60,8 +60,10 @@ from mcbot.capability.report import (
     evidence_rollup,
     harness_axis,
     staleness_for_faces,
+    spec_impl_gap,
     status_suggestions,
 )
+from mcbot.capability.validation import validate_db
 from mcbot.capability.state_export import restore_state, write_state_through
 from mcbot.capability.qa_import import import_csv, link_case, list_unlinked
 from mcbot.capability.receipt import latest_receipt_summary
@@ -415,6 +417,7 @@ def cmd_capability(args) -> int:
         "scan-gametest": cmd_cap_scan_gametest,
         "link": cmd_cap_link,
         "unlinked": cmd_cap_unlinked,
+        "validate": cmd_cap_validate,
     }
     fn = dispatch.get(args.action)
     if fn is None:
@@ -920,6 +923,45 @@ def cmd_cap_unlinked(args) -> int:
     return 0
 
 
+def cmd_cap_validate(args) -> int:
+    """Unified validation: schema/vocabulary/FK checks on all test
+    artifacts in the DB, plus spec-vs-impl coverage gap analysis.
+
+    Exit 0 if all valid; exit 1 if any errors (CI-gateable). This is
+    the single command that answers 'is our test data clean?' without
+    running the game - pure read-model over the DB.
+    """
+    errors = validate_db()
+    gap = spec_impl_gap()
+    print(f"[mcbot] validation: {len(errors)} artifact(s) with errors, "
+          f"{gap['summary']['both']} covered, {gap['summary']['spec_only']} spec-only, "
+          f"{gap['summary']['impl_only']} impl-only, {gap['summary']['neither']} untested")
+    if errors:
+        print()
+        print(f"{'ARTIFACT':<50} {'KIND':<6} ERRORS")
+        print("-" * 110)
+        for artifact, errs in errors[:30]:
+            print(f"{artifact.id:<50} {artifact.kind:<6} {'; '.join(errs)}")
+        if len(errors) > 30:
+            print(f"... and {len(errors) - 30} more")
+    if gap["spec_only"]:
+        print()
+        print("spec-only (declared intent, no automated anchor) — add gametest or accept as manual:")
+        for e in gap["spec_only"]:
+            print(f"  {e['id']:<30} [{e['status']:<8}] spec={e['spec_count']} impl=0")
+    if gap["impl_only"]:
+        print()
+        print("impl-only (automated test, no declared intent) — add CSV spec or accept as exploratory:")
+        for e in gap["impl_only"]:
+            print(f"  {e['id']:<30} [{e['status']:<8}] spec=0 impl={e['impl_count']}")
+    if gap["neither"]:
+        print()
+        print("untested (no spec, no impl) — internal reflex/sense faces by design, rest are review candidates:")
+        for e in gap["neither"]:
+            print(f"  {e['id']:<30} [{e['status']:<8}]")
+    return 1 if errors else 0
+
+
 # ---------------------------------------------------------------------------
 # doc commands
 # ---------------------------------------------------------------------------
@@ -1235,6 +1277,9 @@ def main() -> int:
     p_cap_link.add_argument("case_id", help="QA case id, e.g. TC-COMBAT-001 or GT-BotCombat-xxx")
     p_cap_link.add_argument("capability_id", help="capability id, e.g. combat.bow_draw")
     p_cap_sub.add_parser("unlinked", help="list QA cases not linked to any capability")
+    p_cap_sub.add_parser(
+        "validate",
+        help="unified validation: schema/vocabulary/FK checks on all test artifacts + spec-vs-impl gap analysis (exit 1 on errors)")
     p_cap.set_defaults(func=cmd_capability)
 
     # doc management (rot control; read-only except touch/new/index)
