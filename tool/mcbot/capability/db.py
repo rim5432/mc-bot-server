@@ -192,6 +192,18 @@ _MIGRATIONS: list[tuple[int, str, list[str]]] = [
             "ALTER TABLE capabilities ADD COLUMN harness_paths TEXT NOT NULL DEFAULT '[]'",
         ],
     ),
+    (
+        5,
+        "capabilities: axis - sub-domain classification for coverage analysis",
+        [
+            # The behavioral axis this face belongs to within its category.
+            # Used by `capability domain` to group faces by sub-axis and
+            # compare against the player-behavior reference baseline.
+            # Empty = unclassified (legacy faces; seed refresh will fill).
+            "ALTER TABLE capabilities ADD COLUMN axis TEXT NOT NULL DEFAULT ''",
+            "CREATE INDEX idx_capabilities_axis ON capabilities(axis)",
+        ],
+    ),
 ]
 
 

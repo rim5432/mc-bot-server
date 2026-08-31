@@ -677,18 +677,16 @@ def cmd_cap_domain(args) -> int:
     cov = rep.get("coverage")
     if cov is not None:
         bv = cov["by_verdict"]
-        print(f"--- player-behavior coverage: {cov['coverage_pct']}% "
+        print(f"--- player-behavior coverage: {cov['reference_total']} reference behaviors "
               f"({bv['covered']} covered, {bv['partial']} partial, "
-              f"{bv['gap']} gap, {bv['untested']} untested "
-              f"of {cov['reference_total']} reference behaviors) ---")
+              f"{bv['gap']} no-face, {bv['untested']} untested) ---")
         print()
         print(f"  {'AXIS':<14} {'TOTAL':>5} {'COVERED':>7} {'PARTIAL':>7} "
-              f"{'GAP':>4} {'UNTESTED':>8}  {'COVERAGE':>8}")
-        print("  " + "-" * 78)
+              f"{'NO-FACE':>7} {'UNTESTED':>8}")
+        print("  " + "-" * 66)
         for ax, data in cov["by_axis"].items():
             print(f"  {ax:<14} {data['total']:>5} {data['covered']:>7} "
-                  f"{data['partial']:>7} {data['gap']:>4} {data['untested']:>8}  "
-                  f"{data['coverage_pct']:>7.1f}%")
+                  f"{data['partial']:>7} {data['gap']:>7} {data['untested']:>8}")
         print()
         if cov["gaps"]:
             print(f"  coverage gaps ({len(cov['gaps'])}):")
@@ -709,11 +707,8 @@ def cmd_cap_domain(args) -> int:
             print(f"  partial coverage ({len(cov['partials'])}):")
             for b in cov["partials"]:
                 print(f"    [{b['axis']:<11}] {b['name']} -> {b['mapped_face']}")
-                if b["coverage_note"]:
-                    note = b["coverage_note"]
-                    if len(note) > 120:
-                        note = note[:117] + "..."
-                    print(f"      {note}")
+                if b["verdict_reason"]:
+                    print(f"      {b['verdict_reason']}")
             print()
 
     if rep.get("faces_shipped_untested"):

@@ -375,12 +375,14 @@ HARNESS_PATHS: dict[str, list[str]] = {
 SOURCE_PATHS: dict[str, list[str]] = {
     # combat
     "combat.bow_draw": [
+        "core/behavior/CombatBehavior.java",
         "core/combat/RangedLoadouts.java",
         "adapter/BotPlayerFacade.java",
         "adapter/entity/BotBodyEntity.java",
         "core/tick/BotController.java",
     ],
     "combat.bow_slot": [
+        "core/behavior/CombatBehavior.java",
         "core/combat/RangedLoadouts.java",
         "core/tick/ToolSelector.java",
         "adapter/inventory/BindingInventory.java",
@@ -391,6 +393,7 @@ SOURCE_PATHS: dict[str, list[str]] = {
         "core/tick/BotController.java",
     ],
     "combat.melee": [
+        "core/behavior/CombatBehavior.java",
         "adapter/MeleeResolver.java",
         "core/process/AttackProcess.java",
         "core/command/AttackCommandHandler.java",

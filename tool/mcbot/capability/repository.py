@@ -31,6 +31,7 @@ def _row_to_capability(row) -> Capability:
         id=row["id"],
         name=row["name"],
         category=row["category"],
+        axis=row["axis"] if "axis" in row.keys() else "",
         description=row["description"] or "",
         implementation_status=row["implementation_status"],
         vanilla_ref=row["vanilla_ref"] or "",
@@ -95,13 +96,13 @@ class CapabilityRepository:
                 conn.execute(
                     """
                     UPDATE capabilities SET
-                        name = ?, category = ?, description = ?,
+                        name = ?, category = ?, axis = ?, description = ?,
                         implementation_status = ?, vanilla_ref = ?, deviation = ?,
                         source_paths = ?, harness_paths = ?, verified_at = ?, updated_at = ?
                     WHERE id = ?
                     """,
                     (
-                        cap.name, cap.category, cap.description,
+                        cap.name, cap.category, cap.axis, cap.description,
                         cap.implementation_status, cap.vanilla_ref, cap.deviation,
                         source_paths_json, harness_paths_json, cap.verified_at, now, cap.id,
                     ),
@@ -110,13 +111,13 @@ class CapabilityRepository:
                 conn.execute(
                     """
                     INSERT INTO capabilities (
-                        id, name, category, description, implementation_status,
+                        id, name, category, axis, description, implementation_status,
                         vanilla_ref, deviation, source_paths, harness_paths, verified_at,
                         created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
-                        cap.id, cap.name, cap.category, cap.description,
+                        cap.id, cap.name, cap.category, cap.axis, cap.description,
                         cap.implementation_status, cap.vanilla_ref, cap.deviation,
                         source_paths_json, harness_paths_json, cap.verified_at, now, now,
                     ),

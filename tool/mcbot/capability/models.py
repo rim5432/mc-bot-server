@@ -16,10 +16,17 @@ class Capability:
 
     ``implementation_status`` vocabulary is pinned: shipped | partial
     | gap | deferred. Anything else is a schema defect.
+
+    ``axis`` is the sub-domain classification within ``category``,
+    used by ``capability domain`` to group faces and compare against
+    the player-behavior reference baseline. Combat axes: offense,
+    defense, movement, perception, consumables, equipment, environment.
+    Empty string means unclassified (legacy; seed refresh fills it).
     """
     id: str
     name: str
     category: str
+    axis: str = ""
     description: str = ""
     implementation_status: str = "gap"  # shipped, partial, gap, deferred
     vanilla_ref: str = ""

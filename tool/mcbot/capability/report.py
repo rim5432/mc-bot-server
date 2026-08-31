@@ -420,6 +420,47 @@ def staleness_for_faces(db_path: Optional[Path] = None, *, repo_root: Optional[P
     return result
 
 
+def _detect_weak_mapping(face_id: str, source_paths: list[str]) -> Optional[str]:
+    """Auto-detect whether a face is adapter-only.
+
+    A face is adapter-only when its implementation lives only in the
+    adapter/ layer (net.minecraft bindings) and no core decision layer
+    invokes it. The decision layers are:
+      - core/behavior/  — behavior trees (CombatBehavior, PathingBehavior)
+      - core/process/   — process state machines (AttackProcess, DefendProcess)
+      - core/reflex/    — reflex rules (EngageOnHostileProximityRule)
+
+    Paths under core/tick/ (BotController routing), core/combat/
+    (utility classes like RangedLoadouts), core/command/ (command
+    handlers), and core/world/ (world view) are NOT decision layers —
+    they route or support but do not make the combat decision to invoke
+    the mechanic.
+
+    Detection is based on source_paths layering. Returns a reason string
+    when adapter-only is detected, None otherwise. Returns None when
+    source_paths is empty (cannot determine — the face may simply not
+    have catalogued its source paths yet).
+    """
+    if not source_paths:
+        return None
+    decision_prefixes = ("core/behavior/", "core/process/", "core/reflex/",
+                         "core\\behavior\\", "core\\process\\", "core\\reflex\\")
+    has_decision_layer = any(
+        any(p.startswith(pfx) for pfx in decision_prefixes)
+        for p in source_paths
+    )
+    has_adapter = any(
+        p.startswith("adapter/") or p.startswith("adapter\\")
+        for p in source_paths
+    )
+    if has_adapter and not has_decision_layer:
+        return (
+            "adapter-only: implementation lives in adapter/ layer, "
+            "no core behavior/process/reflex decision layer invokes it"
+        )
+    return None
+
+
 def coverage_analysis(category: str, *, db_path: Optional[Path] = None) -> Optional[dict]:
     """Diff the player-behavior reference baseline against matrix faces.
 
@@ -427,16 +468,24 @@ def coverage_analysis(category: str, *, db_path: Optional[Path] = None) -> Optio
     its mapped face (if any) and that face's implementation status +
     evidence state. Coverage verdicts:
 
-    - ``covered``: mapped face exists and is shipped or partial
-    - ``partial``: mapped face is partial, or the coverage_note flags
-      a structural weakness (adapter-only, untested, mechanic-only)
-    - ``gap``: mapped face is gap or deferred, or no mapped face exists
-    - ``untested``: mapped face is shipped but evidence state is untested
+    - ``covered``: mapped face is shipped, evidence is green, and the
+      implementation is invoked by the core decision layer (not
+      adapter-only)
+    - ``partial``: mapped face is shipped but evidence is RED, or the
+      face is adapter-only (auto-detected from source_paths layering),
+      or the face status itself is partial
+    - ``gap``: no mapped face exists, or the face is gap/deferred
+    - ``untested``: mapped face is shipped but has no impl test anchor
 
-    Per-axis rollups answer "how much of the player's combat action set
-    does the design cover, by sub-domain?" This is the number the old
-    domain report could not produce — it only listed faces that existed,
-    never the behaviors that were missing.
+    No single coverage percentage is computed — the reference behavior
+    set is an open, human-curated enumeration, so a "100% covered"
+    state is not meaningful. Raw counts per verdict and per axis are
+    returned instead; consumers render them directly.
+
+    Weak-mapping detection (adapter-only) is derived from each face's
+    source_paths, not from handwritten notes. When a face has only
+    adapter/ source paths and no core/ source paths, it is auto-flagged
+    as adapter-only.
 
     Returns None when no reference baseline is defined for the category.
     """
@@ -449,17 +498,9 @@ def coverage_analysis(category: str, *, db_path: Optional[Path] = None) -> Optio
         face_rows = {
             r["id"]: dict(r)
             for r in conn.execute(
-                "SELECT id, name, implementation_status, axis FROM capabilities "
-                "WHERE category = ?",
+                "SELECT id, name, implementation_status, axis, source_paths "
+                "FROM capabilities WHERE category = ?",
                 (category,),
-            ).fetchall()
-        }
-        impl_counts = {
-            r["capability_id"]: r["c"]
-            for r in conn.execute(
-                "SELECT capability_id, COUNT(*) as c FROM qa_test_cases "
-                "WHERE kind = 'impl' AND capability_id IS NOT NULL "
-                "GROUP BY capability_id"
             ).fetchall()
         }
     behaviors = []
@@ -467,6 +508,9 @@ def coverage_analysis(category: str, *, db_path: Optional[Path] = None) -> Optio
         face = face_rows.get(ref.mapped_face) if ref.mapped_face else None
         face_status = face["implementation_status"] if face else None
         face_evidence = evidence.get(ref.mapped_face, {}).get("state") if ref.mapped_face else None
+        face_source_paths = (
+            json.loads(face["source_paths"] or "[]") if face else []
+        )
         # Verdict logic (order matters: hardest deficiency first)
         if face is None:
             verdict = "gap"
@@ -480,18 +524,17 @@ def coverage_analysis(category: str, *, db_path: Optional[Path] = None) -> Optio
         elif face_evidence == "red":
             verdict = "partial"
             verdict_reason = "shipped but newest engine run is RED"
-        elif ref.coverage_note and any(
-            kw in ref.coverage_note.lower()
-            for kw in ("adapter", "no behavior", "not combat", "mechanic", "passively", "does not")
-        ):
-            verdict = "partial"
-            verdict_reason = "weak mapping: " + ref.coverage_note.split(".")[0][:80]
-        elif face_status == "partial":
-            verdict = "partial"
-            verdict_reason = "face is partial"
         else:
-            verdict = "covered"
-            verdict_reason = ""
+            weak_reason = _detect_weak_mapping(ref.mapped_face, face_source_paths)
+            if weak_reason:
+                verdict = "partial"
+                verdict_reason = weak_reason
+            elif face_status == "partial":
+                verdict = "partial"
+                verdict_reason = "face is partial"
+            else:
+                verdict = "covered"
+                verdict_reason = ""
         behaviors.append({
             "id": ref.id,
             "name": ref.name,
@@ -501,11 +544,12 @@ def coverage_analysis(category: str, *, db_path: Optional[Path] = None) -> Optio
             "mapped_face": ref.mapped_face,
             "face_status": face_status,
             "face_evidence": face_evidence,
+            "face_source_paths": face_source_paths,
             "coverage_note": ref.coverage_note,
             "verdict": verdict,
             "verdict_reason": verdict_reason,
         })
-    # Per-axis rollup
+    # Per-axis rollup (raw counts only — no percentage)
     axes = {}
     for ax in axis_order_for(category):
         ax_behaviors = [b for b in behaviors if b["axis"] == ax]
@@ -514,13 +558,9 @@ def coverage_analysis(category: str, *, db_path: Optional[Path] = None) -> Optio
         counts = {"covered": 0, "partial": 0, "gap": 0, "untested": 0}
         for b in ax_behaviors:
             counts[b["verdict"]] += 1
-        total = len(ax_behaviors)
         axes[ax] = {
-            "total": total,
+            "total": len(ax_behaviors),
             **counts,
-            "coverage_pct": round(
-                (counts["covered"] + 0.5 * counts["partial"]) / total * 100, 1
-            ) if total else 0.0,
         }
     total = len(behaviors)
     counts = {"covered": 0, "partial": 0, "gap": 0, "untested": 0}
@@ -533,9 +573,6 @@ def coverage_analysis(category: str, *, db_path: Optional[Path] = None) -> Optio
         "category": category,
         "reference_total": total,
         "by_verdict": counts,
-        "coverage_pct": round(
-            (counts["covered"] + 0.5 * counts["partial"]) / total * 100, 1
-        ) if total else 0.0,
         "by_axis": axes,
         "behaviors": behaviors,
         "gaps": gaps,
