@@ -1,6 +1,6 @@
 ---
 title: Interaction model executable queue - the composition primitives the canonical doc promises
-last_verified: 2026-08-30
+last_verified: 2026-08-31
 covers:
   - doc/architecture/harness-interaction.md
   - doc/architecture/boundaries.md
@@ -117,12 +117,19 @@ archived D1 table and its rulings:
          ticket and the body freezes until `forceload add` -
          CompanionChunkLoader-class capability candidate, or runbook
          automation; manual prep documented in shadow_compare.py.
+         Pinned by receipt 2026-08-31 (qa-results/boundary-d/
+         receipt-20260831-051354.json, case C1/C1b): the queue is
+         server-tick driven and keeps failing tasks honestly while
+         the body alone freezes; forceload wakes it.
                                                         [dep: none]
 - [ ] S  resetAt epoch honesty - EventQueue promises a monotonic
          bot-restart marker but a fresh queue restarts it at 1;
          either seed from a persistent counter or amend the
          EventQueue doc to the beyond-head client rule (the CLI
-         ships beyond-head today).                  [dep: none]
+         ships beyond-head today). Pinned by receipt 2026-08-31
+         (qa-results/boundary-d/receipt-20260831-052015.json, case
+         C2-post): clean stop + relaunch returned the same epoch,
+         violating beyond-head.                  [dep: none]
 
 Reopen triggers that live only inside the archived 0012 body
 (brewing / enchant cast overrides, L2 JSON role table, cast mixin,
