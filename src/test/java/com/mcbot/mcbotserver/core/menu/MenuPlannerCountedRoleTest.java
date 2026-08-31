@@ -68,6 +68,19 @@ class MenuPlannerCountedRoleTest {
     }
 
     @Test
+    void countedDepositWithZeroSupplyReportsItemNotFound() {
+        // Player region holds coal, but the requested item is iron_ore:
+        // supply reads as zero. The error must distinguish "item not
+        // found" from "not enough" (which implies the item exists but
+        // in insufficient quantity).
+        MenuView menu = MenuFixtures.furnace(MenuFixtures.builder().put(SlotRole.HOTBAR, 38, "minecraft:coal", 64));
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> MenuPlanner.planDepositCounted(menu, SlotRole.INPUT, "minecraft:iron_ore", 8));
+        assertEquals("item not found in player region: minecraft:iron_ore", ex.getMessage());
+    }
+
+    @Test
     void takeRoleDrainQuickMovesEveryNonEmptySlot() {
         MenuView menu = MenuFixtures.furnace(MenuFixtures.builder().put(SlotRole.OUTPUT, 2, "minecraft:iron_ingot", 7));
         assertEquals(

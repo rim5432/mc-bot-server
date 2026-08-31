@@ -2,6 +2,7 @@ package com.mcbot.mcbotserver.adapter;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.mcbot.mcbotserver.api.inventory.ItemIds;
 import com.mcbot.mcbotserver.api.menu.CraftingView;
 import com.mcbot.mcbotserver.api.menu.MenuTransactions;
 import com.mcbot.mcbotserver.api.menu.MenuView;
@@ -144,7 +145,7 @@ final class MenuVerbs {
             return CommandResponse.answer(ctx.getSource(), CommandResponse.err("no active bot"));
         }
         String roleWord = StringArgumentType.getString(ctx, "slotRole");
-        String item = StringArgumentType.getString(ctx, "item");
+        String item = ItemIds.normalize(StringArgumentType.getString(ctx, "item"));
         int count = IntegerArgumentType.getInteger(ctx, "count");
         SlotRole role = parseRole(roleWord);
         if (role == null) {

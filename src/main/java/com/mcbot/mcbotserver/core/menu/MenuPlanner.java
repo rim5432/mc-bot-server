@@ -210,7 +210,12 @@ public final class MenuPlanner {
      * @param target the role to deposit into (CONTAINER on chests,
      *               INPUT / FUEL on furnace kinds); the wire layer
      *               resolves intent roles per menu kind before calling
-     * @param itemId the item to move; never null or blank
+     * @param itemId the item to move in canonical registry-key form
+     *               ({@code minecraft:iron_ore}); never null or blank.
+     *               Wire entry points normalize via
+     *               {@link com.mcbot.mcbotserver.api.inventory.ItemIds#normalize(String)}
+     *               before calling; a bare id matches nothing and reads
+     *               as zero supply
      * @param count  exact number of items to deposit; positive
      * @return the click sequence in execution order; never null
      * @throws IllegalArgumentException when itemId or count is
@@ -226,6 +231,9 @@ public final class MenuPlanner {
             throw new IllegalArgumentException("count must be positive, got " + count);
         }
         int supply = PlayerRegion.countOf(menu, itemId);
+        if (supply == 0) {
+            throw new IllegalArgumentException("item not found in player region: " + itemId);
+        }
         if (supply < count) {
             throw new IllegalArgumentException("not enough: have " + supply + ", need " + count);
         }

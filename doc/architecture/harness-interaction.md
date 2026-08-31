@@ -6,6 +6,8 @@ covers:
   - tool/harness/mc.py
   - src/main/java/com/mcbot/mcbotserver/adapter/BotCommands.java
   - src/main/java/com/mcbot/mcbotserver/adapter/MenuCommands.java
+  - src/main/java/com/mcbot/mcbotserver/adapter/MenuVerbs.java
+  - src/main/java/com/mcbot/mcbotserver/api/inventory/ItemIds.java
   - src/main/java/com/mcbot/mcbotserver/adapter/WorldCommands.java
   - skills/patrol.py
 related:
@@ -191,11 +193,23 @@ pinned live against runServer (qa-results/boundary-d):
 
 ## 8. Fidelity rules
 
-- **Vocabulary travels verbatim.** Registry ids (`minecraft:stone`),
-  slot roles, task ids - never sanitized into shell-friendly
-  shapes. Brigadier's `word()` rejects colons, so id-bearing wire
-  args are `string()` and the caller quotes them (bitten twice:
-  menu verbs, then mine - the lesson is now law).
+- **Vocabulary travels verbatim on output; input is normalized at the boundary.**
+  Registry ids (`minecraft:stone`) in snapshots and receipts are always
+  canonical — never shortened, never sanitized into shell-friendly
+  shapes. On input, bare ids (`stone`) are accepted and expanded to
+  canonical form (`minecraft:stone`) by `ItemIds.normalize` at every
+  wire entry point (deposit, recipe lookup); already-canonical ids and
+  modded namespaces (`create:stone`) pass through unchanged. Brigadier's
+  `word()` rejects colons, so id-bearing wire args are `string()` and
+  the caller quotes them (bitten twice: menu verbs, then mine - the
+  lesson is now law).
+- **Deposit/take errors are taxonomized.** A zero-supply deposit rejects
+  with `item not found in player region: <id>` (the item is absent,
+  distinct from a format mismatch); a partial-supply deposit rejects
+  with `not enough: have <N>, need <M>` (the item exists but in
+  insufficient quantity). A consumer can branch on the prefix:
+  `item not found` → wrong id or empty inventory; `not enough` →
+  request too large for current supply.
 - **Cursor truth is never filtered client-side.**
   The stream-truth wire keys `latest` / `resetAt` / `dropped` (the
   record components `latestEventId`/`droppedCount` serialize to the

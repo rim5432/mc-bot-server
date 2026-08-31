@@ -2,6 +2,7 @@ package com.mcbot.mcbotserver.adapter;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.mcbot.mcbotserver.api.inventory.ItemIds;
 import com.mcbot.mcbotserver.api.menu.RecipeView;
 import com.mcbot.mcbotserver.core.menu.MenuViewJson;
 import java.util.ArrayList;
@@ -76,8 +77,9 @@ final class MenuInspectOps {
         if (l == null) {
             return CommandResponse.noActiveBot(src);
         }
+        String canonical = ItemIds.normalize(itemId);
         JsonArray recipes = new JsonArray();
-        for (RecipeView recipe : l.catalog().byResult(itemId)) {
+        for (RecipeView recipe : l.catalog().byResult(canonical)) {
             recipes.add(MenuViewJson.toJsonObject(recipe));
         }
         JsonObject root = CommandResponse.ok();
