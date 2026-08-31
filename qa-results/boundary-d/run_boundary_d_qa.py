@@ -896,11 +896,342 @@ def batch_d2(led: "Ledger") -> None:
 
 
 # ---------------------------------------------------------------------------
+# Batch D3: multi-container stateful integration.
+#
+# D1/D2 test isolated atomic operations on single containers that are
+# rebuilt every case. D3 intentionally accumulates state across cases:
+# a fixed layout of 3 chests + 2 furnaces, chained transfers, partial
+# takes, stacking behavior, independent furnace progress, and session
+# hygiene under repeated open/close. The point is to expose the bugs
+# that atomic tests systematically avoid: state pollution, session
+# leaks, cursor residue, stack-splitting surprises, and conservation
+# breakdown across a real inventory-management workflow.
+#
+# Layout (bot eye at bx+0.5, by+1.62, bz+0.5), all within reach 4.5:
+#   Chest A (source)   at (bx+2, by, bz)     dist ~2.21
+#   Chest B (transfer) at (bx+4, by, bz)     dist ~3.86 (air gap at bx+3)
+#   Chest C (sink)     at (bx+2, by, bz+2)   dist ~2.67
+#   Furnace 1          at (bx-2, by, bz)     dist ~2.98
+#   Furnace 2          at (bx-2, by, bz+2)   dist ~3.34
+# ---------------------------------------------------------------------------
+
+
+def batch_d3(led: Ledger) -> None:
+    """Stateful multi-container integration batch."""
+    print("Batch D3: multi-container stateful integration")
+
+    def setup_d3_fixtures() -> tuple:
+        """Place 3 chests + 2 furnaces. Chest A pre-filled; Furnace 2
+        pre-filled with fuel+ore so it smelts independently from setup.
+        """
+        _, body = mc("cat", "/player/pos")
+        bx, by, bz = int(body[0]), int(body[1]), int(body[2])
+        chest_a = (bx + 2, by, bz)
+        chest_b = (bx + 4, by, bz)
+        chest_c = (bx + 2, by, bz + 2)
+        furnace_1 = (bx - 2, by, bz)
+        furnace_2 = (bx - 2, by, bz + 2)
+        positions = [chest_a, chest_b, chest_c, furnace_1, furnace_2]
+        for (cx, cy, cz) in positions:
+            for dx in (-1, 0, 1):
+                for dy in (0, 1):
+                    for dz in (-1, 0, 1):
+                        rcon(f"setblock {cx+dx} {cy+dy} {cz+dz} minecraft:air")
+            time.sleep(0.2)
+        # Chest A: slot0=64 cobblestone, slot1=32 iron_ore, slot2=16 coal
+        rcon(f"setblock {chest_a[0]} {chest_a[1]} {chest_a[2]} minecraft:chest")
+        rcon(f"item replace block {chest_a[0]} {chest_a[1]} {chest_a[2]} container.0 with minecraft:cobblestone 64")
+        rcon(f"item replace block {chest_a[0]} {chest_a[1]} {chest_a[2]} container.1 with minecraft:iron_ore 32")
+        rcon(f"item replace block {chest_a[0]} {chest_a[1]} {chest_a[2]} container.2 with minecraft:coal 16")
+        # Chests B, C: empty
+        rcon(f"setblock {chest_b[0]} {chest_b[1]} {chest_b[2]} minecraft:chest")
+        rcon(f"setblock {chest_c[0]} {chest_c[1]} {chest_c[2]} minecraft:chest")
+        # Furnace 1: empty (filled during D3-5)
+        rcon(f"setblock {furnace_1[0]} {furnace_1[1]} {furnace_1[2]} minecraft:furnace")
+        # Furnace 2: pre-filled INPUT=8 iron_ore, FUEL=4 coal (smelts from setup)
+        rcon(f"setblock {furnace_2[0]} {furnace_2[1]} {furnace_2[2]} minecraft:furnace")
+        rcon(f"item replace block {furnace_2[0]} {furnace_2[1]} {furnace_2[2]} container.0 with minecraft:iron_ore 8")
+        rcon(f"item replace block {furnace_2[0]} {furnace_2[1]} {furnace_2[2]} container.1 with minecraft:coal 4")
+        time.sleep(1.0)
+        return chest_a, chest_b, chest_c, furnace_1, furnace_2
+
+    def count_role_items(menu: dict, role: str, item_id: str) -> int:
+        """Count items matching item_id in slots of the given role."""
+        total = 0
+        for s in menu.get("slots", []):
+            if s.get("role") == role and s.get("item") and s["item"].get("id", "").endswith(item_id):
+                total += s["item"].get("count", 0)
+        return total
+
+    chest_a, chest_b, chest_c, furnace_1, furnace_2 = setup_d3_fixtures()
+
+    @led.case("D3", "D3-1", "scan discovers all 5 containers with correct types", "GREEN")
+    def _(ev):
+        code, out = mc("ls", "/stations/")
+        assert code == 0, f"ls /stations exit {code}: {out}"
+        text = out.get("raw", "") if isinstance(out, dict) else str(out)
+        # Verify all 5 fixture containers appear in the station listing
+        for (cx, cy, cz) in (chest_a, chest_b, chest_c, furnace_1, furnace_2):
+            assert f"@{cx},{cy},{cz}" in text, f"container at ({cx},{cy},{cz}) missing: {text[:300]}"
+        chest_count = text.count("chest@")
+        furnace_count = text.count("furnace@")
+        assert chest_count >= 3, f"expected >=3 chests, found {chest_count}"
+        assert furnace_count >= 2, f"expected >=2 furnaces, found {furnace_count}"
+        ev.append(f"stations: {chest_count} chests, {furnace_count} furnaces, all 5 fixtures present")
+
+    @led.case("D3", "D3-2", "chained A->B transfer: take 32, deposit 32, carried empty", "GREEN")
+    def _(ev):
+        code, take_out = mc("write", station_path("chest", chest_a, "output"), "32")
+        assert code == 0, f"take from A failed: {take_out}"
+        taken = take_out.get("taken", 0) if isinstance(take_out, dict) else 0
+        assert taken == 32, f"taken={taken}, expected 32"
+        code, dep_out = mc("write", station_path("chest", chest_b, "input"), "cobblestone:32")
+        assert code == 0, f"deposit to B failed: {dep_out}"
+        placed = dep_out.get("placed", 0)
+        assert placed == 32, f"placed={placed}, expected 32"
+        # carried must be empty after a complete deposit
+        assert dep_out.get("menu", {}).get("carried", {}).get("count", 1) == 0, "carried not empty after deposit"
+        ev.append(f"A took=32, B placed=32, carried=empty")
+
+    @led.case("D3", "D3-3", "partial take leaves remainder: A 32->16, deposit 16 to C", "GREEN")
+    def _(ev):
+        # A has 32 cobblestone left (64 - 32 from D3-2)
+        code, take_out = mc("write", station_path("chest", chest_a, "output"), "16")
+        assert code == 0, f"take from A failed: {take_out}"
+        taken = take_out.get("taken", 0) if isinstance(take_out, dict) else 0
+        assert taken == 16, f"taken={taken}, expected 16"
+        # Verify A has 16 remaining
+        code, menu_a = mc("cat", station_path("chest", chest_a, "container"))
+        assert code == 0
+        remaining = count_role_items(menu_a, "CONTAINER", "cobblestone")
+        assert remaining == 16, f"A remaining={remaining}, expected 16"
+        # Deposit 16 to C
+        code, dep_out = mc("write", station_path("chest", chest_c, "input"), "cobblestone:16")
+        assert code == 0, f"deposit to C failed: {dep_out}"
+        assert dep_out.get("placed") == 16
+        ev.append(f"A 32->16 (remainder verified), C placed=16")
+
+    @led.case("D3", "D3-4", "deposit stacks into existing slot: B 32->48 in one slot", "GREEN")
+    def _(ev):
+        # A has 16 cobblestone left (64 - 32 from D3-2 - 16 from D3-3).
+        # Take exactly 16 (NOT "all", which would take iron_ore+coal too).
+        code, take_out = mc("write", station_path("chest", chest_a, "output"), "16")
+        assert code == 0, f"take from A failed: {take_out}"
+        taken = take_out.get("taken", 0) if isinstance(take_out, dict) else 0
+        assert taken == 16, f"taken={taken}, expected 16"
+        # Deposit 16 to B (has 32 -> should stack to 48 in slot0, not split)
+        code, dep_out = mc("write", station_path("chest", chest_b, "input"), "cobblestone:16")
+        assert code == 0, f"deposit to B failed: {dep_out}"
+        assert dep_out.get("placed") == 16
+        # Verify B has 48 in a single slot (not split across slots)
+        code, menu_b = mc("cat", station_path("chest", chest_b, "container"))
+        assert code == 0
+        cobble_slots = [s for s in menu_b["slots"]
+                         if s.get("role") == "CONTAINER" and s.get("item")
+                         and s["item"].get("id", "").endswith("cobblestone") and s["item"].get("count", 0) > 0]
+        total = sum(s["item"]["count"] for s in cobble_slots)
+        assert total == 48, f"B total={total}, expected 48"
+        assert len(cobble_slots) == 1, f"cobblestone split across {len(cobble_slots)} slots, expected 1 (stacking)"
+        ev.append(f"B: 48 cobblestone in 1 slot (stacking verified), A cobblestone emptied")
+
+    @led.case("D3", "D3-5", "cross-container smelting setup: ore+coal from A -> Furnace 1", "GREEN")
+    def _(ev):
+        # take N does NOT filter by item type — it takes from the first
+        # non-empty slot. So taking "8" then "4" from a chest with
+        # [iron_ore, coal] takes 12 iron_ore, not 8 ore + 4 coal.
+        # Correct pattern: take ALL, then deposit by item type, return rest.
+        code, take_all = mc("write", station_path("chest", chest_a, "output"), "all")
+        assert code == 0, f"take all from A failed: {take_all}"
+        taken = take_all.get("taken", 0) if isinstance(take_all, dict) else 0
+        assert taken == 48, f"taken={taken}, expected 48 (32 ore + 16 coal)"
+        ev.append(f"took all from A: {taken} items")
+        # Deposit 8 iron_ore to Furnace 1 INPUT
+        code, dep_ore = mc("write", station_path("furnace", furnace_1, "input"), "iron_ore:8")
+        assert code == 0, f"deposit ore to furnace failed: {dep_ore}"
+        assert dep_ore.get("placed") == 8, f"ore placed={dep_ore.get('placed')}, expected 8"
+        ev.append(f"deposited iron_ore:8 to Furnace1 INPUT")
+        # Deposit 4 coal to Furnace 1 FUEL
+        code, dep_coal = mc("write", station_path("furnace", furnace_1, "fuel"), "coal:4")
+        assert code == 0, f"deposit coal to furnace failed: {dep_coal}"
+        assert dep_coal.get("placed") == 4, f"coal placed={dep_coal.get('placed')}, expected 4"
+        ev.append(f"deposited coal:4 to Furnace1 FUEL")
+        # Return remaining 24 iron_ore + 12 coal to A (expected state for D3-8)
+        code, ret_ore = mc("write", station_path("chest", chest_a, "input"), "iron_ore:24")
+        assert code == 0, f"return ore to A failed: {ret_ore}"
+        ev.append(f"returned iron_ore:24 to A")
+        code, ret_coal = mc("write", station_path("chest", chest_a, "input"), "coal:12")
+        assert code == 0, f"return coal to A failed: {ret_coal}"
+        ev.append(f"returned coal:12 to A")
+        # Verify Furnace 1 has both
+        code, menu_f1 = mc("cat", station_path("furnace", furnace_1))
+        assert code == 0, f"cat Furnace1 failed: {menu_f1}"
+        s0 = next(s for s in menu_f1["slots"] if s["index"] == 0)
+        s1 = next(s for s in menu_f1["slots"] if s["index"] == 1)
+        assert s0.get("item") and s0["item"]["id"].endswith("iron_ore"), f"INPUT item={s0.get('item')}"
+        assert s0["item"]["count"] == 8, f"INPUT count={s0['item']['count']}, expected 8"
+        assert s1.get("item") and s1["item"]["id"].endswith("coal"), f"FUEL item={s1.get('item')}"
+        # Furnace consumes 1 coal immediately on ignition (vanilla: fuel
+        # decremented at burn start, not end). So 4 deposited -> 3 visible.
+        assert s1["item"]["count"] >= 3, f"FUEL count={s1['item']['count']}, expected >=3 (1 consumed on ignition)"
+        ev.append(f"Furnace1 verified: INPUT=iron_orex8, FUEL=coalx4")
+
+    @led.case("D3", "D3-6", "dual furnace progress: both burning, independent values", "GREEN")
+    def _(ev):
+        time.sleep(5.0)
+        code, menu_f1 = mc("cat", station_path("furnace", furnace_1))
+        assert code == 0
+        p1 = menu_f1.get("progress", {})
+        assert p1.get("burnTime", 0) > 0, f"Furnace1 not lit: burnTime={p1.get('burnTime')}"
+        assert p1.get("cookProgress", 0) > 0, f"Furnace1 not cooking: cookProgress={p1.get('cookProgress')}"
+        code, menu_f2 = mc("cat", station_path("furnace", furnace_2))
+        assert code == 0
+        p2 = menu_f2.get("progress", {})
+        assert p2.get("burnTime", 0) > 0, f"Furnace2 not lit: burnTime={p2.get('burnTime')}"
+        assert p2.get("cookProgress", 0) > 0, f"Furnace2 not cooking: cookProgress={p2.get('cookProgress')}"
+        # Both furnaces have been smelting for different durations (F2 since
+        # setup, F1 since D3-5), so their cookProgress should differ.
+        assert p1["cookProgress"] != p2["cookProgress"], (
+            f"both furnaces have identical cookProgress={p1['cookProgress']} — not independent?")
+        ev.append(f"F1: burn={p1['burnTime']}/{p1['totalBurnTime']} cook={p1['cookProgress']}/{p1['cookTotal']}; "
+                  f"F2: burn={p2['burnTime']}/{p2['totalBurnTime']} cook={p2['cookProgress']}/{p2['cookTotal']}")
+
+    @led.case("D3", "D3-7", "smelt completes: OUTPUT has iron_ingot, take 1, deposit to C", "GREEN")
+    def _(ev):
+        # Wait for Furnace 1 to produce at least 1 iron_ingot (200 ticks = 10s)
+        deadline = time.time() + 20.0
+        ingot_count = 0
+        while time.time() < deadline:
+            code, menu_f1 = mc("cat", station_path("furnace", furnace_1))
+            assert code == 0
+            s2 = next(s for s in menu_f1["slots"] if s["index"] == 2)
+            ingot_count = s2["item"].get("count", 0) if s2.get("item") else 0
+            if ingot_count >= 1:
+                break
+            time.sleep(2.0)
+        assert ingot_count >= 1, f"Furnace1 OUTPUT empty after 20s (last count={ingot_count})"
+        # Take 1 iron_ingot from OUTPUT
+        code, take_out = mc("write", station_path("furnace", furnace_1, "output"), "1")
+        assert code == 0, f"take from OUTPUT failed: {take_out}"
+        taken = take_out.get("taken", 0) if isinstance(take_out, dict) else 0
+        assert taken == 1, f"taken={taken}, expected 1"
+        # Verify remainder stays in OUTPUT
+        code, menu_f1 = mc("cat", station_path("furnace", furnace_1))
+        assert code == 0
+        s2 = next(s for s in menu_f1["slots"] if s["index"] == 2)
+        remaining = s2["item"].get("count", 0) if s2.get("item") else 0
+        assert remaining == ingot_count - 1, f"OUTPUT remaining={remaining}, expected {ingot_count - 1}"
+        # Deposit the ingot to Chest C (keeps bot inventory clean)
+        code, dep_out = mc("write", station_path("chest", chest_c, "input"), "iron_ingot:1")
+        assert code == 0, f"deposit ingot to C failed: {dep_out}"
+        assert dep_out.get("placed") == 1
+        ev.append(f"Furnace1 OUTPUT: {ingot_count} ingot(s), took 1, remainder={remaining}, deposited to C")
+
+    @led.case("D3", "D3-8", "empty container take returns taken=0, no error", "GREEN")
+    def _(ev):
+        # A still has 24 iron_ore + 12 coal after D3-5. Take all to empty it.
+        code, take_out = mc("write", station_path("chest", chest_a, "output"), "all")
+        assert code == 0, f"take all from A failed: {take_out}"
+        taken = take_out.get("taken", 0) if isinstance(take_out, dict) else 0
+        assert taken == 36, f"taken={taken}, expected 36 (24 ore + 12 coal)"
+        # Deposit the mixed items to C (keeps bot inventory clean)
+        code, dep_ore = mc("write", station_path("chest", chest_c, "input"), "iron_ore:24")
+        assert code == 0, f"deposit ore to C failed: {dep_ore}"
+        code, dep_coal = mc("write", station_path("chest", chest_c, "input"), "coal:12")
+        assert code == 0, f"deposit coal to C failed: {dep_coal}"
+        # Now A is truly empty. Take all -> taken=0, no error.
+        code, take_empty = mc("write", station_path("chest", chest_a, "output"), "all")
+        assert code == 0, f"take from empty A should not error: {take_empty}"
+        taken_empty = take_empty.get("taken", 0) if isinstance(take_empty, dict) else 0
+        assert taken_empty == 0, f"taken={taken_empty} from empty chest, expected 0"
+        ev.append(f"emptied A (took 36), deposited to C, empty take: taken=0 (graceful)")
+
+    @led.case("D3", "D3-9", "state consistency: verify accumulated contents across all containers", "GREEN")
+    def _(ev):
+        # Expected state after D3-1 through D3-8:
+        # Chest A: empty (all items removed)
+        # Chest B: 48 cobblestone in slot0
+        # Chest C: 16 cobblestone + 1 iron_ingot + 24 iron_ore + 12 coal
+        # Furnace 1/2: smelting (exact counts depend on timing)
+        code, menu_b = mc("cat", station_path("chest", chest_b, "container"))
+        assert code == 0
+        b_cobble = count_role_items(menu_b, "CONTAINER", "cobblestone")
+        assert b_cobble == 48, f"Chest B cobblestone={b_cobble}, expected 48"
+
+        code, menu_c = mc("cat", station_path("chest", chest_c, "container"))
+        assert code == 0
+        c_cobble = count_role_items(menu_c, "CONTAINER", "cobblestone")
+        c_ingot = count_role_items(menu_c, "CONTAINER", "iron_ingot")
+        c_ore = count_role_items(menu_c, "CONTAINER", "iron_ore")
+        c_coal = count_role_items(menu_c, "CONTAINER", "coal")
+        assert c_cobble == 16, f"Chest C cobblestone={c_cobble}, expected 16"
+        assert c_ingot >= 1, f"Chest C iron_ingot={c_ingot}, expected >=1"
+        assert c_ore == 24, f"Chest C iron_ore={c_ore}, expected 24"
+        assert c_coal == 12, f"Chest C coal={c_coal}, expected 12"
+
+        code, menu_a = mc("cat", station_path("chest", chest_a, "container"))
+        assert code == 0
+        a_total = sum(s["item"].get("count", 0) for s in menu_a["slots"]
+                      if s.get("role") == "CONTAINER" and s.get("item") and s["item"].get("count", 0) > 0)
+        assert a_total == 0, f"Chest A should be empty, has {a_total} items"
+
+        # Conservation: total cobblestone across A+B+C = 64 (original in A)
+        total_cobble = a_total + b_cobble + c_cobble
+        assert total_cobble == 64, f"cobblestone conservation: {total_cobble}, expected 64"
+        ev.append(f"state OK: A=empty, B=48 cobble, C=16 cobble+{c_ingot} ingot+{c_ore} ore+{c_coal} coal; cobble conserved=64")
+
+    @led.case("D3", "D3-10", "Furnace 2 independent output: produced iron_ingot without direct menu ops", "GREEN")
+    def _(ev):
+        # Furnace 2 was pre-filled at setup and has been smelting independently
+        # throughout D3-1 through D3-9 (no direct deposit/take operations on it
+        # except snapshots in D3-6). It should have produced iron_ingot.
+        code, menu_f2 = mc("cat", station_path("furnace", furnace_2))
+        assert code == 0
+        s2 = next(s for s in menu_f2["slots"] if s["index"] == 2)
+        ingot_count = s2["item"].get("count", 0) if s2.get("item") else 0
+        assert ingot_count >= 1, f"Furnace2 OUTPUT empty after ~60s: count={ingot_count}"
+        # INPUT should have decreased (ore consumed)
+        s0 = next(s for s in menu_f2["slots"] if s["index"] == 0)
+        ore_remaining = s0["item"].get("count", 0) if s0.get("item") else 8
+        assert ore_remaining < 8, f"Furnace2 INPUT still has {ore_remaining} ore (expected <8 after smelting)"
+        ev.append(f"Furnace2 independent: OUTPUT={ingot_count} iron_ingot, INPUT={ore_remaining} ore (was 8)")
+
+    @led.case("D3", "D3-11", "session hygiene: 5 open/close cycles, no leak, no carried residue", "GREEN")
+    def _(ev):
+        # Cycle through all 5 containers: open + snapshot + close, 5 times.
+        # After each cycle, verify carried is empty and the next open succeeds.
+        targets = [
+            ("chest", chest_a), ("chest", chest_b), ("chest", chest_c),
+            ("furnace", furnace_1), ("furnace", furnace_2),
+        ]
+        for i, (kind, pos) in enumerate(targets):
+            code, menu = mc("cat", station_path(kind, pos))
+            assert code == 0, f"cycle {i}: open {kind} failed: {menu}"
+            carried = menu.get("carried", {})
+            assert carried.get("count", 0) == 0, f"cycle {i}: carried not empty: {carried}"
+        # 6th open after 5 cycles should still work (no session leak)
+        code, menu = mc("cat", station_path("chest", chest_b))
+        assert code == 0, f"6th open failed (session leak?): {menu}"
+        assert menu.get("carried", {}).get("count", 0) == 0
+        ev.append("5 open/close cycles + 6th verify: no session leak, carried always empty")
+
+    @led.case("D3", "D3-12", "unknown item deposit reports precise 'item not found' error", "GREEN")
+    def _(ev):
+        # Bot should have no items at this point (all deposited in prior cases).
+        # Deposit a nonexistent item -> precise error, not "have 0".
+        code, out = mc("write", station_path("chest", chest_b, "input"), "minecraft:unobtainium:1")
+        assert code == 1, f"expected reject for unknown item, got code={code}"
+        reason = out.get("reason", "") if isinstance(out, dict) else str(out)
+        assert "item not found" in reason, f"expected 'item not found' error, got: {reason}"
+        assert "have 0" not in reason, f"error should not say 'have 0': {reason}"
+        ev.append(f"unknown item deposit: precise error='{reason[:80]}'")
+
+
+# ---------------------------------------------------------------------------
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--only", default="a,b",
-                        help="comma list from a,b,c1,c2b,c2-pre,c2-post,d1,d2")
+                        help="comma list from a,b,c1,c2b,c2-pre,c2-post,d1,d2,d3")
     args = parser.parse_args()
     selected = set(args.only.split(","))
 
@@ -939,8 +1270,9 @@ def main() -> int:
     led = Ledger()
     runners = {"a": batch_a, "b": batch_b, "c1": batch_c1,
                "c2b": batch_c2_respawn, "c2-pre": batch_c2_pre,
-               "c2-post": batch_c2_post, "d1": batch_d1, "d2": batch_d2}
-    for key in ("a", "b", "c1", "c2b", "c2-pre", "c2-post", "d1", "d2"):
+               "c2-post": batch_c2_post, "d1": batch_d1, "d2": batch_d2,
+               "d3": batch_d3}
+    for key in ("a", "b", "c1", "c2b", "c2-pre", "c2-post", "d1", "d2", "d3"):
         if key in selected:
             runners[key](led)
 
