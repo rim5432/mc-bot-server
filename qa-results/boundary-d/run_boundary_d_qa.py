@@ -693,11 +693,218 @@ def batch_d1(led: Ledger) -> None:
 
 
 # ---------------------------------------------------------------------------
+# D2: furnace-family differentiated roles (INPUT / FUEL / OUTPUT) plus
+# burn/cook progress disclosure. The role infrastructure shipped earlier
+# (MenuSlotLayouts.furnaceRole + hasDifferentiatedRoles); progress is new
+# in this batch (MenuProgress record + BindingMenu reflective read of the
+# private AbstractFurnaceMenu.data ContainerData).
+# ---------------------------------------------------------------------------
+
+
+def batch_d2(led: "Ledger") -> None:
+    """Furnace INPUT/FUEL/OUTPUT roles + burn/cook progress disclosure."""
+
+    def station_path(kind: str, pos: tuple, role: str | None = None) -> str:
+        x, y, z = pos
+        base = f"/stations/{kind}@{x},{y},{z}"
+        return f"{base}/{role}" if role else f"{base}/"
+
+    def setup_d2_fixtures() -> tuple:
+        """Place a furnace, blast_furnace, and smoker within reach.
+
+        Geometry (bot eye at bx+0.5, by+1.62, bz+0.5):
+          furnace       at (bx+2, by, bz)   -> dist ~2.29
+          blast_furnace at (bx+4, by, bz)   -> dist ~4.15
+          smoker        at (bx+2, by, bz+2) -> dist ~3.04 (floating, reachable)
+        All within 4.5 block reach. The smoker floats one block off the
+        platform edge — furnaces need no support and the bot opens
+        containers by raycast, not by walking.
+        """
+        bx, by, bz = bot_pos
+        furnace_pos = (bx + 2, by, bz)
+        blast_pos = (bx + 4, by, bz)
+        smoker_pos = (bx + 2, by, bz + 2)
+        # Clear a pocket so no neighbour block intercepts the raycast.
+        for (cx, cy, cz) in [furnace_pos, blast_pos, smoker_pos]:
+            for dx in (-1, 0, 1):
+                for dy in (0, 1):
+                    for dz in (-1, 0, 1):
+                        rcon(f"setblock {cx+dx} {cy+dy} {cz+dz} minecraft:air")
+            time.sleep(0.2)
+        rcon(f"setblock {furnace_pos[0]} {furnace_pos[1]} {furnace_pos[2]} minecraft:furnace")
+        rcon(f"setblock {blast_pos[0]} {blast_pos[1]} {blast_pos[2]} minecraft:blast_furnace")
+        rcon(f"setblock {smoker_pos[0]} {smoker_pos[1]} {smoker_pos[2]} minecraft:smoker")
+        time.sleep(1.0)
+        return furnace_pos, blast_pos, smoker_pos
+
+    furnace_pos, blast_pos, smoker_pos = setup_d2_fixtures()
+    fx, fy, fz = furnace_pos
+
+    @led.case("D2", "D2-1", "scan discovers the furnace block-entity", "GREEN")
+    def _(ev):
+        code, out = mc("ls", "/stations/")
+        assert code == 0, f"scan failed: {out}"
+        text = out.get("raw", "") if isinstance(out, dict) else str(out)
+        assert f"furnace@{fx},{fy},{fz}" in text, f"furnace not in scan: {text[:200]}"
+        ev.append(f"scan found furnace@{fx},{fy},{fz}")
+
+    @led.case("D2", "D2-2", "empty furnace snapshot: type, size, progress all-zero", "GREEN")
+    def _(ev):
+        code, menu = mc("cat", station_path("furnace", furnace_pos))
+        assert code == 0, f"open failed: {menu}"
+        assert menu["type"] == "furnace", f"type={menu['type']}"
+        assert menu["containerSize"] == 39, f"size={menu['containerSize']}"
+        progress = menu.get("progress")
+        assert progress is not None, "furnace snapshot missing progress object"
+        assert progress["burnTime"] == 0
+        assert progress["totalBurnTime"] == 0
+        assert progress["cookProgress"] == 0
+        assert progress["cookTotal"] == 0
+        ev.append(f"type=furnace size=39 progress={progress}")
+
+    @led.case("D2", "D2-3", "furnace roles are INPUT/FUEL/OUTPUT, no CONTAINER", "GREEN")
+    def _(ev):
+        code, menu = mc("cat", station_path("furnace", furnace_pos))
+        assert code == 0
+        slots = menu["slots"]
+        s0 = next(s for s in slots if s["index"] == 0)
+        s1 = next(s for s in slots if s["index"] == 1)
+        s2 = next(s for s in slots if s["index"] == 2)
+        assert s0["role"] == "INPUT", f"slot0 role={s0['role']}"
+        assert s1["role"] == "FUEL", f"slot1 role={s1['role']}"
+        assert s2["role"] == "OUTPUT", f"slot2 role={s2['role']}"
+        roles = {s["role"] for s in slots}
+        assert "CONTAINER" not in roles, f"CONTAINER leaked into furnace roles: {roles}"
+        ev.append(f"roles: 0=INPUT 1=FUEL 2=OUTPUT, no CONTAINER (full set: {sorted(roles)})")
+
+    @led.case("D2", "D2-4", "deposit INPUT lands in slot0 (no resolveRole fallback)", "GREEN")
+    def _(ev):
+        code, out = mc("write", station_path("furnace", furnace_pos, "input"), "iron_ore:8")
+        assert code == 0, f"deposit INPUT failed: {out}"
+        placed = out.get("placed", 0)
+        assert placed == 8, f"placed={placed}"
+        code, menu = mc("cat", station_path("furnace", furnace_pos))
+        assert code == 0
+        s0 = next(s for s in menu["slots"] if s["index"] == 0)
+        assert s0["item"]["id"].endswith("iron_ore"), f"slot0 item={s0['item']}"
+        assert s0["item"]["count"] == 8
+        ev.append(f"deposit INPUT: placed=8, slot0={s0['item']['id']}x{s0['item']['count']}")
+
+    @led.case("D2", "D2-5", "deposit FUEL lands in slot1", "GREEN")
+    def _(ev):
+        code, out = mc("write", station_path("furnace", furnace_pos, "fuel"), "coal:4")
+        assert code == 0, f"deposit FUEL failed: {out}"
+        placed = out.get("placed", 0)
+        assert placed == 4, f"placed={placed}"
+        code, menu = mc("cat", station_path("furnace", furnace_pos))
+        assert code == 0
+        s1 = next(s for s in menu["slots"] if s["index"] == 1)
+        assert s1["item"]["id"].endswith("coal"), f"slot1 item={s1['item']}"
+        assert s1["item"]["count"] == 4
+        ev.append(f"deposit FUEL: placed=4, slot1={s1['item']['id']}x{s1['item']['count']}")
+
+    @led.case("D2", "D2-6", "after 5s smelting: burnTime>0, cookProgress>0, raw tick values", "GREEN")
+    def _(ev):
+        # Coal = 1600 ticks burn, iron ore = 200 ticks cook. After 5s
+        # (100 ticks) the furnace is lit and the first recipe is ~50%.
+        time.sleep(5.0)
+        code, menu = mc("cat", station_path("furnace", furnace_pos))
+        assert code == 0
+        p = menu["progress"]
+        assert p["burnTime"] > 0, f"burnTime={p['burnTime']} (furnace not lit)"
+        assert p["totalBurnTime"] == 1600, f"totalBurnTime={p['totalBurnTime']} (coal expected 1600)"
+        assert p["cookProgress"] > 0, f"cookProgress={p['cookProgress']}"
+        assert p["cookTotal"] == 200, f"cookTotal={p['cookTotal']} (iron ore expected 200)"
+        ev.append(f"progress: burnTime={p['burnTime']}/1600 cookProgress={p['cookProgress']}/200")
+
+    @led.case("D2", "D2-7", "smelt completes: OUTPUT has iron_ingot, take OUTPUT removes it", "GREEN")
+    def _(ev):
+        # Wait for the first iron ore to finish (200 ticks = 10s) plus
+        # buffer. D2-6 already waited 5s, so 12s more covers it.
+        time.sleep(12.0)
+        code, menu = mc("cat", station_path("furnace", furnace_pos))
+        assert code == 0
+        s2 = next(s for s in menu["slots"] if s["index"] == 2)
+        assert s2["item"]["id"].endswith("iron_ingot"), f"OUTPUT item={s2['item']} (expected iron_ingot)"
+        ingot_count = s2["item"]["count"]
+        assert ingot_count >= 1, f"OUTPUT count={ingot_count}"
+        code, out = mc("write", station_path("furnace", furnace_pos, "output"), "all")
+        assert code == 0, f"take OUTPUT failed: {out}"
+        taken = out.get("taken", 0)
+        assert taken >= ingot_count, f"taken={taken} expected >={ingot_count}"
+        ev.append(f"smelted {ingot_count} iron_ingot, taken={taken}")
+
+    @led.case("D2", "D2-8", "blast_furnace: differentiated roles + progress object present", "GREEN")
+    def _(ev):
+        code, menu = mc("cat", station_path("blast_furnace", blast_pos))
+        assert code == 0, f"open blast_furnace failed: {menu}"
+        assert menu["type"] == "blast_furnace", f"type={menu['type']}"
+        assert menu["containerSize"] == 39
+        slots = menu["slots"]
+        assert next(s for s in slots if s["index"] == 0)["role"] == "INPUT"
+        assert next(s for s in slots if s["index"] == 1)["role"] == "FUEL"
+        assert next(s for s in slots if s["index"] == 2)["role"] == "OUTPUT"
+        progress = menu.get("progress")
+        assert progress is not None, "blast_furnace missing progress"
+        assert progress["burnTime"] == 0 and progress["cookProgress"] == 0
+        ev.append(f"blast_furnace: roles INPUT/FUEL/OUTPUT, progress present (empty)")
+
+    @led.case("D2", "D2-9", "smoker: differentiated roles + progress object present", "GREEN")
+    def _(ev):
+        code, menu = mc("cat", station_path("smoker", smoker_pos))
+        assert code == 0, f"open smoker failed: {menu}"
+        assert menu["type"] == "smoker", f"type={menu['type']}"
+        assert menu["containerSize"] == 39
+        slots = menu["slots"]
+        assert next(s for s in slots if s["index"] == 0)["role"] == "INPUT"
+        assert next(s for s in slots if s["index"] == 1)["role"] == "FUEL"
+        assert next(s for s in slots if s["index"] == 2)["role"] == "OUTPUT"
+        progress = menu.get("progress")
+        assert progress is not None, "smoker missing progress"
+        ev.append(f"smoker: roles INPUT/FUEL/OUTPUT, progress present (empty)")
+
+    @led.case("D2", "D2-10", "deposit with unknown role on furnace rejects", "GREEN")
+    def _(ev):
+        code, out = mc("write", station_path("furnace", furnace_pos, "bogus"), "dirt:1")
+        assert code == 1, f"expected reject, exit {code}: {out}"
+        err = out.get("stderr", "") if isinstance(out, dict) else str(out)
+        assert "unknown role" in err, f"wrong error: {err}"
+        ev.append(f"rejected unknown role: {err[:100]}")
+
+    @led.case("D2", "D2-11", "open furnace at unreachable coordinate rejects", "GREEN")
+    def _(ev):
+        far = (fx + 38, fy, fz)
+        code, out = mc("cat", station_path("furnace", far))
+        assert code == 1, f"expected reject, exit {code}: {out}"
+        err = out.get("stderr", "") if isinstance(out, dict) else str(out)
+        assert err.strip(), "reject carried no reason"
+        ev.append(f"rejected far furnace open: {err[:100]}")
+
+    @led.case("D2", "D2-12", "progress survives menu close/reopen (data read from block entity)", "GREEN")
+    def _(ev):
+        # After D2-7 the furnace may still be smelting remaining ore.
+        # Reopen and verify progress is still a valid object with
+        # internally-consistent values (burnTime <= totalBurnTime when lit).
+        code, menu = mc("cat", station_path("furnace", furnace_pos))
+        assert code == 0
+        p = menu["progress"]
+        assert p is not None
+        if p["totalBurnTime"] > 0:
+            assert p["burnTime"] <= p["totalBurnTime"], (
+                f"burnTime={p['burnTime']} > totalBurnTime={p['totalBurnTime']}")
+        if p["cookTotal"] > 0:
+            assert p["cookProgress"] <= p["cookTotal"], (
+                f"cookProgress={p['cookProgress']} > cookTotal={p['cookTotal']}")
+        ev.append(f"reopen progress consistent: burn={p['burnTime']}/{p['totalBurnTime']} "
+                  f"cook={p['cookProgress']}/{p['cookTotal']}")
+
+
+# ---------------------------------------------------------------------------
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--only", default="a,b",
-                        help="comma list from a,b,c1,c2b,c2-pre,c2-post,d1")
+                        help="comma list from a,b,c1,c2b,c2-pre,c2-post,d1,d2")
     args = parser.parse_args()
     selected = set(args.only.split(","))
 
@@ -736,8 +943,8 @@ def main() -> int:
     led = Ledger()
     runners = {"a": batch_a, "b": batch_b, "c1": batch_c1,
                "c2b": batch_c2_respawn, "c2-pre": batch_c2_pre,
-               "c2-post": batch_c2_post, "d1": batch_d1}
-    for key in ("a", "b", "c1", "c2b", "c2-pre", "c2-post", "d1"):
+               "c2-post": batch_c2_post, "d1": batch_d1, "d2": batch_d2}
+    for key in ("a", "b", "c1", "c2b", "c2-pre", "c2-post", "d1", "d2"):
         if key in selected:
             runners[key](led)
 

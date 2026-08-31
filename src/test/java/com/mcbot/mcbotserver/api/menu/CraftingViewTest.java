@@ -139,6 +139,6 @@ class CraftingViewTest {
         for (int i = 0; i < size; i++) {
             slots.add(new SlotView(i, ItemView.EMPTY, special.getOrDefault(i, SlotRole.MAIN)));
         }
-        return new MenuView(type, null, ItemView.EMPTY, size, slots);
+        return new MenuView(type, null, ItemView.EMPTY, size, slots, null);
     }
 }

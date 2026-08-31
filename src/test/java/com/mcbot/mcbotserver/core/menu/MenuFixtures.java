@@ -70,7 +70,7 @@ final class MenuFixtures {
         for (int i = 0; i < size; i++) {
             slots.add(new SlotView(i, b.items.getOrDefault(i, ItemView.EMPTY), b.roles.get(i)));
         }
-        return new MenuView(kind, null, ItemView.EMPTY, size, slots);
+        return new MenuView(kind, null, ItemView.EMPTY, size, slots, null);
     }
 
     /**
@@ -144,7 +144,7 @@ final class MenuFixtures {
         for (int i = 0; i < 45; i++) {
             slots.add(new SlotView(i, b.items.getOrDefault(i, ItemView.EMPTY), b.roles.getOrDefault(i, SlotRole.MAIN)));
         }
-        return CraftingView.of(new MenuView("inventory", null, ItemView.EMPTY, 45, slots));
+        return CraftingView.of(new MenuView("inventory", null, ItemView.EMPTY, 45, slots, null));
     }
 
     /** Chest-menu fake: CONTAINER 0..26, MAIN 27..53, HOTBAR 54..62. */

@@ -2,6 +2,7 @@ package com.mcbot.mcbotserver.adapter;
 
 import com.mcbot.mcbotserver.adapter.inventory.BindingInventory;
 import com.mcbot.mcbotserver.api.menu.MenuClick;
+import com.mcbot.mcbotserver.api.menu.MenuProgress;
 import com.mcbot.mcbotserver.api.menu.MenuView;
 import com.mcbot.mcbotserver.api.menu.SlotRole;
 import com.mcbot.mcbotserver.api.menu.SlotView;
@@ -16,9 +17,11 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.AbstractFurnaceMenu;
 import net.minecraft.world.inventory.AnvilMenu;
 import net.minecraft.world.inventory.BeaconMenu;
 import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.ContainerSynchronizer;
 import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.inventory.InventoryMenu;
@@ -70,6 +73,27 @@ public final class BindingMenu {
     /** The world block this menu is bound to; null for the bot's own
      * inventory menu. */
     private final CellPos sourcePos;
+
+    /** Reflective handle to {@link AbstractFurnaceMenu#data} — the
+     * four-value ContainerData (litTime, litDuration, cookProgress,
+     * cookTotal) is private with no public getter in 1.20.1, and the
+     * scaled helpers (getLitProgress / getBurnProgress) lose the raw
+     * tick values. The adapter layer is the only place allowed to reach
+     * across the MC visibility boundary (boundaries.md §A: adapter/ may
+     * import net.minecraft.*). Null when the field is absent in a future
+     * mapping — progress disclosure degrades to null, never crashes. */
+    private static final java.lang.reflect.Field FURNACE_DATA;
+
+    static {
+        java.lang.reflect.Field f = null;
+        try {
+            f = AbstractFurnaceMenu.class.getDeclaredField("data");
+            f.setAccessible(true);
+        } catch (NoSuchFieldException e) {
+            f = null;
+        }
+        FURNACE_DATA = f;
+    }
 
     /**
      * Terminal-state latch: set by {@link #close()}, never cleared.
@@ -127,7 +151,27 @@ public final class BindingMenu {
         for (int i = 0; i < size; i++) {
             slots.add(new SlotView(i, BindingInventory.toView(menu.slots.get(i).getItem()), roleOf(i, size)));
         }
-        return new MenuView(type, sourcePos, BindingInventory.toView(menu.getCarried()), size, slots);
+        return new MenuView(
+                type, sourcePos, BindingInventory.toView(menu.getCarried()), size, slots, readFurnaceProgress());
+    }
+
+    /**
+     * Read the four raw tick values from an open furnace-family menu's
+     * private ContainerData. Returns null for every other menu kind, or
+     * when the reflective handle is unavailable (future mapping drift).
+     *
+     * @return the furnace progress, or null when not applicable
+     */
+    private MenuProgress readFurnaceProgress() {
+        if (!(menu instanceof AbstractFurnaceMenu) || FURNACE_DATA == null) {
+            return null;
+        }
+        try {
+            ContainerData data = (ContainerData) FURNACE_DATA.get(menu);
+            return new MenuProgress(data.get(0), data.get(1), data.get(2), data.get(3));
+        } catch (IllegalAccessException e) {
+            return null;
+        }
     }
 
     /**

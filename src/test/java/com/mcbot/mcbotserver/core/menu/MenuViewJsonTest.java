@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonObject;
 import com.mcbot.mcbotserver.api.inventory.ItemView;
+import com.mcbot.mcbotserver.api.menu.MenuProgress;
 import com.mcbot.mcbotserver.api.menu.MenuView;
 import com.mcbot.mcbotserver.api.menu.RecipeView;
 import com.mcbot.mcbotserver.api.menu.SlotRole;
@@ -41,7 +42,8 @@ class MenuViewJsonTest {
                 List.of(
                         slot(0, SlotRole.CONTAINER, "minecraft:stone", 12),
                         slot(1, SlotRole.CONTAINER, null, 0),
-                        slot(2, SlotRole.HOTBAR, "minecraft:planks", 3)));
+                        slot(2, SlotRole.HOTBAR, "minecraft:planks", 3)),
+                null);
     }
 
     /** Pins the snapshot wire keys: type, sourcePos, carried,
@@ -76,7 +78,7 @@ class MenuViewJsonTest {
     @Test
     void inventorySnapshotCarriesEmptySourcePos() {
         MenuView inventory =
-                new MenuView("inventory", null, ItemView.EMPTY, 1, List.of(slot(0, SlotRole.GRID, null, 0)));
+                new MenuView("inventory", null, ItemView.EMPTY, 1, List.of(slot(0, SlotRole.GRID, null, 0)), null);
         JsonObject root = MenuViewJson.toJsonObject(inventory);
         assertTrue(root.get("sourcePos").isJsonPrimitive());
         assertEquals("", root.get("sourcePos").getAsString());
@@ -112,5 +114,39 @@ class MenuViewJsonTest {
         JsonObject root = MenuViewJson.toJsonObject(recipe);
         assertTrue(root.get("shapeless").getAsBoolean(), "shapeless recipes must pin shapeless=true");
         assertEquals(1, root.getAsJsonObject("placements").size());
+    }
+
+    /** Furnace-family snapshots carry a progress object with four raw
+     *  tick values; the wire keys are frozen so a harness reading
+     *  burnTime/cookProgress does not silently break on a rename. */
+    @Test
+    void furnaceProgressCarriesFourRawTickValues() {
+        MenuProgress progress = new MenuProgress(1200, 1600, 100, 200);
+        MenuView furnace = new MenuView(
+                "furnace",
+                new CellPos(5, 64, 5),
+                ItemView.EMPTY,
+                3,
+                List.of(
+                        slot(0, SlotRole.INPUT, "minecraft:iron_ore", 8),
+                        slot(1, SlotRole.FUEL, "minecraft:coal", 4),
+                        slot(2, SlotRole.OUTPUT, null, 0)),
+                progress);
+        JsonObject root = MenuViewJson.toJsonObject(furnace);
+        assertTrue(root.has("progress"), "furnace snapshot must carry progress");
+        JsonObject p = root.getAsJsonObject("progress");
+        assertEquals(1200, p.get("burnTime").getAsInt());
+        assertEquals(1600, p.get("totalBurnTime").getAsInt());
+        assertEquals(100, p.get("cookProgress").getAsInt());
+        assertEquals(200, p.get("cookTotal").getAsInt());
+    }
+
+    /** Non-furnace snapshots carry null progress and the serializer
+     *  omits the key entirely — the pre-progress wire shape stays
+     *  byte-identical for chest/inventory/crafting snapshots. */
+    @Test
+    void nonFurnaceSnapshotOmitsProgressKey() {
+        JsonObject root = MenuViewJson.toJsonObject(chestSnapshot());
+        assertFalse(root.has("progress"), "chest snapshot must not carry a progress key");
     }
 }

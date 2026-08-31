@@ -31,8 +31,17 @@ import java.util.List;
  * @param containerSize total number of slots in the menu
  * @param slots         flat slot list, index 0..containerSize-1;
  *                      never null, immutable after construction
+ * @param progress      furnace-family burn/cook progress in raw ticks;
+ *                      null for every other menu kind (the serializer
+ *                      omits the key when null)
  */
-public record MenuView(String type, CellPos sourcePos, ItemView carried, int containerSize, List<SlotView> slots) {
+public record MenuView(
+        String type,
+        CellPos sourcePos,
+        ItemView carried,
+        int containerSize,
+        List<SlotView> slots,
+        MenuProgress progress) {
 
     /**
      * Creates a validated, immutable menu snapshot.

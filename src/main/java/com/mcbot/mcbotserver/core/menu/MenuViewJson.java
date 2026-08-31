@@ -3,6 +3,7 @@ package com.mcbot.mcbotserver.core.menu;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.mcbot.mcbotserver.api.inventory.ItemView;
+import com.mcbot.mcbotserver.api.menu.MenuProgress;
 import com.mcbot.mcbotserver.api.menu.MenuView;
 import com.mcbot.mcbotserver.api.menu.RecipeView;
 import com.mcbot.mcbotserver.api.menu.SlotView;
@@ -51,6 +52,15 @@ public final class MenuViewJson {
         }
         root.add("carried", itemJson(view.carried()));
         root.addProperty("containerSize", view.containerSize());
+        MenuProgress progress = view.progress();
+        if (progress != null) {
+            JsonObject p = new JsonObject();
+            p.addProperty("burnTime", progress.burnTime());
+            p.addProperty("totalBurnTime", progress.totalBurnTime());
+            p.addProperty("cookProgress", progress.cookProgress());
+            p.addProperty("cookTotal", progress.cookTotal());
+            root.add("progress", p);
+        }
         JsonArray slots = new JsonArray();
         for (SlotView slot : view.slots()) {
             slots.add(slotJson(slot));
