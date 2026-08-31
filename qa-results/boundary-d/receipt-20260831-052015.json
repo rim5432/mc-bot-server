@@ -1,0 +1,21 @@
+{
+ "schema": 1,
+ "task": "boundary-d-qa",
+ "finished_at": "2026-08-31T05:20:15.238380+00:00",
+ "cases": [
+  {
+   "batch": "C",
+   "id": "C2-post",
+   "desc": "resetAt after restart is beyond pre-restart head",
+   "expect": "RED",
+   "verdict": "RED-CONFIRMED",
+   "detail": "gap reproduced",
+   "sec": 0.2
+  }
+ ],
+ "evidence": [
+  "[C2-post] RED-CONFIRMED: gap reproduced",
+  "    resetAt=1",
+  "    beyond-head violated: before=1 after=1"
+ ]
+}
