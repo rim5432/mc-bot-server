@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SpotBugs suppression registry (red wall since the 2026-09-01 first-triage
+  flip). Every Match carries its justification inline: a finding suppressed
+  here is accepted with a reason, not invisible. A NEW SpotBugs finding
+  fails qualityCheck and must either be fixed at the root or land here with
+  its own reason.
+-->
+<FindBugsFilter>
+
+  <!-- ADR-0003 rules ThreatBlackboard a mutable reflex scratch struct: the
+       reflex seat writes these fields per tick, reflex rules read them;
+       encapsulation would not change ownership, only add accessor noise on
+       a hot per-tick path. -->
+  <Match>
+    <Bug pattern="PA_PUBLIC_PRIMITIVE_ATTRIBUTE"/>
+    <Class name="com.mcbot.mcbotserver.api.reflex.ThreatBlackboard"/>
+  </Match>
+
+  <!-- Constructor/setter storing an injected collaborator is dependency
+       injection, not representation exposure: the bus and queue are
+       container-owned, the holder never hands them back out. -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+    <Or>
+      <Class name="com.mcbot.mcbotserver.core.command.CommandBus"/>
+      <Class name="com.mcbot.mcbotserver.core.command.VerbTaskHandler"/>
+    </Or>
+  </Match>
+
+  <!-- No finalizer exists anywhere in the mission hierarchy, and finalize()
+       is deprecated for removal - there is no attacker for the
+       partially-initialized-instance shape. Identity validation stays in
+       the constructor on purpose: fail fast on a malformed mission triple. -->
+  <Match>
+    <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    <Class name="com.mcbot.mcbotserver.core.process.MissionShell"/>
+  </Match>
+
+  <!-- Single-threaded by policy (class Javadoc): every wire dispatch path
+       marshals onto the server tick thread - vanilla RCON via
+       DedicatedServer.runCommand's executeBlocking (submitAsync + join on
+       the tick thread), BotControlSocket via server.execute + latch -
+       verified against the decompiled tree 2026-09-01. The flagged fields
+       never cross a thread boundary; atomics would paper over the false
+       positive and imply a memory model this queue does not need. -->
+  <Match>
+    <Bug pattern="AT_NONATOMIC_64BIT_PRIMITIVE"/>
+    <Class name="com.mcbot.mcbotserver.core.event.InMemoryEventQueue"/>
+  </Match>
+  <Match>
+    <Bug pattern="AT_NONATOMIC_OPERATIONS_ON_SHARED_VARIABLE"/>
+    <Class name="com.mcbot.mcbotserver.core.event.InMemoryEventQueue"/>
+  </Match>
+  <Match>
+    <Bug pattern="AT_STALE_THREAD_WRITE_OF_PRIMITIVE"/>
+    <Class name="com.mcbot.mcbotserver.core.event.InMemoryEventQueue"/>
+  </Match>
+
+  <!-- Test fixture blessed by RecordingActor's Javadoc: returning the
+       remembered lastFlush map is the fixture's whole purpose - tick gates
+       assert on it without intercepting the controller call chain. -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP"/>
+    <Class name="com.mcbot.mcbotserver.core.tick.PipelineActor"/>
+  </Match>
+
+  <!-- assertThrows lambdas: the discarded return value IS the exception
+       contract; SpotBugs cannot see through the JUnit lambda boundary. -->
+  <Match>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT"/>
+    <Class name="com.mcbot.mcbotserver.api.menu.CraftingViewTest"/>
+  </Match>
+
+</FindBugsFilter>

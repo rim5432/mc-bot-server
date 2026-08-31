@@ -1,6 +1,6 @@
 ---
 title: MineProcess - composite mining task with search-mine-collect loop
-last_verified: 2026-08-31
+last_verified: 2026-09-01
 covers:
   - doc/architecture/boundaries.md
   - src/main/java/com/mcbot/mcbotserver/api/process/DigMission.java

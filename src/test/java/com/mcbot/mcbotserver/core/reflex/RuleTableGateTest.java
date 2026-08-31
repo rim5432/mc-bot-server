@@ -174,8 +174,13 @@ class RuleTableGateTest {
         var stream = RuleTableGateTest.class.getResourceAsStream("/data/mcbotserver/reflex_rules.json");
         assertNotNull(stream, "the default table ships in resources");
         String json;
-        try (var reader = new java.io.InputStreamReader(stream, java.nio.charset.StandardCharsets.UTF_8)) {
-            json = new java.io.BufferedReader(reader).lines().collect(java.util.stream.Collectors.joining());
+        // every resource is a first-class try-with-resources entry so the
+        // closure obligation is explicit - reader wraps stream, buffered
+        // wraps reader, and closing runs innermost-first.
+        try (stream;
+                var reader = new java.io.InputStreamReader(stream, java.nio.charset.StandardCharsets.UTF_8);
+                var buffered = new java.io.BufferedReader(reader)) {
+            json = buffered.lines().collect(java.util.stream.Collectors.joining());
         } catch (java.io.IOException e) {
             throw new IllegalStateException(e);
         }

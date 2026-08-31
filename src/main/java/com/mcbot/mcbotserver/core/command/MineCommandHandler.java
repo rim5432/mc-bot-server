@@ -110,7 +110,11 @@ public final class MineCommandHandler extends VerbTaskHandler<MineProcess> {
             if (blockType == null || blockType.isBlank()) {
                 return false;
             }
-            int count = Integer.parseInt(args.get("count"));
+            String countArg = args.get("count");
+            if (countArg == null) {
+                return false;
+            }
+            int count = Integer.parseInt(countArg);
             if (count <= 0) {
                 return false;
             }
@@ -118,7 +122,7 @@ public final class MineCommandHandler extends VerbTaskHandler<MineProcess> {
                 return false;
             }
             return true;
-        } catch (NumberFormatException | NullPointerException e) {
+        } catch (NumberFormatException e) {
             return false;
         }
     }

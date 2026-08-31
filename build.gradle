@@ -157,9 +157,10 @@ tasks.withType(JavaCompile).configureEach {
 // ===== Static analysis =====
 // Hard gates (checkstyle semantic set + spotlessCheck) ride the
 // default `test` flow since the 2026-08-27 promotion (zero-violation
-// baseline proved first; user accepted the ~10s cost). Dashboards
-// (PMD/CPD/SpotBugs) and Error Prone stay behind -Plint until their
-// paydown/triage rounds land; postures in doc/guide/build-and-run.md.
+// baseline proved first; user accepted the ~10s cost). Red walls
+// (PMD since its 2026-08-27 paydown, CPD at >=140 tokens, SpotBugs
+// since the 2026-09-01 first-triage flip) and the Error Prone pass
+// run behind -Plint; postures in doc/guide/build-and-run.md.
 checkstyle {
     // All of 13.x and 14.x ship Java-21 bytecode (probed 2026-08-27);
     // the dev toolchain locks Java 17, so pin the last 17-runnable line
@@ -184,11 +185,16 @@ tasks.withType(Pmd).configureEach {
 // needed - anywhere else the analyzer would drown in missing-class noise.
 spotbugs {
     toolVersion = '4.10.4'
+    // triaged suppressions, each Match carrying its justification
+    // inline; a new finding lands here with a reason or gets fixed
+    excludeFilter = file('config/spotbugs/exclude.xml')
 }
 tasks.withType(com.github.spotbugs.snom.SpotBugsTask).configureEach {
     enabled = project.hasProperty('lint')
-    // dashboard like pmd until first triage pass assigns severities
-    ignoreFailures = true
+    // RED WALL since the 2026-09-01 first-triage flip: all findings at
+    // flip time were fixed at the root or suppressed with justification
+    // (config/spotbugs/exclude.xml), so a new finding now breaks the
+    // lint run instead of just reporting it.
     onlyAnalyze = ['com.mcbot.mcbotserver.api.-', 'com.mcbot.mcbotserver.core.-']
 }
 
@@ -314,7 +320,7 @@ tasks.register('cpdCheck', JavaExec) {
 
 // One-command quality verdict: compile both source sets, then run every
 // gate and analyzer in its configured posture - checkstyle/spotless as
-// plain gates, PMD and CPD as red walls, SpotBugs as dashboard. Coverage
+// plain gates, PMD/CPD/SpotBugs as red walls. Coverage
 // and mutation lenses stay separate on purpose: they are research
 // rounds, not per-commit checks. Entry point: mcbot_tool.py lint.
 tasks.register('qualityCheck') {

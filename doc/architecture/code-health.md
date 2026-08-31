@@ -1,6 +1,6 @@
 ---
 title: Code Health Ledger
-last_verified: 2026-08-31
+last_verified: 2026-09-01
 covers:
   - build.gradle
   - config/checkstyle/checkstyle.xml
@@ -187,14 +187,18 @@ admitted here may encode a size cap.
   build.gradle blocks, and any of them drifting - a dropped
   dependsOn, a quietly added ignoreFailures, an enabled flag
   flipped - disarms a gate with no error anywhere.
-  LintPostureGateTest pins each block's wiring and budgets
-  `ignoreFailures = true` to exactly the two dashboards; a
-  deliberate flip (the PMD paydown graduation) updates the gate, the
-  posture table in doc/guide/build-and-run.md, and the ruling in the
-  same commit - the pinned-inventory admission pattern H-R7 and
+  LintPostureGateTest pins each block's wiring and the SpotBugs
+  exclude-filter home; a deliberate posture change updates the gate,
+  the posture table in doc/guide/build-and-run.md, and the ruling in
+  the same commit - the pinned-inventory admission pattern H-R7 and
   H-R8 already follow. The `lint` verb in tool/mcbot_tool.py rides
-  the same ruling: it replays the canonical dashboard invocation so
-  agents cannot misremember the task set.
+  the same ruling: it replays the canonical qualityCheck invocation
+  so agents cannot misremember the task set. Postures graduate from
+  dashboard to red wall on their own rulings: PMD at the 2026-08-27
+  paydown, SpotBugs at the 2026-09-01 first-triage flip
+  (ignoreFailures budget now zero - suppressions live in
+  config/spotbugs/exclude.xml, each with a written reason); CPD has
+  been a wall since install; EP stays a diagnostic compile pass.
 - **H-R12 Decision index parity.** The boundaries.md decision index is
   the repository-wide resolution point for every `decision N` citation
   (AGENTS.md 0.3); the ledger body is where verdict text lives. A verdict
@@ -307,12 +311,16 @@ without an anchor is a workplan item, not a row here.
   extend the inline-exemption inventory (BotCombatGameTests,
   GametestRig - scenario-per-method and shared-rig-helper shapes).
   -Plint green again: PMD 0, CPD 0.
-- **OPEN - SpotBugs first-triage queue.** api/core-scope first
-  pass flagged ThreatBlackboard's six suspected dead fields
-  (UrF/UwF), GotoCommandHandler's internal-representation exposure
-  (EI2), and DigCommandHandler's NPE-catch pattern (DCN). Triage
-  assigns each a severity or a suppression-with-ruling; dashboard
-  posture stays until then.
+- **CLOSED 2026-09-01 - SpotBugs first-triage queue.** All 22
+  api/core-scope findings triaged to an outcome: 3 fixed at root
+  (Mine/Dig DCN explicit arg null-checks, RuleTableGateTest stream
+  as a first-class try-with-resources resource), 19 suppressed with
+  inline rulings in config/spotbugs/exclude.xml (ThreatBlackboard PA
+  x9 per the ADR-0003 scratch-struct ruling, InMemoryEventQueue AT
+  x4 - single-thread by policy, both wire paths marshal onto the
+  tick thread, verified in the decompiled tree - DI EI2 x2,
+  MissionShell CT, PipelineActor EI, CraftingViewTest RV x2);
+  SpotBugs promoted to red wall, ignoreFailures budget zero.
 - **OPEN - CPD dedup round.** ~18 duplicate blocks >=100 tokens at
   install time, dominated by known mock-vs-server implementation
   pairs; the pre-sorted list is `python tool/mcbot_tool.py gradle

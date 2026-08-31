@@ -21,8 +21,8 @@ import org.junit.jupiter.api.Test;
  * text and the scan needs no classpath. The inventory below is a
  * deliberate pinned snapshot mirroring the posture table in
  * doc/guide/build-and-run.md; a deliberate posture change (for
- * example the planned PMD flip to failing once its paydown lands)
- * updates this gate, that table, and the ruling in the same commit.
+ * example the SpotBugs first-triage flip of 2026-09-01) updates this
+ * gate, that table, and the ruling in the same commit.
  *
  * <p>Rule: doc/architecture/code-health.md H-R11.
  */
@@ -33,11 +33,11 @@ class LintPostureGateTest {
 
     /**
      * The pinned wiring. Hard gates: checkstyle and spotlessCheck hang
-     * off the test task; PMD is a RED WALL under -Plint since its flip
-     * condition landed (zero findings held, 2026-08-27 paydown).
-     * Dashboards: SpotBugs and cpdCheck enable only under -Plint;
-     * SpotBugs additionally softens with ignoreFailures until its own
-     * first-triage flip lands.
+     * off the test task. Red walls under -Plint: PMD (failing since
+     * the 2026-08-27 paydown), CPD (>= 140 tokens), and SpotBugs
+     * (failing since the 2026-09-01 first-triage flip; its triaged
+     * suppressions live in config/spotbugs/exclude.xml, each with an
+     * inline justification). No task softens with ignoreFailures.
      */
     private static final List<Posture> PINNED_POSTURES = List.of(
             new Posture(
@@ -46,13 +46,15 @@ class LintPostureGateTest {
             new Posture("tasks.withType(Pmd).configureEach {", List.of("enabled = project.hasProperty('lint')")),
             new Posture(
                     "tasks.withType(com.github.spotbugs.snom.SpotBugsTask).configureEach {",
-                    List.of("enabled = project.hasProperty('lint')", "ignoreFailures = true")),
+                    List.of("enabled = project.hasProperty('lint')")),
+            new Posture("spotbugs {", List.of("excludeFilter = file('config/spotbugs/exclude.xml')")),
             new Posture("options.errorprone {", List.of("enabled = project.hasProperty('lint')")),
             new Posture("tasks.register('cpdCheck', JavaExec) {", List.of("enabled = project.hasProperty('lint')")),
             new Posture("tasks.register('qualityCheck') {", List.of("'pmdMain'", "'spotbugsTest'", "'spotlessCheck'")));
 
-    /** Soft-posture budget: exactly the SpotBugs dashboard softens, nothing else. */
-    private static final int PINNED_IGNORE_FAILURES = 1;
+    /** Soft-posture budget: zero - suppressions live in the SpotBugs
+     * exclude filter with a written reason, never in ignoreFailures. */
+    private static final int PINNED_IGNORE_FAILURES = 0;
 
     /** Fails when any pinned posture block drifts inside build.gradle. */
     @Test
@@ -69,7 +71,7 @@ class LintPostureGateTest {
                         + " in doc/guide/build-and-run.md, and the ruling in the same commit.");
     }
 
-    /** Fails when any check beyond the two dashboards grows ignoreFailures. */
+    /** Fails when any check grows ignoreFailures. */
     @Test
     void ignoreFailuresStaysScopedToTheDashboards() {
         String gradle = readBuildGradle();
@@ -78,8 +80,8 @@ class LintPostureGateTest {
                 PINNED_IGNORE_FAILURES,
                 count,
                 () -> "ignoreFailures = true appears " + count + "x, pinned " + PINNED_IGNORE_FAILURES
-                        + "x (PMD + SpotBugs dashboards only). Softening any other check is a"
-                        + " posture change: see the remediation in lintPosturesStayPinned.");
+                        + "x. Softening any check is a posture change: see the remediation in"
+                        + " lintPosturesStayPinned.");
     }
 
     private static String readBuildGradle() {

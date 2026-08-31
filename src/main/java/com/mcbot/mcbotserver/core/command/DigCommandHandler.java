@@ -101,13 +101,17 @@ public final class DigCommandHandler extends VerbTaskHandler<DigProcess> {
         Map<String, String> args = command.args();
         try {
             for (String key : List.of("x", "y", "z")) {
-                Integer.parseInt(args.get(key));
+                String value = args.get(key);
+                if (value == null) {
+                    return false;
+                }
+                Integer.parseInt(value);
             }
             if (args.containsKey("timeoutTicks") && Long.parseLong(args.get("timeoutTicks")) <= 0) {
                 return false;
             }
             return true;
-        } catch (NumberFormatException | NullPointerException e) {
+        } catch (NumberFormatException e) {
             return false;
         }
     }

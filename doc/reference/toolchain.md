@@ -1,6 +1,6 @@
 ---
 title: Toolchain Reference
-last_verified: 2026-08-29
+last_verified: 2026-09-01
 covers:
   - gradle.properties
   - build.gradle
