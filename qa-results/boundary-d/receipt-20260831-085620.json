@@ -1,0 +1,141 @@
+{
+ "schema": 1,
+ "task": "boundary-d-qa",
+ "finished_at": "2026-08-31T08:56:20.522096+00:00",
+ "cases": [
+  {
+   "batch": "D2",
+   "id": "D2-1",
+   "desc": "scan discovers the furnace block-entity",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  },
+  {
+   "batch": "D2",
+   "id": "D2-2",
+   "desc": "furnace snapshot: type, size, progress object present",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  },
+  {
+   "batch": "D2",
+   "id": "D2-3",
+   "desc": "furnace roles are INPUT/FUEL/OUTPUT, no CONTAINER",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  },
+  {
+   "batch": "D2",
+   "id": "D2-4",
+   "desc": "pre-filled INPUT iron_ore x8 sits in slot0",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  },
+  {
+   "batch": "D2",
+   "id": "D2-5",
+   "desc": "pre-filled FUEL coal x64 sits in slot1",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  },
+  {
+   "batch": "D2",
+   "id": "D2-6",
+   "desc": "after 5s smelting: burnTime>0, cookProgress>0, raw tick values",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 5.1
+  },
+  {
+   "batch": "D2",
+   "id": "D2-7",
+   "desc": "smelt completes: OUTPUT has iron_ingot, take OUTPUT removes it",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 12.3
+  },
+  {
+   "batch": "D2",
+   "id": "D2-8",
+   "desc": "blast_furnace: differentiated roles + progress object present",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  },
+  {
+   "batch": "D2",
+   "id": "D2-9",
+   "desc": "smoker: differentiated roles + progress object present",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  },
+  {
+   "batch": "D2",
+   "id": "D2-10",
+   "desc": "deposit with unknown role on furnace rejects",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  },
+  {
+   "batch": "D2",
+   "id": "D2-11",
+   "desc": "open furnace at unreachable coordinate rejects",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  },
+  {
+   "batch": "D2",
+   "id": "D2-12",
+   "desc": "progress survives menu close/reopen (data read from block entity)",
+   "expect": "GREEN",
+   "verdict": "PASS",
+   "detail": "contract held",
+   "sec": 0.1
+  }
+ ],
+ "evidence": [
+  "[D2-1] PASS: contract held",
+  "    scan found furnace@2,78,0",
+  "[D2-2] PASS: contract held",
+  "    type=furnace size=39 progress keys=['burnTime', 'cookProgress', 'cookTotal', 'totalBurnTime']",
+  "[D2-3] PASS: contract held",
+  "    roles: 0=INPUT 1=FUEL 2=OUTPUT, no CONTAINER (full set: ['FUEL', 'HOTBAR', 'INPUT', 'MAIN', 'OUTPUT'])",
+  "[D2-4] PASS: contract held",
+  "    slot0=INPUT minecraft:iron_orex8",
+  "[D2-5] PASS: contract held",
+  "    slot1=FUEL minecraft:coalx63",
+  "[D2-6] PASS: contract held",
+  "    progress: burnTime=1461/1600 cookProgress=140/200",
+  "[D2-7] PASS: contract held",
+  "    smelted 1 iron_ingot, taken=1",
+  "[D2-8] PASS: contract held",
+  "    blast_furnace: roles INPUT/FUEL/OUTPUT, progress present (empty)",
+  "[D2-9] PASS: contract held",
+  "    smoker: roles INPUT/FUEL/OUTPUT, progress present (empty)",
+  "[D2-10] PASS: contract held",
+  "    rejected unknown role: write: unknown role 'bogus' (input/fuel/output/recipe)",
+  "[D2-11] PASS: contract held",
+  "    rejected far furnace open: cat: cannot open furnace@40,78,0: open rejected: out of reach, unsupported kind, missing container, ",
+  "[D2-12] PASS: contract held",
+  "    reopen progress consistent: burn=1204/1600 cook=197/200"
+ ]
+}
