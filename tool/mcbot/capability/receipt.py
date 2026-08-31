@@ -1,11 +1,11 @@
 """Test receipt persistence into the capability database.
 
 After every ``runGameTest`` run, the engine log is parsed by
-``mcbot.engine.write_engine_receipt`` into a JSON file. This module
-takes that same log and writes a structured row into ``test_receipts``
-plus one row per failed scenario into ``test_case_runs``, so the
-capability matrix can show per-face test history without re-parsing
-logs.
+``mcbot.engine.parse_run_log`` (the single parse shared with the JSON
+receipt writer). This module persists that verdict as a structured row
+into ``test_receipts`` plus one row per failed scenario (required and
+optional) into ``test_case_runs``, so the capability matrix can show
+per-face test history without re-parsing logs.
 
 The JSON file remains the canonical receipt (H-R5 currency); the DB
 rows are a queryable mirror.
@@ -13,18 +13,12 @@ rows are a queryable mirror.
 from __future__ import annotations
 
 import datetime as _dt
-import re
-import sys
+import json
 from pathlib import Path
 from typing import Optional
 
 from mcbot.capability.db import get_connection, init_db
-
-# Reuse the same parsing patterns as engine.write_engine_receipt so
-# the two sources never disagree.
-_RE_TOTAL = re.compile(r"(\d+) GAME TESTS COMPLETE")
-_RE_FAILED_COUNT = re.compile(r"(\d+) required tests failed")
-_RE_FAILED_NAME = re.compile(r"^\s*- ([a-z0-9_]+)\s*$", re.M)
+from mcbot.engine import git_head_short, parse_run_log
 
 
 def _now_iso() -> str:
@@ -46,142 +40,153 @@ def record_test_run(
     """
     init_db(db_path)
 
-    try:
-        text = log_path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
+    verdict = parse_run_log(log_path)
+    if verdict is None:
         return None
 
-    m_total = _RE_TOTAL.search(text)
-    if not m_total:
-        return None
-    total = int(m_total.group(1))
-
-    m_fail = _RE_FAILED_COUNT.search(text)
-    failed_count = int(m_fail.group(1)) if m_fail else 0
-
-    failed_names = _RE_FAILED_NAME.findall(text)
-    if len(failed_names) > failed_count:
-        failed_names = failed_names[:failed_count]
-
-    green = failed_count == 0
     now = _now_iso()
-
-    # Best-effort git rev (mirrors engine._git_head_short)
-    git_rev = _git_head_short()
-
     with get_connection(db_path) as conn:
-        run_id = f"gametest-{_dt.datetime.now().strftime('%Y%m%d-%H%M%S')}"
-        cur = conn.execute(
-            """
-            INSERT INTO test_receipts (
-                run_id, test_type, started_at, finished_at, git_rev,
-                total, passed, failed, green, log_path, details, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                run_id,
-                task_name,
-                now,
-                now,
-                git_rev,
-                total,
-                total - failed_count,  # passed (approximate; Forge doesn't list passes)
-                failed_count,
-                1 if green else 0,
-                str(log_path),
-                '{"receipt_path": ' + (f'"{receipt_path}"' if receipt_path else 'null') + '}',
-                now,
-            ),
+        receipt_id = _insert_receipt(
+            conn,
+            run_id=f"gametest-{_dt.datetime.now().strftime('%Y%m%d-%H%M%S')}",
+            task_name=task_name,
+            finished_at=now,
+            git_rev=git_head_short(),
+            total=verdict["total"],
+            failed_count=verdict["failed_count"],
+            optional_count=verdict["optional_failed_count"],
+            green=verdict["green"],
+            log_path=str(log_path),
+            details={"receipt_path": str(receipt_path) if receipt_path else None},
+            created_at=now,
         )
-        receipt_id = cur.lastrowid
-
-        # One row per failed scenario. Passed scenarios are not
-        # individually logged by Forge gametest, so we record only
-        # failures (the receipt row carries the total).
-        for test_name in failed_names:
-            # Try to match to a known qa_test_case by id pattern.
-            case_id = _match_case_id(conn, test_name)
-            conn.execute(
-                """
-                INSERT INTO test_case_runs (
-                    test_case_id, receipt_id, result, duration_ms,
-                    details, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    case_id,
-                    receipt_id,
-                    "failed",
-                    None,
-                    f'{{"log_name": "{test_name}"}}',
-                    now,
-                ),
-            )
-
+        _insert_case_failures(
+            conn, receipt_id,
+            required=verdict["failed"],
+            optional=verdict["failed_optional"],
+            created_at=now,
+        )
         conn.commit()
 
     print(
         f"[mcbot] test receipt #{receipt_id} recorded "
-        f"(total={total}, failed={failed_count}, {'GREEN' if green else 'RED'})"
+        f"(total={verdict['total']}, failed={verdict['failed_count']}, "
+        f"{'GREEN' if verdict['green'] else 'RED'})"
     )
     return receipt_id
+
+
+def _insert_receipt(
+    conn,
+    *,
+    run_id: str,
+    task_name: str,
+    finished_at: str,
+    git_rev: Optional[str],
+    total: int,
+    failed_count: int,
+    optional_count: int,
+    green: bool,
+    log_path: str,
+    details: dict,
+    created_at: str,
+) -> int:
+    """Insert one test_receipts row; returns the new receipt id."""
+    cur = conn.execute(
+        """
+        INSERT INTO test_receipts (
+            run_id, test_type, started_at, finished_at, git_rev,
+            total, passed, failed, green, log_path, details, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            run_id,
+            task_name,
+            None,
+            finished_at,
+            git_rev,
+            total,
+            total - failed_count,  # approximate; Forge does not list passes
+            failed_count,
+            1 if green else 0,
+            log_path,
+            json.dumps(details),
+            created_at,
+        ),
+    )
+    return cur.lastrowid
+
+
+def _insert_case_failures(
+    conn,
+    receipt_id: int,
+    *,
+    required: list[str],
+    optional: list[str],
+    created_at: str,
+) -> int:
+    """Insert one test_case_runs row per failed scenario, matched to a
+    qa_test_case when possible. Forge logs only failures, so passes are
+    represented by the receipt row's totals. Returns rows written."""
+    written = 0
+    for log_name, kind in [(n, "failed") for n in required] + [(n, "failed_optional") for n in optional]:
+        case_id = _match_case_id(conn, log_name)
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO test_case_runs (
+                test_case_id, receipt_id, result, duration_ms,
+                details, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                case_id,
+                receipt_id,
+                "failed",
+                None,
+                json.dumps({"log_name": log_name, "kind": kind}),
+                created_at,
+            ),
+        )
+        written += 1
+    return written
 
 
 def _match_case_id(conn, test_name: str) -> Optional[str]:
     """Try to map a Forge-reported test name to a qa_test_cases.id.
 
-    Forge reports names like ``mcbotserver.BotCombatGameTests.refusesRangedItCannotAnswer``
-    or bare ``methodName``. We try:
+    Forge reports bare lowercase structure names
+    (``climbsladdertoplatform``) or dotted
+    ``mcbotserver.BotCombatGameTests.refusesRangedItCannotAnswer``.
+    We try:
       1. exact match against qa_test_cases.id
-      2. GT-<Class>-<method> pattern reconstruction
-      3. LIKE match on method name suffix
+      2. GT-<Class>-<method> pattern reconstruction (dotted names)
+      3. LIKE match on the name suffix — SQLite LIKE is ASCII
+         case-insensitive, so the lowercase structure name matches a
+         camelCase GT id (``GT-%-climbsladdertoplatform`` hits
+         ``GT-BotLocomotionGameTests-climbsLadderToPlatform``)
     """
-    # Strip package prefix if present
     short = test_name.split(".")[-1] if "." in test_name else test_name
 
-    # 1. exact match
     row = conn.execute(
         "SELECT id FROM qa_test_cases WHERE id = ?", (test_name,)
     ).fetchone()
     if row:
         return row["id"]
 
-    # 2. Try to reconstruct GT-<Class>-<method>
-    # Forge name may be "ClassName.methodName" or "pkg.ClassName.methodName"
     parts = test_name.split(".")
     if len(parts) >= 2:
-        class_name = parts[-2]
-        method_name = parts[-1]
-        candidate = f"GT-{class_name}-{method_name}"
+        candidate = f"GT-{parts[-2]}-{parts[-1]}"
         row = conn.execute(
             "SELECT id FROM qa_test_cases WHERE id = ?", (candidate,)
         ).fetchone()
         if row:
             return row["id"]
 
-    # 3. LIKE match on method name suffix (GT-*-methodName)
     row = conn.execute(
         "SELECT id FROM qa_test_cases WHERE id LIKE ? ORDER BY id LIMIT 1",
         (f"GT-%-{short}",),
     ).fetchone()
-    if row:
-        return row["id"]
-
-    return None
-
-
-def _git_head_short() -> Optional[str]:
-    """Best-effort current commit id; None outside a repo."""
-    import subprocess
-    from mcbot.paths import PROJECT_ROOT
-    try:
-        out = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            cwd=str(PROJECT_ROOT), capture_output=True, text=True, timeout=10,
-        )
-        return out.stdout.strip() if out.returncode == 0 else None
-    except (OSError, subprocess.SubprocessError):
-        return None
+    return row["id"] if row else None
 
 
 def latest_receipt_summary(db_path: Optional[Path] = None) -> Optional[dict]:

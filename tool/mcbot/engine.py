@@ -12,6 +12,7 @@ import datetime as _dt
 import json
 import re
 import subprocess
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -20,7 +21,7 @@ from mcbot.paths import PROJECT_ROOT
 ENGINE_RUN_DIR = PROJECT_ROOT / "qa-results" / "engine-runs"
 
 
-def _git_head_short() -> Optional[str]:
+def git_head_short() -> Optional[str]:
     """Best-effort current commit id; None outside a repo."""
     try:
         out = subprocess.run(
@@ -32,6 +33,55 @@ def _git_head_short() -> Optional[str]:
         return None
 
 
+_RE_TOTAL = re.compile(r"(\d+) GAME TESTS COMPLETE")
+_RE_REQUIRED = re.compile(r"(\d+) required tests failed")
+_RE_OPTIONAL = re.compile(r"(\d+) optional tests failed")
+# Failed-test names print as a dash list under the verdict lines. Each
+# line carries the log prefix "[HH:MM:SS] [thread/LEVEL] [logger]:", so
+# anchor on the closing bracket of the logger tag, never the line start.
+_RE_FAILED_NAME = re.compile(r"\]:\s+- ([a-z0-9_]+)\s*$", re.M)
+
+
+def parse_run_log(log_path: Path) -> Optional[dict]:
+    """Parse a finished runGameTest log into a verdict dict.
+
+    The single parse behind both the JSON receipt writer and the
+    capability-DB mirror, so the two can never disagree. Returns None
+    when the log holds no verdict (crash, interrupt, wrong task).
+    ``failed`` holds the required failures, ``failed_optional`` the
+    optional ones; either list may be partial in a truncated log."""
+    try:
+        text = log_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    m_total = _RE_TOTAL.search(text)
+    if not m_total:
+        return None
+    total = int(m_total.group(1))
+    m_req = _RE_REQUIRED.search(text)
+    failed_count = int(m_req.group(1)) if m_req else 0
+    m_opt = _RE_OPTIONAL.search(text)
+    optional_count = int(m_opt.group(1)) if m_opt else 0
+    names = list(_RE_FAILED_NAME.finditer(text))
+    req_end = m_opt.start() if m_opt else len(text)
+    required = (
+        [m.group(1) for m in names if m_req.start() <= m.start() < req_end][:failed_count]
+        if m_req else []
+    )
+    optional = (
+        [m.group(1) for m in names if m.start() >= m_opt.start()][:optional_count]
+        if m_opt else []
+    )
+    return {
+        "total": total,
+        "failed_count": failed_count,
+        "failed": required,
+        "optional_failed_count": optional_count,
+        "failed_optional": optional,
+        "green": failed_count == 0,
+    }
+
+
 def write_engine_receipt(log_path: Path) -> Optional[Path]:
     """Parse a finished runGameTest log into a machine-readable
     receipt (scenario totals, failures, git rev) under
@@ -40,36 +90,28 @@ def write_engine_receipt(log_path: Path) -> Optional[Path]:
     engine verification cite it instead of prose. Returns the
     receipt path, or None when the log holds no verdict (crash,
     interrupt, wrong task)."""
-    try:
-        text = log_path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
+    verdict = parse_run_log(log_path)
+    if verdict is None:
         return None
-    m_total = re.search(r"(\d+) GAME TESTS COMPLETE", text)
-    if not m_total:
-        return None
-    total = int(m_total.group(1))
-    m_fail = re.search(r"(\d+) required tests failed", text)
-    failed_count = int(m_fail.group(1)) if m_fail else 0
-    failed = re.findall(r"^\s*- ([a-z0-9_]+)\s*$", text, re.M)
-    if len(failed) < failed_count:
-        failed = failed[:failed_count] if failed else []
     receipt = {
         "schema": 1,
         "task": "runGameTest",
         "log": str(log_path),
-        "git_rev": _git_head_short(),
+        "git_rev": git_head_short(),
         "finished_at": _dt.datetime.now().isoformat(timespec="seconds"),
-        "scenarios_total": total,
-        "failed_count": failed_count,
-        "failed": failed,
-        "green": failed_count == 0,
+        "scenarios_total": verdict["total"],
+        "failed_count": verdict["failed_count"],
+        "failed": verdict["failed"],
+        "optional_failed_count": verdict["optional_failed_count"],
+        "failed_optional": verdict["failed_optional"],
+        "green": verdict["green"],
     }
     ENGINE_RUN_DIR.mkdir(parents=True, exist_ok=True)
     stamp = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
     path = ENGINE_RUN_DIR / f"gametest-{stamp}.json"
     try:
         path.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8", newline="\n")
-        print(f"[mcbot] engine receipt: {path} (total={total}, failed={failed_count})")
+        print(f"[mcbot] engine receipt: {path} (total={verdict['total']}, failed={verdict['failed_count']})")
     except OSError as e:
         print(f"[mcbot] WARN: cannot write engine receipt: {e}", file=sys.stderr)
         return None
