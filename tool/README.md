@@ -64,24 +64,37 @@ a posture change is a ruling, made in those three places at once.
 ## Capability matrix (`capability ...`)
 
 One SQLite DB (`tool/.runtime/mcbot.db`, WAL) folds the bot's
-player-behavior faces (35 capabilities from `player-behavior-RE.md`)
-against QA cases (CSV sheets + `@GameTest` source scan) and engine
-receipts. **Doctrine: the DB is a disposable cache.** Committed
-artifacts are the truth — catalog (seed), cases (CSVs + gametest
-source), receipts (`qa-results/engine-runs/*.json`, H-R5 currency),
-manual triage (`qa-results/capability-state.json` overlay). Gates
-never read the DB (CI has no `.runtime`); they parse committed text.
+player-behavior faces against test specs, gametest methods, and
+engine receipts. **Doctrine: one fact class, one home, one write
+path — the DB is a disposable join cache.** Committed artifacts are
+the truth; gates never read the DB (CI has no `.runtime`), they
+parse committed text.
+
+| Fact class | Home (committed) | Collector |
+|---|---|---|
+| capability catalog | seed (from `player-behavior-RE.md`) | `init` |
+| test SPECIFICATIONS (TC-*) + their links | `qa-results/ranged-survival/qa-test-cases-ranged-survival.csv` (10-col, explicit `capability_id`) | `qa-import` |
+| test IMPLEMENTATIONS (GT-*) | gametest source | `scan-gametest` (owns lifecycle incl. pruning) |
+| run evidence | `qa-results/engine-runs/*.json` (H-R5 currency) | auto-record + `backfill` |
+| status rulings + non-CSV links | `qa-results/capability-state.json` | write-through via `set`/`link`; `restore` for rebuilds |
+
+Vocabulary everywhere: **faces** (capabilities) / **specs** (TC) /
+**impls** (GT) / **runs** (receipts). Statuses render as `shipped*`
+— DECLARED human rulings, not yet derived from receipts.
 
 | Command | What it does |
 |---|---|
-| `capability init` / `db-status` | seed the 35 faces / show table health |
+| `capability init` / `db-status` | seed the faces / show table health |
 | `capability overview` / `list` / `status <id>` / `gaps` | macro counts, filtered lists, one face's detail, gap inventory |
-| `capability set <id> --status ... --verify` | flip a status — recorded in the append-only transitions table |
-| `capability qa-import <csv>` / `scan-gametest` / `link` / `unlinked` | case ingestion + auto-linking; unresolved cases surface for manual `link` |
+| `capability set <id> --status ... --verify` | flip a status (audited transition) — regenerates the state file in the same command |
+| `capability qa-import <csv>` | import spec rows; the CSV is authoritative for spec links (re-import overwrites verb edits; blank/unknown ids → unlinked) |
+| `capability scan-gametest` | sync impl rows from source: insert/update/prune; manual links and their `link_source` survive |
+| `capability link <case> <cap>` | manual triage (impls mainly; spec links belong in the CSV) — write-through |
+| `capability unlinked` | split by kind: unlinked specs vs unlinked impls are two different problems |
 | `capability backfill` | mirror every committed engine-run JSON into the DB (idempotent; re-parses surviving logs to recover failed names lost to the pre-6583cd4 regex bug) |
 | `capability diff [--since YYYY-MM-DD]` | what changed: status transitions, run green/red split + scenario growth, RED details with per-scenario failures, new faces |
-| `capability domain <category>` | per-face evidence: status, QA coverage (NO-COVERAGE flag), deviations, failure history, domain green streak |
-| `capability export` / `restore` | durable copy of manual triage ↔ re-apply after a rebuild |
+| `capability domain <category>` | per-face evidence: status, SPECS/IMPLS counts, NO-SPEC / NO-IMPL / DEVIATION flags, failure history, domain green streak |
+| `capability restore` | apply the committed overlay after a rebuild |
 
 Rebuild recipe after losing `.runtime`:
 `capability init` → `qa-import` each CSV → `scan-gametest` →
@@ -90,7 +103,7 @@ Rebuild recipe after losing `.runtime`:
 Known honest limits: gametest logs list failures per scenario but
 never passes, so green evidence is run-granular, not per-face; the
 transitions table was born 2026-08-31 (older history lives in git);
-auto-links are keyword guesses — audit suspicious ones with
+impl auto-links are keyword guesses — audit with
 `capability status <id>` before trusting per-face rollups.
 
 Implementation lives in `tool/mcbot/` (split from the old
