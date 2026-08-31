@@ -2,7 +2,6 @@ package com.mcbot.mcbotserver.adapter.entity;
 
 import com.mcbot.mcbotserver.adapter.BotPlayerFacade;
 import com.mcbot.mcbotserver.adapter.inventory.BindingInventory;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.PathfinderMob;
@@ -79,26 +78,12 @@ public final class BotBodyEntity extends PathfinderMob {
     private int presenceCooldown;
 
     /**
-     * Experience level (vanilla Player.experienceLevel mirror). 0 at
-     * spawn; increases as XP orbs are absorbed. The level formula in
-     * {@link #getXpNeededForNextLevel()} matches vanilla: 0-15 uses
-     * 7+level*2, 15-30 uses 37+(level-15)*5, 30+ uses 112+(level-30)*9.
+     * Experience state (level/progress/total) with the vanilla
+     * {@code Player.experience*} arithmetic, in the same
+     * state-vs-math split as {@link HungerTicker}: the carrier owns
+     * the state, the mirror owns the math.
      */
-    private int experienceLevel;
-
-    /**
-     * Progress toward the next level, 0.0..1.0 (vanilla
-     * Player.experienceProgress mirror). Added to by giveExperiencePoints;
-     * when it reaches 1.0 the level increments and the remainder carries.
-     */
-    private float experienceProgress;
-
-    /**
-     * Total experience points ever absorbed (vanilla Player.totalExperience
-     * mirror). Used for scoreboard and anvil cost display; never decreases
-     * on level-up (only the progress bar resets).
-     */
-    private int totalExperience;
+    private final ExperienceMirror experience = new ExperienceMirror();
 
     /**
      * Lazy-initialized Player facade for kill-XP attribution. Vanilla
@@ -528,25 +513,13 @@ public final class BotBodyEntity extends PathfinderMob {
     }
 
     /**
-     * Sneak edge guard: a verbatim clone of Player.maybeBackOffFromEdge
-     * (decompiled 1.20.1 Player.java lines 1116-1168), adapted for a
-     * non-Player carrier. The base Entity implementation is a no-op
-     * (returns the movement vector unchanged), so without this override a
+     * Sneak edge guard: delegates to {@link SneakEdgeGuard}, the
+     * verbatim clone of Player.maybeBackOffFromEdge (decompiled
+     * 1.20.1 Player.java lines 1116-1168) with its isAboveGround
+     * gate - see there for the conditions and the three-pass
+     * algorithm. The base Entity implementation is a no-op (returns
+     * the movement vector unchanged), so without this override a
      * sneaking bot walks straight off ledges.
-     *
-     * <p>Conditions (all must hold): the mover type is SELF (the binding
-     * drives movement through LivingEntity.travel → move(SELF, delta)),
-     * the movement has no upward component (y <= 0 — jumping off a ledge
-     * is still allowed), shift is held (isShiftKeyDown, which Player
-     * exposes as isStayingOnGroundSurface), and the body is above ground
-     * (onGround or close enough that a block is within step height below).
-     *
-     * <p>Algorithm: reduce x and z in 0.05 increments while the body,
-     * offset by (dx, -maxUpStep, dz), has no collision — no collision
-     * means no ground below that offset, i.e. the body would walk off the
-     * edge. The loop stops at the largest dx/dz that still has ground
-     * below, so the body creeps right up to the edge but never past it.
-     * Three passes: x-only, z-only, then combined diagonal.
      *
      * @param movement the intended movement vector; never null
      * @param moverType the mover type; never null
@@ -554,66 +527,7 @@ public final class BotBodyEntity extends PathfinderMob {
      */
     @Override
     protected Vec3 maybeBackOffFromEdge(Vec3 movement, MoverType moverType) {
-        if (moverType != MoverType.SELF || movement.y > 0.0 || !isShiftKeyDown() || !isBotAboveGround()) {
-            return movement;
-        }
-        double dx = movement.x;
-        double dz = movement.z;
-        double step = 0.05;
-        while (dx != 0.0 && level().noCollision(this, getBoundingBox().move(dx, -maxUpStep(), 0.0))) {
-            if (Math.abs(dx) < step) {
-                dx = 0.0;
-            } else if (dx > 0.0) {
-                dx -= step;
-            } else {
-                dx += step;
-            }
-        }
-        while (dz != 0.0 && level().noCollision(this, getBoundingBox().move(0.0, -maxUpStep(), dz))) {
-            if (Math.abs(dz) < step) {
-                dz = 0.0;
-            } else if (dz > 0.0) {
-                dz -= step;
-            } else {
-                dz += step;
-            }
-        }
-        while (dx != 0.0
-                && dz != 0.0
-                && level().noCollision(this, getBoundingBox().move(dx, -maxUpStep(), dz))) {
-            if (Math.abs(dx) < step) {
-                dx = 0.0;
-            } else if (dx > 0.0) {
-                dx -= step;
-            } else {
-                dx += step;
-            }
-            if (Math.abs(dz) < step) {
-                dz = 0.0;
-            } else if (dz > 0.0) {
-                dz -= step;
-            } else {
-                dz += step;
-            }
-        }
-        return new Vec3(dx, movement.y, dz);
-    }
-
-    /**
-     * Whether the body is close enough to ground that the edge guard
-     * should engage. Mirrors Player.isAboveGround (decompiled 1.20.1
-     * Player.java lines 1170-1173): on ground always qualifies; a
-     * falling body qualifies only when fallDistance is below step height
-     * AND a block exists within that distance below (noCollision returns
-     * false). A body already over open air (no block below) is excluded —
-     * the guard only prevents walking OFF an edge, not mid-air steering.
-     *
-     * @return true when the edge guard should apply
-     */
-    private boolean isBotAboveGround() {
-        return onGround()
-                || (fallDistance < maxUpStep()
-                        && !level().noCollision(this, getBoundingBox().move(0.0, fallDistance - maxUpStep(), 0.0)));
+        return SneakEdgeGuard.clamp(this, movement, moverType);
     }
 
     // ------------------------------------------------------------------
@@ -626,7 +540,7 @@ public final class BotBodyEntity extends PathfinderMob {
      * @return experience level; never negative
      */
     public int getExperienceLevel() {
-        return experienceLevel;
+        return experience.getLevel();
     }
 
     /**
@@ -636,7 +550,7 @@ public final class BotBodyEntity extends PathfinderMob {
      * @return progress fraction; 0.0..1.0
      */
     public float getExperienceProgress() {
-        return experienceProgress;
+        return experience.getProgress();
     }
 
     /**
@@ -645,7 +559,7 @@ public final class BotBodyEntity extends PathfinderMob {
      * @return total XP; never negative
      */
     public int getTotalExperience() {
-        return totalExperience;
+        return experience.getTotal();
     }
 
     /**
@@ -657,13 +571,7 @@ public final class BotBodyEntity extends PathfinderMob {
      * @return XP points needed for the next level
      */
     public int getXpNeededForNextLevel() {
-        if (experienceLevel >= 30) {
-            return 112 + (experienceLevel - 30) * 9;
-        }
-        if (experienceLevel >= 15) {
-            return 37 + (experienceLevel - 15) * 5;
-        }
-        return 7 + experienceLevel * 2;
+        return experience.getXpNeededForNextLevel();
     }
 
     /**
@@ -676,32 +584,7 @@ public final class BotBodyEntity extends PathfinderMob {
      * @param points XP to add (or subtract if negative)
      */
     public void giveExperiencePoints(int points) {
-        if (points == 0) {
-            return;
-        }
-        // Clamp to int range to match vanilla (net.minecraft.util.Mth.clamp
-        // is not needed here because int arithmetic is already bounded).
-        totalExperience = Math.max(0, totalExperience + points);
-        float needed = getXpNeededForNextLevel();
-        experienceProgress += (float) points / needed;
-        while (experienceProgress < 0.0F) {
-            float overflow = experienceProgress * needed;
-            if (experienceLevel > 0) {
-                experienceLevel--;
-                needed = getXpNeededForNextLevel();
-                experienceProgress = 1.0F + overflow / needed;
-            } else {
-                experienceProgress = 0.0F;
-                break;
-            }
-        }
-        while (experienceProgress >= 1.0F) {
-            float overflow = (experienceProgress - 1.0F) * needed;
-            experienceLevel++;
-            needed = getXpNeededForNextLevel();
-            experienceProgress = overflow / needed;
-        }
-        experienceProgress = Mth.clamp(experienceProgress, 0.0F, 1.0F);
+        experience.addPoints(points);
     }
 
     /**
@@ -710,13 +593,7 @@ public final class BotBodyEntity extends PathfinderMob {
      * @param levels levels to add (or subtract if negative)
      */
     public void giveExperienceLevels(int levels) {
-        experienceLevel = Math.max(0, experienceLevel + levels);
-        // Vanilla resets the progress bar only on level LOSS (a menu
-        // cost); positive grants (orbs, kills) keep the bar - zeroing
-        // it here would drop earned progress precision every level-up.
-        if (levels < 0) {
-            experienceProgress = 0.0F;
-        }
+        experience.addLevels(levels);
     }
 
     /**
@@ -751,7 +628,7 @@ public final class BotBodyEntity extends PathfinderMob {
         for (net.minecraft.world.entity.ExperienceOrb orb :
                 level().getEntitiesOfClass(net.minecraft.world.entity.ExperienceOrb.class, box)) {
             if (orb.isAlive() && orb.value > 0) {
-                giveExperiencePoints(orb.value);
+                experience.addPoints(orb.value);
                 orb.discard();
             }
         }
