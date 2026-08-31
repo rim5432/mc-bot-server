@@ -36,6 +36,11 @@ class QATestCase:
 
     Imported from the manual CSV tracking sheets or created directly.
     ``status`` vocabulary: not_executed | passed | failed | blocked.
+
+    ``kind`` separates the two case lifecycles sharing this table:
+    'spec' (human-authored TC-* test specification) vs 'impl'
+    (source-derived GT-* gametest method). ``link_source`` records
+    who declared the capability link: csv | manual | auto.
     """
     id: str
     capability_id: Optional[str] = None
@@ -45,10 +50,14 @@ class QATestCase:
     module: str = ""
     test_type: str = ""  # gametest, unit, manual
     description: str = ""
+    preconditions: str = ""
     steps: str = ""
     expected_result: str = ""
     related_risk: str = ""
     test_data: str = ""
+    notes: str = "{}"  # JSON: risk_refs, fixture, block_reason, ...
+    kind: str = "spec"
+    link_source: Optional[str] = None
     status: str = "not_executed"
     block_reason: str = ""
     last_run_at: Optional[str] = None

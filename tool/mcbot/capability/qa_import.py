@@ -1,41 +1,274 @@
-"""QA test case import and capability auto-linking.
+"""QA test-case import (CSV) and case-link management.
 
-Reads the manual CSV tracking sheets (ranged-survival, mechanics,
-etc.) and loads them into the ``qa_test_cases`` table. Each case is
-auto-linked to a capability face via a two-stage matcher:
+The CSV is the single home for test SPECIFICATIONS (TC-*): the
+10-column English format carries an explicit ``capability_id`` per
+case - the author declares the behavior domain at write time, no
+keyword guessing. Rows with a blank/unknown capability_id land on
+the unlinked list for human triage. Re-importing is authoritative
+for spec rows: the CSV wins over anything a verb changed in the DB
+(manual triage on a spec row belongs in the CSV, not the DB).
 
-1. **Module map** — the CSV ``模块`` column maps to a capability
-   category (combat→combat, dig→digging, fishing→perception, ...).
-2. **Keyword rules** — ordered keyword patterns matched against the
-   case title + requirement; the first hit wins. Cases that match
-   nothing are left ``capability_id = NULL`` and surfaced by
-   ``capability unlinked`` for manual triage.
+gametest METHODS (GT-*) are a different lifecycle (kind='impl'):
+scanned from source by gametest_scan, which owns those rows
+including pruning. The keyword tables at the bottom of this module
+exist only for that scanner's auto-link fallback.
 
-Manual links override auto-links and are never overwritten on
-re-import (idempotent on the case id).
+CSV format::
+
+    case_id,capability_id,title,priority,test_type,status,
+    preconditions,steps,expected_result,notes
+
+``notes`` is a JSON object (risk_refs, fixture, block_reason, ...);
+a non-JSON value is preserved verbatim under notes._raw so nothing
+is silently lost.
 """
 from __future__ import annotations
 
 import csv
 import datetime as _dt
+import json
 from pathlib import Path
 from typing import Optional
 
-from mcbot.capability.db import init_db
+from mcbot.capability.db import get_connection, init_db
 from mcbot.capability.models import QATestCase
 from mcbot.capability.repository import CapabilityRepository
 
-# Modules that are NOT player-behavior faces — skip auto-linking entirely.
-# These are meta / infrastructure / process concerns, not vanilla mechanics
-# the bot mirrors. They stay capability_id = NULL for manual triage.
+CSV_COLUMNS = [
+    "case_id", "capability_id", "title", "priority", "test_type", "status",
+    "preconditions", "steps", "expected_result", "notes",
+]
+
+
+def _now_iso() -> str:
+    return _dt.datetime.now().isoformat(timespec="seconds")
+
+
+# ---------------------------------------------------------------------------
+# Row mapping (single place; every reader below uses it)
+# ---------------------------------------------------------------------------
+def _row_to_case(row) -> QATestCase:
+    return QATestCase(
+        id=row["id"], capability_id=row["capability_id"], title=row["title"],
+        requirement=row["requirement"] or "", priority=row["priority"] or "",
+        module=row["module"] or "", test_type=row["test_type"] or "",
+        description=row["description"] or "", preconditions=row["preconditions"] or "",
+        steps=row["steps"] or "", expected_result=row["expected_result"] or "",
+        related_risk=row["related_risk"] or "", test_data=row["test_data"] or "",
+        notes=row["notes"] or "{}", kind=row["kind"] or "spec",
+        link_source=row["link_source"], status=row["status"],
+        block_reason=row["block_reason"] or "", last_run_at=row["last_run_at"],
+        last_receipt_id=row["last_receipt_id"], created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )
+
+
+def _get_case(db_path: Optional[Path], case_id: str) -> Optional[QATestCase]:
+    with get_connection(db_path) as conn:
+        row = conn.execute(
+            "SELECT * FROM qa_test_cases WHERE id = ?", (case_id,)
+        ).fetchone()
+    return _row_to_case(row) if row else None
+
+
+def _insert_case(db_path: Optional[Path], case: QATestCase) -> None:
+    with get_connection(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO qa_test_cases (
+                id, capability_id, title, requirement, priority, module,
+                test_type, description, preconditions, steps, expected_result,
+                related_risk, test_data, notes, kind, link_source, status,
+                block_reason, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                case.id, case.capability_id, case.title, case.requirement,
+                case.priority, case.module, case.test_type, case.description,
+                case.preconditions, case.steps, case.expected_result,
+                case.related_risk, case.test_data, case.notes, case.kind,
+                case.link_source, case.status, case.block_reason,
+                case.created_at, case.updated_at,
+            ),
+        )
+        conn.commit()
+
+
+def _update_case(db_path: Optional[Path], case_id: str, **fields) -> None:
+    if not fields:
+        return
+    sets = ", ".join(f"{k} = ?" for k in fields)
+    params = list(fields.values()) + [case_id]
+    with get_connection(db_path) as conn:
+        conn.execute(f"UPDATE qa_test_cases SET {sets} WHERE id = ?", params)
+        conn.commit()
+
+
+def _count_cases(db_path: Optional[Path]) -> int:
+    with get_connection(db_path) as conn:
+        row = conn.execute("SELECT COUNT(*) as c FROM qa_test_cases").fetchone()
+    return row["c"] if row else 0
+
+
+# ---------------------------------------------------------------------------
+# CSV import (v2 English format, explicit capability_id)
+# ---------------------------------------------------------------------------
+def import_csv(
+    csv_path: Path,
+    *,
+    db_path: Optional[Path] = None,
+) -> dict:
+    """Import the v2 QA CSV into qa_test_cases (kind='spec').
+
+    Authoritative for spec rows: existing rows are updated to match
+    the CSV, including the capability link (link_source='csv'). A
+    blank or unknown capability_id leaves the row unlinked for the
+    unlinked list. Idempotent on case id.
+    """
+    init_db(db_path)
+    repo = CapabilityRepository(db_path)
+
+    inserted = updated = linked = unlinked = skipped = 0
+    invalid_caps: list[str] = []
+    bad_notes: list[str] = []
+
+    with open(csv_path, "r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        fieldnames = reader.fieldnames or []
+        if "case_id" not in fieldnames:
+            raise ValueError(
+                "not a v2 QA csv (missing case_id column). The legacy "
+                "13-column Chinese sheet is archived under "
+                "qa-results/ranged-survival/archive/; translate to the "
+                "10-column format documented in this module's docstring."
+            )
+        for row in reader:
+            case_id = (row.get("case_id") or "").strip()
+            if not case_id:
+                skipped += 1
+                continue
+
+            cap_id = (row.get("capability_id") or "").strip() or None
+            if cap_id and not repo.get(cap_id):
+                invalid_caps.append(f"{case_id}->{cap_id}")
+                cap_id = None
+
+            notes_raw = (row.get("notes") or "").strip()
+            notes = "{}"
+            if notes_raw:
+                try:
+                    json.loads(notes_raw)
+                    notes = notes_raw
+                except ValueError:
+                    notes = json.dumps({"_raw": notes_raw})
+                    bad_notes.append(case_id)
+
+            now = _now_iso()
+            common = dict(
+                capability_id=cap_id,
+                link_source="csv" if cap_id else None,
+                title=(row.get("title") or "").strip(),
+                priority=(row.get("priority") or "").strip(),
+                test_type=(row.get("test_type") or "").strip(),
+                status=(row.get("status") or "not_executed").strip(),
+                preconditions=(row.get("preconditions") or "").strip(),
+                steps=(row.get("steps") or "").strip(),
+                expected_result=(row.get("expected_result") or "").strip(),
+                notes=notes,
+                kind="spec",
+                updated_at=now,
+            )
+            if cap_id:
+                linked += 1
+            else:
+                unlinked += 1
+
+            if _get_case(db_path, case_id):
+                _update_case(db_path, case_id, **common)
+                updated += 1
+            else:
+                _insert_case(db_path, QATestCase(
+                    id=case_id, requirement="", module="", description="",
+                    related_risk="", test_data="", block_reason="",
+                    created_at=now, **common,
+                ))
+                inserted += 1
+
+    return {
+        "inserted": inserted,
+        "updated": updated,
+        "linked": linked,
+        "unlinked": unlinked,
+        "skipped": skipped,
+        "invalid_caps": invalid_caps,
+        "bad_notes": bad_notes,
+        "total": _count_cases(db_path),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Link management
+# ---------------------------------------------------------------------------
+def list_unlinked(db_path: Optional[Path] = None) -> list[QATestCase]:
+    """All cases with no capability link, specs and impls together
+    (the CLI splits them by kind - they are two different problems)."""
+    with get_connection(db_path) as conn:
+        rows = conn.execute(
+            "SELECT * FROM qa_test_cases WHERE capability_id IS NULL ORDER BY id"
+        ).fetchall()
+    return [_row_to_case(r) for r in rows]
+
+
+def link_case(
+    case_id: str,
+    capability_id: str,
+    db_path: Optional[Path] = None,
+) -> bool:
+    """Manually link a case to a capability (link_source='manual').
+
+    For kind='spec' rows the authoritative home is the CSV - a manual
+    link survives until the next CSV import overwrites it. Impls
+    (GT-*) keep manual links across rescans.
+    """
+    repo = CapabilityRepository(db_path)
+    if not repo.get(capability_id):
+        raise ValueError(f"capability not found: {capability_id}")
+    with get_connection(db_path) as conn:
+        cur = conn.execute(
+            "UPDATE qa_test_cases SET capability_id = ?, link_source = 'manual', "
+            "updated_at = ? WHERE id = ?",
+            (capability_id, _now_iso(), case_id),
+        )
+        conn.commit()
+    return cur.rowcount > 0
+
+
+def cases_for_capability(
+    capability_id: str,
+    db_path: Optional[Path] = None,
+) -> list[QATestCase]:
+    """All cases linked to a capability."""
+    with get_connection(db_path) as conn:
+        rows = conn.execute(
+            "SELECT * FROM qa_test_cases WHERE capability_id = ? ORDER BY id",
+            (capability_id,),
+        ).fetchall()
+    return [_row_to_case(r) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# Auto-link tables - GAMETEST SCANNER ONLY (impl rows).
+#
+# TC specs never pass through these: their capability_id is declared
+# in the CSV. The haystack here is English camelCase method tokens,
+# so Chinese keyword variants are inert but harmless.
+# ---------------------------------------------------------------------------
+# Modules that are NOT player-behavior faces - skip auto-linking.
 EXCLUDED_MODULES: set[str] = {
     "hygiene", "rescue", "infra", "meta", "process", "tooling",
     "build", "ci", "docs", "test",
 }
 
-# ---------------------------------------------------------------------------
-# Module → capability category map (coarse stage)
-# ---------------------------------------------------------------------------
 MODULE_CATEGORY_MAP: dict[str, str] = {
     "combat": "combat",
     "dig": "digging",
@@ -57,12 +290,8 @@ MODULE_CATEGORY_MAP: dict[str, str] = {
     "sensing": "perception",
 }
 
-# ---------------------------------------------------------------------------
-# Keyword → capability_id rules (fine stage, ordered — first hit wins)
-# Each rule: (list of keyword substrings, capability_id)
-# A rule fires when ALL of its keywords appear in the haystack
-# (title + requirement + description, lowercased).
-# ---------------------------------------------------------------------------
+# Ordered (keywords, capability_id) rules; a rule fires when ANY
+# keyword appears in the haystack. First hit wins.
 KEYWORD_RULES: list[tuple[list[str], str]] = [
     # combat
     (["弓", "蓄力", "bow"], "combat.bow_draw"),
@@ -149,263 +378,3 @@ KEYWORD_RULES: list[tuple[list[str], str]] = [
     (["梯子", "ladder", "vine"], "motion.ladders_vines"),
     (["藤蔓", "climbable"], "motion.ladders_vines"),
 ]
-
-
-def _now_iso() -> str:
-    return _dt.datetime.now().isoformat(timespec="seconds")
-
-
-def match_capability(
-    title: str,
-    requirement: str,
-    description: str,
-    module: str,
-    repo: CapabilityRepository,
-) -> Optional[str]:
-    """Two-stage matcher: module map → keyword rules.
-
-    Returns the capability_id or None if nothing matches.
-    """
-    # Excluded modules are never auto-linked (meta / infra concerns,
-    # not player-behavior faces). They stay NULL for manual triage.
-    if module.lower() in EXCLUDED_MODULES:
-        return None
-
-    haystack = f"{title} {requirement} {description}".lower()
-
-    # Stage 2: keyword rules (fine-grained, first hit wins).
-    # A rule fires when ANY of its keywords appears in the haystack
-    # (synonyms grouped together; Chinese and English variants coexist).
-    for keywords, cap_id in KEYWORD_RULES:
-        if any(kw.lower() in haystack for kw in keywords):
-            # verify the capability actually exists
-            if repo.get(cap_id):
-                return cap_id
-
-    # Stage 1 fallback: module → category, pick the first capability
-    # in that category if exactly one exists; otherwise None (ambiguous)
-    category = MODULE_CATEGORY_MAP.get(module.lower())
-    if category:
-        caps_in_cat = repo.list(category=category)
-        if len(caps_in_cat) == 1:
-            return caps_in_cat[0].id
-
-    return None
-
-
-def import_csv(
-    csv_path: Path,
-    *,
-    source: str = "manual_csv",
-    db_path: Optional[Path] = None,
-) -> dict:
-    """Import a QA CSV file into the qa_test_cases table.
-
-    Idempotent on case id: re-importing updates fields but preserves
-    an existing manual capability_id link. Returns a summary dict.
-    """
-    init_db(db_path)
-    repo = CapabilityRepository(db_path)
-
-    inserted = 0
-    updated = 0
-    auto_linked = 0
-    unlinked = 0
-    skipped = 0
-
-    with open(csv_path, "r", encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            case_id = (row.get("用例ID") or "").strip()
-            if not case_id:
-                skipped += 1
-                continue
-
-            title = (row.get("用例标题") or "").strip()
-            requirement = (row.get("需求") or "").strip()
-            priority = (row.get("优先级") or "").strip()
-            module = (row.get("模块") or "").strip()
-            test_type = (row.get("类型") or "").strip()
-            description = (row.get("描述") or "").strip()
-            steps = (row.get("步骤") or "").strip()
-            expected = (row.get("预期结果") or "").strip()
-            related_risk = (row.get("关联风险机制") or "").strip()
-            test_data = (row.get("测试数据") or "").strip()
-            status = (row.get("状态") or "not_executed").strip()
-            block_reason = (row.get("阻断原因") or "").strip()
-
-            # Auto-link (only if not already manually linked)
-            existing = _get_case(db_path, case_id)
-            cap_id = None
-            if existing and existing.capability_id:
-                cap_id = existing.capability_id  # preserve manual link
-            else:
-                cap_id = match_capability(title, requirement, description, module, repo)
-                if cap_id:
-                    auto_linked += 1
-                else:
-                    unlinked += 1
-
-            now = _now_iso()
-            if existing:
-                _update_case(
-                    db_path, case_id,
-                    capability_id=cap_id, title=title, requirement=requirement,
-                    priority=priority, module=module, test_type=test_type,
-                    description=description, steps=steps, expected_result=expected,
-                    related_risk=related_risk, test_data=test_data,
-                    status=status, block_reason=block_reason, updated_at=now,
-                )
-                updated += 1
-            else:
-                _insert_case(
-                    db_path,
-                    QATestCase(
-                        id=case_id, capability_id=cap_id, title=title,
-                        requirement=requirement, priority=priority, module=module,
-                        test_type=test_type, description=description, steps=steps,
-                        expected_result=expected, related_risk=related_risk,
-                        test_data=test_data, status=status, block_reason=block_reason,
-                        created_at=now, updated_at=now,
-                    ),
-                )
-                inserted += 1
-
-    total = _count_cases(db_path)
-    return {
-        "inserted": inserted,
-        "updated": updated,
-        "auto_linked": auto_linked,
-        "unlinked": unlinked,
-        "skipped": skipped,
-        "total": total,
-        "source": source,
-    }
-
-
-# ---------------------------------------------------------------------------
-# Direct DB helpers for qa_test_cases (no repository class yet)
-# ---------------------------------------------------------------------------
-from mcbot.capability.db import get_connection
-
-
-def _get_case(db_path: Optional[Path], case_id: str) -> Optional[QATestCase]:
-    with get_connection(db_path) as conn:
-        row = conn.execute(
-            "SELECT * FROM qa_test_cases WHERE id = ?", (case_id,)
-        ).fetchone()
-    if not row:
-        return None
-    return QATestCase(
-        id=row["id"], capability_id=row["capability_id"], title=row["title"],
-        requirement=row["requirement"] or "", priority=row["priority"] or "",
-        module=row["module"] or "", test_type=row["test_type"] or "",
-        description=row["description"] or "", steps=row["steps"] or "",
-        expected_result=row["expected_result"] or "", related_risk=row["related_risk"] or "",
-        test_data=row["test_data"] or "", status=row["status"],
-        block_reason=row["block_reason"] or "", last_run_at=row["last_run_at"],
-        last_receipt_id=row["last_receipt_id"], created_at=row["created_at"],
-        updated_at=row["updated_at"],
-    )
-
-
-def _insert_case(db_path: Optional[Path], case: QATestCase) -> None:
-    with get_connection(db_path) as conn:
-        conn.execute(
-            """
-            INSERT INTO qa_test_cases (
-                id, capability_id, title, requirement, priority, module,
-                test_type, description, steps, expected_result, related_risk,
-                test_data, status, block_reason, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                case.id, case.capability_id, case.title, case.requirement,
-                case.priority, case.module, case.test_type, case.description,
-                case.steps, case.expected_result, case.related_risk, case.test_data,
-                case.status, case.block_reason, case.created_at, case.updated_at,
-            ),
-        )
-        conn.commit()
-
-
-def _update_case(db_path: Optional[Path], case_id: str, **fields) -> None:
-    if not fields:
-        return
-    sets = ", ".join(f"{k} = ?" for k in fields)
-    params = list(fields.values()) + [case_id]
-    with get_connection(db_path) as conn:
-        conn.execute(f"UPDATE qa_test_cases SET {sets} WHERE id = ?", params)
-        conn.commit()
-
-
-def _count_cases(db_path: Optional[Path]) -> int:
-    with get_connection(db_path) as conn:
-        row = conn.execute("SELECT COUNT(*) as c FROM qa_test_cases").fetchone()
-    return row["c"] if row else 0
-
-
-def list_unlinked(db_path: Optional[Path] = None) -> list[QATestCase]:
-    """Return all QA cases with no capability link."""
-    with get_connection(db_path) as conn:
-        rows = conn.execute(
-            "SELECT * FROM qa_test_cases WHERE capability_id IS NULL ORDER BY id"
-        ).fetchall()
-    return [
-        QATestCase(
-            id=r["id"], capability_id=r["capability_id"], title=r["title"],
-            requirement=r["requirement"] or "", priority=r["priority"] or "",
-            module=r["module"] or "", test_type=r["test_type"] or "",
-            description=r["description"] or "", steps=r["steps"] or "",
-            expected_result=r["expected_result"] or "", related_risk=r["related_risk"] or "",
-            test_data=r["test_data"] or "", status=r["status"],
-            block_reason=r["block_reason"] or "", last_run_at=r["last_run_at"],
-            last_receipt_id=r["last_receipt_id"], created_at=r["created_at"],
-            updated_at=r["updated_at"],
-        )
-        for r in rows
-    ]
-
-
-def link_case(
-    case_id: str,
-    capability_id: str,
-    db_path: Optional[Path] = None,
-) -> bool:
-    """Manually link a QA case to a capability. Returns True if updated."""
-    repo = CapabilityRepository(db_path)
-    if not repo.get(capability_id):
-        raise ValueError(f"capability not found: {capability_id}")
-    with get_connection(db_path) as conn:
-        cur = conn.execute(
-            "UPDATE qa_test_cases SET capability_id = ?, updated_at = ? WHERE id = ?",
-            (capability_id, _now_iso(), case_id),
-        )
-        conn.commit()
-    return cur.rowcount > 0
-
-
-def cases_for_capability(
-    capability_id: str,
-    db_path: Optional[Path] = None,
-) -> list[QATestCase]:
-    """Return all QA cases linked to a capability."""
-    with get_connection(db_path) as conn:
-        rows = conn.execute(
-            "SELECT * FROM qa_test_cases WHERE capability_id = ? ORDER BY id",
-            (capability_id,),
-        ).fetchall()
-    return [
-        QATestCase(
-            id=r["id"], capability_id=r["capability_id"], title=r["title"],
-            requirement=r["requirement"] or "", priority=r["priority"] or "",
-            module=r["module"] or "", test_type=r["test_type"] or "",
-            description=r["description"] or "", steps=r["steps"] or "",
-            expected_result=r["expected_result"] or "", related_risk=r["related_risk"] or "",
-            test_data=r["test_data"] or "", status=r["status"],
-            block_reason=r["block_reason"] or "", last_run_at=r["last_run_at"],
-            last_receipt_id=r["last_receipt_id"], created_at=r["created_at"],
-            updated_at=r["updated_at"],
-        )
-        for r in rows
-    ]

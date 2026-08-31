@@ -160,6 +160,26 @@ _MIGRATIONS: list[tuple[int, str, list[str]]] = [
             "CREATE INDEX idx_transitions_changed ON capability_status_transitions(changed_at)",
         ],
     ),
+    (
+        3,
+        "qa_test_cases: spec/impl split + link provenance + notes JSON",
+        [
+            # kind: 'spec' = human-authored test specification (TC-*),
+            # 'impl' = source-derived gametest method (GT-*). Two
+            # lifecycles, one table - the discriminator keeps the
+            # receipt->case->capability attribution chain a single join.
+            "ALTER TABLE qa_test_cases ADD COLUMN kind TEXT NOT NULL DEFAULT 'spec'",
+            # link_source: csv | manual | auto - who declared the
+            # capability link. NULL while unlinked.
+            "ALTER TABLE qa_test_cases ADD COLUMN link_source TEXT",
+            # notes: JSON object (risk_refs, fixture, block_reason, ...)
+            "ALTER TABLE qa_test_cases ADD COLUMN notes TEXT NOT NULL DEFAULT '{}'",
+            "ALTER TABLE qa_test_cases ADD COLUMN preconditions TEXT NOT NULL DEFAULT ''",
+            "UPDATE qa_test_cases SET kind = 'impl' WHERE id LIKE 'GT-%'",
+            "UPDATE qa_test_cases SET link_source = 'auto' WHERE capability_id IS NOT NULL",
+            "CREATE INDEX idx_qa_cases_kind ON qa_test_cases(kind)",
+        ],
+    ),
 ]
 
 

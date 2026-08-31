@@ -661,14 +661,22 @@ def cmd_cap_qa_import(args) -> int:
     if not csv_path.exists():
         print(f"[mcbot] CSV file not found: {csv_path}", file=sys.stderr)
         return 1
-    result = import_csv(csv_path)
-    print(f"[mcbot] QA import complete")
-    print(f"  inserted   : {result['inserted']}")
-    print(f"  updated    : {result['updated']}")
-    print(f"  auto_linked: {result['auto_linked']}")
-    print(f"  unlinked   : {result['unlinked']}")
-    if result['skipped']:
-        print(f"  skipped    : {result['skipped']} (no case id)")
+    try:
+        result = import_csv(csv_path)
+    except ValueError as e:
+        print(f"[mcbot] {e}", file=sys.stderr)
+        return 2
+    print("[mcbot] QA import complete (spec rows; CSV is authoritative)")
+    print(f"  inserted : {result['inserted']}")
+    print(f"  updated  : {result['updated']}")
+    print(f"  linked   : {result['linked']} (capability_id declared in CSV, link_source=csv)")
+    print(f"  unlinked : {result['unlinked']} (blank/unknown capability_id - see `capability unlinked`)")
+    if result["skipped"]:
+        print(f"  skipped  : {result['skipped']} (no case id)")
+    if result["invalid_caps"]:
+        print(f"  WARN unknown capability ids: {', '.join(result['invalid_caps'])}", file=sys.stderr)
+    if result["bad_notes"]:
+        print(f"  WARN non-JSON notes preserved under _raw: {', '.join(result['bad_notes'])}", file=sys.stderr)
     print(f"  total cases: {result['total']}")
     return 0
 

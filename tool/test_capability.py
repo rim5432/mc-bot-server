@@ -18,6 +18,7 @@ from pathlib import Path
 from mcbot.capability.backfill import backfill_receipts
 from mcbot.capability.db import get_connection, init_db
 from mcbot.capability.models import Capability
+from mcbot.capability.qa_import import import_csv, link_case
 from mcbot.capability.report import diff_since, domain_report
 from mcbot.capability.repository import CapabilityRepository
 from mcbot.capability.state_export import export_state, restore_state
@@ -331,6 +332,95 @@ class StateOverlayTest(unittest.TestCase):
         second = restore_state(self.overlay, db_path=self.db)
         self.assertEqual(second["statuses_applied"], 0)
         self.assertEqual(second["links_applied"], 0)
+
+
+class ImportCsvV2Test(unittest.TestCase):
+    """The English CSV: explicit capability_id, no guessing, spec kind."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self._tmp.name)
+        self.db = self.dir / "test.db"
+        init_db(self.db)
+        now = "2026-08-31T12:00:00"
+        CapabilityRepository(self.db).upsert(Capability(
+            id="combat.bow_draw", name="Bow draw", category="combat",
+            implementation_status="shipped", created_at=now, updated_at=now,
+        ))
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _csv(self, text: str) -> Path:
+        p = self.dir / "cases.csv"
+        p.write_text(text, encoding="utf-8", newline="\n")
+        return p
+
+    def test_declared_link_and_kind(self):
+        p = self._csv(
+            "case_id,capability_id,title,priority,test_type,status,preconditions,"
+            "steps,expected_result,notes\n"
+            "TC-COMBAT-001,combat.bow_draw,Bow full charge,P0,gametest,not_executed,"
+            '"bot holds bow","hold USE 20 ticks","arrow speed 3.0","{""risk_refs"": [""bow-001""]}"\n'
+            "TC-COMBAT-002,,Blank anchor,P1,gametest,not_executed,,\"\",\"\",,\n"
+        )
+        result = import_csv(p, db_path=self.db)
+        self.assertEqual(result["inserted"], 2)
+        self.assertEqual(result["linked"], 1)
+        self.assertEqual(result["unlinked"], 1)
+        with get_connection(self.db) as conn:
+            r = conn.execute(
+                "SELECT capability_id, link_source, kind, notes FROM qa_test_cases "
+                "WHERE id = 'TC-COMBAT-001'"
+            ).fetchone()
+            self.assertEqual(r["capability_id"], "combat.bow_draw")
+            self.assertEqual(r["link_source"], "csv")
+            self.assertEqual(r["kind"], "spec")
+            self.assertIn("bow-001", r["notes"])
+            r = conn.execute(
+                "SELECT capability_id, link_source FROM qa_test_cases "
+                "WHERE id = 'TC-COMBAT-002'"
+            ).fetchone()
+            self.assertIsNone(r["capability_id"])
+            self.assertIsNone(r["link_source"])
+
+    def test_reimport_is_authoritative_over_verb_edits(self):
+        p = self._csv(
+            "case_id,capability_id,title,priority,test_type,status,preconditions,"
+            "steps,expected_result,notes\n"
+            "TC-COMBAT-001,combat.bow_draw,Bow full charge,P0,gametest,not_executed,"
+            ",\"\",,\"\"\n"
+        )
+        import_csv(p, db_path=self.db)
+        # a manual verb link on a spec row...
+        link_case("TC-COMBAT-001", "combat.bow_draw", db_path=self.db)
+        with get_connection(self.db) as conn:
+            src = conn.execute(
+                "SELECT link_source FROM qa_test_cases WHERE id = 'TC-COMBAT-001'"
+            ).fetchone()["link_source"]
+        self.assertEqual(src, "manual")
+        # ...dies at re-import: the CSV is the single home for spec links
+        import_csv(p, db_path=self.db)
+        with get_connection(self.db) as conn:
+            r = conn.execute(
+                "SELECT link_source FROM qa_test_cases WHERE id = 'TC-COMBAT-001'"
+            ).fetchone()
+        self.assertEqual(r["link_source"], "csv")
+
+    def test_unknown_capability_falls_to_unlinked(self):
+        p = self._csv(
+            "case_id,capability_id,title,priority,test_type,status,preconditions,"
+            "steps,expected_result,notes\n"
+            "TC-X-001,nope.nope,Typo link,P1,gametest,not_executed,,\"\",,\"\"\n"
+        )
+        result = import_csv(p, db_path=self.db)
+        self.assertEqual(result["unlinked"], 1)
+        self.assertEqual(result["invalid_caps"], ["TC-X-001->nope.nope"])
+
+    def test_legacy_format_rejected(self):
+        p = self._csv("用例ID,需求,标题\nTC-1,弓,弓测试\n")
+        with self.assertRaises(ValueError):
+            import_csv(p, db_path=self.db)
 
 
 if __name__ == "__main__":
