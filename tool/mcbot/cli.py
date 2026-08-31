@@ -51,6 +51,7 @@ from mcbot.lock import (
 )
 from mcbot.capability import db as cap_db
 from mcbot.capability import queries as cap_queries
+from mcbot.capability.backfill import backfill_receipts
 from mcbot.capability.gametest_scan import scan_gametests
 from mcbot.capability.qa_import import import_csv, link_case, list_unlinked
 from mcbot.capability.receipt import latest_receipt_summary
@@ -385,6 +386,7 @@ def cmd_capability(args) -> int:
         "set": cmd_cap_set,
         "gaps": cmd_cap_gaps,
         "db-status": cmd_cap_db_status,
+        "backfill": cmd_cap_backfill,
         "qa-import": cmd_cap_qa_import,
         "scan-gametest": cmd_cap_scan_gametest,
         "link": cmd_cap_link,
@@ -532,6 +534,21 @@ def cmd_cap_db_status(args) -> int:
     print(f"  tables:")
     for table, count in st["tables"].items():
         print(f"    {table:<20} {count} rows")
+    return 0
+
+
+def cmd_cap_backfill(args) -> int:
+    result = backfill_receipts()
+    print("[mcbot] engine-receipt backfill complete")
+    print(f"  files    : {result['files']} gametest-*.json receipts")
+    print(f"  inserted : {result['inserted']} (into test_receipts)")
+    print(f"  skipped  : {result['skipped']} (already mirrored)")
+    print(f"  case rows: {result['case_rows']} (failed scenarios linked where possible)")
+    if result["recovered"]:
+        print(f"  recovered: {result['recovered']} receipts whose failed names "
+              f"were re-parsed from surviving logs")
+    if result["unreadable"]:
+        print(f"  WARN: {result['unreadable']} unreadable JSON files", file=sys.stderr)
     return 0
 
 
@@ -889,6 +906,9 @@ def main() -> int:
     p_cap_set.add_argument("--verify", action="store_true", help="mark verified_at = today")
     p_cap_sub.add_parser("gaps", help="list all gap/deferred capabilities")
     p_cap_sub.add_parser("db-status", help="show database health and row counts")
+    p_cap_sub.add_parser(
+        "backfill",
+        help="mirror committed qa-results/engine-runs JSON receipts into the DB (idempotent)")
     p_cap_qa = p_cap_sub.add_parser("qa-import", help="import QA test cases from a CSV file")
     p_cap_qa.add_argument("csv_file", help="path to QA CSV file (UTF-8 with BOM supported)")
     p_cap_sub.add_parser("scan-gametest", help="scan gametest source for @GameTest methods and auto-link")
