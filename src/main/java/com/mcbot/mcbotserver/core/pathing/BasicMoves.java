@@ -101,17 +101,37 @@ public final class BasicMoves {
     }
 
     /**
-     * Body-passability from the cell's collision shape. Replaces the
-     * Stage-0 {@code isAir} check: the shape's box tells us whether
-     * the body can sweep through, and a partial block (slab, fence)
-     * is correctly half-passable without an id check.
+     * Body-passability from the cell's collision shape, with the one
+     * trait-driven exception the shape cannot express: a full-height
+     * flush plate is a climb route when the cell carries the
+     * climbable trait (ladder; geometrically identical door plates
+     * carry no trait and stay walls). Replaces the Stage-0
+     * {@code isAir} check: the shape's box tells us whether the body
+     * can sweep through, and a partial block (slab, fence) is
+     * correctly half-passable without an id check.
      *
      * @param world the view; must not be null
      * @param cell  the cell to test; must not be null
      * @return true when the cell is body-passable
      */
     private static boolean passable(WorldView world, CellPos cell) {
-        return world.getCollisionShape(cell, ViewMode.LIVE).passable();
+        return world.getCollisionShape(cell, ViewMode.LIVE).passable() || climbPlate(world, cell);
+    }
+
+    /**
+     * Whether the cell is a climbable flush plate (a ladder rung):
+     * the climbable trait says climbing is possible, the plate shape
+     * says the body fits beside the rungs. Either alone lies - the
+     * trait without the plate is a vine cell (already EMPTY-passable
+     * in the shape layer), the plate without the trait is a door.
+     *
+     * @param world the view; must not be null
+     * @param cell  the cell to test; must not be null
+     * @return true when the cell is a climbable ladder-style plate
+     */
+    private static boolean climbPlate(WorldView world, CellPos cell) {
+        return climbable(world, cell)
+                && world.getCollisionShape(cell, ViewMode.LIVE).isFlushThinPlate();
     }
 
     /**
@@ -180,20 +200,6 @@ public final class BasicMoves {
     }
 
     record Diagonal(CellPos source, CellPos destination) implements Movement {
-
-        /**
-         * Body-passability for the corner sweep. Reads the
-         * {@link com.mcbot.mcbotserver.api.world.CollisionShape} the
-         * adapter installed; the box's top is the source of truth
-         * for whether the swept body fits.
-         *
-         * @param world the view; must not be null
-         * @param cell  the cell to test; must not be null
-         * @return true when the cell is body-passable
-         */
-        private static boolean passable(WorldView world, CellPos cell) {
-            return world.getCollisionShape(cell, ViewMode.LIVE).passable();
-        }
 
         @Override
         public boolean isViable(WorldView world) {

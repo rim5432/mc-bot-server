@@ -144,17 +144,82 @@ public record CollisionShape(Kind kind, Box box) {
      * {@link #STEP_UP_REACH} (a hop clears it). An EMPTY cell
      * trivially passes.
      *
-     * <p>Deliberately footprint-blind: a tall thin box (fence post)
+     * <p>Deliberately footprint-blind for centered posts: a fence post
      * answers false, i.e. the cell is a wall. This matches vanilla -
      * a 0.6-wide body cannot fit through the slot a centered post
      * leaves, and real fences fill their cell near-full width. The
      * way past a fence is the missing-post cell, which is EMPTY and
      * already answers true.
      *
+     * <p>A full-height flush plate (ladder) answers false here BY
+     * DESIGN: geometrically a ladder plate and a closed-door plate
+     * are the same 3/16-deep flush plate, so shape alone cannot
+     * separate "climb route" from "wall". The climb-trait exception
+     * lives where traits are readable - the move graph's passability
+     * predicate (BasicMoves) accepts a flush plate only on a cell
+     * carrying the climbable trait.
+     *
      * @return true if the cell is body-passable
      */
     public boolean passable() {
         return kind == Kind.EMPTY || box.maxY < STEP_UP_REACH;
+    }
+
+    /**
+     * A solid box that is thin in one horizontal axis and flush
+     * against the corresponding cell wall leaves a contiguous gap
+     * wide enough for the body (remaining gap on the thin axis is at
+     * least {@link #BODY_WIDTH}). Ladder plates (3/16 deep, vanilla
+     * {@code LadderBlock.EAST_AABB} family) and closed-door plates
+     * (also 3/16) both match - the two are geometrically
+     * indistinguishable, so this predicate only answers shape; the
+     * climbable-trait gate in the move graph decides whether a
+     * matching plate is a climb route (ladder) or a wall (door).
+     *
+     * @return true when the solid is a flush thin plate the body can pass
+     */
+    public boolean isFlushThinPlate() {
+        if (kind == Kind.EMPTY) {
+            // The empty box is all-zero and would read as a zero-span
+            // flush plate; an empty cell holds no plate at all (vines
+            // are climbable with no collision box and must yield NaN
+            // from flushPlateYaw, not a wall direction).
+            return false;
+        }
+        double xSpan = box.maxX - box.minX;
+        double zSpan = box.maxZ - box.minZ;
+        boolean xFlush = box.minX <= 0.01 || box.maxX >= 0.99;
+        boolean zFlush = box.minZ <= 0.01 || box.maxZ >= 0.99;
+        return (xSpan <= 1 - BODY_WIDTH && xFlush) || (zSpan <= 1 - BODY_WIDTH && zFlush);
+    }
+
+    /**
+     * The yaw that steers a body INTO a flush thin plate's backing
+     * wall. A ladder on the north wall needs northward drive to press
+     * the rungs and set {@code horizontalCollision}; the atan2(0,0)
+     * fallback for a directly-overhead waypoint points south and walks
+     * away from the wall. Returns NaN when the shape is not a flush
+     * thin plate — callers test with {@code Double.isNaN} before use.
+     *
+     * <p>Frame: engine yaw convention (degrees, 0=south, negative=east,
+     * positive=west, &plusmn;180=north), matching
+     * {@code PathingBehavior}'s {@code atan2(-dx, dz)} derivation.
+     *
+     * @return yaw in degrees to face the plate, or NaN
+     */
+    public double flushPlateYaw() {
+        if (!isFlushThinPlate()) {
+            return Double.NaN;
+        }
+        double zSpan = box.maxZ - box.minZ;
+        if (zSpan <= 1 - BODY_WIDTH) {
+            // Plate spans the full X but is thin in Z: attached to a
+            // north or south wall. minZ ~ 0 = north wall -> face north.
+            return box.minZ <= 0.01 ? 180.0 : 0.0;
+        }
+        // Plate spans the full Z but is thin in X: attached to an east
+        // or west wall. minX ~ 0 = west wall -> face west.
+        return box.minX <= 0.01 ? 90.0 : -90.0;
     }
 
     /**

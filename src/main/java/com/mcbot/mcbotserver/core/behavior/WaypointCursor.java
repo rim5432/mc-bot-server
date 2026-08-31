@@ -142,4 +142,27 @@ final class WaypointCursor {
             }
         }
     }
+
+    /**
+     * Consume waypoints for a pure-vertical climb segment: a waypoint
+     * counts as touched ONLY when the body's floor cell equals it (Y
+     * included). The XZ-only reach in {@link #advance} would consume a
+     * directly-overhead waypoint on the first tick (horizontal ~0 <=
+     * WAYPOINT_REACH), exhausting the cursor before the body has
+     * climbed a single block and triggering a replan loop. Vertical
+     * segments route through this Y-aware variant; horizontal segments
+     * keep the XZ-only contract.
+     *
+     * @param floor the body's current floor cell; never null
+     */
+    void advanceClimb(CellPos floor) {
+        while (waypointIndex < waypoints.size()) {
+            CellPos wp = waypoints.get(waypointIndex);
+            if (floor.equals(wp)) {
+                waypointIndex++;
+            } else {
+                break;
+            }
+        }
+    }
 }

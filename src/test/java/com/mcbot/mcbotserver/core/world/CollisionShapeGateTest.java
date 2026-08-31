@@ -93,6 +93,51 @@ class CollisionShapeGateTest {
     }
 
     @Test
+    void fullHeightPlateIsAThinPlateButNotShapePassable() {
+        // Engine-true ladder plates are 3/16 deep (vanilla
+        // LadderBlock WEST_AABB family) - the SAME depth as a closed
+        // door, so the shape layer cannot separate climb route from
+        // wall and answers passable()=false for both. The thin-plate
+        // predicate plus the climbable trait (consumed in
+        // BasicMoves) is what opens ladder cells; this pins the
+        // shape-layer half: plate recognition and wall naming.
+        for (double[] wall : new double[][] {
+            {0.8125, 0, 0, 1, 1, 1, -90},
+            {0, 0, 0, 0.1875, 1, 1, 90},
+            {0, 0, 0.8125, 1, 1, 1, 0},
+            {0, 0, 0, 1, 1, 0.1875, 180}
+        }) {
+            CollisionShape s = CollisionShape.partial(new Box(wall[0], wall[1], wall[2], wall[3], wall[4], wall[5]));
+            assertTrue(s.isFlushThinPlate(), "a 3/16 flush plate is a recognized thin plate");
+            assertFalse(s.passable(), "a full-height plate blocks the shape-layer sweep");
+            assertEquals(wall[6], s.flushPlateYaw(), 1e-9, "yaw must face the plate's backing wall");
+        }
+    }
+
+    @Test
+    void deepOrCenteredPlatesAreNotThin() {
+        // A 0.5-deep flush plate leaves a 0.5 gap - under the 0.6
+        // body width; not a plate the body can pass.
+        CollisionShape deep = CollisionShape.partial(new Box(0, 0, 0, 0.5, 1, 1));
+        assertFalse(deep.isFlushThinPlate(), "gap under body width is not passable");
+        assertTrue(Double.isNaN(deep.flushPlateYaw()));
+        // An open doorway column (flush but 1.0 deep in X) is a full
+        // wall, not a plate.
+        assertFalse(CollisionShape.fullCube().isFlushThinPlate());
+    }
+
+    @Test
+    void emptyShapeHasNoPlateYaw() {
+        // Vines are climbable with a zero collision box; the yaw
+        // override must fall back (NaN), not invent a wall direction
+        // from the all-zero box.
+        assertTrue(Double.isNaN(CollisionShape.empty().flushPlateYaw()), "EMPTY must answer NaN, not 180");
+        // A centered fence post is thin but not flush: no wall to press.
+        CollisionShape post = CollisionShape.partial(new Box(0.4, 0, 0.4, 0.6, 1, 0.6));
+        assertTrue(Double.isNaN(post.flushPlateYaw()), "a centered post has no backing wall");
+    }
+
+    @Test
     void boxEmptyAndFullAreCanonical() {
         assertEquals(0, Box.empty().maxX() - Box.empty().minX(), "empty box has zero extent");
         Box f = Box.full();

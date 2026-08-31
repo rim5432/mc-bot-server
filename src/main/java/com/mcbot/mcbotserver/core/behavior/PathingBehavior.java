@@ -303,7 +303,17 @@ public final class PathingBehavior implements Behavior {
             }
         }
 
-        cursor.advance(position);
+        // Vertical climb segments use Y-aware cursor advance: the XZ-only
+        // reach in WaypointCursor.advance would consume a directly-overhead
+        // waypoint on tick one (horizontal ~0 <= WAYPOINT_REACH), exhausting
+        // the plan before the body has climbed. The climb gate requires the
+        // floor cell to be climbable — a vertical waypoint over open air is
+        // not a climb and keeps the XZ-only contract.
+        if (isVerticalClimb(world, cell, cursor)) {
+            cursor.advanceClimb(cell);
+        } else {
+            cursor.advance(position);
+        }
         if (cursor.isEmpty()) {
             // No usable plan yet (a search is still in flight after
             // a reset): nothing to steer toward this tick.
@@ -554,20 +564,56 @@ public final class PathingBehavior implements Behavior {
         return Math.hypot(position.x() - (ax + abx * t), position.z() - (az + abz * t));
     }
 
+    /**
+     * Whether the active waypoint is a pure-vertical climb leg: same
+     * XZ as the body's floor cell, strictly higher, and the floor cell
+     * carries the climbable trait. Drives two execution overrides:
+     * (1) the cursor advances Y-aware (see {@link WaypointCursor#advanceClimb})
+     * instead of XZ-only; (2) the steer yaw points into the ladder
+     * wall (see {@link #steerTowardCurrentWaypoint}) rather than the
+     * atan2(0,0)=0 fallback that walks away from the rungs.
+     *
+     * @param world  read-only perception for the climbable trait; never null
+     * @param floor  the body's current floor cell; never null
+     * @param cursor the active plan cursor; never null
+     * @return true iff the current waypoint is a vertical climb leg
+     */
+    static boolean isVerticalClimb(WorldView world, CellPos floor, WaypointCursor cursor) {
+        if (cursor.isEmpty() || cursor.exhausted()) {
+            return false;
+        }
+        CellPos wp = cursor.current();
+        return wp.x() == floor.x()
+                && wp.z() == floor.z()
+                && wp.y() > floor.y()
+                && world.getBlockTraits(floor, ViewMode.LIVE).climbable();
+    }
+
     private void steerTowardCurrentWaypoint(WorldView world, Vec3 position, Actor actor) {
         CellPos wp = cursor.steerTarget();
+        CellPos floor = floorOf(position);
+        boolean climbing = isVerticalClimb(world, floor, cursor);
         double dx = wp.x() + 0.5 - position.x();
         double dz = wp.z() + 0.5 - position.z();
-        float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+        // Climb yaw override: a pure-vertical waypoint sits directly
+        // overhead, so atan2(-dx, dz) degenerates to 0 (south). The
+        // ladder's flush-plate shape tells us which wall the rungs are
+        // on; steering into that wall sets horizontalCollision, which
+        // vanilla onClimbable needs to lift the body. A non-climbable
+        // cell or a non-flush shape falls back to the normal derivation.
+        float yaw;
+        if (climbing) {
+            double plateYaw = world.getCollisionShape(floor, ViewMode.LIVE).flushPlateYaw();
+            yaw = Double.isNaN(plateYaw) ? (float) Math.toDegrees(Math.atan2(-dx, dz)) : (float) plateYaw;
+        } else {
+            yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+        }
         // Jump only when the current waypoint sits above the body's
-        // floor cell - the execution half of a JumpUp edge. On a
-        // smoothed staircase run (issue 0005 P1.3) the single far
-        // waypoint stays above the floor for the whole climb, so the
-        // held thrust reads as a continuous hop cadence.
-        // Auto-step clears rises <= 0.5 (slabs); taller steps need
-        // this thrust to leave the ground.
-        CellPos floor = floorOf(position);
-        boolean jumpForWaypoint = wp.y() > floor.y();
+        // floor cell AND this is not a vertical climb. On a ladder the
+        // climbable gate in travel() supplies upward velocity once
+        // horizontalCollision is set; an explicit jump would add 0.42
+        // on top and can eject the body from the ladder column.
+        boolean jumpForWaypoint = wp.y() > floor.y() && !climbing;
         // Sneak is the execution half of a SwimDown edge only: the
         // waypoint below a body already standing in liquid. In water
         // the shift flag maps to downward thrust (BotBodyEntity
