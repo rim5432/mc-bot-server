@@ -210,11 +210,14 @@ def import_csv(
 # Link management
 # ---------------------------------------------------------------------------
 def list_unlinked(db_path: Optional[Path] = None) -> list[QATestCase]:
-    """All cases with no capability link, specs and impls together
-    (the CLI splits them by kind - they are two different problems)."""
+    """Cases missing a capability link, specs and impls together (the
+    CLI splits them by kind - two different problems). kind='wire'
+    rows (boundary-d contract cases) are excluded: they anchor to the
+    wire contract, not to behavior faces, by design."""
     with get_connection(db_path) as conn:
         rows = conn.execute(
-            "SELECT * FROM qa_test_cases WHERE capability_id IS NULL ORDER BY id"
+            "SELECT * FROM qa_test_cases "
+            "WHERE capability_id IS NULL AND kind != 'wire' ORDER BY id"
         ).fetchall()
     return [_row_to_case(r) for r in rows]
 

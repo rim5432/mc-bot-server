@@ -547,16 +547,16 @@ def cmd_cap_db_status(args) -> int:
 
 def cmd_cap_backfill(args) -> int:
     result = backfill_receipts()
-    print("[mcbot] engine-receipt backfill complete")
-    print(f"  files    : {result['files']} gametest-*.json receipts")
-    print(f"  inserted : {result['inserted']} (into test_receipts)")
-    print(f"  skipped  : {result['skipped']} (already mirrored)")
-    print(f"  case rows: {result['case_rows']} (failed scenarios linked where possible)")
-    if result["recovered"]:
-        print(f"  recovered: {result['recovered']} receipts whose failed names "
-              f"were re-parsed from surviving logs")
-    if result["unreadable"]:
-        print(f"  WARN: {result['unreadable']} unreadable JSON files", file=sys.stderr)
+    for family, label in (("engine_runs", "engine runs (gametest)"), ("boundary_d", "boundary-d wire runs")):
+        r = result[family]
+        print(f"[mcbot] {label}: {r['files']} receipts on disk")
+        print(f"  inserted : {r['inserted']}  skipped: {r['skipped']}")
+        print(f"  case rows: {r['case_rows']}", end="")
+        if family == "engine_runs" and r.get("recovered"):
+            print(f"  recovered: {r['recovered']} (failed names re-parsed from surviving logs)", end="")
+        print()
+        if r["unreadable"]:
+            print(f"  WARN: {r['unreadable']} unreadable files", file=sys.stderr)
     return 0
 
 

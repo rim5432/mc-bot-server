@@ -121,22 +121,23 @@ class BackfillTest(unittest.TestCase):
         init_db(self.db)
         with get_connection(self.db) as conn:
             conn.execute(
-                "INSERT INTO qa_test_cases (id, title, status, created_at, updated_at) "
-                "VALUES ('GT-BotLocomotionGameTests-climbsLadderToPlatform', 't', "
-                "'not_executed', 'x', 'x')"
+                "INSERT INTO qa_test_cases (id, title, kind, test_type, status, created_at, updated_at) "
+                "VALUES ('GT-BotLocomotionGameTests-climbsLadderToPlatform', 't', 'impl', "
+                "'gametest', 'not_executed', 'x', 'x')"
             )
             conn.commit()
         self._receipt("20260830-100000", failed_count=1,
                       failed=["climbsladdertoplatform"], green=False)
         self._receipt("20260830-110000")
 
-        first = backfill_receipts(self.dir, db_path=self.db)
-        self.assertEqual(first["inserted"], 2)
-        self.assertEqual(first["case_rows"], 1)
+        first = backfill_receipts(self.dir, db_path=self.db, boundary_d_dir=self.dir)
+        eng = first["engine_runs"]
+        self.assertEqual(eng["inserted"], 2)
+        self.assertEqual(eng["case_rows"], 1)
 
-        second = backfill_receipts(self.dir, db_path=self.db)
-        self.assertEqual(second["inserted"], 0)
-        self.assertEqual(second["skipped"], 2)
+        second = backfill_receipts(self.dir, db_path=self.db, boundary_d_dir=self.dir)
+        self.assertEqual(second["engine_runs"]["inserted"], 0)
+        self.assertEqual(second["engine_runs"]["skipped"], 2)
 
         with get_connection(self.db) as conn:
             # the lowercase structure name must fold onto the camelCase
@@ -532,6 +533,61 @@ class GametestScanTest(unittest.TestCase):
                 "'GT-BotLocomotionGameTests-sprintAwayFromDanger'"
             ).fetchone()
         self.assertEqual(r["link_source"], "manual")
+
+
+class BoundaryDBackfillTest(unittest.TestCase):
+    """Wire-surface receipts fold in as their own family."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self._tmp.name)
+        self.db = self.dir / "test.db"
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_boundary_d_cases_ingested(self):
+        (self.dir / "receipt-20260831-050000.json").write_text(json.dumps({
+            "schema": 1, "task": "boundary-d-qa",
+            "finished_at": "2026-08-31T05:00:00",
+            "cases": [
+                {"batch": "A", "id": "A1", "desc": "ls / answers the canonical roots",
+                 "expect": "GREEN", "verdict": "PASS", "detail": "contract held", "sec": 0.2},
+                {"batch": "B", "id": "B4", "desc": "ticket-gap body-freeze",
+                 "expect": "RED", "verdict": "RED-CONFIRMED", "detail": "pin holds", "sec": 8.1},
+                {"batch": "C", "id": "C2", "desc": "broken clause",
+                 "expect": "GREEN", "verdict": "FAIL", "detail": "regressed", "sec": 1.0},
+            ],
+        }), encoding="utf-8", newline="\n")
+        first = backfill_receipts(self.dir, db_path=self.db, boundary_d_dir=self.dir)
+        bd = first["boundary_d"]
+        self.assertEqual(bd["inserted"], 1)
+        self.assertEqual(bd["case_rows"], 3)
+
+        second = backfill_receipts(self.dir, db_path=self.db, boundary_d_dir=self.dir)
+        self.assertEqual(second["boundary_d"]["skipped"], 1)
+
+        with get_connection(self.db) as conn:
+            r = conn.execute(
+                "SELECT total, failed, green FROM test_receipts WHERE test_type = 'boundary_d'"
+            ).fetchone()
+            self.assertEqual(r["total"], 3)
+            self.assertEqual(r["failed"], 1)  # RED-CONFIRMED is a holding pin, not a failure
+            self.assertEqual(r["green"], 0)
+            rows = conn.execute(
+                "SELECT test_case_id, result FROM test_case_runs "
+                "WHERE test_case_id LIKE 'BD-%' ORDER BY test_case_id"
+            ).fetchall()
+            self.assertEqual([x["test_case_id"] for x in rows], ["BD-A1", "BD-B4", "BD-C2"])
+            self.assertEqual([x["result"] for x in rows], ["PASS", "RED-CONFIRMED", "FAIL"])
+            # wire rows exist and stay out of the unlinked triage lists
+            k = conn.execute(
+                "SELECT kind, status FROM qa_test_cases WHERE id = 'BD-B4'"
+            ).fetchone()
+            self.assertEqual(k["kind"], "wire")
+            self.assertEqual(k["status"], "RED-CONFIRMED")
+            from mcbot.capability.qa_import import list_unlinked
+            self.assertEqual(list_unlinked(db_path=self.db), [])
 
 
 if __name__ == "__main__":
