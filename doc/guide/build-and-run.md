@@ -1,8 +1,9 @@
 ---
 title: Build & Run Guide
-last_verified: 2026-08-30
+last_verified: 2026-08-31
 covers:
   - tool/mcbot_tool.py
+  - tool/mcbot/
 ---
 
 # Build & Run Guide
@@ -12,7 +13,11 @@ Never call `gradlew.bat` or `gradle` directly — it bypasses the
 cross-process lock that multi-agent collaboration depends on.
 Full hard-constraint rules live in the root `AGENTS.md` (§0.2);
 this page is the quick path, and `tool/README.md` carries the full
-subcommand table.
+subcommand table. Since the 2026-08-31 package split, the entry
+file is a thin wrapper — all implementation lives in `tool/mcbot/`
+(`paths`, `config`, `gradle`, `lock`, `proc`, `engine`, `docs`,
+`cli`, and the `capability/` convergence-matrix subpackage); the
+CLI surface and every command above are unchanged.
 
 ## Everyday commands
 
@@ -41,8 +46,8 @@ hygiene outweighs ~10s of build time):
 python tool/mcbot_tool.py lint   # = gradle qualityCheck -Plint --continue
 ```
 
-`LINT_TASKS` in tool/mcbot_tool.py mirrors this section; change both
-in the same commit.
+`LINT_TASKS` in `tool/mcbot/config.py` mirrors this section; change
+both in the same commit.
 
 Postures after the 2026-08-27 promotion:
 

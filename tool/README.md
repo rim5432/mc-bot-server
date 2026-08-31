@@ -54,11 +54,49 @@ python tool/mcbot_tool.py test -- --tests "*ReflexChainGateTest*"
 | `lock status\|clear` | who holds what; force-clear a dead holder |
 | `proc list\|killdaemon` | java/gradle process census; daemon kill requires `--yes` |
 | `doc ...` | documentation health: `list` / `check` / `touch` / `new` / `index` |
+| `capability ...` | convergence matrix over the bot's behavior faces (SQLite, see next section) |
 | `tasks` / `deps` | raw gradle task & dependency listings |
 
 Gate postures (what fails where, and why) are pinned by
 `LintPostureGateTest` and documented in the build-and-run guide —
 a posture change is a ruling, made in those three places at once.
+
+## Capability matrix (`capability ...`)
+
+One SQLite DB (`tool/.runtime/mcbot.db`, WAL) folds the bot's
+player-behavior faces (35 capabilities from `player-behavior-RE.md`)
+against QA cases (CSV sheets + `@GameTest` source scan) and engine
+receipts. **Doctrine: the DB is a disposable cache.** Committed
+artifacts are the truth — catalog (seed), cases (CSVs + gametest
+source), receipts (`qa-results/engine-runs/*.json`, H-R5 currency),
+manual triage (`qa-results/capability-state.json` overlay). Gates
+never read the DB (CI has no `.runtime`); they parse committed text.
+
+| Command | What it does |
+|---|---|
+| `capability init` / `db-status` | seed the 35 faces / show table health |
+| `capability overview` / `list` / `status <id>` / `gaps` | macro counts, filtered lists, one face's detail, gap inventory |
+| `capability set <id> --status ... --verify` | flip a status — recorded in the append-only transitions table |
+| `capability qa-import <csv>` / `scan-gametest` / `link` / `unlinked` | case ingestion + auto-linking; unresolved cases surface for manual `link` |
+| `capability backfill` | mirror every committed engine-run JSON into the DB (idempotent; re-parses surviving logs to recover failed names lost to the pre-6583cd4 regex bug) |
+| `capability diff [--since YYYY-MM-DD]` | what changed: status transitions, run green/red split + scenario growth, RED details with per-scenario failures, new faces |
+| `capability domain <category>` | per-face evidence: status, QA coverage (NO-COVERAGE flag), deviations, failure history, domain green streak |
+| `capability export` / `restore` | durable copy of manual triage ↔ re-apply after a rebuild |
+
+Rebuild recipe after losing `.runtime`:
+`capability init` → `qa-import` each CSV → `scan-gametest` →
+`backfill` → `restore`.
+
+Known honest limits: gametest logs list failures per scenario but
+never passes, so green evidence is run-granular, not per-face; the
+transitions table was born 2026-08-31 (older history lives in git);
+auto-links are keyword guesses — audit suspicious ones with
+`capability status <id>` before trusting per-face rollups.
+
+Implementation lives in `tool/mcbot/` (split from the old
+monolithic `mcbot_tool.py`): `paths/config/gradle/lock/proc/engine/
+docs/cli` plus the `capability/` subpackage. Tests:
+`python tool/test_capability.py`.
 
 ## When a build fails
 
