@@ -859,7 +859,8 @@ def cmd_cap_qa_import(args) -> int:
 
 
 def cmd_cap_scan_gametest(args) -> int:
-    result = scan_gametests()
+    strict = getattr(args, "strict", False)
+    result = scan_gametests(strict=strict)
     if "error" in result:
         print(f"[mcbot] scan failed: {result['error']}", file=sys.stderr)
         return 1
@@ -877,6 +878,32 @@ def cmd_cap_scan_gametest(args) -> int:
     if result["pruned"]:
         print(f"  pruned        : {result['pruned']} (impl rows whose method left the source)")
     print(f"  total cases   : {result['total_cases']}")
+    # Link-source confidence breakdown
+    lsc = result.get("link_source_counts", {})
+    if lsc:
+        parts = [f"{k}={v}" for k, v in sorted(lsc.items())]
+        print(f"  link sources  : {', '.join(parts)}")
+    # Strict mode: detailed diagnostics + non-zero exit on failures
+    if strict:
+        failures = result.get("strict_failures", 0)
+        if result.get("unlinked_methods"):
+            print(f"\n  UNLINKED METHODS ({len(result['unlinked_methods'])}):")
+            for m in result["unlinked_methods"][:20]:
+                print(f"    {m['file']}:{m['class']}.{m['method']}")
+            if len(result["unlinked_methods"]) > 20:
+                print(f"    ... and {len(result['unlinked_methods']) - 20} more")
+        if result.get("invalid_annotations"):
+            print(f"\n  INVALID ANNOTATIONS ({len(result['invalid_annotations'])}):")
+            for a in result["invalid_annotations"]:
+                print(f"    {a['file']}:{a['class']}.{a['method']} -> "
+                      f"declared '{a['declared']}' (not in capabilities table)")
+        if failures:
+            print(f"\n  STRICT: {failures} failure(s) — unlinked methods or invalid "
+                  f"capability annotations. Fix before merge.", file=sys.stderr)
+            return 1
+        else:
+            print(f"\n  STRICT: all {result['total_methods']} methods linked, all "
+                  f"annotations valid.")
     return 0
 
 
@@ -1272,7 +1299,9 @@ def main() -> int:
         help="face -> boundary-D path axis + wire-run evidence + pathless review list")
     p_cap_qa = p_cap_sub.add_parser("qa-import", help="import QA test cases from a CSV file")
     p_cap_qa.add_argument("csv_file", help="path to QA CSV file (UTF-8 with BOM supported)")
-    p_cap_sub.add_parser("scan-gametest", help="scan gametest source for @GameTest methods and auto-link")
+    p_cap_scan = p_cap_sub.add_parser("scan-gametest", help="scan gametest source for @GameTest methods and auto-link")
+    p_cap_scan.add_argument("--strict", action="store_true",
+                             help="fail on unlinked methods or invalid capability annotations (CI gate)")
     p_cap_link = p_cap_sub.add_parser("link", help="manually link a QA case to a capability")
     p_cap_link.add_argument("case_id", help="QA case id, e.g. TC-COMBAT-001 or GT-BotCombat-xxx")
     p_cap_link.add_argument("capability_id", help="capability id, e.g. combat.bow_draw")

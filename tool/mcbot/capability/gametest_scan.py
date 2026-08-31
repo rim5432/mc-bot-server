@@ -146,10 +146,16 @@ def scan_gametests(
     src_root: Optional[Path] = None,
     *,
     db_path: Optional[Path] = None,
+    strict: bool = False,
 ) -> dict:
     """Scan all gametest source files and register @GameTest methods.
 
     Returns a summary dict. Idempotent on generated case ids.
+
+    In strict mode, the return includes ``unlinked_methods`` and
+    ``invalid_annotations`` lists, and ``strict_failures`` is the count
+    of problems that should fail a CI gate (unlinked methods + invalid
+    capability annotations). The caller decides whether to exit non-zero.
     """
     init_db(db_path)
     repo = CapabilityRepository(db_path)
@@ -165,6 +171,10 @@ def scan_gametests(
     skipped_classes = 0
     total_methods = 0
     seen_ids: set[str] = set()
+    # Strict-mode diagnostics
+    unlinked_methods: list[dict] = []
+    invalid_annotations: list[dict] = []
+    link_source_counts: dict[str, int] = {}
 
     for java_file in sorted(root.glob("*.java")):
         class_name = java_file.stem
@@ -204,22 +214,42 @@ def scan_gametests(
             if existing and existing.capability_id:
                 link_fields["capability_id"] = existing.capability_id
                 link_fields["link_source"] = existing.link_source or "auto"
+                ls = link_fields["link_source"]
             else:
                 # Priority 1: explicit // capability: <id> comment above the method
                 annotated = _extract_capability_comment(content, method_match.start())
-                if annotated and repo.get(annotated):
-                    link_fields["capability_id"] = annotated
-                    link_fields["link_source"] = "annotated"
-                    auto_linked += 1
+                if annotated:
+                    if repo.get(annotated):
+                        link_fields["capability_id"] = annotated
+                        link_fields["link_source"] = "annotated"
+                        ls = "annotated"
+                        auto_linked += 1
+                    else:
+                        # Annotation references a non-existent face - collect for strict mode
+                        invalid_annotations.append({
+                            "case_id": case_id, "class": class_name,
+                            "method": method_name, "file": java_file.name,
+                            "declared": annotated,
+                        })
+                        link_fields["capability_id"] = None
+                        link_fields["link_source"] = None
+                        ls = "unlinked"
+                        unlinked += 1
                 else:
                     # Priority 2: keyword match, then class fallback
                     cap_id, link_src = _method_to_capability(method_name, class_name, repo)
                     link_fields["capability_id"] = cap_id
                     link_fields["link_source"] = link_src
+                    ls = link_src or "unlinked"
                     if cap_id:
                         auto_linked += 1
                     else:
                         unlinked += 1
+                        unlinked_methods.append({
+                            "case_id": case_id, "class": class_name,
+                            "method": method_name, "file": java_file.name,
+                        })
+            link_source_counts[ls] = link_source_counts.get(ls, 0) + 1
 
             now = _dt.datetime.now().isoformat(timespec="seconds")
 
@@ -264,7 +294,7 @@ def scan_gametests(
     from mcbot.capability.qa_import import _count_cases
     total = _count_cases(db_path)
 
-    return {
+    result = {
         "scanned_files": len(list(root.glob("*.java"))),
         "skipped_classes": skipped_classes,
         "total_methods": total_methods,
@@ -274,4 +304,10 @@ def scan_gametests(
         "unlinked": unlinked,
         "pruned": pruned,
         "total_cases": total,
+        "link_source_counts": link_source_counts,
     }
+    if strict:
+        result["unlinked_methods"] = unlinked_methods
+        result["invalid_annotations"] = invalid_annotations
+        result["strict_failures"] = len(unlinked_methods) + len(invalid_annotations)
+    return result
