@@ -20,8 +20,9 @@ from mcbot.capability.db import get_connection, init_db
 from mcbot.capability.gametest_scan import scan_gametests
 from mcbot.capability.models import Capability
 from mcbot.capability.qa_import import import_csv, link_case
-from mcbot.capability.report import diff_since, domain_report
+from mcbot.capability.report import diff_since, domain_report, harness_axis
 from mcbot.capability.repository import CapabilityRepository
+from mcbot.capability.seed import seed_database
 from mcbot.capability.state_export import export_state, restore_state
 from mcbot.engine import parse_run_log
 
@@ -588,6 +589,61 @@ class BoundaryDBackfillTest(unittest.TestCase):
             self.assertEqual(k["status"], "RED-CONFIRMED")
             from mcbot.capability.qa_import import list_unlinked
             self.assertEqual(list_unlinked(db_path=self.db), [])
+
+
+class HarnessAxisTest(unittest.TestCase):
+    """Face -> path axis: seed refresh + inverted report shape."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.db = Path(self._tmp.name) / "test.db"
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_seed_maps_paths_and_refreshes_existing_rows(self):
+        seed_database(self.db)
+        repo = CapabilityRepository(self.db)
+        cap = repo.get("motion.sprint")
+        self.assertEqual(cap.harness_paths, ["/tasks/goto"])
+        vitals = repo.get("vitals.lava")
+        self.assertEqual(vitals.harness_paths, [])
+
+        # catalog refresh: a wiped path on an existing row is restored
+        # by the next init without touching status (overlay's home)
+        cap.harness_paths = []
+        cap.implementation_status = "partial"
+        repo.upsert(cap)
+        seed_database(self.db)
+        cap = repo.get("motion.sprint")
+        self.assertEqual(cap.harness_paths, ["/tasks/goto"])
+        self.assertEqual(cap.implementation_status, "partial")
+
+    def test_axis_shape_and_wire_evidence(self):
+        seed_database(self.db)
+        with get_connection(self.db) as conn:
+            conn.execute(
+                "INSERT INTO test_receipts (run_id, test_type, finished_at, "
+                "total, passed, failed, green, created_at) VALUES "
+                "('receipt-x','boundary_d','2026-08-31T10:00:00',2,2,0,1,'x')"
+            )
+            conn.execute(
+                "INSERT INTO qa_test_cases (id, title, kind, test_type, status, "
+                "created_at, updated_at) VALUES "
+                "('BD-A1', 'wire case', 'wire', 'boundary_d', 'PASS', 'x', 'x')"
+            )
+            conn.execute(
+                "INSERT INTO test_case_runs (test_case_id, receipt_id, result, created_at) "
+                "VALUES ('BD-A1', 1, 'PASS', 'x')"
+            )
+            conn.commit()
+        axis = harness_axis(self.db)
+        self.assertGreater(axis["mapped_faces"], 0)
+        self.assertIn("/tasks/goto", axis["by_path"])
+        self.assertIn("motion.sprint", axis["by_path"]["/tasks/goto"])
+        self.assertIn("vitals", axis["pathless_by_category"])
+        self.assertEqual(axis["wire"]["runs"], 1)
+        self.assertEqual(axis["wire_verdicts"], {"PASS": 1})
 
 
 if __name__ == "__main__":

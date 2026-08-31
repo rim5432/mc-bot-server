@@ -317,21 +317,67 @@ SEED_CAPABILITIES: list[Capability] = [
 ]
 
 
-def seed_database(db_path: Optional[Path] = None) -> dict:
-    """Initialize the database and insert any seed capabilities not yet present.
+# ---------------------------------------------------------------------------
+# Harness path axis (boundary-D surface that exercises each face).
+#
+# The path namespace's contract is harness-interaction.md ("new
+# capabilities are new paths, never new verbs"). This table is
+# catalog data: curated, deliberately UNDER-mapped - only paths the
+# canonical doc confirms are declared. Faces absent here render
+# PATHLESS in `capability paths`; internal reflex/sense faces are
+# pathless by design, the rest are review candidates.
+# ---------------------------------------------------------------------------
+HARNESS_PATHS: dict[str, list[str]] = {
+    # motion: goto exercises walking/sprint/climb; sneak is a player write
+    "motion.sprint": ["/tasks/goto"],
+    "motion.ladders_vines": ["/tasks/goto"],
+    "motion.sneak": ["write /player/sneak", "/tasks/goto"],
+    # digging: the mine job family
+    "dig.pacing": ["/tasks/mine"],
+    "dig.tool_speed": ["/tasks/mine"],
+    "dig.enchantment_loot": ["/tasks/mine"],
+    # combat: directed engagement (target selection + line of sight +
+    # melee/ranged by held item all ride the attack task)
+    "combat.bow_draw": ["/entities/<id>/attack"],
+    "combat.bow_slot": ["/entities/<id>/attack"],
+    "combat.shield": ["/entities/<id>/attack"],
+    "combat.melee": ["/entities/<id>/attack"],
+    "combat.line_of_sight": ["/entities/<id>/attack"],
+    "combat.hostile_acquisition": ["/entities/<id>/attack"],
+    # interaction: held item against the POV ray
+    "interaction.right_click_order": ["write /player/held/use"],
+    "interaction.blockitem_place": ["write /player/held/use"],
+    "interaction.bucket_rod": ["write /player/held/use"],
+    "interaction.use_item_deviations": ["write /player/held/use"],
+    # inventory: bag/free reads + station menu crafting
+    "inventory.shape": ["cat /player/bag", "cat /player/inventory/free"],
+    "inventory.menu_clicks": ["/stations", "/recipes/<slug>"],
+}
 
-    Returns a summary dict: {inserted: N, skipped: M, total: K}.
-    Idempotent — existing ids are left untouched.
+
+def seed_database(db_path: Optional[Path] = None) -> dict:
+    """Initialize the DB and insert any seed capabilities not yet present.
+
+    Idempotent on statuses - existing rows keep their status /
+    verified_at (those live in the state overlay) - but CATALOG
+    fields refresh: harness_paths from HARNESS_PATHS always
+    re-applies, so a new mapping lands on the next init.
     """
     init_db(db_path)
     repo = CapabilityRepository(db_path)
     inserted = 0
     skipped = 0
     for cap in SEED_CAPABILITIES:
-        if repo.get(cap.id):
+        existing = repo.get(cap.id)
+        if existing:
             skipped += 1
+            paths = HARNESS_PATHS.get(cap.id, [])
+            if existing.harness_paths != paths:
+                existing.harness_paths = paths
+                repo.upsert(existing)
             continue
         cap.verified_at = cap.verified_at or VERIFIED_AT
+        cap.harness_paths = HARNESS_PATHS.get(cap.id, [])
         repo.upsert(cap)
         inserted += 1
     total = len(repo.list())

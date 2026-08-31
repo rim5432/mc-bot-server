@@ -14,6 +14,7 @@ Honest limits baked into the shapes:
 from __future__ import annotations
 
 import datetime as _dt
+import json
 from pathlib import Path
 from typing import Optional
 
@@ -112,6 +113,55 @@ def diff_since(since: str, *, db_path: Optional[Path] = None) -> dict:
         "red_details": red_details,
         "faces_added": faces_added,
         "current": overview(db_path),
+    }
+
+
+def harness_axis(db_path: Optional[Path] = None) -> dict:
+    """The face -> boundary-D path axis, inverted for display, plus
+    wire-surface evidence (boundary_d receipts + BD verdict counts).
+
+    Mapped faces carry curated paths (seed.HARNESS_PATHS); pathless
+    faces split nowhere automatically - internal reflex/sense faces
+    are pathless by design, the rest are review candidates; the CLI
+    lists them by category for that review."""
+    init_db(db_path)
+    with get_connection(db_path) as conn:
+        rows = conn.execute(
+            "SELECT id, category, implementation_status, harness_paths "
+            "FROM capabilities ORDER BY category, id"
+        ).fetchall()
+        by_path: dict[str, list[str]] = {}
+        pathless: dict[str, list[str]] = {}
+        for r in rows:
+            paths = json.loads(r["harness_paths"] or "[]")
+            if paths:
+                for p in paths:
+                    by_path.setdefault(p, []).append(r["id"])
+            else:
+                pathless.setdefault(r["category"], []).append(r["id"])
+        wire = conn.execute(
+            """
+            SELECT COUNT(*) as runs, COALESCE(SUM(green), 0) as green_runs,
+                   MAX(finished_at) as last_run
+            FROM test_receipts WHERE test_type = 'boundary_d'
+            """
+        ).fetchone()
+        verdicts = {
+            r["result"]: r["c"]
+            for r in conn.execute(
+                "SELECT result, COUNT(*) as c FROM test_case_runs "
+                "WHERE test_case_id LIKE 'BD-%' GROUP BY result"
+            ).fetchall()
+        }
+    total = len(rows)
+    mapped = total - sum(len(v) for v in pathless.values())
+    return {
+        "total_faces": total,
+        "mapped_faces": mapped,
+        "by_path": dict(sorted(by_path.items())),
+        "pathless_by_category": dict(sorted(pathless.items())),
+        "wire": dict(wire) if wire else None,
+        "wire_verdicts": verdicts,
     }
 
 

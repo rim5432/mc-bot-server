@@ -180,6 +180,18 @@ _MIGRATIONS: list[tuple[int, str, list[str]]] = [
             "CREATE INDEX idx_qa_cases_kind ON qa_test_cases(kind)",
         ],
     ),
+    (
+        4,
+        "capabilities: harness_paths - the boundary-D surface that exercises each face",
+        [
+            # JSON array of harness paths (harness-interaction.md is the
+            # path namespace's contract; the mapping face->paths is
+            # catalog data curated in seed.py). Empty = face has no
+            # direct harness exercise (internal reflex/sense faces are
+            # pathless by design; others are review candidates).
+            "ALTER TABLE capabilities ADD COLUMN harness_paths TEXT NOT NULL DEFAULT '[]'",
+        ],
+    ),
 ]
 
 

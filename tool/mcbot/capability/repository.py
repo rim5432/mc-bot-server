@@ -36,6 +36,7 @@ def _row_to_capability(row) -> Capability:
         vanilla_ref=row["vanilla_ref"] or "",
         deviation=row["deviation"] or "",
         source_paths=json.loads(row["source_paths"] or "[]"),
+        harness_paths=json.loads(row["harness_paths"] or "[]"),
         verified_at=row["verified_at"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
@@ -85,6 +86,7 @@ class CapabilityRepository:
             )
         now = _now_iso()
         source_paths_json = json.dumps(cap.source_paths)
+        harness_paths_json = json.dumps(cap.harness_paths)
         with get_connection(self._db_path) as conn:
             existing = conn.execute(
                 "SELECT created_at FROM capabilities WHERE id = ?", (cap.id,)
@@ -95,13 +97,13 @@ class CapabilityRepository:
                     UPDATE capabilities SET
                         name = ?, category = ?, description = ?,
                         implementation_status = ?, vanilla_ref = ?, deviation = ?,
-                        source_paths = ?, verified_at = ?, updated_at = ?
+                        source_paths = ?, harness_paths = ?, verified_at = ?, updated_at = ?
                     WHERE id = ?
                     """,
                     (
                         cap.name, cap.category, cap.description,
                         cap.implementation_status, cap.vanilla_ref, cap.deviation,
-                        source_paths_json, cap.verified_at, now, cap.id,
+                        source_paths_json, harness_paths_json, cap.verified_at, now, cap.id,
                     ),
                 )
             else:
@@ -109,14 +111,14 @@ class CapabilityRepository:
                     """
                     INSERT INTO capabilities (
                         id, name, category, description, implementation_status,
-                        vanilla_ref, deviation, source_paths, verified_at,
+                        vanilla_ref, deviation, source_paths, harness_paths, verified_at,
                         created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         cap.id, cap.name, cap.category, cap.description,
                         cap.implementation_status, cap.vanilla_ref, cap.deviation,
-                        source_paths_json, cap.verified_at, now, now,
+                        source_paths_json, harness_paths_json, cap.verified_at, now, now,
                     ),
                 )
             conn.commit()

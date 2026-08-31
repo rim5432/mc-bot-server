@@ -53,7 +53,7 @@ from mcbot.capability import db as cap_db
 from mcbot.capability import queries as cap_queries
 from mcbot.capability.backfill import backfill_receipts
 from mcbot.capability.gametest_scan import scan_gametests
-from mcbot.capability.report import diff_since, domain_report
+from mcbot.capability.report import diff_since, domain_report, harness_axis
 from mcbot.capability.state_export import restore_state, write_state_through
 from mcbot.capability.qa_import import import_csv, link_case, list_unlinked
 from mcbot.capability.receipt import latest_receipt_summary
@@ -391,6 +391,7 @@ def cmd_capability(args) -> int:
         "backfill": cmd_cap_backfill,
         "diff": cmd_cap_diff,
         "domain": cmd_cap_domain,
+        "paths": cmd_cap_paths,
         "restore": cmd_cap_restore,
         "qa-import": cmd_cap_qa_import,
         "scan-gametest": cmd_cap_scan_gametest,
@@ -483,6 +484,12 @@ def cmd_cap_status(args) -> int:
         print(f"\n  source_paths:")
         for p in cap.source_paths:
             print(f"    - {p}")
+    if cap.harness_paths:
+        print(f"\n  harness     :")
+        for p in cap.harness_paths:
+            print(f"    - {p}")
+    else:
+        print(f"\n  harness     : (no direct boundary-D path)")
     return 0
 
 
@@ -650,6 +657,29 @@ def cmd_cap_restore(args) -> int:
     if result["missing_faces"] or result["missing_cases"]:
         print(f"  WARN: overlay references {result['missing_faces']} unknown faces, "
               f"{result['missing_cases']} unknown cases (skipped)", file=sys.stderr)
+    return 0
+
+
+def cmd_cap_paths(args) -> int:
+    axis = harness_axis()
+    print(f"[mcbot] harness axis: {axis['mapped_faces']}/{axis['total_faces']} faces "
+          f"mapped to boundary-D paths")
+    print()
+    print(f"{'PATH':<28} FACES")
+    print("-" * 95)
+    for path, faces in axis["by_path"].items():
+        print(f"{path:<28} {', '.join(faces)} ({len(faces)})")
+    print()
+    print(f"pathless ({axis['total_faces'] - axis['mapped_faces']} faces) - internal "
+          f"reflex/sense faces are pathless by design; the rest are review candidates:")
+    for category, faces in axis["pathless_by_category"].items():
+        print(f"  {category:<14} {', '.join(faces)}")
+    wire = axis["wire"]
+    if wire and wire["runs"]:
+        verdicts = ", ".join(f"{v} {c}" for v, c in sorted(axis["wire_verdicts"].items()))
+        print(f"\nwire evidence: {wire['runs']} boundary-d runs "
+              f"({wire['green_runs']} green), last {wire['last_run']}")
+        print(f"  BD case verdicts: {verdicts}")
     return 0
 
 
@@ -1046,6 +1076,9 @@ def main() -> int:
         "restore",
         help="apply the committed overlay after a rebuild (init/import/scan/backfill); "
              "set/link maintain it write-through")
+    p_cap_sub.add_parser(
+        "paths",
+        help="face -> boundary-D path axis + wire-run evidence + pathless review list")
     p_cap_qa = p_cap_sub.add_parser("qa-import", help="import QA test cases from a CSV file")
     p_cap_qa.add_argument("csv_file", help="path to QA CSV file (UTF-8 with BOM supported)")
     p_cap_sub.add_parser("scan-gametest", help="scan gametest source for @GameTest methods and auto-link")

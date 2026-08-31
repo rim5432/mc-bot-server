@@ -25,6 +25,7 @@ class Capability:
     vanilla_ref: str = ""
     deviation: str = ""
     source_paths: list[str] = field(default_factory=list)
+    harness_paths: list[str] = field(default_factory=list)
     verified_at: Optional[str] = None  # YYYY-MM-DD
     created_at: str = ""
     updated_at: str = ""
