@@ -718,6 +718,9 @@ def cmd_cap_scan_gametest(args) -> int:
     print(f"  scanned files : {result['scanned_files']}")
     print(f"  skipped classes: {result['skipped_classes']} (framework/integration)")
     print(f"  test methods  : {result['total_methods']}")
+    if result["total_methods"] == 0:
+        print("  WARN: zero @GameTest methods found - wrong source root or broken "
+              "pattern? Nothing pruned.", file=sys.stderr)
     print(f"  inserted      : {result['inserted']}")
     print(f"  updated       : {result['updated']}")
     print(f"  auto_linked   : {result['auto_linked']}")

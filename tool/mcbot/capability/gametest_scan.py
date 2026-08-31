@@ -205,19 +205,19 @@ def scan_gametests(
 
     # Prune impl rows whose method no longer exists in source. The
     # scanner owns the impl lifecycle; specs are never pruned here.
-    with get_connection(db_path) as conn:
-        if seen_ids:
+    # An EMPTY scan never prunes: zero methods found almost always
+    # means a wrong root or a broken pattern, not a vanished suite -
+    # deleting the whole impl table on a misfire would be destructive.
+    pruned = 0
+    if seen_ids:
+        with get_connection(db_path) as conn:
             placeholders = ", ".join("?" for _ in seen_ids)
             pruned = conn.execute(
                 f"DELETE FROM qa_test_cases WHERE kind = 'impl' "
                 f"AND id NOT IN ({placeholders})",
                 tuple(seen_ids),
             ).rowcount
-        else:
-            pruned = conn.execute(
-                "DELETE FROM qa_test_cases WHERE kind = 'impl'"
-            ).rowcount
-        conn.commit()
+            conn.commit()
 
     # Count total cases in DB
     from mcbot.capability.qa_import import _count_cases

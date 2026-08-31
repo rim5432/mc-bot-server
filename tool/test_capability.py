@@ -514,6 +514,20 @@ class GametestScanTest(unittest.TestCase):
             self.assertEqual(r["capability_id"], "motion.sprint")
             self.assertEqual(r["link_source"], "auto")
 
+    def test_empty_scan_never_prunes(self):
+        # zero methods found = wrong root or broken pattern, not a
+        # vanished suite; the impl table must survive the misfire
+        self._seed_stale_and_manual()
+        empty_src = self.dir / "empty"
+        empty_src.mkdir()
+        result = scan_gametests(empty_src, db_path=self.db)
+        self.assertEqual(result["pruned"], 0)
+        with get_connection(self.db) as conn:
+            self.assertIsNotNone(conn.execute(
+                "SELECT id FROM qa_test_cases WHERE id = "
+                "'GT-BotLocomotionGameTests-removedMethod'"
+            ).fetchone())
+
     def test_rescan_preserves_manual_link_and_source(self):
         scan_gametests(self.src, db_path=self.db)
         from mcbot.capability.qa_import import link_case
