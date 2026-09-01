@@ -2,6 +2,10 @@ package com.mcbot.mcbotserver.core.behavior;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.mcbot.mcbotserver.api.goal.GoalBlock;
+import com.mcbot.mcbotserver.api.goal.GoalDistance;
+import com.mcbot.mcbotserver.api.goal.GoalRange;
+import com.mcbot.mcbotserver.api.goal.Goals;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
 import java.util.List;
@@ -34,7 +38,9 @@ class PlanProgressFuseSegmentTest {
         PlanProgressFuse fuse = new PlanProgressFuse();
         fuse.onAdopted(cursor.index());
 
-        CellPos anchor = new CellPos(1, 64, 99);
+        // Orthogonal point goal: criterion 2 stays silent by more
+        // than STUCK_EPSILON and the assertion isolates criterion 3.
+        GoalDistance anchor = Goals.distanceOf(new GoalBlock(new CellPos(1, 64, 99)));
         // First observation: criterion 3 fires against the sentinel
         // and latches 1.0 m to waypoint (1, 64, 0).
         assertTrue(fuse.evaluate(cursor, new Vec3(0.5, 64, 0.5), anchor));
@@ -51,5 +57,32 @@ class PlanProgressFuseSegmentTest {
         assertTrue(
                 fuse.evaluate(cursor, new Vec3(1.6, 64, 0.5), anchor),
                 "criterion 3 must re-arm when the cursor advances");
+    }
+
+    /**
+     * Criterion 2 is goal-aware (decision 56): against a range-band
+     * distance, an OUTWARD step inside the min counts as progress.
+     * The old center anchor measured the same step as regression -
+     * a kiting body would accumulate the STUCK window on the exact
+     * motion the goal asked for. Waypoint sits orthogonal and far so
+     * criteria 1 and 3 stay silent and the assertion isolates
+     * criterion 2.
+     */
+    @Test
+    void criterionTwoFiresForOutwardKiteUnderBandDistance() {
+        WaypointCursor cursor = new WaypointCursor();
+        cursor.set(List.of(new CellPos(0, 64, 0), new CellPos(1, 64, 99)));
+        PlanProgressFuse fuse = new PlanProgressFuse();
+        fuse.onAdopted(cursor.index());
+
+        GoalDistance band = Goals.distanceOf(new GoalRange(new CellPos(0, 64, 0), 8, 12));
+        // First observation: criterion 1 fires against the sentinel.
+        assertTrue(fuse.evaluate(cursor, new Vec3(2.5, 64.5, 0.5), band));
+
+        // One block outward: band gap 6 -> 5. The center-anchored
+        // metric would read distance 2 -> 3 and return false here.
+        assertTrue(
+                fuse.evaluate(cursor, new Vec3(3.5, 64.5, 0.5), band),
+                "an outward kite step must count as goal progress");
     }
 }

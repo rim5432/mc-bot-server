@@ -65,4 +65,38 @@ public final class Goals {
         }
         return Heuristic.euclideanTo(cellOf(goal));
     }
+
+    /**
+     * The progress-tier distance from a body position to the goal's
+     * target set. Point goals keep the exact historical math the
+     * plan-progress fuse and the no-path ledger were tuned against:
+     * 3D Euclidean to the anchor cell centre. GoalRange uses the
+     * continuous Chebyshev band-edge distance - the position-space
+     * analogue of {@link #heuristicOf(Goal)} - because distance to
+     * the CENTER reads a correct outward kite as regression
+     * (search layer and progress layer split the same way; see
+     * {@link GoalDistance}).
+     *
+     * @param goal the goal to measure against; never null
+     * @return a distance function over positions; never null
+     */
+    public static GoalDistance distanceOf(Goal goal) {
+        if (goal instanceof GoalRange r) {
+            return from -> {
+                double dx = Math.abs(from.x() - r.center().x() - 0.5);
+                double dy = Math.abs(from.y() - r.center().y() - 0.5);
+                double dz = Math.abs(from.z() - r.center().z() - 0.5);
+                double dist = Math.max(dx, Math.max(dy, dz));
+                if (dist < r.min()) {
+                    return r.min() - dist;
+                }
+                if (dist > r.max()) {
+                    return dist - r.max();
+                }
+                return 0.0;
+            };
+        }
+        CellPos anchor = cellOf(goal);
+        return from -> from.distanceTo(anchor.x() + 0.5, anchor.y() + 0.5, anchor.z() + 0.5);
+    }
 }

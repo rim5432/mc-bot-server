@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.mcbot.mcbotserver.api.pathing.Heuristic;
 import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.api.types.Vec3;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -118,6 +119,41 @@ class GoalRangeGeometryTest {
     @Test
     void centerMustNotBeNull() {
         assertThrows(IllegalArgumentException.class, () -> new GoalRange(null, MIN, MAX), "null center is rejected");
+    }
+
+    /**
+     * The progress-tier distance mirrors the heuristic's band-edge
+     * geometry in position space (decision 56): inside the min it
+     * counts DOWN as the body moves outward - the kite-progress
+     * contract. A center-anchored metric would read the same motion
+     * as regression and mint false STUCK/NO_PATH witnesses.
+     */
+    @Test
+    void distanceOfCountsOutwardKiteAsProgress() {
+        GoalRange g = new GoalRange(CENTER, MIN, MAX);
+        GoalDistance d = Goals.distanceOf(g);
+        // West of center, inside min by 3 (continuous Chebyshev 5 vs min 8).
+        assertEquals(3.0, d.meters(new Vec3(5.5, 64.5, 10.5)), 1.0E-9, "inside-min distance is the gap to the band");
+        // One step outward (away from center, x decreasing) closes the gap.
+        assertEquals(2.0, d.meters(new Vec3(4.5, 64.5, 10.5)), 1.0E-9, "outward motion must shrink the distance");
+        // On the band: zero, like the heuristic on the goal set.
+        assertEquals(0.0, d.meters(new Vec3(18.5, 64.5, 10.5)), 1.0E-9, "in-band distance is zero");
+        // Beyond max: the gap reopens outward.
+        assertEquals(3.0, d.meters(new Vec3(25.5, 64.5, 10.5)), 1.0E-9, "outside-max distance is the overshoot");
+    }
+
+    /**
+     * Point goals keep the exact historical anchor math the fuse and
+     * the witness ledger were tuned against: 3D Euclidean to the
+     * anchor cell centre. Swapping this for a banded or Chebyshev
+     * variant would silently re-tune STUCK timing for every goto.
+     */
+    @Test
+    void distanceOfKeepsPointGoalAnchorMath() {
+        GoalDistance d = Goals.distanceOf(new GoalBlock(CENTER));
+        Vec3 from = new Vec3(5.5, 64.5, 10.5);
+        assertEquals(
+                from.distanceTo(10.5, 64.5, 10.5), d.meters(from), 1.0E-12, "point goals measure to the anchor centre");
     }
 
     @Test

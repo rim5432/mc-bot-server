@@ -1,8 +1,10 @@
 package com.mcbot.mcbotserver.core.behavior;
 
 import com.mcbot.mcbotserver.api.goal.Goal;
+import com.mcbot.mcbotserver.api.goal.GoalDistance;
 import com.mcbot.mcbotserver.api.goal.Goals;
 import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.api.types.Vec3;
 import java.util.Objects;
 
 /**
@@ -32,7 +34,10 @@ import java.util.Objects;
  * <p>Improvement is measured against the best-ever distance, not the
  * previous one: a legitimate detour that temporarily moves the
  * terminal away from the goal cannot mint false witnesses, because
- * only a new global minimum counts as progress.
+ * only a new global minimum counts as progress. Distance runs to
+ * the goal's TARGET SET via {@link Goals#distanceOf}, not the
+ * anchor cell (decision 56): for a range band an outward-moving
+ * terminal - the correct kite - is progress, not regression.
  *
  * <p>Contract: see boundaries.md decision 8 vocabulary (the NO_PATH
  * verdict stays PathingBehavior's to declare; this class only
@@ -62,6 +67,7 @@ final class NoPathEscalator {
 
     private final int baseBudget;
     private Goal goal;
+    private GoalDistance goalDistance = pos -> Double.MAX_VALUE;
     private double bestDistance = Double.MAX_VALUE;
     private int witnesses;
     private boolean tripped;
@@ -93,8 +99,9 @@ final class NoPathEscalator {
         if (!goal.equals(this.goal)) {
             reset();
             this.goal = goal;
+            this.goalDistance = Goals.distanceOf(goal);
         }
-        double distance = Goals.cellOf(goal).distanceTo(terminal);
+        double distance = goalDistance.meters(new Vec3(terminal.x() + 0.5, terminal.y() + 0.5, terminal.z() + 0.5));
         if (distance < bestDistance - IMPROVEMENT_EPSILON) {
             bestDistance = distance;
             witnesses = 0;

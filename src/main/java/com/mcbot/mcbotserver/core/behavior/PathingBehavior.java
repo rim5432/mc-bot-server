@@ -464,7 +464,7 @@ public final class PathingBehavior implements Behavior {
      * waypoint-progress).
      */
     private void evaluatePlanProgress(Vec3 position, Goal goal) {
-        if (fuse.evaluate(cursor, position, Goals.cellOf(goal))) {
+        if (fuse.evaluate(cursor, position, Goals.distanceOf(goal))) {
             fuse.onProgress();
         } else {
             fuse.onStall();

@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.core.behavior;
 
+import com.mcbot.mcbotserver.api.goal.GoalDistance;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
 
@@ -79,13 +80,17 @@ final class PlanProgressFuse {
      * updates the latches for the criteria that fire so the next
      * call can detect further progress.
      *
-     * @param cursor     the active plan cursor; never null
-     * @param position   the body's current position; never null
-     * @param goalAnchor the goal's anchor cell; never null
+     * @param cursor        the active plan cursor; never null
+     * @param position      the body's current position; never null
+     * @param goalDistance  distance to the goal's target set; never
+     *                      null. Position-space and goal-aware
+     *                      (decision 56): for a range band this is
+     *                      the band-edge distance, so an outward kite
+     *                      counts as progress, not regression
      * @return true iff at least one criterion fired
      */
-    boolean evaluate(WaypointCursor cursor, Vec3 position, CellPos goalAnchor) {
-        double goalDist = position.distanceTo(goalAnchor.x() + 0.5, goalAnchor.y() + 0.5, goalAnchor.z() + 0.5);
+    boolean evaluate(WaypointCursor cursor, Vec3 position, GoalDistance goalDistance) {
+        double goalDist = goalDistance.meters(position);
 
         boolean p1 = cursor.index() > lastWaypointIndex;
         if (p1) {

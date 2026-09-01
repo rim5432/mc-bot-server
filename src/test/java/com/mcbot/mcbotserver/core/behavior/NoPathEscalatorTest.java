@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
 import com.mcbot.mcbotserver.api.goal.GoalNear;
+import com.mcbot.mcbotserver.api.goal.GoalRange;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import org.junit.jupiter.api.Test;
 
@@ -28,6 +29,47 @@ class NoPathEscalatorTest {
     }
 
     /** First adoption only sets the baseline; nothing is a witness. */
+    /**
+     * Range-band goals measure witnesses against the band edge, not
+     * the center (decision 56): an inside-min kite whose partials
+     * walk the terminal OUTWARD is improving every time - a
+     * center-anchored metric would mint three witnesses and trip a
+     * false NO_PATH on a perfectly converging kite.
+     */
+    @Test
+    void rangeBandOutwardKiteNeverMintsWitnesses() {
+        NoPathEscalator e = new NoPathEscalator(100);
+        GoalRange band = new GoalRange(new CellPos(10, 64, 10), 8, 12);
+        // Terminals march outward from Chebyshev 5 to the min edge 8
+        // (west of center: x decreasing).
+        for (int x = 5; x >= 2; x--) {
+            e.onAdopted(band, at(x, 64, 10));
+        }
+        assertEquals(0, e.witnesses(), "outward kite terminals improve against the band edge");
+        assertFalse(e.tripped());
+        // Repeated terminals ON the band are at distance zero: no
+        // improvement possible, but also the predicate is satisfied -
+        // the caller retires the ledger via onRouteComplete before
+        // witnesses could matter (pinned for the metric, not the
+        // retirement, which PathingBehavior owns).
+    }
+
+    /**
+     * The flip side: terminals that move toward the center (away
+     * from the band) DO accumulate witnesses - the band metric must
+     * not merely invert the old one.
+     */
+    @Test
+    void rangeBandInwardTerminalsAccumulateWitnesses() {
+        NoPathEscalator e = new NoPathEscalator(100);
+        GoalRange band = new GoalRange(new CellPos(10, 64, 10), 8, 12);
+        e.onAdopted(band, at(5, 64, 10));
+        for (int i = 0; i < NoPathEscalator.WITNESS_LIMIT; i++) {
+            e.onAdopted(band, at(6, 64, 10));
+        }
+        assertTrue(e.tripped(), "inward terminals open the band gap and must trip");
+    }
+
     @Test
     void firstAdoptionSetsBaselineWithoutWitness() {
         NoPathEscalator e = new NoPathEscalator(100);
