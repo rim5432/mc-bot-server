@@ -1039,3 +1039,51 @@ Amendment chains recorded so far (both sides annotated):
     policy-breach proxy, not a thread-safety proof; CompletableFuture
     (the cross-thread boundary itself) is excluded and registered in
     decision 59.
+    61. 2026-09-02 Directed taming: the /entities/<id>/tame task verb
+    over the taming.chain face, engine-proven. (a) The vanilla
+    use-on-entity press became a first-class intent:
+    Intent.InteractEntity(entityId) on the INTERACT channel -
+    decision 25's one-shot family grows the entity-direction sibling
+    of InteractBlock (USE stays entity-melee per the 0007 review).
+    The executor resolves the claim's UUID against the server level,
+    gates the shared 3.0 interaction reach, and rides
+    Player.interactOn (Mob.interact's leash/saddle/tame chain); the
+    documented deviation is the device pressing by id, not by
+    crosshair. (b) Overrides grew its third additive order component
+    Tame{targetId, typeKey}: the process emits it only after a
+    verified sighting, so the behavior picks the species' tame item
+    with zero world scans - TameFoodCatalog owns the type-to-items
+    map and the hotbar slot read shared with the process's
+    NO_TAME_ITEM verdict. Verdict semantics mirror attack with
+    tame's typed refusals: the tamed fact on the snapshot IS the
+    completion verdict (ledger 40's directly-judged shape), the
+    first sighting settles NOT_TAMEABLE / ALREADY_TAMED /
+    NO_TAME_ITEM, a corpse sighting fails TARGET_DEAD;
+    EntitySnapshot carries the tamed fact adapter-side
+    (TamableAnimal.isTame()), with a 5-arg convenience ctor keeping
+    the pre-tame call sites. (c) The 12-tick press cadence doubles
+    as the sit-toggle guard: an empty-hand owner press toggles sit
+    (vanilla TamableAnimal interactions), and the process-before-
+    behavior tick order retires the tamed directive between presses,
+    so no empty-hand press can land on the freshly owned pet. (d)
+    Attribution repair riding the arc: the first offline run went red
+    on a HEAD-pre-existing regression - 20b200d's NullAway pass
+    initialized HungryProcess.lastDirective, reintroducing the
+    post-failure mover anchor 7f02283 had pinned away. Repaired by
+    declaring the terminal hold in the contract itself
+    (BotProcess.onTick is @Nullable: null is the post-terminal
+    return, not an implementation bug) and returning null
+    post-terminal in HungryProcess; Attack/Defend/Tame keep their
+    always-populated directives. Engine evidence:
+    tamesWolfWithBones / alreadyTamedWolfFailsFast /
+    tameRejectsNonTameableTarget green in three consecutive pooled
+    batches at 08a4b64 (142 scenarios; taming never red), while each
+    batch flaked a DIFFERENT pre-existing family scenario
+    (crosseslavatrench - red at HEAD on 09-01 pre-arc,
+    digsfreewhensuffocating, bowtapshotdealsweakdamage) under the
+    wiped-world + cooldown protocol - the single-red rotation is
+    machine load, not the arc. Declined: horse/ride taming (the
+    ride-bucking temper loop needs a mount+steer capability;
+    mechanics survey in player-behavior-RE.md section 9) and
+    cat/parrot engine scenarios (the species map is catalog-gated
+    offline; the engine path is species-agnostic).
