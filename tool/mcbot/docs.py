@@ -17,7 +17,6 @@ from typing import Optional
 from mcbot.paths import PROJECT_ROOT
 
 DOC_DIR = PROJECT_ROOT / "doc"
-DOC_INDEX = DOC_DIR / "README.md"
 DOC_CATEGORIES = ["architecture", "guide", "reference", "decisions"]
 DEFAULT_STALE_DAYS = 90
 
@@ -99,7 +98,7 @@ def _strip_code_fences(body: str) -> str:
 def _iter_doc_files() -> list:
     if not DOC_DIR.exists():
         return []
-    return sorted(p for p in DOC_DIR.rglob("*.md") if p != DOC_INDEX)
+    return sorted(DOC_DIR.rglob("*.md"))
 
 
 def check_doc(path: Path, stale_days: int = DEFAULT_STALE_DAYS) -> list:

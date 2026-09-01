@@ -3,6 +3,7 @@ package com.mcbot.mcbotserver.core.behavior;
 import static com.mcbot.mcbotserver.core.behavior.UseClaimTestSupport.inventory;
 import static com.mcbot.mcbotserver.core.behavior.UseClaimTestSupport.pressSequence;
 import static com.mcbot.mcbotserver.core.behavior.UseClaimTestSupport.selectedSlotOf;
+import static com.mcbot.mcbotserver.core.behavior.UseClaimTestSupport.strikeClaims;
 import static com.mcbot.mcbotserver.core.behavior.UseClaimTestSupport.useClaims;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -155,13 +156,12 @@ class CombatRangedGateTest {
         }
 
         List<Boolean> presses = pressSequence(actor);
-        assertEquals(23, presses.size(), "20 charge, release, sword-switch gap, swing pair: " + presses);
+        assertEquals(21, presses.size(), "20 charge, release, then the melee path strikes by id: " + presses);
         for (int i = 0; i < CombatBehavior.BOW_CHARGE_TICKS; i++) {
             assertTrue(presses.get(i), "the draw holds through the range flip at tick " + i);
         }
         assertFalse(presses.get(20), "the committed shot releases");
-        assertTrue(presses.get(21), "the melee path takes over right after the shot");
-        assertFalse(presses.get(22), "the melee swing unlatches");
+        assertFalse(strikeClaims(actor).isEmpty(), "the melee path takes over with a directed strike");
         assertEquals(0, selectedSlotOf(actor), "the sword is drawn only after the shot lands");
     }
 
@@ -187,9 +187,9 @@ class CombatRangedGateTest {
         combat.tick(world, orderAt(6), actor);
 
         List<Boolean> presses = pressSequence(actor);
-        assertEquals(6, presses.size(), "4 charge ticks, the abort, the first swing: " + presses);
+        assertEquals(5, presses.size(), "4 charge ticks, the abort, then the melee strike: " + presses);
         assertFalse(presses.get(4), "a barely-started draw is aborted, not finished");
-        assertTrue(presses.get(5), "the swing fires once the sword lands");
+        assertFalse(strikeClaims(actor).isEmpty(), "the swing fires once the sword lands");
         assertEquals(0, selectedSlotOf(actor), "the melee band draws the sword");
     }
 
@@ -237,10 +237,8 @@ class CombatRangedGateTest {
         assertTrue(
                 actor.submitted.stream().noneMatch(c -> c.channel() == Channel.SLOT),
                 "the sword is already held - and melee-range must not re-arm the bow");
-        List<Boolean> presses = pressSequence(actor);
-        assertEquals(2, presses.size(), "melee pacing: one swing pair, not a draw");
-        assertTrue(presses.get(0), "the swing fires");
-        assertFalse(presses.get(1), "the swing unlatches - a draw would hold true");
+        assertTrue(useClaims(actor).isEmpty(), "melee-range pacing holds no draw - a draw would press true");
+        assertFalse(strikeClaims(actor).isEmpty(), "the melee band swings on the ordered id");
     }
 
     private static CombatBehavior combat() {

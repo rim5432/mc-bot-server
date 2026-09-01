@@ -186,18 +186,19 @@ It never touches `gradlew.bat`.
 
 ## Documentation management (doc/)
 
-Docs live under [`doc/`](../doc/README.md), organized as
-`architecture/ guide/ reference/ decisions/ archive/`. Every doc carries
+Docs live under `doc/`, organized as
+`architecture/ guide/ reference/ decisions/`. Every doc carries
 front-matter (`title` / `last_verified` / `covers:`); **rot detection is
 git-history-driven**: if any path in `covers:` changed after the verified
-date, `doc check` flags DRIFT.
+date, `doc check` flags DRIFT. Resolved issues are deleted, not archived —
+their invariants live in boundaries.md or code Javadoc, and the analysis
+lives in git history.
 
 ```bash
 python tool/mcbot_tool.py doc list            # health overview
 python tool/mcbot_tool.py doc check           # rot audit (exit 1 on ERR; usable as a gate)
 python tool/mcbot_tool.py doc touch toolchain # re-mark verified after editing covered code
 python tool/mcbot_tool.py doc new decisions my-idea --title "My Idea"   # scaffold (ADR numbers auto-assigned)
-python tool/mcbot_tool.py doc index           # regenerate the doc/README.md index
 ```
 
 Daily rhythm: edit covered code → update the covering doc → `doc check`

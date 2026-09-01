@@ -63,6 +63,23 @@ final class UseClaimTestSupport {
     }
 
     /**
+     * Every USE-channel directed strike claim, in submission order -
+     * the melee swing the combat order addresses by id (ledger 62).
+     *
+     * @param actor the recorded submissions; never null
+     * @return the strike intents; never null
+     */
+    static List<Intent.Strike> strikeClaims(RecordingActor actor) {
+        List<Intent.Strike> strikes = new ArrayList<>();
+        for (Claim c : actor.submitted) {
+            if (c.channel() == Channel.USE && c.intent() instanceof Intent.Strike s) {
+                strikes.add(s);
+            }
+        }
+        return strikes;
+    }
+
+    /**
      * An own-inventory snapshot with the given hotbar contents: a null
      * entry (or past the array) means an empty slot.
      *

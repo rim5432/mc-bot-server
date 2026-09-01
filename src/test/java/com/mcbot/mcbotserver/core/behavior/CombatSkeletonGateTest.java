@@ -160,7 +160,7 @@ class CombatSkeletonGateTest {
             combat.tick(emptyWorld(), directive, actor);
             boolean pressed = actor.submitted.subList(before, actor.submitted.size()).stream()
                     .anyMatch(c -> c.channel() == Channel.USE
-                            && ((com.mcbot.mcbotserver.api.actor.Intent.Use) c.intent()).pressing());
+                            && c.intent() instanceof com.mcbot.mcbotserver.api.actor.Intent.Strike);
             if (pressed) {
                 swings++;
             }
@@ -176,7 +176,7 @@ class CombatSkeletonGateTest {
         assertTrue(
                 farActor.submitted.stream()
                         .noneMatch(c -> c.channel() == Channel.USE
-                                && ((com.mcbot.mcbotserver.api.actor.Intent.Use) c.intent()).pressing()),
+                                && c.intent() instanceof com.mcbot.mcbotserver.api.actor.Intent.Strike),
                 "a permanently escaped target gets no swings");
     }
 
@@ -309,7 +309,7 @@ class CombatSkeletonGateTest {
             boolean aimed = window.stream().anyMatch(c -> c.channel() == Channel.ROT);
             boolean useNow = window.stream()
                     .anyMatch(c -> c.channel() == Channel.USE
-                            && ((com.mcbot.mcbotserver.api.actor.Intent.Use) c.intent()).pressing());
+                            && c.intent() instanceof com.mcbot.mcbotserver.api.actor.Intent.Strike);
             assertTrue(aimed, "aim must refresh every tick");
             if (useNow) {
                 swings++;

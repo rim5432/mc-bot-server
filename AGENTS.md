@@ -31,7 +31,7 @@
 | Mod entry class | `src/main/java/com/mcbot/mcbotserver/McBotServer.java` |
 | Build wiring / properties | `build.gradle`, `gradle.properties` |
 | Workflow toolbox | `tool/mcbot_tool.py`; harness reference implementation in `tool/harness/mc.py` |
-| Doc root | `doc/` (architecture / decisions / guide / reference); index auto-generated as `doc/README.md` via `doc index` |
+| Doc root | `doc/` (architecture / decisions / guide / reference); `doc list` enumerates all docs |
 | Live contract | `doc/architecture/boundaries.md`; verdicts in `doc/architecture/ledger.md` |
 | Implementation checklist | `doc/guide/workplan.md` (authoritative, dependency-ordered) |
 | Reference notes (read-only) | `doc/reference/{baritone,numen,disclosure-patterns}-notes.md` |

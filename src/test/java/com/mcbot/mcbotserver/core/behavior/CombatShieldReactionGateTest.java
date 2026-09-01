@@ -3,6 +3,7 @@ package com.mcbot.mcbotserver.core.behavior;
 import static com.mcbot.mcbotserver.core.behavior.UseClaimTestSupport.applySlotFeedback;
 import static com.mcbot.mcbotserver.core.behavior.UseClaimTestSupport.inventory;
 import static com.mcbot.mcbotserver.core.behavior.UseClaimTestSupport.pressSequence;
+import static com.mcbot.mcbotserver.core.behavior.UseClaimTestSupport.strikeClaims;
 import static com.mcbot.mcbotserver.core.behavior.UseClaimTestSupport.useClaims;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -124,15 +125,15 @@ class CombatShieldReactionGateTest {
         combat.tick(world, orderAt(2), actor);
 
         List<Boolean> presses = pressSequence(actor);
-        // [raise, linger x10, release, sword-switch tick has no press, swing, unlatch]
-        assertEquals(14, presses.size(), "raise + 10 linger + release + swing pair: " + presses);
+        // [raise, linger x10, release] - the melee resume is a Strike
+        // claim (ledger 62), no longer a Use press pair.
+        assertEquals(12, presses.size(), "raise + 10 linger + release: " + presses);
         assertTrue(presses.get(0), "the raise");
         for (int i = 1; i <= CombatBehavior.BLOCK_LINGER_TICKS; i++) {
             assertTrue(presses.get(i), "linger tick " + i + " holds the guard");
         }
         assertFalse(presses.get(11), "the guard releases after the linger");
-        assertTrue(presses.get(12), "the swing fires once the sword lands");
-        assertFalse(presses.get(13), "the swing unlatches");
+        assertFalse(strikeClaims(actor).isEmpty(), "the swing fires once the sword lands");
         List<com.mcbot.mcbotserver.api.actor.Claim> slots = actor.submitted.stream()
                 .filter(c -> c.channel() == Channel.SLOT)
                 .toList();
@@ -156,9 +157,8 @@ class CombatShieldReactionGateTest {
         combat.tick(world, orderAt(2), actor);
 
         List<Boolean> presses = pressSequence(actor);
-        assertEquals(2, presses.size(), "plain melee pacing despite the arrow");
-        assertTrue(presses.get(0), "the swing fires");
-        assertFalse(presses.get(1), "the swing unlatches");
+        assertEquals(0, presses.size(), "plain melee pacing despite the arrow - the swing is a Strike now");
+        assertEquals(1, strikeClaims(actor).size(), "the ready body swings immediately");
         assertTrue(
                 actor.submitted.stream().noneMatch(c -> c.channel() == Channel.SLOT),
                 "nothing to switch to - no shield carried");
@@ -176,9 +176,8 @@ class CombatShieldReactionGateTest {
         combat.tick(world, orderAt(2), actor);
 
         List<Boolean> presses = pressSequence(actor);
-        assertEquals(2, presses.size(), "a receding flight earns no block");
-        assertTrue(presses.get(0), "the swing fires");
-        assertFalse(presses.get(1), "the swing unlatches");
+        assertEquals(0, presses.size(), "a receding flight earns no block - the swing is a Strike now");
+        assertEquals(1, strikeClaims(actor).size(), "the ready body swings immediately");
     }
 
     @Test
