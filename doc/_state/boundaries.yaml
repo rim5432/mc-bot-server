@@ -1,0 +1,290 @@
+# Single source of truth for the boundaries decision index.
+# boundaries.md carries the full contract text and verdict narratives;
+# this file is the machine-readable index that resolves every
+# 'decision N' citation and tracks amendment chains.
+# doc check (future enhancement) will verify that markdown citations
+# of 'decision N' resolve to entries in this file.
+# The DecisionIndexSyncGateTest already verifies that this index's max
+# equals ledger.md's body max.
+
+meta:
+  last_updated: 2026-09-02
+  source_doc: doc/architecture/boundaries.md
+  total_decisions: 61
+  note: "Sub-decisions (17a, 17b, 19a, 19b) are excluded from the max count per DecisionIndexSyncGateTest parsing rules (digit-before-period requirement)."
+
+decisions:
+  - id: 1
+    title: "LLM stays out of the bot; harness is an external brain"
+    adopted: null
+    section: A
+  - id: 2
+    title: "Host = server-side fake player; engine owns physics"
+    adopted: null
+    section: A
+  - id: 3
+    title: "Capability stack: WorldView / Actor / skills / orchestration"
+    adopted: null
+    section: A
+  - id: 4
+    title: "Data-driven trio: Registry / Codec / ReloadListener"
+    adopted: null
+    section: A
+  - id: 5
+    title: "core package has zero MC imports"
+    adopted: null
+    section: A
+  - id: 6
+    title: "Process/Behavior duality; central winner-take-all arbiter"
+    adopted: null
+    section: B
+  - id: 7
+    title: "Goal is a pure data abstraction"
+    adopted: null
+    section: B
+  - id: 8
+    title: "Movement modeled as a five-tuple"
+    adopted: null
+    section: B
+  - id: 9
+    title: "Reflex layer is an independent bypass"
+    adopted: null
+    section: C
+  - id: 10
+    title: "Scenario combinations are rule-table data"
+    adopted: null
+    section: C
+  - id: 11
+    title: "DefendProcess light planner; structural refusals at engage time"
+    adopted: null
+    section: B
+  - id: 12
+    title: "InterruptionContext snapshot; resume revalidates world first"
+    adopted: null
+    section: C
+  - id: 13
+    title: "Behavior.tick returns ExecutionReport"
+    adopted: null
+    section: B
+  - id: 14
+    title: "Actor four independent channels, per-tick claims"
+    adopted: null
+    section: B
+  - id: 15
+    title: "Single tick entry; fixed reflex -> arbiter -> behaviors -> flush order"
+    adopted: null
+    section: C
+  - id: 16
+    title: "Minimal reflex rule exercises the full preempt chain early"
+    adopted: null
+    section: C
+  - id: 17
+    title: "WorldView exposes BlockSnapshot / EntitySnapshot / CollisionShape"
+    adopted: null
+    section: A
+    sub_decisions:
+      - id: 17a
+        title: "isLoaded(pos) distinguishes unloaded from air"
+      - id: 17b
+        title: "ViewMode SNAPSHOT/LIVE reserves the off-thread seam"
+  - id: 18
+    title: "First boundary-D semantics: GotoCommand, submit/cancel/status"
+    adopted: null
+    section: D
+  - id: 19
+    title: "Shape-vs-traits split for movement viability vs vocabulary"
+    adopted: null
+    section: B
+    sub_decisions:
+      - id: 19a
+        title: "New Movements derive preconditions from shape plus traits"
+      - id: 19b
+        title: "Settled STEP_UP_REACH / STANDABLE_THRESHOLD geometry semantics"
+  - id: 20
+    title: "Plan-progress fuse and vertical trigger gate"
+    adopted: "2026-08-24"
+    section: B
+  - id: 21
+    title: "Unreachable-goal escalation: honest NO_PATH"
+    adopted: null
+    section: B
+  - id: 22
+    title: "ReflexAction vocabulary (boundary C growth)"
+    adopted: "2026-08-24"
+    section: C
+  - id: 23
+    title: "Reflex-carried idle combat (ENGAGE)"
+    adopted: "2026-08-24"
+    section: C
+  - id: 24
+    title: "Vitals pass and the extreme-scenario reflexes"
+    adopted: "2026-08-25"
+    section: C
+  - id: 25
+    title: "Block capability axis opened - dig first"
+    adopted: "2026-08-25"
+    section: D
+  - id: 26
+    title: "Reflex ESCAPE action and rescue mission handoff"
+    adopted: "2026-08-25"
+    section: C
+  - id: 27
+    title: "Powder-snow climb reflex"
+    adopted: "2026-08-25"
+    section: C
+  - id: 28
+    title: "Harness surface convergence (console + disclosure tables)"
+    adopted: "2026-08-25"
+    section: D
+  - id: 29
+    title: "Menu transactions are imperative request-response"
+    adopted: "2026-08-26"
+    section: D
+  - id: 30
+    title: "Consumer-count drain-lock retired from the event stream"
+    adopted: "2026-08-26"
+    section: D
+  - id: 31
+    title: "Slot identity dual-space accepted; dual-RCON re-eval trigger"
+    adopted: "2026-08-26"
+    section: D
+  - id: 32
+    title: "State-snapshot field set pinned at BotState's categorical rule"
+    adopted: null
+    section: D
+  - id: 33
+    title: "Harness interaction model codified: space is a namespace, time is job control"
+    adopted: "2026-08-27"
+    section: D
+  - id: 34
+    title: "Carrier food lifecycle: Path A FoodData on the body, free-regen floor retired, EAT reflex consumption"
+    adopted: "2026-08-27"
+    section: C
+  - id: 35
+    title: "Third reflex seat promotion: ReflexMissionSeat unifies ENGAGE/ESCAPE; FORAGE action + ACQUIRE rule"
+    adopted: "2026-08-27"
+    section: C
+  - id: 36
+    title: "Shapeless recipes cataloged via ingredient-index encoding; scarce-first pattern resolution"
+    adopted: "2026-08-27"
+    section: D
+  - id: 37
+    title: "Bow ranging over USE: hold-draw semantics amend decision 14; melee ranking suppressed while ranging"
+    adopted: "2026-08-27"
+    section: B
+    amends: [14]
+  - id: 38
+    title: "Grammar fold: /actions/ retired, write addresses the noun; read re-homed to documents; ls universal"
+    adopted: "2026-08-28"
+    section: D
+  - id: 39
+    title: "Directed engagement (/entities/<id>/attack task) + batch craft chains (harness plans, bot batches)"
+    adopted: "2026-08-28"
+    section: D
+  - id: 40
+    title: "Attack kill-confirmation: health-zero sighting = SUCCESS"
+    adopted: "2026-08-28"
+    section: D
+    amends: [39]
+  - id: 41
+    title: "Architecture wave: package cycles dissolved, tickOnce single home, menu kind single table"
+    adopted: "2026-08-28"
+    section: A
+  - id: 42
+    title: "Audit completion round: cellOf/RangedLoadouts/TargetTracker extractions, controller constructors 4->2"
+    adopted: "2026-08-28"
+    section: A
+    amends: [41]
+  - id: 43
+    title: "stop-contract fix: /bot stop sums all task handlers; H1 api/ thickness census closed"
+    adopted: "2026-08-29"
+    section: D
+  - id: 44
+    title: "Ponytail re-audit: ReflexSeat folded into ReflexMissionSeat; gametest rig helpers absorbed"
+    adopted: "2026-08-29"
+    section: C
+  - id: 45
+    title: "Rulings + engine batch: issue 0016 wired, HungryProcess/eat bugs fixed, PIT gates 150/200"
+    adopted: "2026-08-29"
+    section: C
+  - id: 46
+    title: "Anvil/XP surface + sneak steering gate + combat attributes + dig tool awareness; 52 gametests green"
+    adopted: "2026-08-29"
+    section: B
+  - id: 47
+    title: "Mechanics QA execution: engine suite 67 green (two consecutive runs), DigExecutor harvest gate fixed, gametest receipts + status currency line"
+    adopted: "2026-08-30"
+    section: D
+  - id: 48
+    title: "Ranged/survival QA batch 1: facade getItemBySlot/getProjectile bridging, eye-line ballistics, bobber Vec3; 72 green twice"
+    adopted: "2026-08-30"
+    section: B
+  - id: 49
+    title: "Ranged/survival batch 2: rear-shield direction gate, bow tap band, shears select; 75 green"
+    adopted: "2026-08-30"
+    section: B
+  - id: 50
+    title: "Boundary-D honesty round, receipt-closed: resetAt epoch allocator (EventEpochStore SavedData) + BotChunkTicket forceload; C2b/C2-post red->green live"
+    adopted: "2026-08-31"
+    section: D
+  - id: 51
+    title: "Combat range routing stateful + weapon-aware: committed draws finish through band flips, bow answers point-blank when unarmed of better melee, bow-only opens at standoff"
+    adopted: "2026-09-01"
+    section: B
+    amends: [37]
+  - id: 52
+    title: "Reactive shield: WorldView.getProjectiles + ProjectileThreats geometry; combat order + hit-course flight + carried shield preempts both attack paths; melee hold-item gate closes the bow/shield-held press race"
+    adopted: "2026-09-01"
+    section: C
+  - id: 53
+    title: "Async planner verdict weight: PathResult.drainedOpenSet separates drained open sets (NO_PATH) from budget cuts and failed futures (CUT = re-ask); starved-worker flake root-caused"
+    adopted: "2026-09-01"
+    section: B
+  - id: 54
+    title: "Goal vocabulary growth: GoalRange(center, min, max) band predicate + band-edge heuristic; DefendProcess/AttackProcess ranged standoff migrates from GoalNear(10) to GoalRange(8,12)"
+    adopted: "2026-09-01"
+    section: B
+    amends: [51]
+    closes_issue: "0018"
+  - id: 55
+    title: "Core nullness strategy: six-site get-deref audit, JsonFields.require convergence, SurvivalReflexLayer data-dependency refactor, GetDerefGateTest regression guard; CI static-analysis required-check registration"
+    adopted: "2026-09-01"
+    section: A
+  - id: 56
+    title: "Steering frame decoupling + band-aware progress: MOVE decomposition against a BodyYawSource (strafe/backpedal kiting when combat aim owns ROT), Goals.distanceOf feeds fuse criterion 2 + NO_PATH witnesses"
+    adopted: "2026-09-01"
+    section: B
+    amends: [54]
+  - id: 57
+    title: "Pooled-run hostile leaks: wall-less shared template + 5-block structure spacing + tickPresence recruitment funnel leaked hostiles through later scenarios' 1-wide geometry; leak-site tail discards + per-tick foreign sweep"
+    adopted: "2026-09-01"
+    section: C
+  - id: 58
+    title: "DefendProcess mid-fight stance re-route: ranged-vs-melee decision re-derived every engaged tick from live loadout; ranged-typed target with vanished loadout refuses rather than unarmed-chases; target identity stays locked"
+    adopted: "2026-09-01"
+    section: B
+  - id: 59
+    title: "Static-analysis meta-layer: canary bidirectional pinning for three text-scan gates; SpotBugs NP verified silent on assignment-then-deref; NullAway-core deferred with triggers; exemption registry triaged to three-element discipline"
+    adopted: "2026-09-01"
+    section: A
+  - id: 60
+    title: "NullAway-core expansion: full @Nullable annotation alignment across 32 core/ files (97 initial warnings, 0 after paydown); AnnotatedPackages api+core at ERROR; B2 symmetric version pinning; ConcurrencyPrimitiveGateTest"
+    adopted: "2026-09-01"
+    section: A
+  - id: 61
+    title: "Directed taming: /entities/<id>/tame task verb over taming.chain face, engine-proven; Intent.InteractEntity(entityId) on INTERACT channel; Overrides gains Tame{targetId, typeKey}; typed refusals NOT_TAMEABLE/ALREADY_TAMED/NO_TAME_ITEM/TARGET_DEAD; 12-tick press cadence doubles as sit-toggle guard"
+    adopted: "2026-09-02"
+    section: D
+    amends: [25]
+
+amendment_chains:
+  - chain: [14, 37, 51]
+    note: "Actor channels -> bow ranging -> stateful range routing"
+  - chain: [39, 40]
+    note: "Directed engagement -> kill-confirmation"
+  - chain: [41, 42]
+    note: "Architecture wave -> audit completion"
+  - chain: [51, 54, 56]
+    note: "Range routing -> GoalRange -> steering decoupling"
+  - chain: [25, 61]
+    note: "Block capability dig first -> directed taming (entity-direction sibling of InteractBlock)"

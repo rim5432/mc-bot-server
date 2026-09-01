@@ -14,6 +14,11 @@ All future implementation happens inside the seams below. Interfaces are
 frozen; implementations are free. When a change is needed, it is event-
 driven via the reopen triggers at the end - never vibe-driven.
 
+**Decision index lives in [`doc/_state/boundaries.yaml`](../_state/boundaries.yaml)** —
+machine-readable list of all 61 decisions with adoption dates, amendment
+chains, and section mapping. This file carries the contract text; the YAML
+is the citation-resolution index.
+
 ## The four boundaries
 
 | ID | Sides | Contract | Status | Verification |
