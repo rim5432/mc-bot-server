@@ -1087,3 +1087,46 @@ Amendment chains recorded so far (both sides annotated):
     mechanics survey in player-behavior-RE.md section 9) and
     cat/parrot engine scenarios (the species map is catalog-gated
     offline; the engine path is species-agnostic).
+
+    62. 2026-09-02 Directed melee strike + the land-game hunt yield
+    face: the first yield-scenario face landed under the
+    scenario-identity doctrine (face = the excursion's gain, not the
+    fight). Root cause the first engine run exposed: MeleeResolver's
+    candidate prefilter intersected the threat registry
+    (hostileTypes), so a directed attack task on a cow swung forever
+    without ever qualifying a victim - cowAlive=true, beef=0 at
+    timeout; combat's nearest-hostile cone was built for defense,
+    not addressed predation. Repair: a new one-shot
+    Intent.Strike(entityId) on the USE channel (the hurt-side
+    sibling of ledger 61's InteractEntity; USE stays entity-melee
+    per the 0007 review; Claim's channel-variant table whitelists
+    it), served by StrikeEntityExecutor - it resolves the claim's
+    UUID against the server level, gates the shared 3.0 surface
+    reach, self-times the weapon's item-derived cooldown (the
+    PathfinderMob body has no vanilla charge ticker; a no-op path
+    consumes nothing), and rides the resolver's full crit-aware
+    damage chain (performMeleeAttack widened package-private), so
+    enchant bonus, knockback, Fire Aspect, crit, and
+    setLastHurtByPlayer XP attribution all carry over.
+    CombatBehavior.tickMelee now submits one Strike claim per
+    cooldown window (no USE press/unlatch pair; claim identity is
+    the rising edge in BindingActor.applyUse), so every directed
+    combat order's victim is ADDRESSED by id - hostile or passive
+    alike - while the Intent.Use press keeps the cone resolver for
+    the no-order reflex paths. Offline gates migrated to the
+    addressed semantics (CombatRanged/ShieldReaction/Skeleton gate
+    assertions now read Strike claims; UseClaimTestSupport
+    .strikeClaims; new CombatStrikeGateTest pins id-addressing,
+    window pacing, hold-item suppression, out-of-reach silence).
+    The acquisition.hunt_game face (seed row + one engine scenario,
+    huntsCowAndCollectsBeefYield: kill AND beef-in-inventory, the
+    yield not the kill) rides this fix; husbandry.shear_wool /
+    breed_loop / passive_collect seeded gap - they wait on a
+    general entity-use harness path over InteractEntity (the tame
+    path is species-specific). Attribution: the strike code and the
+    four marker re-points (4db91ac's archive cleanup left
+    issue-0005/0008 markers dangling; repaired to boundaries
+    decisions 24/26 and player-behavior-RE.md section 8) landed
+    swept inside the concurrent docs round's 7bd7804 reformat and
+    8d858f6 toolchain-merge commits; this entry and the boundaries
+    index row are the verdict of record.
