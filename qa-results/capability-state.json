@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "exported_at": "2026-09-02T00:45:33",
+  "exported_at": "2026-09-02T02:01:33",
   "statuses": [
     {
       "id": "acquisition.water_fish",
@@ -219,6 +219,12 @@
       "deviation": ""
     },
     {
+      "id": "taming.chain",
+      "status": "shipped",
+      "verified_at": "2026-09-02",
+      "deviation": ""
+    },
+    {
       "id": "vitals.air_supply",
       "status": "shipped",
       "verified_at": "2026-08-29",
@@ -304,8 +310,8 @@
     },
     {
       "case_id": "GT-BotCombatGameTests-arrowsRunOutMidFightReroutesToMelee",
-      "capability_id": "combat.melee",
-      "link_source": "auto_keyword"
+      "capability_id": "combat.hostile_acquisition",
+      "link_source": "feature_annotated"
     },
     {
       "case_id": "GT-BotCombatGameTests-blocksIncomingArrowsMidCombat",
@@ -900,6 +906,21 @@
     {
       "case_id": "GT-BotPotionGameTests-potionStackCountTwoKeepsRemainderAndAddsBottle",
       "capability_id": "consumable.potion",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotTamingGameTests-alreadyTamedWolfFailsFast",
+      "capability_id": "taming.chain",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotTamingGameTests-tameRejectsNonTameableTarget",
+      "capability_id": "taming.chain",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotTamingGameTests-tamesWolfWithBones",
+      "capability_id": "taming.chain",
       "link_source": "annotated"
     },
     {
