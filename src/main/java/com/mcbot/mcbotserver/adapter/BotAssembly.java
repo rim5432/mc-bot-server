@@ -139,7 +139,8 @@ public final class BotAssembly {
                 .seal();
         BindingWorldView view =
                 new BindingWorldView(level, traits, () -> body.getInventory().snapshot());
-        BindingActor actor = new BindingActor(body);
+        BindingActor actor =
+                new BindingActor(body, events, () -> level.getDayTime() / 24000L, () -> level.getDayTime() % 24000L);
 
         // Best-food ranking (issue 0010 D5): highest nutrition wins,
         // ties keep the lower hotbar slot - cooked beats raw, raw
@@ -227,6 +228,7 @@ public final class BotAssembly {
         // The eat reflex executes against the same best-food ranking
         // the sensor stamps (one source of truth for both ends).
         controller.setEatSlotSupplier(bestFoodSlot);
+        controller.setFoodLevelSource(() -> body.getFoodData().getFoodLevel());
         controller.setMlgBucketSlotSupplier(waterBucketSlot);
         CommandBus bus = new CommandBus(events);
         GotoCommandHandler gotoHandler = new GotoCommandHandler(

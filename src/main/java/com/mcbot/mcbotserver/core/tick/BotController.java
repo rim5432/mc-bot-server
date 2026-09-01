@@ -22,6 +22,7 @@ import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.core.reflex.MinimalReflex;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer.ReflexDecision;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -145,6 +146,13 @@ public final class BotController {
     private final ReflexPreemption preemption;
 
     private int ticksSinceKeepalive;
+
+    /**
+     * Current food level for EAT_STARTED disclosure. Defaults to 0 so
+     * an unwired rig emits a truthful "unknown" value rather than a
+     * phantom full-bar; the production wiring feeds the body's FoodData.
+     */
+    private java.util.function.IntSupplier foodLevelSource = () -> 0;
 
     /**
      * How often the keepalive event fires. Matches
@@ -300,6 +308,17 @@ public final class BotController {
      */
     public void setEatSlotSupplier(java.util.function.IntSupplier supplier) {
         this.claimInjector.setEatSlotSupplier(supplier);
+    }
+
+    /**
+     * Feed the current food level for EAT_STARTED disclosure (ledger 34
+     * extension). The production wiring reads the body's FoodData; rigs
+     * without it default to 0.
+     *
+     * @param supplier current food level 0..20; never null
+     */
+    public void setFoodLevelSource(java.util.function.IntSupplier supplier) {
+        this.foodLevelSource = java.util.Objects.requireNonNull(supplier, "supplier");
     }
 
     /**
@@ -601,8 +620,44 @@ public final class BotController {
         Intent.Move hold = decision.action() == ReflexAction.ASCEND
                 ? new Intent.Move(0, 0, true, false)
                 : new Intent.Move(0, 0, false, false);
+        if (decision.action() == ReflexAction.EAT) {
+            // Pre-selection disclosure (ledger 34 extension): the reflex
+            // has decided to eat and the slot is about to be selected.
+            // Urgent because preemptAndHold parks the current mission on
+            // the same tick — the harness's mental model ("task running")
+            // is about to be wrong.
+            emitEatStarted(decision, day, tod);
+        }
         preemption.preemptAndHold(decision, hold, tickCounter, day, tod);
         return true;
+    }
+
+    /**
+     * Push one EAT_STARTED event: the reflex decided to eat and the
+     * food slot is about to be selected (pre-selection disclosure,
+     * ledger 34 extension). Urgent because preemptAndHold parks the
+     * current mission on the same tick. Wrapped so reporting never
+     * takes the pipeline down.
+     */
+    private void emitEatStarted(SurvivalReflexLayer.ReflexDecision decision, long day, long tod) {
+        try {
+            Map<String, String> attrs = new HashMap<>();
+            attrs.put("foodLevel", Integer.toString(foodLevelSource.getAsInt()));
+            attrs.put("slot", Integer.toString(claimInjector.currentEatSlot()));
+            attrs.put("ruleName", decision.ruleName());
+            attrs.put("source", "reflex");
+            events.push(new BotEvent(
+                    EventKind.EAT_STARTED,
+                    day,
+                    tod,
+                    true,
+                    Map.copyOf(attrs),
+                    "eat started: foodLevel=" + foodLevelSource.getAsInt()
+                            + " slot=" + claimInjector.currentEatSlot()
+                            + " rule=" + decision.ruleName()));
+        } catch (RuntimeException ignored) {
+            // Reporting must never take the pipeline down.
+        }
     }
 
     /**

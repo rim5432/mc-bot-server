@@ -8,7 +8,13 @@ import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.ai.control.MoveControl;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.BowlFoodItem;
+import net.minecraft.world.item.HoneyBottleItem;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.PotionItem;
+import net.minecraft.world.item.SuspiciousStewItem;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
@@ -78,6 +84,19 @@ public final class BotBodyEntity extends PathfinderMob {
     private int presenceCooldown;
 
     /**
+     * Position at the previous customServerAiStep call. Used for
+     * movement-exhaustion distance measurement because customServerAiStep
+     * runs BEFORE LivingEntity.travel() in the aiStep() chain (decompiled
+     * 1.20.1 LivingEntity.aiStep line 2609 serverAiStep, line 2662
+     * travel), so getX()-xo is zero at this point — the engine has not
+     * yet moved the body this tick. Tracked manually instead.
+     */
+    private double lastTickX;
+
+    private double lastTickZ;
+    private boolean hasLastTickPos;
+
+    /**
      * Experience state (level/progress/total) with the vanilla
      * {@code Player.experience*} arithmetic, in the same
      * state-vs-math split as {@link HungerTicker}: the carrier owns
@@ -111,6 +130,20 @@ public final class BotBodyEntity extends PathfinderMob {
      * 32); the per-monster attribute check below is the authority.
      */
     private static final double PRESENCE_SCAN_HALF_WIDTH = 40.0;
+
+    /**
+     * Movement exhaustion rates (Player.checkMovementStatistics, vanilla
+     * 1.20.1). Sprint is 0.1/block (parity); walk is a recorded
+     * deviation at 0.01/block (the vanilla swim rate, not vanilla's
+     * zero walk rate) — a non-zero baseline so a purely-walking mob
+     * carrier still drains hunger over time. See player-behavior-RE.md
+     * section 1 and the hunger.movement_exhaustion capability face.
+     * Future movement kinds (swim, jump, sneak) should add their own
+     * constants here rather than inline literals.
+     */
+    private static final float SPRINT_EXHAUSTION_PER_BLOCK = 0.1f;
+
+    private static final float WALK_EXHAUSTION_PER_BLOCK = 0.01f;
 
     /**
      * Downward velocity applied while sneaking in water. Vanilla
@@ -393,8 +426,22 @@ public final class BotBodyEntity extends PathfinderMob {
         // zero-walk carrier would never exhaust on foot, so the bot
         // uses the vanilla swim rate as its walking floor. See
         // player-behavior-RE.md section 1 for the full deviation note.
-        float movedHorizontally = (float) Math.hypot(getX() - xo, getZ() - zo);
-        foodData.addExhaustion(movedHorizontally * (isSprinting() ? 0.1f : 0.01f));
+        //
+        // Position is tracked manually (lastTickX/Z) rather than via
+        // getX()-xo: customServerAiStep runs BEFORE LivingEntity.travel()
+        // in the aiStep() chain, so xo still equals the current position
+        // at this point and getX()-xo is always zero. The delta against
+        // the previous call measures the previous tick's travel, which is
+        // exactly what vanilla Player.checkMovementStatistics does (it
+        // also runs on the previous tick's displacement).
+        if (hasLastTickPos) {
+            float movedHorizontally = (float) Math.hypot(getX() - lastTickX, getZ() - lastTickZ);
+            foodData.addExhaustion(
+                    movedHorizontally * (isSprinting() ? SPRINT_EXHAUSTION_PER_BLOCK : WALK_EXHAUSTION_PER_BLOCK));
+        }
+        lastTickX = getX();
+        lastTickZ = getZ();
+        hasLastTickPos = true;
         applyDriveJump();
         applyWaterDescent();
         if (hasPendingRotation) {
@@ -423,27 +470,152 @@ public final class BotBodyEntity extends PathfinderMob {
      * only fires while hungry, so the golden-apple-at-full edge is
      * out of scope).
      *
+     * <p>Container retention (the non-obvious part): BowlFoodItem and
+     * SuspiciousStewItem always return a bowl from {@code finishUsingItem}
+     * for non-creative callers, even when the original stack had count{@code >}1
+     * — the shrunk remainder is silently lost if the caller replaces the
+     * slot with the returned bowl. HoneyBottleItem returns the shrunk stack
+     * for count{@code >}1 but only adds the glass bottle to {@code Player}
+     * inventories (the bot is a Mob, so the bottle is lost). This method
+     * implements the vanilla Player resolution: count 1 replaces the slot
+     * with the container; count{@code >}1 keeps the shrunk stack in the slot
+     * and routes the container to inventory (or drops it if full).
+     *
+     * <p>Always-edible bypass (golden apples, enchanted golden apples):
+     * {@code FoodProperties.canAlwaysEat()} bypasses the {@code needsFood()}
+     * gate, matching vanilla {@code Item.use} — a player at full hunger can
+     * still eat a golden apple for its absorption/regeneration effects. The
+     * reflex layer ({@code EatWhenHungryRule}) does not fire above its
+     * trigger, so always-edible food at full hunger is harness-driven
+     * (strategic use before combat), not reflex-driven.
+     *
      * @return true when an item was consumed
      */
     public boolean eatHeldItem() {
         ItemStack held = inventory.container().getItem(selectedSlot);
         var props = held.getFoodProperties(this);
-        if (props == null || !foodData.needsFood()) {
+        if (props == null || (!foodData.needsFood() && !props.canAlwaysEat())) {
             return false;
         }
-        // Capture the nutrition numbers BEFORE finishUsingItem: it
-        // consumes the stack in place, and Forge's contexted
-        // FoodData.eat(Item, ItemStack, LivingEntity) re-reads the
-        // properties from the already-consumed stack - null for an
-        // air stack - so the whole meal silently applied zero food
-        // (engine eatsWhenHungry read food=10 after a confirmed bite).
-        // The vanilla int/float primitive carries no context.
+        // Capture nutrition BEFORE finishUsingItem: it shrinks the stack in
+        // place, and Forge's contexted eat re-reads properties from the
+        // shrunk stack (null for air) — the whole meal would apply zero food.
         int nutrition = props.getNutrition();
         float saturation = props.getSaturationModifier();
+        // Determine the container item BEFORE finishUsingItem mutates the
+        // stack. BowlFoodItem/SuspiciousStewItem -> bowl; HoneyBottleItem ->
+        // glass bottle; everything else -> no container.
+        Item containerItem = containerItemFor(held.getItem());
         ItemStack remainder = held.finishUsingItem(level(), this);
         foodData.eat(nutrition, saturation);
-        inventory.container().setItem(selectedSlot, remainder);
+        if (containerItem != null) {
+            if (held.isEmpty()) {
+                // Count was 1: finishUsingItem returned the container; the
+                // slot becomes the container (bowl / glass bottle).
+                inventory.container().setItem(selectedSlot, remainder);
+            } else {
+                // Count was >1: finishUsingItem shrank held to count-1. Keep
+                // the shrunk stack in the slot and route the container to
+                // inventory (BowlFoodItem/SuspiciousStewItem return the bowl
+                // as remainder; HoneyBottleItem returns the shrunk stack, so
+                // we synthesize the bottle here).
+                inventory.container().setItem(selectedSlot, held);
+                ItemStack container = remainder.getItem() == containerItem ? remainder : new ItemStack(containerItem);
+                addOrDrop(container);
+            }
+        } else {
+            // Non-container food: remainder is the shrunk stack.
+            inventory.container().setItem(selectedSlot, remainder);
+        }
         return true;
+    }
+
+    /**
+     * Drink the held potion (consumable-face Phase 1): the vanilla
+     * mob-safe chain — {@code finishUsingItem} applies the potion
+     * effects ({@code PotionUtils.getMobEffects} -> {@code addEffect}
+     * / {@code applyInstantenousEffect}) and fires the DRINK game
+     * event, but does NOT shrink the stack or return a glass bottle
+     * for non-Player callers ({@code PotionItem.finishUsingItem}
+     * lines 60-75 are Player-only). This method implements the
+     * vanilla Player resolution: count 1 replaces the slot with a
+     * glass bottle; count{@code >}1 keeps the shrunk stack in the
+     * slot and routes the glass bottle to inventory (or drops it if
+     * full).
+     *
+     * <p>No hunger gate: potions are drinkable at any time, matching
+     * vanilla {@code PotionItem.use} (calls {@code
+     * startUsingInstantly} with no {@code canEat} check). The only
+     * food category sharing this property is always-edible
+     * ({@code FoodProperties.canAlwaysEat}); normal food is gated by
+     * {@code needsFood()}.
+     *
+     * <p>Effects are applied by {@code finishUsingItem} itself; the
+     * caller ({@code BindingActor.onUsePressEdge}) captures the
+     * effect list BEFORE calling this method for the DRINK_COMPLETED
+     * event, exactly as {@code eatHeldItem}'s caller captures
+     * nutrition before consumption.
+     *
+     * @return true when a potion was consumed
+     */
+    public boolean drinkHeldItem() {
+        ItemStack held = inventory.container().getItem(selectedSlot);
+        if (!(held.getItem() instanceof PotionItem)) {
+            return false;
+        }
+        // finishUsingItem applies effects but does not shrink for Mob
+        // callers — the Player-only shrink in PotionItem.finishUsingItem
+        // line 63 is skipped, so we must shrink manually below.
+        held.finishUsingItem(level(), this);
+        held.shrink(1);
+        if (held.isEmpty()) {
+            // Count was 1: slot becomes the glass bottle.
+            inventory.container().setItem(selectedSlot, new ItemStack(Items.GLASS_BOTTLE));
+        } else {
+            // Count was > 1: keep the shrunk stack in the slot and
+            // route the glass bottle to inventory (or drop if full).
+            inventory.container().setItem(selectedSlot, held);
+            addOrDrop(new ItemStack(Items.GLASS_BOTTLE));
+        }
+        return true;
+    }
+
+    /**
+     * Resolve the container item a food type leaves behind, or null for
+     * foods with no container. Extracted so the eat path stays linear and
+     * the mapping is auditable in one place.
+     *
+     * @param item the food item being eaten; never null
+     * @return the container item (Items.BOWL / Items.GLASS_BOTTLE), or null
+     */
+    private static Item containerItemFor(Item item) {
+        if (item instanceof BowlFoodItem || item instanceof SuspiciousStewItem) {
+            return Items.BOWL;
+        }
+        if (item instanceof HoneyBottleItem) {
+            return Items.GLASS_BOTTLE;
+        }
+        return null;
+    }
+
+    /**
+     * Add a single-item stack to the first empty main-inventory slot, or
+     * drop it at the carrier's position if the inventory is full. The
+     * vanilla Player path uses {@code Inventory.add} with stacking; the
+     * bot's SimpleContainer has no {@code addItem}, so this finds an empty
+     * slot directly — sufficient for container items which are always count
+     * 1 and rarely contend for space.
+     *
+     * @param stack the single-item stack to route; never null
+     */
+    private void addOrDrop(ItemStack stack) {
+        for (int i = 0; i < BindingInventory.CONTAINER_SIZE; i++) {
+            if (inventory.container().getItem(i).isEmpty()) {
+                inventory.container().setItem(i, stack);
+                return;
+            }
+        }
+        spawnAtLocation(stack);
     }
 
     /**

@@ -76,7 +76,25 @@ class WireVocabularyGateTest {
                             "ticksSincePlan",
                             "planAge",
                             "noPathWitnesses",
-                            "goalCell")));
+                            "goalCell")),
+            Map.entry("EAT_STARTED", Set.of("foodLevel", "slot", "ruleName", "source")),
+            Map.entry(
+                    "EAT_COMPLETED",
+                    Set.of(
+                            "itemId",
+                            "slot",
+                            "nutrition",
+                            "saturationGained",
+                            "foodLevelBefore",
+                            "foodLevelAfter",
+                            "saturationBefore",
+                            "saturationAfter",
+                            "containerType",
+                            "source")),
+            Map.entry("EAT_FAILED", Set.of("reason", "slot", "itemId", "source")),
+            Map.entry("DRINK_STARTED", Set.of("potionId", "slot", "health", "source")),
+            Map.entry("DRINK_COMPLETED", Set.of("potionId", "slot", "effects", "containerType", "source")),
+            Map.entry("DRINK_FAILED", Set.of("reason", "slot", "itemId", "source")));
 
     /**
      * Every main-source file that constructs a {@link BotEvent} or
@@ -94,7 +112,8 @@ class WireVocabularyGateTest {
             "core/tick/BotController.java",
             "core/tick/CrashLatch.java",
             "core/tick/MissionReporter.java",
-            "core/behavior/PathingBehavior.java");
+            "core/behavior/PathingBehavior.java",
+            "adapter/BindingActor.java");
 
     /** Attr-key literal shapes used at push sites. */
     private static final Pattern[] ATTR_LITERAL = {

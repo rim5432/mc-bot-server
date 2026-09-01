@@ -119,6 +119,11 @@ class GametestInventoryCheck {
                             "paginatesRecipesSorted",
                             "craftsShapelessPlanksFromLogs")),
             Map.entry("GauntletGameTests", Set.of("gauntletEndToEnd", "routesThroughFenceGap")),
+            Map.entry(
+                    "BotPotionGameTests",
+                    Set.of(
+                            "healingPotionRestoresHealthAndLeavesGlassBottle",
+                            "potionStackCountTwoKeepsRemainderAndAddsBottle")),
             Map.entry("CrashRecoveryGameTests", Set.of("latchesAndRecoversAfterCrash")),
             Map.entry("ProductionWiringGameTests", Set.of("walksViaCommandAndServerTick")),
             Map.entry(
@@ -143,7 +148,20 @@ class GametestInventoryCheck {
                             "naturalRegenDisabledStopsHealingButNotStarvation",
                             "saturatedFastRegenHealsAndCostsExhaustion",
                             "slowRegenFiresAtFoodLevelEighteen",
-                            "starvationDealsDamageAtZeroFood")));
+                            "starvationDealsDamageAtZeroFood",
+                            "walkAccumulatesExhaustionAtDeviatedRate",
+                            "sprintAccumulatesExhaustionAtVanillaRate",
+                            "eatReflexEmitsStartedAndCompletedEvents",
+                            "bowlFoodCountOneLeavesBowlInSlot",
+                            "bowlFoodCountTwoKeepsStewAndAddsBowlToInventory",
+                            "honeyBottleCountTwoKeepsBottleAndAddsGlassToInventory",
+                            "suspiciousStewAppliesStoredPotionEffect",
+                            "honeyBottleRemovesPoisonEffect",
+                            "chorusFruitConsumesItemAndAppliesFood",
+                            "goldenAppleEdibleAtFullHungerAndAppliesEffects",
+                            "suspiciousStewWithMultipleEffectsAppliesAll",
+                            "bowlFoodFullInventoryDropsContainer",
+                            "eatCompletedEventCarriesFullNutritionSnapshot")));
     /** Pulls the method name out of each
      * {@code @GameTest(...)} declaration in a source file. */
     private static final Pattern GAME_TEST_METHOD =

@@ -60,6 +60,17 @@ final class ReflexClaimInjector {
     }
 
     /**
+     * The eat slot the supplier currently reports, or -1 when no food is
+     * sensed. Package-private: BotController reads it for EAT_STARTED
+     * disclosure (ledger 34 extension).
+     *
+     * @return 0..8 when food is sensed, -1 otherwise
+     */
+    int currentEatSlot() {
+        return eatSlot.getAsInt();
+    }
+
+    /**
      * Feed the MLG reflex's execution slot: the water-bucket hotbar
      * slot, or -1 when none. Defaults to -1 so an unwired rig
      * degrades a WATER_BUCKET decision to silence - stale slot data

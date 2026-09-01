@@ -6,18 +6,31 @@ import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.capability.Feature;
+import com.mcbot.mcbotserver.api.event.BotEvent;
+import com.mcbot.mcbotserver.api.event.EventKind;
+import com.mcbot.mcbotserver.api.event.EventQueue;
 import com.mcbot.mcbotserver.api.menu.MenuTransactions;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.actor.ChannelArbiter;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.LongSupplier;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.item.BowItem;
+import net.minecraft.world.item.BowlFoodItem;
 import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.FishingRodItem;
+import net.minecraft.world.item.HoneyBottleItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.PotionItem;
 import net.minecraft.world.item.ShieldItem;
+import net.minecraft.world.item.SuspiciousStewItem;
+import net.minecraft.world.item.alchemy.PotionUtils;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
@@ -152,12 +165,25 @@ public final class BindingActor implements Actor {
     private boolean lastDropClaimed;
     private boolean lastInteractClaimed;
 
+    /** Boundary-D event sink for eat lifecycle disclosure (ledger 34). */
+    private final EventQueue events;
+
+    /** Game-day supplier for event stamps; never null. */
+    private final LongSupplier daySupplier;
+
+    /** Time-of-day ticks supplier for event stamps; never null. */
+    private final LongSupplier todSupplier;
+
     /**
      * Creates an actor bound to one body.
      *
-     * @param body the physical carrier; never null
+     * @param body         the physical carrier; never null
+     * @param events       boundary-D event sink for eat lifecycle; never
+     *                     null
+     * @param daySupplier  game-day stamp source; never null
+     * @param todSupplier  time-of-day tick stamp source; never null
      */
-    public BindingActor(BotBodyEntity body) {
+    public BindingActor(BotBodyEntity body, EventQueue events, LongSupplier daySupplier, LongSupplier todSupplier) {
         this.body = Objects.requireNonNull(body, "body");
         this.melee = new MeleeResolver(body);
         this.presence = new PresenceLayer(body);
@@ -168,6 +194,9 @@ public final class BindingActor implements Actor {
         this.facade = new BotPlayerFacade(body);
         this.interact = new InteractBlockExecutor(body, facade);
         this.menuTx = new ActorMenuTransactions(facade);
+        this.events = Objects.requireNonNull(events, "events");
+        this.daySupplier = Objects.requireNonNull(daySupplier, "daySupplier");
+        this.todSupplier = Objects.requireNonNull(todSupplier, "todSupplier");
     }
 
     /**
@@ -244,7 +273,7 @@ public final class BindingActor implements Actor {
     private void applyUse(Claim use) {
         if (use != null && use.intent() instanceof Intent.Use u) {
             if (u.pressing() && !lastUsePressing) {
-                onUsePressEdge();
+                onUsePressEdge(use.holder());
             }
             if (facade.isUsingItem()) {
                 // The draw charge advances only when pumped - the facade
@@ -285,25 +314,233 @@ public final class BindingActor implements Actor {
             deviation = "Bot-specific: the facade is a Player-shaped object for attribute/XP machinery, but it never"
                     + " takes damage — the shield must be held on the body that actually receives the hurt call."
                     + "Verified by issue 0003: a facade-raised shield did nothing.")
-    private void onUsePressEdge() {
-        if (body.eatHeldItem()) {
+    private void onUsePressEdge(String owner) {
+        String source = owner != null && owner.startsWith("reflex:") ? "reflex" : "harness";
+        ItemStack held = body.getInventory().container().getItem(body.selectedSlot);
+        var props = held.getFoodProperties(body);
+        if (props != null) {
+            int foodBefore = body.getFoodData().getFoodLevel();
+            float satBefore = body.getFoodData().getSaturationLevel();
+            int slot = body.selectedSlot;
+            String itemId = BuiltInRegistries.ITEM.getKey(held.getItem()).toString();
+            int nutrition = props.getNutrition();
+            float satModifier = props.getSaturationModifier();
+            // Container type for the EAT_COMPLETED attrs: bowl foods and
+            // honey bottles leave a container; normal foods and chorus fruit
+            // do not. Captured before eatHeldItem mutates the slot.
+            String containerType = containerTypeFor(held.getItem());
+            boolean consumed = body.eatHeldItem();
+            if (consumed) {
+                int foodAfter = body.getFoodData().getFoodLevel();
+                float satAfter = body.getFoodData().getSaturationLevel();
+                emitEatCompleted(
+                        itemId, slot, nutrition, satBefore, satAfter, foodBefore, foodAfter, containerType, source);
+                return;
+            }
+            // Food in hand but not consumed: needsFood() was false (full)
+            // or the stack was empty between props read and eatHeldItem.
+            emitEatFailed("NOT_HUNGRY", slot, itemId, source);
             return;
         }
-        Item held = body.getInventory().container().getItem(body.selectedSlot).getItem();
-        if (held instanceof BowItem) {
+        if (held.getItem() instanceof PotionItem) {
+            int slot = body.selectedSlot;
+            String itemId = BuiltInRegistries.ITEM.getKey(held.getItem()).toString();
+            String potionId =
+                    BuiltInRegistries.POTION.getKey(PotionUtils.getPotion(held)).toString();
+            String effects = serializeEffects(PotionUtils.getMobEffects(held));
+            float health = body.getHealth();
+            emitDrinkStarted(potionId, slot, health, source);
+            boolean consumed = body.drinkHeldItem();
+            if (consumed) {
+                emitDrinkCompleted(potionId, slot, effects, "glass_bottle", source);
+            } else {
+                emitDrinkFailed("NOT_DRINKABLE", slot, itemId, source);
+            }
+            return;
+        }
+        Item heldItem = held.getItem();
+        if (heldItem instanceof BowItem) {
             facade.startUsingItem(InteractionHand.MAIN_HAND);
-        } else if (held instanceof ShieldItem) {
+        } else if (heldItem instanceof ShieldItem) {
             body.startUsingItem(InteractionHand.MAIN_HAND);
-        } else if (held instanceof BucketItem || held instanceof FishingRodItem) {
-            // Air-use items: vanilla resolves them through Item.use
-            // against a POV raycast from the actor's eyes (the bucket
-            // fills/empties at the ray hit, the rod casts or reels).
-            // useHeldAirStack syncs the facade pose first - the ray
-            // must not fire from a stale position.
+        } else if (heldItem instanceof BucketItem || heldItem instanceof FishingRodItem) {
             useHeldAirStack();
         } else {
             melee.onUsePress();
         }
+    }
+
+    /**
+     * Push one EAT_COMPLETED event. Wrapped so a reporting failure never
+     * takes the tick pipeline down (same invariant as MissionReporter).
+     */
+    private void emitEatCompleted(
+            String itemId,
+            int slot,
+            int nutrition,
+            float satBefore,
+            float satAfter,
+            int foodBefore,
+            int foodAfter,
+            String containerType,
+            String source) {
+        try {
+            Map<String, String> attrs = new HashMap<>();
+            attrs.put("itemId", itemId);
+            attrs.put("slot", Integer.toString(slot));
+            attrs.put("nutrition", Integer.toString(nutrition));
+            attrs.put("saturationGained", Float.toString(satAfter - satBefore));
+            attrs.put("foodLevelBefore", Integer.toString(foodBefore));
+            attrs.put("foodLevelAfter", Integer.toString(foodAfter));
+            attrs.put("saturationBefore", Float.toString(satBefore));
+            attrs.put("saturationAfter", Float.toString(satAfter));
+            attrs.put("containerType", containerType);
+            attrs.put("source", source);
+            events.push(new BotEvent(
+                    EventKind.EAT_COMPLETED,
+                    daySupplier.getAsLong(),
+                    todSupplier.getAsLong(),
+                    false,
+                    Map.copyOf(attrs),
+                    "ate " + itemId + " (" + nutrition + " nutrition, food " + foodBefore + "->" + foodAfter + ")"));
+        } catch (RuntimeException ignored) {
+            // Reporting must never take the pipeline down.
+        }
+    }
+
+    /**
+     * Push one EAT_FAILED event. Same failure-isolation wrapper as
+     * {@link #emitEatCompleted}.
+     */
+    private void emitEatFailed(String reason, int slot, String itemId, String source) {
+        try {
+            Map<String, String> attrs = new HashMap<>();
+            attrs.put("reason", reason);
+            attrs.put("slot", Integer.toString(slot));
+            attrs.put("itemId", itemId);
+            attrs.put("source", source);
+            events.push(new BotEvent(
+                    EventKind.EAT_FAILED,
+                    daySupplier.getAsLong(),
+                    todSupplier.getAsLong(),
+                    false,
+                    Map.copyOf(attrs),
+                    "eat failed: " + reason + " (slot " + slot + ", item " + itemId + ")"));
+        } catch (RuntimeException ignored) {
+            // Reporting must never take the pipeline down.
+        }
+    }
+
+    /**
+     * Serialize a potion's effect list into the DRINK_COMPLETED wire
+     * format: comma-separated "id:amplifier:duration" triples.
+     * Instantaneous effects (instant health, instant damage) carry
+     * duration 0 — the harness distinguishes them by effect id. An
+     * empty list yields "" (not null), so the attr is always present.
+     *
+     * @param effects the potion's effect instances; never null
+     * @return the serialized string, possibly empty
+     */
+    private static String serializeEffects(List<MobEffectInstance> effects) {
+        StringBuilder sb = new StringBuilder();
+        for (MobEffectInstance e : effects) {
+            if (!sb.isEmpty()) {
+                sb.append(',');
+            }
+            sb.append(BuiltInRegistries.MOB_EFFECT.getKey(e.getEffect()).toString());
+            sb.append(':').append(e.getAmplifier());
+            sb.append(':').append(e.getDuration());
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Push one DRINK_STARTED event. Wrapped so a reporting failure
+     * never takes the tick pipeline down.
+     */
+    private void emitDrinkStarted(String potionId, int slot, float health, String source) {
+        try {
+            Map<String, String> attrs = new HashMap<>();
+            attrs.put("potionId", potionId);
+            attrs.put("slot", Integer.toString(slot));
+            attrs.put("health", Float.toString(health));
+            attrs.put("source", source);
+            events.push(new BotEvent(
+                    EventKind.DRINK_STARTED,
+                    daySupplier.getAsLong(),
+                    todSupplier.getAsLong(),
+                    true,
+                    Map.copyOf(attrs),
+                    "drink started: " + potionId + " (slot " + slot + ", health " + health + ")"));
+        } catch (RuntimeException ignored) {
+            // Reporting must never take the pipeline down.
+        }
+    }
+
+    /**
+     * Push one DRINK_COMPLETED event. Wrapped so a reporting failure
+     * never takes the tick pipeline down.
+     */
+    private void emitDrinkCompleted(String potionId, int slot, String effects, String containerType, String source) {
+        try {
+            Map<String, String> attrs = new HashMap<>();
+            attrs.put("potionId", potionId);
+            attrs.put("slot", Integer.toString(slot));
+            attrs.put("effects", effects);
+            attrs.put("containerType", containerType);
+            attrs.put("source", source);
+            events.push(new BotEvent(
+                    EventKind.DRINK_COMPLETED,
+                    daySupplier.getAsLong(),
+                    todSupplier.getAsLong(),
+                    false,
+                    Map.copyOf(attrs),
+                    "drank " + potionId + " (effects: " + effects + ")"));
+        } catch (RuntimeException ignored) {
+            // Reporting must never take the pipeline down.
+        }
+    }
+
+    /**
+     * Push one DRINK_FAILED event. Wrapped so a reporting failure
+     * never takes the tick pipeline down.
+     */
+    private void emitDrinkFailed(String reason, int slot, String itemId, String source) {
+        try {
+            Map<String, String> attrs = new HashMap<>();
+            attrs.put("reason", reason);
+            attrs.put("slot", Integer.toString(slot));
+            attrs.put("itemId", itemId);
+            attrs.put("source", source);
+            events.push(new BotEvent(
+                    EventKind.DRINK_FAILED,
+                    daySupplier.getAsLong(),
+                    todSupplier.getAsLong(),
+                    false,
+                    Map.copyOf(attrs),
+                    "drink failed: " + reason + " (slot " + slot + ", item " + itemId + ")"));
+        } catch (RuntimeException ignored) {
+            // Reporting must never take the pipeline down.
+        }
+    }
+
+    /**
+     * Resolve the container type string for EAT_COMPLETED attrs. Mirrors
+     * {@link BotBodyEntity#containerItemFor(Item)} but returns the wire
+     * string instead of the engine item. Kept in the actor because the
+     * event vocabulary is owned here; the body owns the physical mapping.
+     *
+     * @param item the food item; never null
+     * @return "bowl", "glass_bottle", or "none"
+     */
+    private static String containerTypeFor(Item item) {
+        if (item instanceof BowlFoodItem || item instanceof SuspiciousStewItem) {
+            return "bowl";
+        }
+        if (item instanceof HoneyBottleItem) {
+            return "glass_bottle";
+        }
+        return "none";
     }
 
     /** Releases every in-progress hold (facade draw, body shield). */

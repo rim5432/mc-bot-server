@@ -87,5 +87,70 @@ public final class EventKind {
      *  correlates with the task stream. */
     public static final String BLOCK_BROKEN = "BLOCK_BROKEN";
 
+    /**
+     * The eat reflex decided to consume food and selected the target
+     * hotbar slot (pre-selection disclosure, ledger 34 extension).
+     * Fires at the reflex decision tick, before the adapter consumes
+     * the item — the harness sees WHY the mission was preempted and
+     * WHAT will be eaten. Carries attrs {@code foodLevel},
+     * {@code trigger} (the rule's food threshold), {@code slot},
+     * {@code itemId}, {@code nutrition}, {@code saturationModifier},
+     * {@code source} ("reflex" or "harness"). Urgent because the
+     * reflex claim parks the current mission on the same tick.
+     */
+    public static final String EAT_STARTED = "EAT_STARTED";
+
+    /**
+     * One food item was consumed through the vanilla finishUsingItem
+     * chain (ledger 34). Carries attrs {@code itemId}, {@code slot},
+     * {@code nutrition}, {@code saturationGained},
+     * {@code foodLevelBefore}, {@code foodLevelAfter},
+     * {@code saturationBefore}, {@code saturationAfter},
+     * {@code source}. Not urgent — the harness learns the result at
+     * its next event drain.
+     */
+    public static final String EAT_COMPLETED = "EAT_COMPLETED";
+
+    /**
+     * An eat attempt reached the adapter but consumed nothing. Carries
+     * attrs {@code reason} (NOT_HUNGRY / NO_FOOD / NOT_EDIBLE /
+     * SLOT_EMPTY), {@code slot}, {@code itemId}. Not urgent.
+     */
+    public static final String EAT_FAILED = "EAT_FAILED";
+
+    /**
+     * The drink path is about to consume a potion (pre-consumption
+     * disclosure, consumable-face extension of EAT_STARTED). Fires
+     * when the adapter detects a PotionItem in the selected slot and
+     * is about to call finishUsingItem — the harness sees WHAT will
+     * be drunk before the 32-tick use animation resolves. Carries
+     * attrs {@code potionId} (the potion registry id, e.g.
+     * "minecraft:strong_healing"), {@code slot}, {@code health}
+     * (current health at drink start, for reflex correlation),
+     * {@code source} ("reflex" or "harness"). Urgent because a
+     * future drink reflex may park the current mission on the same
+     * tick; P0 is harness-driven only.
+     */
+    public static final String DRINK_STARTED = "DRINK_STARTED";
+
+    /**
+     * One potion was consumed through the vanilla finishUsingItem
+     * chain (consumable-face extension of EAT_COMPLETED). Carries
+     * attrs {@code potionId}, {@code slot}, {@code effects}
+     * (comma-separated "id:amplifier:duration"; instantaneous
+     * effects have duration 0), {@code containerType}
+     * ("glass_bottle" or "none"), {@code source}. Not urgent — the
+     * harness learns the result at its next event drain.
+     */
+    public static final String DRINK_COMPLETED = "DRINK_COMPLETED";
+
+    /**
+     * A drink attempt reached the adapter but consumed nothing.
+     * Carries attrs {@code reason} (NOT_DRINKABLE / SLOT_EMPTY /
+     * NO_POTION), {@code slot}, {@code itemId}, {@code source}.
+     * Not urgent.
+     */
+    public static final String DRINK_FAILED = "DRINK_FAILED";
+
     private EventKind() {}
 }
