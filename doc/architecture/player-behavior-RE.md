@@ -1,6 +1,6 @@
 ---
 title: Player Behavior RE - reverse-engineered vanilla mechanics truths
-last_verified: 2026-08-29
+last_verified: 2026-09-02
 covers: []
 related:
   - doc/architecture/boundaries.md
@@ -211,3 +211,124 @@ deviation cited.
   claim, dry ground, 5-block eye clip; ~1.3x speed observed).
 - **Ladders and vines are climbable traits** with no deliberate move
   yet (workplan gap inventory).
+
+## 9. Hunting yield: kill, herd, harvest (survey, 2026-09-02)
+
+Survey-stage truths for the animal-yield gameplay; read from the
+decompiled sources and the vanilla data pack extracted from
+`forge_gradle/minecraft_repo/versions/1.20.1/client-extra.jar`
+(loot tables and biome worldgen are data-driven JSON, absent from the
+decompile tree itself). No bot mirror exists yet - these records feed
+the hunting-yield face proposal (pending ruling). Face identity here
+is scenario/yield, per the convergence doctrine: combat owns the
+fight, the hunting faces own the gain.
+
+### 9.1 Direct-kill loot (data-driven per entity)
+
+- Per-pool shape is always `set_count` uniform + optional
+  `furnace_smelt` under `entity_properties flags.is_on_fire` +
+  `looting_enchant` uniform 0-1 (e.g. `cow.json`: leather 0-2,
+  beef 1-3; `pig.json` porkchop 1-3; `sheep.json` mutton 1-2 - wool
+  is NOT death loot; `chicken.json` feather 0-2 + chicken 1;
+  `rabbit.json` hide 0-1 + rabbit 1).
+- **Burning prey cooks the drop**: the `furnace_smelt` function
+  (SmeltItemFunction) swaps the raw item for its smelted form when the
+  dying entity is on fire - Fire Aspect or any fire death yields
+  cooked meat directly, no furnace leg (cow.json/pig.json/chicken.json
+  pools; SmeltItemFunction.java).
+- **Looting math** (LootingEnchantFunction.run:45-61): adds
+  `Math.round(looting_level * uniform(min,max))` per pool - for the
+  animals' uniform 0-1 providers that is one extra item per level in
+  expectation (x0.5) per pool, uncapped (no `limit` set on animal
+  tables). Works only with a player (KILLER_ENTITY) kill.
+- **Rabbit's foot is a rare kill drop**: pool conditioned on
+  `killed_by_player` + `random_chance_with_looting` chance 0.1,
+  multiplier 0.03 (10% + 3% per looting level; rabbit.json pool 2).
+- **Zero-death-loot animals** - their yield is entirely on the living
+  side: goat (milk), bee (hive), fox, frog; turtle dies for seagrass
+  0-2 + bowl only; panda drops bamboo 1; squid ink_sac 1-3 /
+  glow_squid 1-3; cod/salmon/tropical_fish/pufferfish drop 1 fish +
+  bone_meal 1; hoglin is the top porkchop prey (2-4 + leather 0-1).
+- **Death XP**: `1 + random.nextInt(3)` = 1-3 per animal
+  (Animal.getExperienceReward:131).
+
+### 9.2 Breeding algorithm (Animal.java, AgeableMob.java)
+
+- Feed an adult its breeding food while `age == 0` and not in love ->
+  `inLove = 600` (30 s; Animal.mobInteract:141-158, setInLove:175).
+- Two animals of the SAME class both in love -> one baby;
+  `spawnChildFromBreeding` (Animal.java:218-236) then both parents
+  `setAge(6000)` = 5-minute breed cooldown + reset love.
+- **Breeding XP**: `nextInt(7) + 1` = 1-7 per newborn, gated by
+  `RULE_DOMOBLOOT` (Animal.java:248).
+- **Natural growth**: babies start at `age = -24000` and tick +1/tick
+  = exactly 20 minutes to adult (AgeableMob.BABY_START_AGE, aiStep).
+- **Feeding a baby accelerates growth by 10% of the REMAINING time
+  per food item**: `getSpeedUpSecondsWhenFeeding(-age) = age/20 * 0.1`
+  (AgeableMob.java:159-161, applied in Animal.mobInteract baby
+  branch) - a fixed 20-minute growth is reachable with ~9 feedings
+  (0.9^k series), cheaper when wheat is farmed.
+- **Breeding foods** (isFood/TemptGoal): cow/sheep/goat wheat;
+  pig carrot/potato/beetroot (Pig.java:54); chicken any of 6 seed
+  types (Chicken.java:39-40); rabbit carrot/golden carrot/dandelion
+  (Rabbit.java:318-319); turtle seagrass (Turtle.java:283). Turtle
+  breeding additionally refuses love while `hasEgg()` (Turtle.java:258)
+  and lays on its home beach instead of spawning a live baby.
+
+### 9.3 Living-animal renewable yields (no kill required)
+
+- **Wool**: shear yields `1 + nextInt(3)` = 1-3 of the sheep's color
+  (Sheep.shear:214-231); `readyForShearing` = alive && !sheared &&
+  !baby (:236); regrow when the sheep eats a grass block
+  (EatBlockGoal, Sheep.java:116/122). Sheep keep producing forever on
+  grazed grass.
+- **Eggs**: `eggTime = nextInt(6000) + 6000` ticks = every 5-10
+  minutes a hen drops an egg item (Chicken.java:48, 95-99). A thrown
+  egg hatches a chick with p = 1/8, or 4 chicks with p = 1/32
+  (ThrownEgg.onHit:57-59) - eggs are both yield and slow breeder.
+- **Milk**: cow and goat convert an empty bucket to
+  `MILK_BUCKET` on right-click with NO cooldown (Cow.mobInteract:81-89,
+  Goat.java:211) - infinite-renewable, combat-free food-adjacent gain.
+- **Mooshroom shearing** drops mushrooms and converts the mooshroom
+  into a plain cow (MushroomCow.shear:172-176) - a one-shot wool-like
+  harvest that downgrades the animal.
+- **Turtle scute**: the baby -> adult age boundary drops 1 scute
+  (Turtle.java:311) - the only "grow the animal for its shed" yield.
+
+### 9.4 Prey difficulty and supply
+
+- Attributes (createAttributes) x panic goal multipliers (addGoal):
+  cow 10 HP / 0.20 speed, panic x2.0 (Cow.java:42,52); pig 10 HP /
+  0.25, panic x1.25 (Pig.java:75,64); sheep 8 HP / 0.23, panic x1.25
+  (Sheep.java:144,118); chicken 4 HP / 0.25, panic x1.4
+  (Chicken.java:74,59); rabbit 3 HP / 0.30, panic x2.2 + explicit
+  AvoidEntityGoal (Rabbit.java:267,97); turtle 30 HP / 0.25 but slow
+  on land; goat 10 HP / 0.20 with ATTACK_DAMAGE 2 (rams back);
+  hoglin 40 HP / 0.3 fighting speed / ATTACK_DAMAGE 6, brain-driven
+  avoidance AI (Hoglin.java:53-58). Consequence: open-field chasing
+  loses to panicking prey; every land prey except rabbit/goat is
+  TEMPTABLE toward the bot with its breeding food (TemptGoal 1.1-1.25
+  multiplier) - luring beats chasing.
+- Supply: plains creature band sheep w12, pig w10, chicken w10,
+  cow w8 (4-4 packs each), horse w5, donkey w1
+  (worldgen/biome/plains.json spawners.creature) - one herd encounter
+  is four animals of yield; animal spawn rule requires
+  ANIMALS_SPAWNABLE_ON ground below and light > 8 (Animal.java:109-118).
+
+### 9.5 Yield strategy derivations for the bot
+
+- Weapon route: looting sword maxima every meat/hide pool in
+  expectation; a fire route (burning kill) converts all meat to its
+  cooked form on the spot - the two enchantments are the entire
+  "yield algorithm" space on the kill side, no per-animal code.
+- Passive-first economics: milk (no cooldown) > eggs (5-10 min clock)
+  > wool (1-3 per graze cycle) are kill-free and repeatable; kill
+  yield (meat/leather) is the only path to cooked-protein bulk.
+- Breeding loop: two adults + breeding food compound into infinite
+  meat/leather; input cost is farmed wheat/carrots/seeds (the farming
+  domain feeds the husbandry loop), output is 1-7 XP per newborn on
+  top of the kill yield.
+- Device-layer gap for all living-side yields: right-click ON AN
+  ENTITY with an item (mobInteract) has no bot verb today - the
+  interaction faces cover block use only. Entity interaction (milk,
+  shear, feed) is a prerequisite verb for the husbandry faces.
