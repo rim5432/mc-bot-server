@@ -41,7 +41,7 @@ import java.util.function.Supplier;
  * World reads (block search, air poll) happen in {@link #onTick} via
  * the live {@link WorldView}.
  *
- * <p>State machine: IDLE → SEARCH → MOVING → DIGGING → COLLECTING →
+ * <p>State machine: IDLE -> SEARCH -> MOVING -> DIGGING -> COLLECTING ->
  * (SEARCH | DONE), with FAILED as the terminal failure path.
  * Per-target failures (STUCK, move budget, dig budget, unloaded
  * mid-dig) skip that target and return to SEARCH rather than failing
@@ -276,7 +276,7 @@ public final class MineProcess extends MissionShell implements DigMission {
     /**
      * COLLECTING phase: stand on the broken cell for the pickup window
      * so vanilla auto-pickup can collect the drop, then decide: target
-     * count reached → DONE, otherwise search for the next target.
+     * count reached -> DONE, otherwise search for the next target.
      */
     private Directive doCollecting(WorldView world) {
         if (ticksInCurrentPhase < pickupWindow) {

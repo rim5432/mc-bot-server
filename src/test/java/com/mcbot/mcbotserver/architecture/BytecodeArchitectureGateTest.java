@@ -66,9 +66,9 @@ class BytecodeArchitectureGateTest {
     /**
      * Subpackages inside every module are acyclic too. This rule
      * replaced the two documented exceptions below it once their last
-     * real edges were removed: api.behavior ↔ api.process (dissolved by
+     * real edges were removed: api.behavior <-> api.process (dissolved by
      * moving ExecutionReport to api.process) and
-     * adapter ↔ adapter.entity ↔ adapter.rescue (dissolved by moving
+     * adapter <-> adapter.entity <-> adapter.rescue (dissolved by moving
      * BindingInventory to adapter.inventory). A new subpackage cycle is
      * a design regression, not a documented exception.
      */

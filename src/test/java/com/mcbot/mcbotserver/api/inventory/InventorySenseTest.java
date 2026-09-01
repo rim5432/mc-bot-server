@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test;
 @SuppressWarnings("PMD.TooManyMethods")
 class InventorySenseTest {
 
-    // ── ItemView ──────────────────────────────────────────────
+    // -- ItemView ----------------------------------------------
 
     @Test
     void emptyConstantIsTrulyEmpty() {
@@ -68,7 +68,7 @@ class InventorySenseTest {
         assertTrue(weird.isEmpty());
     }
 
-    // ── InventoryView construction ────────────────────────────
+    // -- InventoryView construction ----------------------------
 
     @Test
     void emptyFactoryHasAllEmptySlotsAndSelectedZero() {
@@ -127,7 +127,7 @@ class InventorySenseTest {
                 () -> new InventoryView(emptyMain(), InventoryView.HOTBAR_SIZE, emptyArmor(), ItemView.EMPTY));
     }
 
-    // ── InventoryView queries ─────────────────────────────────
+    // -- InventoryView queries ---------------------------------
 
     @Test
     void getSelectedReturnsTheHotbarSlotAtSelectedIndex() {
@@ -172,7 +172,7 @@ class InventorySenseTest {
         assertEquals("minecraft:dirt", backpack.get(backpack.size() - 1).itemId());
     }
 
-    // ── Immutability ──────────────────────────────────────────
+    // -- Immutability ------------------------------------------
 
     @Test
     void snapshotIsImmutableAgainstCallerMutation() {
@@ -201,7 +201,7 @@ class InventorySenseTest {
         assertThrows(UnsupportedOperationException.class, () -> inv.backpack().set(0, new ItemView("x", 1)));
     }
 
-    // ── helpers ────────────────────────────────────────────────
+    // -- helpers ------------------------------------------------
 
     private static List<ItemView> emptyMain() {
         var list = new ArrayList<ItemView>(InventoryView.MAIN_SIZE);

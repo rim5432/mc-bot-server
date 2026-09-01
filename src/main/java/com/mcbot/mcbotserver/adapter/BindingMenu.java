@@ -44,7 +44,7 @@ import net.minecraft.world.item.ItemStack;
  * directly. {@code ResultSlot.onTake} consumes crafting-grid materials
  * on take — bypassing {@code clicked()} would duplicate items.
  *
- * <p>Lifecycle: open (constructor) → snapshot/click at will →
+ * <p>Lifecycle: open (constructor) -> snapshot/click at will ->
  * {@link #close()} once; close is terminal and idempotent. The
  * constructor attaches the binding to the facade as its open menu, so
  * {@code MenuOpener} can close the previous menu before opening a new

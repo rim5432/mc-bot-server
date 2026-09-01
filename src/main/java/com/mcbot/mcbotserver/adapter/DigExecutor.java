@@ -144,7 +144,7 @@ public final class DigExecutor {
             body.level().destroyBlockProgress(body.getId(), pos, -1);
             // Tool-aware break: Level.destroyBlock always passes
             // ItemStack.EMPTY as the tool to Block.dropResources, so
-            // match_tool loot conditions (stone→pickaxe, leaves→shears,
+            // match_tool loot conditions (stone->pickaxe, leaves->shears,
             // silk-touch, fortune) never fired. Replicate the vanilla
             // dropResources path with the actual held stack: capture
             // state + block entity + fluid BEFORE removal, emit 2001
@@ -158,7 +158,7 @@ public final class DigExecutor {
             // bare-hand stone break removes the block and pays tool
             // wear but must not drop or seed XP (ServerPlayerGameMode
             // destroyBlock, the survival flag1 branch). XP is handled
-            // inside dropResources via spawnAfterBreak → ForgeHooks.
+            // inside dropResources via spawnAfterBreak -> ForgeHooks.
             BlockState breakState = state;
             BlockEntity breakEntity = breakState.hasBlockEntity() ? body.level().getBlockEntity(pos) : null;
             FluidState breakFluid = body.level().getFluidState(pos);

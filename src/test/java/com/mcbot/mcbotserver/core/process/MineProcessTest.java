@@ -28,7 +28,7 @@ class MineProcessTest {
 
     private static final CellPos BOT = new CellPos(0, 64, 0);
 
-    /** Drives one full break cycle: MOVING → SUCCESS → air → COLLECT. */
+    /** Drives one full break cycle: MOVING -> SUCCESS -> air -> COLLECT. */
     private static void breakOne(MineProcess mine, MockWorldView world, CellPos target) {
         mine.onExecutionReport(ExecutionReport.success());
         world.putAir(target);

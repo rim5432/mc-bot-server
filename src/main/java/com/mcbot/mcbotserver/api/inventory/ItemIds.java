@@ -33,10 +33,10 @@ public final class ItemIds {
      *
      * <p>Rules:
      * <ul>
-     *   <li>null or blank → {@link IllegalArgumentException} with a precise message</li>
-     *   <li>contains {@code ':'} → returned as-is (assumed already canonical;
+     *   <li>null or blank -> {@link IllegalArgumentException} with a precise message</li>
+     *   <li>contains {@code ':'} -> returned as-is (assumed already canonical;
      *       modded namespaces such as {@code create:iron_ore} pass through)</li>
-     *   <li>otherwise → {@code "minecraft:" + raw}</li>
+     *   <li>otherwise -> {@code "minecraft:" + raw}</li>
      * </ul>
      *
      * <p>This method does NOT fold case — Minecraft registry keys are

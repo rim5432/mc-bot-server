@@ -41,7 +41,7 @@ import java.util.Map;
  * @param patternWidth pattern row length, 1..3 (vanilla grids are at
  *                     most 3x3); placeholder without geometric
  *                     meaning when {@code shapeless} is true
- * @param placements   pattern position → accepted item ids (non-empty,
+ * @param placements   pattern position -> accepted item ids (non-empty,
  *                     in query order); for shapeless views the keys
  *                     are exactly 0..n-1; never null, immutable
  * @param shapeless    true when positions are ingredient indices
@@ -65,7 +65,7 @@ public record RecipeView(
      *                     blank
      * @param resultCount  items produced per craft; positive
      * @param patternWidth pattern row length, 1..3
-     * @param placements   pattern position → accepted item ids; never
+     * @param placements   pattern position -> accepted item ids; never
      *                     null
      */
     public RecipeView(

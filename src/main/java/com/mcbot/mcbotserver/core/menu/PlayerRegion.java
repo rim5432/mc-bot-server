@@ -61,7 +61,7 @@ final class PlayerRegion {
      * the supply pool recipe resolution draws from.
      *
      * @param menu the full snapshot; never null
-     * @return item id → total count; never null, possibly empty
+     * @return item id -> total count; never null, possibly empty
      */
     static Map<String, Integer> totals(MenuView menu) {
         Map<String, Integer> totals = new LinkedHashMap<>();

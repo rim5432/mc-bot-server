@@ -66,7 +66,7 @@ class RecipeViewTest {
         // 2 wide, top row only — columns 0..1, row 0.
         RecipeView torch = new RecipeView("test:x", "test:y", 1, 2, Map.of(0, List.of("a"), 1, List.of("b")));
         assertTrue(torch.fitsInventoryGrid());
-        // Position 4 is pattern row 2 (width 2) → needs the table.
+        // Position 4 is pattern row 2 (width 2) -> needs the table.
         RecipeView tall = new RecipeView("test:x", "test:y", 1, 2, Map.of(0, List.of("a"), 4, List.of("b")));
         assertFalse(tall.fitsInventoryGrid());
     }

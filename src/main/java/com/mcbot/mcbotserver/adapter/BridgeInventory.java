@@ -157,7 +157,7 @@ public final class BridgeInventory extends Inventory {
      * slot. Overridden because the inherited {@code Inventory.removeItem}
      * operates on the phantom {@code items} list and would return EMPTY
      * for every slot — the vanilla click extraction path
-     * ({@code Slot.tryRemove} → {@code Slot.remove} →
+     * ({@code Slot.tryRemove} -> {@code Slot.remove} ->
      * {@code container.removeItem}) would silently pick up nothing.
      *
      * @param slot   flat slot index 0..40
