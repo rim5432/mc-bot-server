@@ -843,6 +843,71 @@ class RefInventoryTest(unittest.TestCase):
         self.assertEqual(cov["mapped"], 0)
 
 
+class FeatureScanTest(unittest.TestCase):
+    """The @Feature inventory: annotations upsert, vanished annotations
+    prune, unknown faces are rejected at scan time."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.db = self.root / "test.db"
+        seed_database(self.db)
+        (self.root / "Thing.java").write_text(
+            "public class Thing {\n"
+            "    @Feature(\n"
+            '            id = "combat.melee.crit_hit",\n'
+            '            face = "combat.melee",\n'
+            '            description = "Critical hit window.")\n'
+            "    private boolean isCriticalHit() { return false; }\n"
+            "}\n",
+            encoding="utf-8",
+        )
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_upsert_prune_and_face_gate(self):
+        from mcbot.capability.feature_repository import FeatureRepository
+        from mcbot.capability.feature_scan import scan_features
+
+        first = scan_features(self.root, db_path=self.db)
+        self.assertEqual(first["inserted"], 1)
+        feat = FeatureRepository(self.db).get("combat.melee.crit_hit")
+        self.assertEqual(feat.face, "combat.melee")
+        self.assertEqual(feat.source_method, "isCriticalHit")
+        self.assertTrue(feat.source_line > 0)
+
+        # re-scan is idempotent; the annotation vanishing prunes the row
+        second = scan_features(self.root, db_path=self.db)
+        self.assertEqual((second["inserted"], second["updated"]), (0, 1))
+        (self.root / "Thing.java").write_text(
+            "public class Thing {\n"
+            "    private boolean isCriticalHit() { return false; }\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        third = scan_features(self.root, db_path=self.db)
+        self.assertEqual(third["pruned"], 1)
+        self.assertEqual(FeatureRepository(self.db).count(), 0)
+
+        # an annotation naming an unseeded face never enters the table,
+        # and strict mode reports it as a gate failure
+        (self.root / "Bad.java").write_text(
+            "public class Bad {\n"
+            "    @Feature(\n"
+            '            id = "nope.nope.ghost",\n'
+            '            face = "nope.nope",\n'
+            '            description = "orphan.")\n'
+            "    private void x() { }\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        lenient = scan_features(self.root, db_path=self.db)
+        self.assertEqual(lenient["inserted"], 0)
+        strict = scan_features(self.root, db_path=self.db, strict=True)
+        self.assertEqual(strict["strict_failures"], 1)
+
+
 class CliImportSmokeTest(unittest.TestCase):
     """The capability tests never import mcbot.cli, so a syntax error in
     the CLI shipped green once already (f-string backslash). Import it."""

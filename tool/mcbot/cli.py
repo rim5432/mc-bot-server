@@ -62,9 +62,6 @@ from mcbot.capability.report import (
     domain_report,
     evidence_for_faces,
     evidence_rollup,
-    face_features,
-    feature_status,
-    features_overview,
     harness_axis,
     is_internal_face,
     source_drift,
@@ -1144,63 +1141,66 @@ def cmd_cap_scan_features(args) -> int:
     return 0
 
 
+def _feature_test_count(feature_id: str) -> int:
+    """Number of test cases anchored to a feature (raw count, no status
+    math — face-level truth lives on the receipt evidence axis)."""
+    from mcbot.capability.db import get_connection
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) as c FROM qa_test_cases WHERE feature_id = ?",
+            (feature_id,),
+        ).fetchone()
+    return row["c"] if row else 0
+
+
 def cmd_cap_features(args) -> int:
-    """List annotation-declared features, optionally filtered by face."""
+    """Annotation inventory: what @Feature declares, where it lives,
+    and how many tests anchor to it. Deliberately status-free."""
+    feat_repo = FeatureRepository()
     if args.face:
-        data = face_features(args.face)
-        if data["feature_count"] == 0:
-            print(f"[mcbot] face '{args.face}' has no @Feature annotations")
-            print(f"  declared status: {data['face_status']}")
+        cap = CapabilityRepository().get(args.face)
+        feats = feat_repo.list(face=args.face)
+        if not feats:
+            print(f"[mcbot] face '{args.face}' has no @Feature annotations"
+                  + ("" if cap else " (face itself is not in the seed)"))
             print(f"  hint: add @Feature(id=..., face='{args.face}', ...) to the implementing methods")
             return 0
-        print(f"=== FEATURES: {args.face} ({data['face_name']}) ===")
-        print(f"  declared status : {data['face_status']}")
-        print(f"  derived status  : {data['derived_status']}")
-        print(f"  feature count   : {data['feature_count']}")
-        sc = data["status_counts"]
-        print(f"  shipped={sc.get('shipped', 0)}  partial={sc.get('partial', 0)}  "
-              f"gap={sc.get('gap', 0)}  regression={sc.get('regression', 0)}")
-        print()
-        print(f"{'STATUS':<12} {'FEATURE ID':<40} {'TESTS':>6}  SOURCE")
+        print(f"=== FEATURES: {args.face} ({cap.name if cap else 'unknown face'}) ===")
+        print(f"{'FEATURE ID':<40} {'TESTS':>5}  SOURCE")
         print("-" * 100)
-        for f in data["features"]:
-            tc = f["test_counts"]
-            test_str = f"{tc.get('passed', 0)}p/{tc.get('failed', 0)}f/{tc.get('not_executed', 0)}u"
-            src = f"{f['source_method']} ({f['source_file'].split('/')[-1]}:{f['source_line']})"
-            print(f"{f['status']:<12} {f['id']:<40} {test_str:>6}  {src}")
+        for f in feats:
+            src = f"{f.source_method} ({f.source_file.split('/')[-1]}:{f.source_line})"
+            print(f"{f.id:<40} {_feature_test_count(f.id):>5}  {src}")
         return 0
 
-    # All faces overview
-    ov = features_overview()
-    print(f"=== FEATURES OVERVIEW ===")
-    print(f"  total features : {ov['total_features']}")
-    print(f"  faces covered  : {ov['faces_with_features']}/{ov['total_faces']}")
-    sc = ov["status_counts"]
-    print(f"  shipped={sc.get('shipped', 0)}  partial={sc.get('partial', 0)}  "
-          f"gap={sc.get('gap', 0)}  regression={sc.get('regression', 0)}")
+    all_feats = feat_repo.list()
+    by_face: dict[str, int] = {}
+    for f in all_feats:
+        by_face[f.face] = by_face.get(f.face, 0) + 1
+    print("=== FEATURE INVENTORY ===")
+    print(f"  total features : {len(all_feats)} across {len(by_face)} faces")
     print()
-    print(f"{'FACE':<30} {'DECL':<10} {'DERIVED':<12} {'FEATS':>6}")
-    print("-" * 62)
-    for fb in ov["face_breakdown"]:
-        print(f"{fb['face_id']:<30} {fb['face_status']:<10} {fb['derived_status']:<12} {fb['feature_count']:>6}")
-    if ov["faces_without_features"]:
+    print(f"{'FACE':<32} {'FEATS':>5}")
+    print("-" * 40)
+    for face_id in sorted(by_face):
+        print(f"{face_id:<32} {by_face[face_id]:>5}")
+    without = [c.id for c in CapabilityRepository().list() if c.id not in by_face]
+    if without:
         print()
-        print(f"faces without @Feature annotations ({len(ov['faces_without_features'])}):")
-        for fid in ov["faces_without_features"]:
+        print(f"faces without @Feature annotations ({len(without)}):")
+        for fid in without:
             print(f"  {fid}")
     return 0
 
 
 def cmd_cap_feature(args) -> int:
-    """Show one feature in detail: description, source, derived status, tests."""
-    feat_repo = FeatureRepository()
-    feat = feat_repo.get(args.feature_id)
+    """One annotation in detail: what it declares, where it lives, and
+    the raw test rows anchored to it."""
+    feat = FeatureRepository().get(args.feature_id)
     if not feat:
         print(f"[mcbot] feature not found: {args.feature_id}", file=sys.stderr)
         print(f"  hint: run `capability scan-features` to discover @Feature annotations", file=sys.stderr)
         return 1
-
-    st = feature_status(args.feature_id)
     print(f"=== FEATURE: {feat.id} ===")
     print(f"  face          : {feat.face}")
     print(f"  description   : {feat.description}")
@@ -1211,19 +1211,16 @@ def cmd_cap_feature(args) -> int:
     print(f"  source        : {feat.source_file}:{feat.source_line}")
     if feat.source_method:
         print(f"  method        : {feat.source_method}")
-    print()
-    print(f"  derived status: {st['status']}")
-    tc = st["counts"]
-    print(f"  tests         : {st['total_tests']} total "
-          f"({tc.get('passed', 0)} passed, {tc.get('failed', 0)} failed, "
-          f"{tc.get('blocked', 0)} blocked, {tc.get('not_executed', 0)} unexecuted)")
-    if st["cases"]:
+    from mcbot.capability.db import get_connection
+    with get_connection() as conn:
+        cases = [dict(r) for r in conn.execute(
+            "SELECT id, status, link_source, title FROM qa_test_cases "
+            "WHERE feature_id = ? ORDER BY id", (feat.id,)).fetchall()]
+    if cases:
         print()
-        print(f"  {'CASE ID':<45} {'STATUS':<14} {'LINK':<18} TITLE")
-        print(f"  {'-'*45} {'-'*14} {'-'*18} {'-'*30}")
-        for c in st["cases"]:
-            print(f"  {c['id']:<45} {c.get('status', '?'):<14} "
-                  f"{c.get('link_source', '?') or '?':<18} {c.get('title', '')[:30]}")
+        print("  linked tests:")
+        for c in cases:
+            print(f"    {c['id']:<45} {c['status'] or '?':<14} {(c['title'] or '')[:36]}")
     else:
         print()
         print("  no linked tests — add `// feature: <id>` above the @GameTest method")
@@ -1569,7 +1566,7 @@ def main() -> int:
     p_cap_features.add_argument("face", nargs="?", help="filter by face id, e.g. combat.melee")
     p_cap_feature = p_cap_sub.add_parser(
         "feature",
-        help="show one feature: description, source location, derived status, linked tests")
+        help="show one feature: description, source location, linked tests")
     p_cap_feature.add_argument("feature_id", help="feature id, e.g. combat.melee.crit_hit")
     p_cap_scan_feat = p_cap_sub.add_parser(
         "scan-features",

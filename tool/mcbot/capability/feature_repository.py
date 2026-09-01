@@ -105,21 +105,20 @@ class FeatureRepository:
     def prune(self, keep_ids: set[str]) -> int:
         """Delete features whose id is not in keep_ids.
 
-        The scanner calls this after a full scan with the set of ids it
-        found — annotations removed from source are pruned so the table
-        never carries ghosts. Returns the number of rows deleted.
+        An empty keep set means keep nothing — every row goes. The
+        scanner gates this call on having actually seen Java files (a
+        zero-file scan is a misconfigured root, not an empty
+        inventory). Returns the number of rows deleted.
         """
-        if not keep_ids:
-            # An empty keep set means the scan found nothing, which is
-            # almost always a misconfigured root or broken regex —
-            # never prune the whole table on a misfire.
-            return 0
         with get_connection(self._db_path) as conn:
-            placeholders = ", ".join("?" for _ in keep_ids)
-            cur = conn.execute(
-                f"DELETE FROM features WHERE id NOT IN ({placeholders})",
-                tuple(keep_ids),
-            )
+            if keep_ids:
+                placeholders = ", ".join("?" for _ in keep_ids)
+                cur = conn.execute(
+                    f"DELETE FROM features WHERE id NOT IN ({placeholders})",
+                    tuple(keep_ids),
+                )
+            else:
+                cur = conn.execute("DELETE FROM features")
             conn.commit()
         return cur.rowcount
 

@@ -262,8 +262,11 @@ def scan_features(
             else:
                 inserted += 1
 
-    # Prune features whose annotation no longer exists in source
-    pruned = repo.prune(seen_ids)
+    # Prune features whose annotation no longer exists in source. A
+    # scan that saw zero Java files is a misfire (wrong root or broken
+    # pattern), not an empty inventory — never prune on it. Zero
+    # annotations across real files is a legitimate empty inventory.
+    pruned = repo.prune(seen_ids) if scanned_files else 0
 
     result = {
         "scanned_files": scanned_files,
