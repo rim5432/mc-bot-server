@@ -261,6 +261,12 @@ _MIGRATIONS: list[tuple[int, str, list[str]]] = [
             "CREATE INDEX idx_qa_cases_feature ON qa_test_cases(feature_id)",
         ],
     ),
+    (
+        8,
+        "drop capability_status_transitions: the audit was retired - it "
+        "recorded zero rows in its lifetime; git receipts are the history",
+        ["DROP TABLE IF EXISTS capability_status_transitions"],
+    ),
 ]
 
 
@@ -304,8 +310,7 @@ def db_status(db_path: Optional[Path] = None) -> dict:
         counts = {}
         for table in [
             "capabilities", "qa_test_cases", "test_receipts",
-            "test_case_runs", "capability_status_transitions",
-            "features", "reference_actions",
+            "test_case_runs", "features", "reference_actions",
         ]:
             try:
                 row = conn.execute(f"SELECT COUNT(*) as c FROM {table}").fetchone()

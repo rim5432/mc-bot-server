@@ -131,15 +131,8 @@ class CapabilityRepository:
         *,
         deviation: Optional[str] = None,
         verified_at: Optional[str] = None,
-        source: str = "manual",
-        note: str = "",
     ) -> bool:
         """Update just the status (and optionally deviation / verified_at).
-
-        A status change appends one capability_status_transitions row
-        (old -> new, source, note) so ``capability diff`` can replay
-        history. Unchanged statuses record nothing. ``source`` marks
-        who flipped it: manual | restore | derive.
 
         Returns True if a row was updated, False if the id doesn't exist.
         """
@@ -158,20 +151,10 @@ class CapabilityRepository:
             params.append(verified_at)
         params.append(capability_id)
         with get_connection(self._db_path) as conn:
-            old = conn.execute(
-                "SELECT implementation_status FROM capabilities WHERE id = ?", (capability_id,)
-            ).fetchone()
-            if not old:
+            if not conn.execute(
+                "SELECT 1 FROM capabilities WHERE id = ?", (capability_id,)
+            ).fetchone():
                 return False
-            if old["implementation_status"] != status:
-                conn.execute(
-                    """
-                    INSERT INTO capability_status_transitions (
-                        capability_id, old_status, new_status, source, note, changed_at
-                    ) VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                    (capability_id, old["implementation_status"], status, source, note, now),
-                )
             conn.execute(
                 f"UPDATE capabilities SET {', '.join(sets)} WHERE id = ?", params
             )

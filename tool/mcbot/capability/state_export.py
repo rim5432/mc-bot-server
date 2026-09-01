@@ -19,12 +19,11 @@ Rebuild recipe (README documents it too):
   capability init -> qa-import <csv>... -> scan-gametest
   -> backfill -> restore
 
-Restore semantics: a differing status goes through update_status
-(records a transition, source=restore); identical statuses are
-no-ops. Links replay with their recorded link_source (missing ->
-'manual', schema-1 tolerance). A stored empty deviation / null
-verified_at never erases current values (the overlay only carries
-positive facts).
+Restore semantics: a differing status goes through update_status;
+identical statuses are no-ops. Links replay with their recorded
+link_source (missing -> 'manual', schema-1 tolerance). A stored empty
+deviation / null verified_at never erases current values (the overlay
+only carries positive facts).
 """
 from __future__ import annotations
 
@@ -127,7 +126,6 @@ def restore_state(
             row["id"], row["status"],
             deviation=row.get("deviation") or None,
             verified_at=row.get("verified_at") or None,
-            source="restore",
         )
         statuses_applied += 1
 

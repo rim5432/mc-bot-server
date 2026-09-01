@@ -160,8 +160,8 @@ class BackfillTest(unittest.TestCase):
             self.assertEqual(row["green"], 0)
 
 
-class StatusTransitionTest(unittest.TestCase):
-    """update_status appends transitions; unchanged statuses do not."""
+class UpdateStatusTest(unittest.TestCase):
+    """update_status flips the declared status; unknown ids say so."""
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -177,32 +177,16 @@ class StatusTransitionTest(unittest.TestCase):
     def tearDown(self):
         self._tmp.cleanup()
 
-    def _transitions(self) -> list[dict]:
-        with get_connection(self.db) as conn:
-            return [
-                dict(r) for r in conn.execute(
-                    "SELECT * FROM capability_status_transitions ORDER BY id"
-                ).fetchall()
-            ]
-
-    def test_change_records_one_transition_with_source(self):
-        self.repo.update_status("combat.melee", "partial", source="manual")
-        rows = self._transitions()
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["old_status"], "gap")
-        self.assertEqual(rows[0]["new_status"], "partial")
-        self.assertEqual(rows[0]["source"], "manual")
-
-    def test_same_status_records_nothing(self):
-        self.repo.update_status("combat.melee", "gap")
-        self.assertEqual(self._transitions(), [])
+    def test_change_flips_status(self):
+        self.assertTrue(self.repo.update_status("combat.melee", "partial"))
+        self.assertEqual(self.repo.get("combat.melee").implementation_status, "partial")
 
     def test_unknown_id_returns_false(self):
         self.assertFalse(self.repo.update_status("nope.nope", "shipped"))
 
 
 class ReportTest(unittest.TestCase):
-    """diff_since + domain_report fold receipts, case runs, transitions."""
+    """diff_since + domain_report fold receipts and case runs."""
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -334,11 +318,6 @@ class StateOverlayTest(unittest.TestCase):
             ).fetchone()
             self.assertEqual(row["capability_id"], "dig.tool_speed")
             self.assertEqual(row["link_source"], "manual")
-            # the restore flip is auditable as a transition
-            t = conn.execute(
-                "SELECT source FROM capability_status_transitions"
-            ).fetchone()
-            self.assertEqual(t["source"], "restore")
 
     def test_restore_twice_is_idempotent(self):
         export_state(self.overlay, db_path=self.db)

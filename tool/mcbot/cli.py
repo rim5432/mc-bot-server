@@ -716,11 +716,6 @@ def cmd_cap_diff(args) -> int:
     if runs["count"]:
         growth = f", scenarios {runs['first_total']} -> {runs['last_total']}"
     print(f"engine runs: {runs['count']} ({runs['green']} GREEN, {runs['red']} RED){growth}")
-    print(f"status transitions: {len(d['transitions'])}  [{d['transitions_note']}]")
-    for t in d["transitions"]:
-        name = f"  {t['name']}" if t.get("name") else ""
-        print(f"  {t['changed_at']}  {t['capability_id']}{name}: "
-              f"{t['old_status']} -> {t['new_status']}  ({t['source']})")
     if d["red_details"]:
         shown = d["red_details"][:10]
         print(f"RED runs ({len(d['red_details'])}, showing first 10):")

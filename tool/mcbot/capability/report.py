@@ -2,14 +2,12 @@
 per-domain reports.
 
 Both fold committed-artifact mirrors already in the DB (receipts,
-case runs, links) plus the transitions audit table. They never touch
-source files, so a rebuilt DB produces the same report.
+case runs, links). They never touch source files, so a rebuilt DB
+produces the same report.
 
-Honest limits baked into the shapes:
-- gametest logs list failures per scenario but never passes, so
-  green evidence is run-granular, not per-capability;
-- transitions only exist from 2026-08-31 onward (the table's birth);
-  older history lives in git (receipts) and is reported as such.
+Honest limit baked into the shapes: gametest logs list failures per
+scenario but never passes, so green evidence is run-granular, not
+per-capability.
 """
 from __future__ import annotations
 
@@ -24,8 +22,6 @@ from mcbot.capability.queries import overview
 from mcbot.capability.ref_inventory import inventory_coverage
 from mcbot.capability.repository import CapabilityRepository
 
-TRANSITIONS_BORN = "2026-08-31"
-
 
 def _since_ts(since: str) -> str:
     """Normalize a YYYY-MM-DD (or full ISO timestamp) to a comparable
@@ -38,7 +34,6 @@ def _since_ts(since: str) -> str:
 def diff_since(since: str, *, db_path: Optional[Path] = None) -> dict:
     """Everything that changed since a date, one dict.
 
-    - transitions: status flips in the window (with capability name)
     - runs: receipt counts, green/red split, scenario growth, red-run
       details with failed scenarios (matched to case ids)
     - faces_added: capabilities whose created_at falls in the window
@@ -48,19 +43,6 @@ def diff_since(since: str, *, db_path: Optional[Path] = None) -> dict:
     init_db(db_path)
     ts = _since_ts(since)
     with get_connection(db_path) as conn:
-        transitions = [
-            dict(r) for r in conn.execute(
-                """
-                SELECT t.capability_id, c.name, t.old_status, t.new_status,
-                       t.source, t.changed_at
-                FROM capability_status_transitions t
-                LEFT JOIN capabilities c ON c.id = t.capability_id
-                WHERE t.changed_at >= ?
-                ORDER BY t.changed_at
-                """,
-                (ts,),
-            ).fetchall()
-        ]
         runs_rows = conn.execute(
             """
             SELECT run_id, finished_at, git_rev, total, failed, green
@@ -101,11 +83,6 @@ def diff_since(since: str, *, db_path: Optional[Path] = None) -> dict:
     runs = [dict(r) for r in runs_rows]
     return {
         "since": since,
-        "transitions": transitions,
-        "transitions_note": (
-            f"transitions recorded from {TRANSITIONS_BORN} onward only "
-            "(table is new); older history lives in git receipts"
-        ),
         "runs": {
             "count": len(runs),
             "green": sum(1 for r in runs if r["green"]),
