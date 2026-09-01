@@ -61,17 +61,18 @@ final class ReflexRuleJsonReader {
 
     /** Type tag -> factory; adding a rule kind is one put, not another branch. */
     private static final java.util.Map<String, java.util.function.Function<JsonObject, ReflexRule>> FACTORIES =
-            java.util.Map.of(
-                    "FREEZE_ON_LOW_HEALTH", ReflexRuleJsonReader::freezeRule,
-                    "SURFACE_ON_LOW_AIR", ReflexRuleJsonReader::surfaceRule,
-                    "ENGAGE_ON_HOSTILE_PROXIMITY", ReflexRuleJsonReader::engageRule,
-                    "ESCAPE_ON_LAVA", ReflexRuleJsonReader::escapeLavaRule,
-                    "EXTINGUISH_FIRE", ReflexRuleJsonReader::extinguishFireRule,
-                    "DIG_ON_SUFFOCATION", ReflexRuleJsonReader::suffocationRule,
-                    "CLIMB_OUT_OF_POWDER_SNOW", ReflexRuleJsonReader::climbPowderSnowRule,
-                    "EAT_WHEN_HUNGRY", ReflexRuleJsonReader::eatRule,
-                    "ACQUIRE_FOOD_WHEN_HUNGRY", ReflexRuleJsonReader::acquireRule,
-                    "WATER_BUCKET_ON_FALL", ReflexRuleJsonReader::waterBucketOnFallRule);
+            java.util.Map.ofEntries(
+                    java.util.Map.entry("FREEZE_ON_LOW_HEALTH", ReflexRuleJsonReader::freezeRule),
+                    java.util.Map.entry("SURFACE_ON_LOW_AIR", ReflexRuleJsonReader::surfaceRule),
+                    java.util.Map.entry("ENGAGE_ON_HOSTILE_PROXIMITY", ReflexRuleJsonReader::engageRule),
+                    java.util.Map.entry("ESCAPE_ON_LAVA", ReflexRuleJsonReader::escapeLavaRule),
+                    java.util.Map.entry("EXTINGUISH_FIRE", ReflexRuleJsonReader::extinguishFireRule),
+                    java.util.Map.entry("DIG_ON_SUFFOCATION", ReflexRuleJsonReader::suffocationRule),
+                    java.util.Map.entry("CLIMB_OUT_OF_POWDER_SNOW", ReflexRuleJsonReader::climbPowderSnowRule),
+                    java.util.Map.entry("DRINK_ON_LOW_HEALTH", ReflexRuleJsonReader::drinkRule),
+                    java.util.Map.entry("EAT_WHEN_HUNGRY", ReflexRuleJsonReader::eatRule),
+                    java.util.Map.entry("ACQUIRE_FOOD_WHEN_HUNGRY", ReflexRuleJsonReader::acquireRule),
+                    java.util.Map.entry("WATER_BUCKET_ON_FALL", ReflexRuleJsonReader::waterBucketOnFallRule));
 
     private static ReflexRule waterBucketOnFallRule(JsonObject rule) {
         int priority = fInt(rule, "priority", WaterBucketOnFallRule.MLG_PRIORITY);
@@ -194,6 +195,23 @@ final class ReflexRuleJsonReader {
             throw new IllegalArgumentException("CLIMB_OUT_OF_POWDER_SNOW: " + e.getMessage(), e);
         }
     }
+    /**
+     * Drink-on-low-health carries threshold + priority only - the firing
+     * condition is a pure threshold on the sensed health with the
+     * sensor's potion slot as the availability gate (flat priority
+     * shape, same as EatWhenHungryRule). Sits below ENGAGE (combat
+     * missions own consumable pacing) and above EAT (health > hunger).
+     */
+    private static ReflexRule drinkRule(JsonObject rule) {
+        float threshold = fFloat(rule, "threshold", DrinkOnLowHealthRule.TRIGGER_HEALTH);
+        int priority = fInt(rule, "priority", DrinkOnLowHealthRule.DRINK_PRIORITY);
+        try {
+            return new DrinkOnLowHealthRule(threshold, priority);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("DRINK_ON_LOW_HEALTH: " + e.getMessage(), e);
+        }
+    }
+
     /**
      * Eat-when-hungry carries trigger + priority only - the firing
      * condition is a pure threshold on the sensed food level with the

@@ -132,6 +132,7 @@ class GametestInventoryCheck {
                             "potionStackCountTwoKeepsRemainderAndAddsBottle",
                             "milkBucketClearsEffectsAndLeavesBucket",
                             "harnessUseClaimEmitsDrinkStartedAndCompleted",
+                            "drinkReflexOnLowHealthEmitsStartedAndCompleted",
                             "brewingStandBrewsWaterBottleWithNetherWart",
                             "brewingStandFuelSlotRejectsNonBlazePowder",
                             "brewingStandSlotRolesAreCorrect",

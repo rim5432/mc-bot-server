@@ -82,6 +82,9 @@ public final class ReflexRuleJson {
         } else if (rule instanceof ClimbOutOfPowderSnowRule snow) {
             entry.addProperty("trigger", snow.trigger());
             entry.addProperty("priority", snow.priority());
+        } else if (rule instanceof DrinkOnLowHealthRule drink) {
+            entry.addProperty("threshold", drink.trigger());
+            entry.addProperty("priority", drink.priority());
         } else {
             throw new IllegalArgumentException(
                     "no JSON form for rule type: " + rule.getClass().getSimpleName());

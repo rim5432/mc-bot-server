@@ -128,6 +128,15 @@ public final class ThreatBlackboard {
     public int waterBucketSlot = -1;
 
     /**
+     * Hotbar slot of the best healing potion in inventory at sensing
+     * time, or -1 when none was sensed - the drink reflex's
+     * availability gate: low health with no potion is an
+     * acquisition/harness problem, not a body reflex. Same contract
+     * as {@link #foodSlot} and {@link #waterBucketSlot}.
+     */
+    public int potionSlot = -1;
+
+    /**
      * Reset all fields to a fresh-tick baseline before sensing.
      *
      * @param health body health at sensing time, 0..max
@@ -142,5 +151,6 @@ public final class ThreatBlackboard {
         this.freezeTicks = 0;
         this.inWall = false;
         this.suffocationBlock = null;
+        this.potionSlot = -1;
     }
 }

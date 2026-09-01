@@ -54,6 +54,10 @@ class ReflexPriorityOrderGateTest {
         expect("FREEZE_ON_LOW_HEALTH", 100);
         expect("CLIMB_OUT_OF_POWDER_SNOW", 95);
         expect("ENGAGE_ON_HOSTILE_PROXIMITY", 90);
+        // Drink reflex sits below ENGAGE (combat missions own their
+        // consumable pacing) and above EAT (health is more urgent than
+        // hunger). Trigger 12 gives a 2-HP window before FREEZE (10).
+        expect("DRINK_ON_LOW_HEALTH", 88);
         // Issue 0010 D6: combat first, hunger is routine - the eat
         // reflex sits below ENGAGE.
         expect("EAT_WHEN_HUNGRY", 85);

@@ -100,6 +100,9 @@ public final class LevelThreatSensor implements ThreatSensor {
     private final Supplier<CellPos> mlgGroundCell;
     private final java.util.function.IntSupplier waterBucketSlot;
 
+    /** Best-healing-potion hotbar slot or -1, ranked by the assembly. */
+    private final java.util.function.IntSupplier bestPotionSlot;
+
     /**
      * Creates a sensor scanning around the live body position.
      *
@@ -133,6 +136,9 @@ public final class LevelThreatSensor implements ThreatSensor {
      *                      MLG scan depth, null when deeper; never null
      * @param waterBucketSlot water-bucket hotbar slot supplier, -1
      *                      when none; never null
+     * @param bestPotionSlot best-healing-potion hotbar slot supplier,
+     *                      -1 when the inventory carries no healing
+     *                      potion; never null
      */
     public LevelThreatSensor(
             Supplier<CellPos> bodyPos,
@@ -146,7 +152,8 @@ public final class LevelThreatSensor implements ThreatSensor {
             java.util.function.IntSupplier bestFoodSlot,
             Supplier<Boolean> falling,
             Supplier<CellPos> mlgGroundCell,
-            java.util.function.IntSupplier waterBucketSlot) {
+            java.util.function.IntSupplier waterBucketSlot,
+            java.util.function.IntSupplier bestPotionSlot) {
         for (Object arg : new Object[] {
             bodyPos,
             airSupply,
@@ -159,7 +166,8 @@ public final class LevelThreatSensor implements ThreatSensor {
             bestFoodSlot,
             falling,
             mlgGroundCell,
-            waterBucketSlot
+            waterBucketSlot,
+            bestPotionSlot
         }) {
             if (arg == null) {
                 throw new IllegalArgumentException("arguments must not be null");
@@ -177,6 +185,7 @@ public final class LevelThreatSensor implements ThreatSensor {
         this.falling = falling;
         this.mlgGroundCell = mlgGroundCell;
         this.waterBucketSlot = waterBucketSlot;
+        this.bestPotionSlot = bestPotionSlot;
     }
 
     @Feature(
@@ -200,6 +209,7 @@ public final class LevelThreatSensor implements ThreatSensor {
         board.descending = falling.get();
         board.groundCell = mlgGroundCell.get();
         board.waterBucketSlot = waterBucketSlot.getAsInt();
+        board.potionSlot = bestPotionSlot.getAsInt();
         board.inLethalFluid = inLava.get();
         board.fireTicks = fireTicks.get();
         board.freezeTicks = freezeTicks.get();

@@ -195,6 +195,7 @@ class RuleTableGateTest {
                         "EXTINGUISH_FIRE",
                         "CLIMB_OUT_OF_POWDER_SNOW",
                         "ENGAGE_ON_HOSTILE_PROXIMITY",
+                        "DRINK_ON_LOW_HEALTH",
                         "EAT_WHEN_HUNGRY",
                         "ACQUIRE_FOOD_WHEN_HUNGRY",
                         "WATER_BUCKET_ON_FALL"),

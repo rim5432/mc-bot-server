@@ -152,7 +152,12 @@ public final class BotAssembly {
         // sensor stamp and the controller's injector feed - one source
         // of truth for both ends (the eat-slot pattern).
         java.util.function.IntSupplier waterBucketSlot = waterBucketSlotOf(body);
-        SurvivalReflexLayer reflex = reflexLayer(level, body, bestFoodSlot, waterBucketSlot);
+        // Best-healing-potion slot: same shared-supplier pattern as
+        // food and water-bucket - the sensor stamps it on the blackboard
+        // for the rule's availability gate, the injector reads it for
+        // the SLOT+USE claim pair.
+        java.util.function.IntSupplier bestPotionSlot = bestPotionSlotOf(body);
+        SurvivalReflexLayer reflex = reflexLayer(level, body, bestFoodSlot, waterBucketSlot, bestPotionSlot);
 
         Behavior mover = new PathingBehavior(
                 "mover",
@@ -236,6 +241,9 @@ public final class BotAssembly {
         controller.setEatSlotSupplier(bestFoodSlot);
         controller.setFoodLevelSource(() -> body.getFoodData().getFoodLevel());
         controller.setMlgBucketSlotSupplier(waterBucketSlot);
+        // The drink reflex executes against the same best-potion ranking
+        // the sensor stamps (one source of truth for both ends).
+        controller.setDrinkSlotSupplier(bestPotionSlot);
         CommandBus bus = new CommandBus(events);
         GotoCommandHandler gotoHandler = new GotoCommandHandler(
                 arbiter, events, () -> level.getDayTime() / 24000L, () -> level.getDayTime() % 24000L);
@@ -332,7 +340,8 @@ public final class BotAssembly {
             ServerLevel level,
             BotBodyEntity body,
             java.util.function.IntSupplier bestFoodSlot,
-            java.util.function.IntSupplier waterBucketSlot) {
+            java.util.function.IntSupplier waterBucketSlot,
+            java.util.function.IntSupplier bestPotionSlot) {
         SurvivalReflexLayer reflex = new SurvivalReflexLayer(new LevelThreatSensor(
                 () -> poseOf(body),
                 body::getAirSupply,
@@ -345,7 +354,8 @@ public final class BotAssembly {
                 bestFoodSlot,
                 () -> body.getDeltaMovement().y < -0.25,
                 () -> mlgGroundCellOf(level, body),
-                waterBucketSlot));
+                waterBucketSlot,
+                bestPotionSlot));
         reflex.addRule(new FreezeOnLowHealthRule());
         // Air reflex outranks the freeze rule by default (SURFACE
         // _PRIORITY 110 vs FREEZE 100): freezing underwater converts
@@ -398,6 +408,11 @@ public final class BotAssembly {
         // running. Sits BELOW the survival holds: at three health
         // points the right reflex is to stop, not to start a fight.
         reflex.addRule(new EngageOnHostileProximityRule());
+        // Drink reflex sits below ENGAGE (combat missions own their
+        // consumable pacing) and above EAT (health is more urgent than
+        // hunger). Trigger 12 gives a 2-HP window before FREEZE (10)
+        // locks in with its hysteresis release at 15.
+        reflex.addRule(new com.mcbot.mcbotserver.core.reflex.DrinkOnLowHealthRule());
         // Eat reflex sits below ENGAGE (0010 D6: combat first) and
         // only fires while the sensor sees both hunger and food.
         reflex.addRule(new com.mcbot.mcbotserver.core.reflex.EatWhenHungryRule());
@@ -449,6 +464,49 @@ public final class BotAssembly {
             }
             return -1;
         };
+    }
+
+    /**
+     * Best-healing-potion hotbar scan: drinkable PotionItem only
+     * (splash/lingering are thrown, not consumed). Rank: instant_health
+     * (instant heal, no waiting) > regeneration (heal over time). Ties
+     * keep the lower hotbar slot. Returns -1 when no healing potion is
+     * carried, which silences the drink reflex - no phantom sips.
+     */
+    private static java.util.function.IntSupplier bestPotionSlotOf(BotBodyEntity body) {
+        return () -> {
+            var container = body.getInventory().container();
+            int best = -1;
+            int bestRank = -1;
+            for (int slot = 0; slot < com.mcbot.mcbotserver.api.inventory.InventoryView.HOTBAR_SIZE; slot++) {
+                var stack = container.getItem(slot);
+                if (stack.isEmpty() || !(stack.getItem() instanceof net.minecraft.world.item.PotionItem)) {
+                    continue;
+                }
+                int rank = healingRankOf(stack);
+                if (rank > bestRank) {
+                    best = slot;
+                    bestRank = rank;
+                }
+            }
+            return best;
+        };
+    }
+
+    /**
+     * Rank a potion stack by its healing utility: 2 = instant_health,
+     * 1 = regeneration, 0 = no healing effect (not selected).
+     */
+    private static int healingRankOf(net.minecraft.world.item.ItemStack stack) {
+        for (var effect : net.minecraft.world.item.alchemy.PotionUtils.getMobEffects(stack)) {
+            if (effect.getEffect() == net.minecraft.world.effect.MobEffects.HEAL) {
+                return 2;
+            }
+            if (effect.getEffect() == net.minecraft.world.effect.MobEffects.REGENERATION) {
+                return 1;
+            }
+        }
+        return 0;
     }
 
     private static CellPos poseOf(BotBodyEntity body) {

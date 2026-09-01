@@ -30,6 +30,9 @@ final class ReflexClaimInjector {
     /** Best-food hotbar slot for the EAT reflex; -1 until wired. */
     private IntSupplier eatSlot = () -> -1;
 
+    /** Best-healing-potion hotbar slot for the DRINK reflex; -1 until wired. */
+    private IntSupplier drinkSlot = () -> -1;
+
     /** Water-bucket hotbar slot for the MLG reflex; -1 until wired. */
     private IntSupplier mlgBucketSlot = () -> -1;
 
@@ -68,6 +71,29 @@ final class ReflexClaimInjector {
      */
     int currentEatSlot() {
         return eatSlot.getAsInt();
+    }
+
+    /**
+     * Feed the drink reflex's execution slot: the hotbar slot holding
+     * the best healing potion, or -1 when none. Defaults to -1 so an
+     * unwired rig degrades a DRINK decision to the plain hold - stale
+     * slot data must not mint a phantom sip.
+     *
+     * @param supplier best-potion hotbar slot 0..8, or -1; never null
+     */
+    void setDrinkSlotSupplier(IntSupplier supplier) {
+        this.drinkSlot = java.util.Objects.requireNonNull(supplier, "supplier");
+    }
+
+    /**
+     * The drink slot the supplier currently reports, or -1 when no
+     * potion is sensed. Package-private: BotController reads it for
+     * DRINK_STARTED disclosure.
+     *
+     * @return 0..8 when a potion is sensed, -1 otherwise
+     */
+    int currentDrinkSlot() {
+        return drinkSlot.getAsInt();
     }
 
     /**
@@ -119,7 +145,12 @@ final class ReflexClaimInjector {
                 actor.submit(new Claim(Channel.USE, decision.priority(), owner, new Intent.Use(mlgPulse)));
             }
         }
-        int slot = decision.action() == ReflexAction.EAT ? eatSlot.getAsInt() : -1;
+        int slot =
+                switch (decision.action()) {
+                    case EAT -> eatSlot.getAsInt();
+                    case DRINK -> drinkSlot.getAsInt();
+                    default -> -1;
+                };
         if (slot >= 0) {
             String owner = "reflex:" + decision.ruleName();
             actor.submit(new Claim(Channel.SLOT, decision.priority(), owner, new Intent.SelectSlot(slot)));

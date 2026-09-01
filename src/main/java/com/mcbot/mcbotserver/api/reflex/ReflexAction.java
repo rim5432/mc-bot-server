@@ -111,5 +111,21 @@ public enum ReflexAction {
      * failed first placement (pose lag, ray miss) must retry on the
      * next rising edge instead of hanging on a stuck press.
      */
-    WATER_BUCKET
+    WATER_BUCKET,
+
+    /**
+     * Drink the best healing potion the sensor found: the controller
+     * holds the body still (MOVE), selects the sensed potion hotbar
+     * slot (SLOT) and holds the use claim (USE) every tick the rule
+     * keeps firing; the adapter consumes exactly one potion per rising
+     * press edge through the drinkHeldItem chain (finishUsingItem
+     * applies effects, manual shrink, glass-bottle recovery, DRINK
+     * game event). The rising-edge gate makes one firing episode drink
+     * exactly one potion - sense then sees the restored health and the
+     * rule releases. Low health with no sensed potion never reaches
+     * this action: that is an acquisition/harness problem, not a body
+     * reflex. Sits below ENGAGE (combat missions own their consumable
+     * pacing) and above EAT (health is more urgent than hunger).
+     */
+    DRINK
 }

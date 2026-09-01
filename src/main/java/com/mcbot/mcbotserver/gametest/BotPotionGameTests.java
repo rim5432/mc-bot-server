@@ -291,6 +291,109 @@ public final class BotPotionGameTests {
                 .thenSucceed();
     }
 
+    /**
+     * Scenario: the DRINK_ON_LOW_HEALTH reflex fires when health drops
+     * to the trigger (12) and a healing potion is in the hotbar — the
+     * reflex layer submits its own USE claim (owner "reflex:DRINK_ON_LOW_HEALTH"),
+     * the rising edge in applyUse fires onUsePressEdge, and the potion
+     * branch emits DRINK_STARTED + DRINK_COMPLETED with source=reflex.
+     * Pins the full reflex path: sensor stamps potionSlot -> rule fires
+     * -> injector submits SLOT+USE -> adapter drinks -> events disclose.
+     * The harness-path test (harnessUseClaimEmitsDrinkStartedAndCompleted)
+     * covers the claim routing with source=harness; this test covers the
+     * reflex-owned claim with source=reflex and the automatic trigger.
+     */
+    // capability: consumable.potion
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void drinkReflexOnLowHealthEmitsStartedAndCompleted(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, WALK_Y, 7));
+        var body = rig.body();
+        // Health 12 = DRINK_ON_LOW_HEALTH trigger: the reflex fires on
+        // the first tick. instant_health I heals 4 HP -> 12->16, which
+        // is above the trigger, so the rule releases after one drink.
+        float healthBefore = 12.0f;
+        body.setHealth(healthBefore);
+        body.getInventory().container().setItem(0, PotionUtils.setPotion(new ItemStack(Items.POTION), Potions.HEALING));
+
+        helper.startSequence()
+                .thenWaitUntil(GametestRig.driveUntil(
+                        rig, () -> GametestRig.assertEventSeen(rig.events(), EventKind.DRINK_COMPLETED)))
+                .thenExecuteAfter(0, () -> {
+                    var events = GametestRig.eventsOf(rig.events());
+                    // DRINK_STARTED: urgent, pre-consumption, source=reflex
+                    // (the claim owner is "reflex:DRINK_ON_LOW_HEALTH").
+                    BotEvent started = events.stream()
+                            .filter(e -> EventKind.DRINK_STARTED.equals(e.kind()))
+                            .findFirst()
+                            .orElseThrow();
+                    check(started.urgent(), "DRINK_STARTED must be urgent (reflex preempts mission)");
+                    check(
+                            "minecraft:healing".equals(started.attrs().get("potionId")),
+                            "DRINK_STARTED potionId must be minecraft:healing, got "
+                                    + started.attrs().get("potionId"));
+                    check(
+                            "0".equals(started.attrs().get("slot")),
+                            "DRINK_STARTED slot must be 0, got "
+                                    + started.attrs().get("slot"));
+                    check(
+                            "12.0".equals(started.attrs().get("health")),
+                            "DRINK_STARTED health must be 12.0, got "
+                                    + started.attrs().get("health"));
+                    check(
+                            "reflex".equals(started.attrs().get("source")),
+                            "DRINK_STARTED source must be reflex (reflex-owned claim), got "
+                                    + started.attrs().get("source"));
+                    // DRINK_COMPLETED: non-urgent, source=reflex, effects,
+                    // containerType=glass_bottle.
+                    BotEvent completed = events.stream()
+                            .filter(e -> EventKind.DRINK_COMPLETED.equals(e.kind()))
+                            .findFirst()
+                            .orElseThrow();
+                    check(!completed.urgent(), "DRINK_COMPLETED must be non-urgent");
+                    check(
+                            "minecraft:healing".equals(completed.attrs().get("potionId")),
+                            "DRINK_COMPLETED potionId must be minecraft:healing, got "
+                                    + completed.attrs().get("potionId"));
+                    check(
+                            "0".equals(completed.attrs().get("slot")),
+                            "DRINK_COMPLETED slot must be 0, got "
+                                    + completed.attrs().get("slot"));
+                    check(
+                            "minecraft:instant_health:0:1"
+                                    .equals(completed.attrs().get("effects")),
+                            "DRINK_COMPLETED effects must be instant_health:0:1, got "
+                                    + completed.attrs().get("effects"));
+                    check(
+                            "glass_bottle".equals(completed.attrs().get("containerType")),
+                            "DRINK_COMPLETED containerType must be glass_bottle, got "
+                                    + completed.attrs().get("containerType"));
+                    check(
+                            "reflex".equals(completed.attrs().get("source")),
+                            "DRINK_COMPLETED source must be reflex, got "
+                                    + completed.attrs().get("source"));
+                    // STARTED precedes COMPLETED.
+                    long startedIdx = events.indexOf(started);
+                    long completedIdx = events.indexOf(completed);
+                    check(
+                            startedIdx < completedIdx,
+                            "DRINK_STARTED must precede DRINK_COMPLETED (started=" + startedIdx + " completed="
+                                    + completedIdx + ")");
+                    // Side effect: body healed 4 HP (12 -> 16).
+                    check(
+                            body.getHealth() == healthBefore + 4.0f,
+                            "body must heal 4 HP after reflex drink; got " + body.getHealth() + " (expected "
+                                    + (healthBefore + 4.0f) + ")");
+                    // Side effect: slot 0 now holds the glass bottle.
+                    ItemStack slot0 = body.getInventory().container().getItem(0);
+                    check(
+                            slot0.is(Items.GLASS_BOTTLE),
+                            "slot 0 must have glass bottle after reflex drink; got " + slot0);
+                    check(slot0.getCount() == 1, "glass bottle count must be 1; got " + slot0.getCount());
+                    body.discard();
+                })
+                .thenSucceed();
+    }
+
     // -----------------------------------------------------------------------
     // Brewing stand menu interactions (capability: inventory.menu_clicks)
     // -----------------------------------------------------------------------

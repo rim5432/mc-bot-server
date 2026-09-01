@@ -39,6 +39,11 @@
       "priority": 90
     },
     {
+      "type": "DRINK_ON_LOW_HEALTH",
+      "threshold": 12.0,
+      "priority": 88
+    },
+    {
       "type": "EAT_WHEN_HUNGRY",
       "trigger": 16,
       "priority": 85

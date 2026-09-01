@@ -334,6 +334,19 @@ public final class BotController {
     }
 
     /**
+     * Feed the drink reflex's execution slot: the hotbar slot holding
+     * the best healing potion, or -1 when none. Same degradation
+     * contract as the eat slot - an unwired rig degrades a DRINK
+     * decision to the plain freeze hold instead of minting a phantom
+     * sip.
+     *
+     * @param supplier best-potion hotbar slot 0..8, or -1; never null
+     */
+    public void setDrinkSlotSupplier(java.util.function.IntSupplier supplier) {
+        this.claimInjector.setDrinkSlotSupplier(supplier);
+    }
+
+    /**
      * Whether the crash latch is currently set.
      *
      * @return true from first caught RuntimeException until a full
