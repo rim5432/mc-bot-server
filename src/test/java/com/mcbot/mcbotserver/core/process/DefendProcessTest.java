@@ -448,4 +448,140 @@ class DefendProcessTest {
         assertEquals("ENGAGEMENT_REFUSED", m.failureReasonOrNull());
         assertEquals(SKELETON, m.verdictAttrs().get("threatType"));
     }
+
+    /**
+     * An own-inventory snapshot carrying a bow but no arrows: the
+     * loadout whose hotbarBowSlot answer is -1 - ammunition is part
+     * of the loadout, not a bonus.
+     *
+     * @return the inventory view; never null
+     */
+    private static InventoryView inventoryWithBowWithoutArrows() {
+        java.util.List<ItemView> main =
+                new java.util.ArrayList<>(java.util.Collections.nCopies(InventoryView.MAIN_SIZE, ItemView.EMPTY));
+        main.set(0, new ItemView("minecraft:bow", 1));
+        return new InventoryView(
+                main,
+                0,
+                java.util.List.copyOf(java.util.Collections.nCopies(InventoryView.ARMOR_SIZE, ItemView.EMPTY)),
+                ItemView.EMPTY);
+    }
+
+    /**
+     * Mid-fight re-route, ammunition direction: a bow-only carrier
+     * engaged at standoff must charge the swing rim once the arrows
+     * are gone. hotbarBowSlot answers -1 without ammunition, and the
+     * stance follows the live loadout instead of the engage-time
+     * snapshot - an empty bow holding a band it can no longer service
+     * is the frozen-decision defect this pins away.
+     */
+    @Test
+    void arrowsRunOutMidFightChargesMelee() {
+        MockWorldView world = new MockWorldView();
+        DefendProcess m = new DefendProcess(
+                "t1", PriorityBands.DEFEND_PRIORITY, 1000L, () -> BOT, Set.of(ZOMBIE), Set.of(), WeaponCatalog.none());
+        world.setInventory(inventoryWithBow());
+        world.addEntity(zombie("Z1", 6));
+
+        Directive first = m.onTick(world);
+        com.mcbot.mcbotserver.api.goal.GoalRange opening = (com.mcbot.mcbotserver.api.goal.GoalRange) first.goal();
+        assertEquals(DefendProcess.RANGED_STANDOFF + 2, opening.max(), "the fight opens at the standoff band");
+
+        world.setInventory(inventoryWithBowWithoutArrows());
+        Directive rerouted = m.onTick(world);
+        assertTrue(m.isActive(), "the fight continues - re-routed, not failed");
+        com.mcbot.mcbotserver.api.goal.GoalNear goal = (com.mcbot.mcbotserver.api.goal.GoalNear) rerouted.goal();
+        assertEquals(DefendProcess.GOAL_RANGE, goal.range(), "no ammunition means the swing-rim chase");
+    }
+
+    /**
+     * Mid-fight re-route, weapon direction: a sword appearing in the
+     * hotbar mid-standoff closes the fight to the swing rim - the
+     * same ranking that decided melee at engage time keeps deciding
+     * it while engaged.
+     */
+    @Test
+    void swordPickupMidFightClosesFromStandoff() {
+        MockWorldView world = new MockWorldView();
+        WeaponCatalog catalog = id -> SWORD.equals(id) ? 7f : 0f;
+        DefendProcess m = new DefendProcess(
+                "t1", PriorityBands.DEFEND_PRIORITY, 1000L, () -> BOT, Set.of(ZOMBIE), Set.of(), catalog);
+        world.setInventory(inventoryWithBow());
+        world.addEntity(zombie("Z1", 6));
+
+        Directive first = m.onTick(world);
+        assertTrue(first.goal() instanceof com.mcbot.mcbotserver.api.goal.GoalRange, "bow-only opens the standoff");
+
+        world.setInventory(inventoryWithBowAndSword());
+        Directive rerouted = m.onTick(world);
+        com.mcbot.mcbotserver.api.goal.GoalNear goal = (com.mcbot.mcbotserver.api.goal.GoalNear) rerouted.goal();
+        assertEquals(DefendProcess.GOAL_RANGE, goal.range(), "the ranked sword restores the charge");
+    }
+
+    /**
+     * Mid-fight re-route, loadout-gained direction: an unarmed melee
+     * engagement opens the standoff once a bow loadout appears - the
+     * stance is a function of state, not of history.
+     */
+    @Test
+    void bowPickupMidFightOpensStandoff() {
+        MockWorldView world = new MockWorldView();
+        DefendProcess m = new DefendProcess(
+                "t1", PriorityBands.DEFEND_PRIORITY, 1000L, () -> BOT, Set.of(ZOMBIE), Set.of(), WeaponCatalog.none());
+        world.addEntity(zombie("Z1", 6));
+
+        Directive first = m.onTick(world);
+        assertTrue(first.goal() instanceof com.mcbot.mcbotserver.api.goal.GoalNear, "unarmed opens the chase");
+
+        world.setInventory(inventoryWithBow());
+        Directive rerouted = m.onTick(world);
+        com.mcbot.mcbotserver.api.goal.GoalRange goal = (com.mcbot.mcbotserver.api.goal.GoalRange) rerouted.goal();
+        assertEquals(DefendProcess.RANGED_STANDOFF - 2, goal.min(), "the gained loadout holds the standoff band");
+    }
+
+    /**
+     * The one refusing direction: a ranged-typed target whose loadout
+     * vanishes mid-fight fails ENGAGEMENT_REFUSED with the threat
+     * type - an unarmed chase against a kiting skeleton is the bleed
+     * the engage-time refusal exists to prevent, mid-fight included.
+     */
+    @Test
+    void skeletonLoadoutGoneMidFightRefuses() {
+        MockWorldView world = new MockWorldView();
+        DefendProcess m = new DefendProcess(
+                "t1", PriorityBands.DEFEND_PRIORITY, 1000L, () -> BOT, Set.of(ZOMBIE, SKELETON), Set.of(SKELETON));
+        world.setInventory(inventoryWithBow());
+        world.addEntity(new EntitySnapshot("S1", SKELETON, new CellPos(6, 64, 0), 20f, 20f));
+
+        Directive first = m.onTick(world);
+        assertTrue(
+                first.goal() instanceof com.mcbot.mcbotserver.api.goal.GoalRange,
+                "armed, the skeleton is answered at standoff");
+
+        world.setInventory(inventoryWithBowWithoutArrows());
+        m.onTick(world);
+        assertFalse(m.isActive(), "the unarmed skeleton fight refuses rather than bleeds");
+        assertEquals("ENGAGEMENT_REFUSED", m.failureReasonOrNull());
+        assertEquals(SKELETON, m.verdictAttrs().get("threatType"));
+    }
+
+    /**
+     * Churn guard: an unchanged loadout never flips the stance - the
+     * re-evaluation reads state, it must not invent transitions.
+     */
+    @Test
+    void unchangedLoadoutKeepsStanceAcrossTicks() {
+        MockWorldView world = new MockWorldView();
+        DefendProcess m = new DefendProcess(
+                "t1", PriorityBands.DEFEND_PRIORITY, 1000L, () -> BOT, Set.of(ZOMBIE), Set.of(), WeaponCatalog.none());
+        world.setInventory(inventoryWithBow());
+        world.addEntity(zombie("Z1", 6));
+
+        for (int tick = 0; tick < 10; tick++) {
+            Directive directive = m.onTick(world);
+            assertTrue(
+                    directive.goal() instanceof com.mcbot.mcbotserver.api.goal.GoalRange,
+                    "stance stable on tick " + tick);
+        }
+    }
 }

@@ -310,6 +310,9 @@ public final class DefendProcess extends MissionShell {
                 fail(REASON_LOST);
                 return lastDirective;
             }
+            if (!rerouteOnLoadoutChange(world, current)) {
+                return lastDirective;
+            }
             return directiveFor();
         }
 
@@ -421,6 +424,55 @@ public final class DefendProcess extends MissionShell {
     private void engageRanged(EntitySnapshot target) {
         engage(target);
         targetRanged = true;
+    }
+
+    /**
+     * Mid-fight loadout re-evaluation: the ranged stance is re-derived
+     * every engaged tick against the live inventory, so arrows running
+     * out or a weapon pickup re-routes the fight instead of steering a
+     * decision frozen at engage time. Mirrors the engage-time routing
+     * exactly - one decision function, no drift between the two sites.
+     *
+     * <p>The one direction that refuses instead of re-routing is a
+     * ranged-typed target whose loadout vanished mid-fight: an unarmed
+     * chase against a kiting ranged mob is the bleed the engage-time
+     * refusal exists to prevent, mid-fight included.
+     *
+     * @param world   read surface for the inventory; never null
+     * @param current the engaged target, still sighted; never null
+     * @return true when the fight continues (stance possibly flipped)
+     */
+    @Feature(
+            id = "combat.hostile_acquisition.mid_fight_loadout_reroute",
+            face = "combat.hostile_acquisition",
+            description = "Mid-fight loadout re-route: the ranged-vs-melee stance is re-derived every engaged tick"
+                    + " from the live inventory (bow loadout presence, melee-weapon ranking), mirroring the"
+                    + " engage-time routing. Arrows running out charges the swing rim; picking up a bow opens the"
+                    + " standoff; picking up a better melee weapon closes from standoff. A ranged-typed target"
+                    + " whose loadout vanishes fails ENGAGEMENT_REFUSED rather than unarmed-chasing a kiter.",
+            vanillaRef = "Hostile mob AI re-selects attack options continuously (decompiled 1.20.1)",
+            deviation = "Bot-specific: vanilla mobs have fixed attack repertoires; the bot's loadout is dynamic,"
+                    + " so the stance decision must be too. Target identity stays locked - only the stance re-routes.")
+    private boolean rerouteOnLoadoutChange(WorldView world, EntitySnapshot current) {
+        boolean hasRangedLoadout = RangedLoadouts.hotbarBowSlot(world) >= 0;
+        boolean rangedTyped = rangedTypes.contains(current.type());
+        boolean shouldRange = rangedTyped
+                ? hasRangedLoadout
+                : hasRangedLoadout && !RangedLoadouts.meleeWeaponBeatsBow(world, weapons);
+        if (shouldRange == targetRanged) {
+            return true;
+        }
+        if (shouldRange) {
+            targetRanged = true;
+            return true;
+        }
+        if (rangedTyped) {
+            lastRefusedType = current.type();
+            fail(REASON_REFUSED);
+            return false;
+        }
+        targetRanged = false;
+        return true;
     }
 
     @Feature(
