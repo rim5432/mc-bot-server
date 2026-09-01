@@ -8,16 +8,22 @@ import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.ai.control.MoveControl;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.projectile.ThrownPotion;
 import net.minecraft.world.item.BowlFoodItem;
 import net.minecraft.world.item.HoneyBottleItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.LingeringPotionItem;
 import net.minecraft.world.item.MilkBucketItem;
 import net.minecraft.world.item.PotionItem;
+import net.minecraft.world.item.SplashPotionItem;
 import net.minecraft.world.item.SuspiciousStewItem;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 
 /**
  * The physical body: a vanilla-pathfinding-capable mob whose locomotion
@@ -630,6 +636,56 @@ public final class BotBodyEntity extends PathfinderMob {
             inventory.container().setItem(selectedSlot, held);
             addOrDrop(new ItemStack(container));
         }
+    }
+
+    /**
+     * Throw the held splash or lingering potion (consumable-face P2-c):
+     * the vanilla ThrowableItem path — spawn a {@code ThrownPotion} entity
+     * with the bot's rotation, shoot it with the vanilla -20deg pitch
+     * offset and 0.5 velocity, and shrink the held stack. Unlike {@code
+     * drinkHeldItem}, this does NOT call {@code finishUsingItem}: the
+     * projectile carries the item stack and applies effects on impact
+     * (splash AoE / lingering AreaEffectCloud), resolved entirely by the
+     * {@code ThrownPotion} entity.
+     *
+     * <p>Container recovery: thrown potions leave no container (unlike
+     * drinkable potions which leave a glass bottle) — the stack simply
+     * shrinks by 1. Count 1 empties the slot; count{@code >}1 keeps the
+     * shrunk stack.
+     *
+     * <p>Sound: splash uses {@code SPLASH_POTION_THROW}, lingering uses
+     * {@code LINGERING_POTION_THROW} — same pitch randomization as vanilla
+     * {@code ThrowableItem.use} (0.4F / (random * 0.4F + 0.8F)).
+     *
+     * @return true when a splash/lingering potion was thrown
+     */
+    public boolean throwHeldPotion() {
+        ItemStack held = inventory.container().getItem(selectedSlot);
+        boolean isSplash = held.getItem() instanceof SplashPotionItem;
+        boolean isLingering = held.getItem() instanceof LingeringPotionItem;
+        if (!isSplash && !isLingering) {
+            return false;
+        }
+        // The projectile carries a copy: the original is shrunk below, and
+        // sharing the reference would mutate the projectile's stack too.
+        ItemStack projectileStack = held.copy();
+        ThrownPotion potion = new ThrownPotion(level(), this);
+        potion.setItem(projectileStack);
+        // Vanilla ThrowableItem.use parameters: -20deg pitch offset, 0.5
+        // velocity, 1.0 inaccuracy.
+        potion.shootFromRotation(this, getXRot(), getYRot(), -20.0F, 0.5F, 1.0F);
+        level().addFreshEntity(potion);
+        SoundEvent sound = isLingering ? SoundEvents.LINGERING_POTION_THROW : SoundEvents.SPLASH_POTION_THROW;
+        level().playSound(null, getX(), getY(), getZ(), sound, SoundSource.PLAYERS, 0.5F,
+                0.4F / (level().getRandom().nextFloat() * 0.4F + 0.8F));
+        // Shrink: count 1 empties the slot; count > 1 keeps the shrunk stack.
+        held.shrink(1);
+        if (held.isEmpty()) {
+            inventory.container().setItem(selectedSlot, ItemStack.EMPTY);
+        } else {
+            inventory.container().setItem(selectedSlot, held);
+        }
+        return true;
     }
 
     /**

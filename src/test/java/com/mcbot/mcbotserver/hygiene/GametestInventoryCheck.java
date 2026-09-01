@@ -133,6 +133,7 @@ class GametestInventoryCheck {
                             "milkBucketClearsEffectsAndLeavesBucket",
                             "harnessUseClaimEmitsDrinkStartedAndCompleted",
                             "drinkReflexOnLowHealthEmitsStartedAndCompleted",
+                            "harnessUseClaimThrowsSplashPotion",
                             "brewingStandBrewsWaterBottleWithNetherWart",
                             "brewingStandFuelSlotRejectsNonBlazePowder",
                             "brewingStandSlotRolesAreCorrect",

@@ -27,9 +27,11 @@ import net.minecraft.world.item.FishingRodItem;
 import net.minecraft.world.item.HoneyBottleItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.LingeringPotionItem;
 import net.minecraft.world.item.MilkBucketItem;
 import net.minecraft.world.item.PotionItem;
 import net.minecraft.world.item.ShieldItem;
+import net.minecraft.world.item.SplashPotionItem;
 import net.minecraft.world.item.SuspiciousStewItem;
 import net.minecraft.world.item.alchemy.PotionUtils;
 import net.minecraft.world.level.ClipContext;
@@ -343,6 +345,23 @@ public final class BindingActor implements Actor {
             emitEatFailed("NOT_HUNGRY", slot, itemId, source);
             return;
         }
+        // Splash/lingering potions MUST be checked before PotionItem:
+        // ThrowablePotionItem extends PotionItem, so a bare instanceof
+        // PotionItem would match them and attempt to drink (finishUsingItem
+        // applies nothing for throwable potions — the effects resolve on
+        // projectile impact instead).
+        if (held.getItem() instanceof SplashPotionItem || held.getItem() instanceof LingeringPotionItem) {
+            int slot = body.selectedSlot;
+            String potionId =
+                    BuiltInRegistries.POTION.getKey(PotionUtils.getPotion(held)).toString();
+            String effects = serializeEffects(PotionUtils.getMobEffects(held));
+            String throwType = held.getItem() instanceof LingeringPotionItem ? "lingering" : "splash";
+            boolean thrown = body.throwHeldPotion();
+            if (thrown) {
+                emitPotionThrown(potionId, slot, throwType, effects, source);
+            }
+            return;
+        }
         if (held.getItem() instanceof PotionItem) {
             int slot = body.selectedSlot;
             String itemId = BuiltInRegistries.ITEM.getKey(held.getItem()).toString();
@@ -536,6 +555,30 @@ public final class BindingActor implements Actor {
                     false,
                     Map.copyOf(attrs),
                     "drink failed: " + reason + " (slot " + slot + ", item " + itemId + ")"));
+        } catch (RuntimeException ignored) {
+            // Reporting must never take the pipeline down.
+        }
+    }
+
+    /**
+     * Push one POTION_THROWN event. Wrapped so a reporting failure
+     * never takes the tick pipeline down.
+     */
+    private void emitPotionThrown(String potionId, int slot, String throwType, String effects, String source) {
+        try {
+            Map<String, String> attrs = new HashMap<>();
+            attrs.put("potionId", potionId);
+            attrs.put("slot", Integer.toString(slot));
+            attrs.put("throwType", throwType);
+            attrs.put("effects", effects);
+            attrs.put("source", source);
+            events.push(new BotEvent(
+                    EventKind.POTION_THROWN,
+                    daySupplier.getAsLong(),
+                    todSupplier.getAsLong(),
+                    false,
+                    Map.copyOf(attrs),
+                    "threw " + throwType + " " + potionId + " (effects: " + effects + ")"));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down.
         }

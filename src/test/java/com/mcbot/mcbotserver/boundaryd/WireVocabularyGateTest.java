@@ -94,7 +94,8 @@ class WireVocabularyGateTest {
             Map.entry("EAT_FAILED", Set.of("reason", "slot", "itemId", "source")),
             Map.entry("DRINK_STARTED", Set.of("potionId", "slot", "health", "source")),
             Map.entry("DRINK_COMPLETED", Set.of("potionId", "slot", "effects", "containerType", "source")),
-            Map.entry("DRINK_FAILED", Set.of("reason", "slot", "itemId", "source")));
+            Map.entry("DRINK_FAILED", Set.of("reason", "slot", "itemId", "source")),
+            Map.entry("POTION_THROWN", Set.of("potionId", "slot", "throwType", "effects", "source")));
 
     /**
      * Every main-source file that constructs a {@link BotEvent} or

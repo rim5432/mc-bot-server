@@ -394,6 +394,77 @@ public final class BotPotionGameTests {
                 .thenSucceed();
     }
 
+    /**
+     * Scenario: the harness submits a USE claim while a splash poison
+     * potion is in slot 0 — the rising edge in applyUse fires
+     * onUsePressEdge, the SplashPotionItem branch calls
+     * body.throwHeldPotion(), which spawns a ThrownPotion entity with
+     * the bot's rotation (vanilla -20deg pitch offset, 0.5 velocity)
+     * and shrinks the stack. POTION_THROWN is emitted with potionId,
+     * slot, throwType=splash, effects, source=harness. Pins the
+     * ThrowableItem path: unlike drinkable potions (finishUsingItem,
+     * 32-tick animation, glass bottle left behind), thrown potions are
+     * one-shot, leave no container, and the effects resolve on impact
+     * via the ThrownPotion entity (splash AoE).
+     */
+    // capability: consumable.potion
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void harnessUseClaimThrowsSplashPotion(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, WALK_Y, 7));
+        var body = rig.body();
+        body.getInventory().container().setItem(
+                0, PotionUtils.setPotion(new ItemStack(Items.SPLASH_POTION), Potions.POISON));
+
+        helper.startSequence()
+                .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
+                    // Re-armed every tick: claims expire at flush. The
+                    // first tick with pressing=true fires the rising edge
+                    // in applyUse -> onUsePressEdge -> splash branch.
+                    rig.actor().submit(new Claim(Channel.USE, 50, "test:throw", new Intent.Use(true)));
+                    GametestRig.assertEventSeen(rig.events(), EventKind.POTION_THROWN);
+                }))
+                .thenExecuteAfter(0, () -> {
+                    var events = GametestRig.eventsOf(rig.events());
+                    // POTION_THROWN: non-urgent (one-shot, no preemption),
+                    // carries potionId, slot, throwType, effects, source.
+                    BotEvent thrown = events.stream()
+                            .filter(e -> EventKind.POTION_THROWN.equals(e.kind()))
+                            .findFirst()
+                            .orElseThrow();
+                    check(!thrown.urgent(), "POTION_THROWN must be non-urgent (one-shot throw)");
+                    check(
+                            "minecraft:poison".equals(thrown.attrs().get("potionId")),
+                            "POTION_THROWN potionId must be minecraft:poison, got "
+                                    + thrown.attrs().get("potionId"));
+                    check(
+                            "0".equals(thrown.attrs().get("slot")),
+                            "POTION_THROWN slot must be 0, got " + thrown.attrs().get("slot"));
+                    check(
+                            "splash".equals(thrown.attrs().get("throwType")),
+                            "POTION_THROWN throwType must be splash, got " + thrown.attrs().get("throwType"));
+                    check(
+                            thrown.attrs().get("effects") != null && thrown.attrs().get("effects").contains("poison"),
+                            "POTION_THROWN effects must contain poison, got " + thrown.attrs().get("effects"));
+                    check(
+                            "harness".equals(thrown.attrs().get("source")),
+                            "POTION_THROWN source must be harness, got " + thrown.attrs().get("source"));
+                    // Side effect: slot 0 is empty (thrown potions leave
+                    // no container — unlike drinkable potions which leave
+                    // a glass bottle).
+                    ItemStack slot0 = body.getInventory().container().getItem(0);
+                    check(slot0.isEmpty(), "slot 0 must be empty after throw; got " + slot0);
+                    // Side effect: a ThrownPotion entity was spawned in the
+                    // level. The projectile carries the splash potion stack
+                    // and will apply poison on impact.
+                    var thrownPotions = helper.getLevel()
+                            .getEntitiesOfClass(net.minecraft.world.entity.projectile.ThrownPotion.class,
+                                    body.getBoundingBox().inflate(8.0));
+                    check(!thrownPotions.isEmpty(), "a ThrownPotion entity must exist after throw");
+                    body.discard();
+                })
+                .thenSucceed();
+    }
+
     // -----------------------------------------------------------------------
     // Brewing stand menu interactions (capability: inventory.menu_clicks)
     // -----------------------------------------------------------------------

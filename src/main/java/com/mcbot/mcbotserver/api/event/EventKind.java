@@ -152,5 +152,20 @@ public final class EventKind {
      */
     public static final String DRINK_FAILED = "DRINK_FAILED";
 
+    /**
+     * A splash or lingering potion was thrown from the selected hotbar
+     * slot via the ThrowableItem path (consumable-face extension:
+     * potions that are applied on impact rather than consumed). The
+     * ThrownPotion entity is spawned with the bot's rotation and the
+     * vanilla -20deg pitch offset / 0.5 velocity; impact effects
+     * (splash AoE or lingering AreaEffectCloud) resolve engine-side.
+     * Carries attrs {@code potionId} (the potion registry id, e.g.
+     * "minecraft:poison"), {@code slot}, {@code throwType}
+     * ("splash" or "lingering"), {@code effects} (comma-separated
+     * "id:amplifier:duration"), {@code source} ("reflex" or "harness").
+     * Not urgent — throwing is one-shot, no preemption needed.
+     */
+    public static final String POTION_THROWN = "POTION_THROWN";
+
     private EventKind() {}
 }
