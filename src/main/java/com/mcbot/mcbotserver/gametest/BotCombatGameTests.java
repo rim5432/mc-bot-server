@@ -888,6 +888,13 @@ public final class BotCombatGameTests {
                             "still inside min: bodyX=" + rig.body().getBlockX() + " targetX=" + zombie.getBlockX()
                                     + " dist=" + dist);
                 }))
+                // Arrows get their own poll window: the first full draw
+                // (20 charge ticks + flight) releases right around band
+                // arrival - an instant check at settle time races the
+                // impact and reads a clean kite as zero damage.
+                .thenWaitUntil(driveUntil(rig, () -> check(
+                        zombie.getHealth() < healthBefore[0],
+                        "the kite must land arrows after restoring range; health=" + zombie.getHealth())))
                 .thenExecuteFor(GametestRig.SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     check(rig.body().isAlive(), "the body must survive the kiting encounter");
@@ -896,10 +903,6 @@ public final class BotCombatGameTests {
                             finalDist >= 8,
                             "after backing away the separation must be at least the band min; dist=" + finalDist
                                     + " bodyX=" + rig.body().getBlockX() + " targetX=" + zombie.getBlockX());
-                    check(
-                            zombie.getHealth() < healthBefore[0],
-                            "the bot must land arrows while kiting; before=" + healthBefore[0] + " after="
-                                    + zombie.getHealth());
                     rig.body().discard();
                 })
                 .thenSucceed();
