@@ -7,6 +7,11 @@ import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
 
 import com.mcbot.mcbotserver.McBotServer;
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
+import com.mcbot.mcbotserver.api.actor.Channel;
+import com.mcbot.mcbotserver.api.actor.Claim;
+import com.mcbot.mcbotserver.api.actor.Intent;
+import com.mcbot.mcbotserver.api.event.BotEvent;
+import com.mcbot.mcbotserver.api.event.EventKind;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -171,6 +176,119 @@ public final class BotPotionGameTests {
         check(slot0.getCount() == 1, "bucket count must be 1; got " + slot0.getCount());
         body.discard();
         helper.succeed();
+    }
+
+    /**
+     * Scenario: a harness-driven USE claim with a healing potion in hand
+     * triggers the rising-edge {@code onUsePressEdge} potion branch,
+     * emitting DRINK_STARTED (urgent, pre-consumption) and
+     * DRINK_COMPLETED (non-urgent, result) on the boundary-D event
+     * stream with correct attrs. Pins the drink lifecycle disclosure
+     * through the BindingActor claim path — the body-level tests call
+     * {@code drinkHeldItem} directly and never exercise event emission,
+     * claim routing, or source resolution.
+     *
+     * <p>The rising edge fires once: {@code applyUse} sees
+     * pressing=true with lastUsePressing=false on the first claimed
+     * tick, calls {@code onUsePressEdge}, which detects the PotionItem
+     * and drinks. Subsequent ticks with the claim held do not re-fire
+     * (lastUsePressing stays true), so one claim = one drink, matching
+     * vanilla right-click semantics.
+     */
+    // capability: consumable.potion
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void harnessUseClaimEmitsDrinkStartedAndCompleted(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, WALK_Y, 7));
+        var body = rig.body();
+        // Damage the body so instant_health has room to heal and the
+        // DRINK_STARTED health attr carries a meaningful pre-drink value.
+        float healthBefore = 10.0f;
+        body.setHealth(healthBefore);
+        body.getInventory().container().setItem(0, PotionUtils.setPotion(new ItemStack(Items.POTION), Potions.HEALING));
+
+        helper.startSequence()
+                .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
+                    // Re-armed every tick: claims expire at flush. The
+                    // first tick with pressing=true fires the rising edge
+                    // in applyUse -> onUsePressEdge -> potion branch.
+                    rig.actor().submit(new Claim(Channel.USE, 50, "test:drink", new Intent.Use(true)));
+                    GametestRig.assertEventSeen(rig.events(), EventKind.DRINK_COMPLETED);
+                }))
+                .thenExecuteAfter(0, () -> {
+                    var events = GametestRig.eventsOf(rig.events());
+                    // DRINK_STARTED: urgent, pre-consumption, carries
+                    // potionId, slot, health at decision time, source.
+                    BotEvent started = events.stream()
+                            .filter(e -> EventKind.DRINK_STARTED.equals(e.kind()))
+                            .findFirst()
+                            .orElseThrow();
+                    check(started.urgent(), "DRINK_STARTED must be urgent (pre-consumption decision)");
+                    check(
+                            "minecraft:healing".equals(started.attrs().get("potionId")),
+                            "DRINK_STARTED potionId must be minecraft:healing, got "
+                                    + started.attrs().get("potionId"));
+                    check(
+                            "0".equals(started.attrs().get("slot")),
+                            "DRINK_STARTED slot must be 0, got "
+                                    + started.attrs().get("slot"));
+                    check(
+                            "10.0".equals(started.attrs().get("health")),
+                            "DRINK_STARTED health must be 10.0, got "
+                                    + started.attrs().get("health"));
+                    check(
+                            "harness".equals(started.attrs().get("source")),
+                            "DRINK_STARTED source must be harness, got "
+                                    + started.attrs().get("source"));
+                    // DRINK_COMPLETED: non-urgent, carries potionId, slot,
+                    // serialized effects, containerType, source.
+                    BotEvent completed = events.stream()
+                            .filter(e -> EventKind.DRINK_COMPLETED.equals(e.kind()))
+                            .findFirst()
+                            .orElseThrow();
+                    check(!completed.urgent(), "DRINK_COMPLETED must be non-urgent");
+                    check(
+                            "minecraft:healing".equals(completed.attrs().get("potionId")),
+                            "DRINK_COMPLETED potionId must be minecraft:healing, got "
+                                    + completed.attrs().get("potionId"));
+                    check(
+                            "0".equals(completed.attrs().get("slot")),
+                            "DRINK_COMPLETED slot must be 0, got "
+                                    + completed.attrs().get("slot"));
+                    check(
+                            "minecraft:instant_health:0:1"
+                                    .equals(completed.attrs().get("effects")),
+                            "DRINK_COMPLETED effects must be instant_health:0:1 (vanilla HEALING registers"
+                                    + " MobEffectInstance(HEAL, 1, 0) — instant effects carry 1 tick), got "
+                                    + completed.attrs().get("effects"));
+                    check(
+                            "glass_bottle".equals(completed.attrs().get("containerType")),
+                            "DRINK_COMPLETED containerType must be glass_bottle, got "
+                                    + completed.attrs().get("containerType"));
+                    check(
+                            "harness".equals(completed.attrs().get("source")),
+                            "DRINK_COMPLETED source must be harness, got "
+                                    + completed.attrs().get("source"));
+                    // STARTED precedes COMPLETED in stream order (decision
+                    // before consumption, same tick but ordered push).
+                    long startedIdx = events.indexOf(started);
+                    long completedIdx = events.indexOf(completed);
+                    check(
+                            startedIdx < completedIdx,
+                            "DRINK_STARTED must precede DRINK_COMPLETED (started=" + startedIdx + " completed="
+                                    + completedIdx + ")");
+                    // Side effect: the body healed 4 HP (instant_health I:
+                    // (4 << amplifier) * healthFactor = 4).
+                    check(
+                            body.getHealth() == healthBefore + 4.0f,
+                            "body must heal 4 HP after drinking healing potion; got " + body.getHealth() + " (expected "
+                                    + (healthBefore + 4.0f) + ")");
+                    // Side effect: slot 0 now holds the glass bottle.
+                    ItemStack slot0 = body.getInventory().container().getItem(0);
+                    check(slot0.is(Items.GLASS_BOTTLE), "slot 0 must have glass bottle after drink; got " + slot0);
+                    check(slot0.getCount() == 1, "glass bottle count must be 1; got " + slot0.getCount());
+                    body.discard();
+                })
+                .thenSucceed();
     }
 
     // -----------------------------------------------------------------------

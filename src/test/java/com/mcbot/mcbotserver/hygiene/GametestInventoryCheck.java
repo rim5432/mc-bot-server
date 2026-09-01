@@ -131,6 +131,7 @@ class GametestInventoryCheck {
                             "healingPotionRestoresHealthAndLeavesGlassBottle",
                             "potionStackCountTwoKeepsRemainderAndAddsBottle",
                             "milkBucketClearsEffectsAndLeavesBucket",
+                            "harnessUseClaimEmitsDrinkStartedAndCompleted",
                             "brewingStandBrewsWaterBottleWithNetherWart",
                             "brewingStandFuelSlotRejectsNonBlazePowder",
                             "brewingStandSlotRolesAreCorrect",
