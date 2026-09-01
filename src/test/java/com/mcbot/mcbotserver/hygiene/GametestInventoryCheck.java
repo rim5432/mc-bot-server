@@ -166,6 +166,31 @@ class GametestInventoryCheck {
                             "stonecutterCutsStoneIntoStairs",
                             "stonecutterInputRejectsNonStone",
                             "workstationSlotRolesAreCorrect")),
+            Map.entry(
+                    "BotBeaconGameTests",
+                    Set.of(
+                            "beaconSetsPrimaryEffectAndConsumesPayment",
+                            "beaconPaymentSlotRejectsNonPaymentItem",
+                            "beaconSetEffectsWithoutPaymentIsNoOp")),
+            Map.entry(
+                    "BotContainerGameTests",
+                    Set.of(
+                            "barrelStoresAndRetrievesItems",
+                            "shulkerBoxStoresAndRetrievesItems",
+                            "hopperMenuOpensAndShowsFiveSlots",
+                            "dispenserMenuOpensAndShowsNineSlots",
+                            "dropperMenuOpensAndShowsNineSlots")),
+            Map.entry(
+                    "BotWorkstation2GameTests",
+                    Set.of(
+                            "cartographyTableOpensWithThreeSlots",
+                            "lecternWithBookOpensWithOneSlot",
+                            "lecternWithoutBookDoesNotOpen",
+                            "enchantingTableOpensWithTwoInputSlots",
+                            "campfireHasNoMenu",
+                            "trappedChestOpensAndStoresItems",
+                            "enderChestOpensAndStoresItems",
+                            "enderChestBlockedByRedstoneConductorDoesNotOpen")),
             Map.entry("CrashRecoveryGameTests", Set.of("latchesAndRecoversAfterCrash")),
             Map.entry("ProductionWiringGameTests", Set.of("walksViaCommandAndServerTick")),
             Map.entry(
