@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "exported_at": "2026-09-02T03:34:13",
+  "exported_at": "2026-09-02T04:52:23",
   "statuses": [
     {
       "id": "acquisition.hunt_game",
@@ -125,7 +125,7 @@
     {
       "id": "hunger.movement_exhaustion",
       "status": "shipped",
-      "verified_at": "2026-09-01",
+      "verified_at": "2026-09-02",
       "deviation": "BotBodyEntity.customServerAiStep accumulates no exhaustion naturally, so it is fed manually from horizontal distance traveled. Sprint matches vanilla at 0.1/block; walk charges 0.01/block (the vanilla swim rate, not vanilla's zero walk rate) \u2014 a non-zero baseline so a purely-walking carrier still drains hunger over time. Position is tracked manually (lastTickX/Z fields) because customServerAiStep runs BEFORE LivingEntity.travel() in the aiStep() chain (decompiled 1.20.1: serverAiStep at line 2609, travel at line 2662), so getX()-xo is always zero at that point \u2014 the original getX()-xo implementation was a latent bug that produced zero exhaustion for all movement."
     },
     {

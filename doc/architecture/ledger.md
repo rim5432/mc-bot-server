@@ -1135,3 +1135,46 @@ Amendment chains recorded so far (both sides annotated):
     run gametest-20260902-031909 caught both defects above);
     grindstone-XP and walk-exhaustion reds are pre-existing
     rotation (red since the 09-01 batches, unrelated domains).
+
+    63. 2026-09-02 Standing engine red/flake paydown (walk-exhaustion,
+    grindstone-XP, bowtap-tap): three root causes, all
+    scenario-side, none in device code. (a) hunger
+    movement-exhaustion: the idle head sweep (issue 0005 motion-feel
+    layer, PresenceLayer.tickIdleRot) turned the body during
+    hand-driven walks - body-relative MOVE then walked an arc
+    (path 9.05m vs net displacement 2.20m at pinned failure), and
+    exhaustion accrues on path while the test measured net
+    displacement. Repair: the shared driveFixedForwardForTicks pump
+    owns ROT at priority 50 (the combat hand-pump doctrine extended
+    to hunger drives; production walkers are safe - PathingBehavior
+    submits MOVE and ROT as a pair, and the only unpaired MOVE
+    claims are zero-input holds), and the two drive scenarios
+    repositioned to row 3 so a pinned-yaw 9-10m walk stays on the
+    16-wide pad. (b) grindstone-XP, three stacked causes: Sharpness
+    II yield is ceil(minCost(2)/2)=6+nextInt(6)=6..11 points against
+    the 7-point level-up floor (a 1-in-6 no-level lottery; Sharpness
+    minCost = 11*level - 10) - pinned to Sharpness V (23..45
+    points, deterministic multi-level); the fixed 20-tick wait raced
+    the world's entity tick, which in a 100-test pooled batch lands
+    at unpredictable offsets (probe evidence: orbs invisible to a
+    global entity scan at +20 yet absorbed 30-60 ticks later after
+    the scenario ended; one full 200-tick poll passed without the
+    world ever ticking the body) - the poll now drives the body's
+    own production tick (body.tick() -> customServerAiStep ->
+    tickXpPickup) explicitly instead of racing the scheduler; and
+    the device chain itself verified end-to-end by the probes
+    (ForgeHooks.onGrindstoneTake awards at the grind center, the
+    1.5-inflated scan catches it, the mirror credits 31 points ->
+    level 3). (c) bowtap 14.096: the full-draw base damage exactly 6
+    (the crit-0 edge) times the vanilla zombie's 2 armor points
+    (reduction x0.984) = 5.904 damage, health 14.096 against a
+    14.05 bound written for exactly-6 - the threshold accounted for
+    the crit roll and forgot the target's armor. Repair: zero the
+    target's ARMOR attribute (the scenario pins the bow's damage,
+    not the target's armor) and correct the crit range in the
+    message (nextInt(i/2+2) on i=6 is 0-4). Engine evidence: 144/144
+    green three consecutive pooled runs at gametest-20260902-044847
+    / 044928 / 045014 after the final grindstone poll (the
+    intermediate versions caught the layering: the fixed 20-tick
+    wait red through 042250, a bare driveUntil poll green once then
+    timeout-red at 043922/044055).
