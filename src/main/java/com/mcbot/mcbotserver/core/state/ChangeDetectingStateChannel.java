@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.LongSupplier;
+import javax.annotation.Nullable;
 
 /**
  * Reference StateChannel: change-detected push onto the event stream,
@@ -45,6 +46,8 @@ public final class ChangeDetectingStateChannel implements StateChannel {
     private final EventQueue events;
     private final LongSupplier daySupplier;
     private final LongSupplier timeOfDaySupplier;
+
+    @Nullable
     private BotState last;
 
     /**

@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
+import javax.annotation.Nullable;
 
 /**
  * Light combat planner per boundaries.md decision 11: picks the
@@ -148,11 +149,18 @@ public final class DefendProcess extends MissionShell {
     private final Set<String> hostileTypes;
     private final Set<String> rangedTypes;
     private final WeaponCatalog weapons;
+
+    @Nullable
     private String lastRefusedType;
 
     private boolean succeeded;
+
+    @Nullable
     private String failure;
+
+    @Nullable
     private String targetId;
+
     private boolean targetRanged;
     private final TargetTracker tracker = new TargetTracker();
     private Directive lastDirective;
@@ -230,6 +238,7 @@ public final class DefendProcess extends MissionShell {
         this.hostileTypes = Set.copyOf(Objects.requireNonNull(hostileTypes, "hostileTypes"));
         this.rangedTypes = Set.copyOf(Objects.requireNonNull(rangedTypes, "rangedTypes"));
         this.weapons = Objects.requireNonNull(weapons, "weapons");
+        this.lastDirective = Directive.of(new GoalNear(positionSource.get(), 1));
     }
 
     @Feature(
@@ -399,6 +408,7 @@ public final class DefendProcess extends MissionShell {
     }
 
     @Override
+    @Nullable
     public String failureReasonOrNull() {
         return failure;
     }
@@ -488,17 +498,15 @@ public final class DefendProcess extends MissionShell {
                     + " bow-only carrier holds 8-12 blocks to trade full-draw arrows instead of clubbing; the lower"
                     + " bound makes the bot back away when a target closes, which GoalNear could never express.")
     private Directive directiveFor() {
-        // Bow-answered fights hold a range band instead of the swing-
-        // adjacent chase rim: ranged targets because closing to 2 hands
-        // the initiative to a kiter that backs away shooting, bow-only
-        // carriers because closing trades full-draw arrows for fist-tier
-        // clubbing (ledger 51). GoalRange gives the band a lower bound so
-        // a closing target triggers a backward replan rather than walking
-        // straight through the rim (issue 0018).
+        CellPos targetCell = tracker.targetCell();
+        String id = targetId;
+        if (targetCell == null || id == null) {
+            return lastDirective;
+        }
         Goal goal = targetRanged
-                ? new GoalRange(tracker.targetCell(), RANGED_STANDOFF - 2, RANGED_STANDOFF + 2)
-                : new GoalNear(tracker.targetCell(), GOAL_RANGE);
-        lastDirective = new Directive(goal, new Overrides(new Attack(targetId)));
+                ? new GoalRange(targetCell, RANGED_STANDOFF - 2, RANGED_STANDOFF + 2)
+                : new GoalNear(targetCell, GOAL_RANGE);
+        lastDirective = new Directive(goal, new Overrides(new Attack(id)));
         return lastDirective;
     }
 
@@ -543,6 +551,7 @@ public final class DefendProcess extends MissionShell {
         return out;
     }
 
+    @Nullable
     private EntitySnapshot nearestHostile(WorldView world, CellPos center) {
         EntitySnapshot best = null;
         double bestDist = Double.MAX_VALUE;
@@ -569,7 +578,11 @@ public final class DefendProcess extends MissionShell {
      * @return the matching snapshot, or {@code null} if absent from
      *         the scan radius
      */
-    private EntitySnapshot findTarget(WorldView world, CellPos center, String id) {
+    @Nullable
+    private EntitySnapshot findTarget(WorldView world, CellPos center, @Nullable String id) {
+        if (id == null) {
+            return null;
+        }
         for (EntitySnapshot e : scanHostiles(world, center)) {
             if (id.equals(e.id())) {
                 return e;

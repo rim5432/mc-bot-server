@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
+import javax.annotation.Nullable;
 
 /**
  * Boundary-D verb wiring for "mine" (issue 0014): a block type + count
@@ -58,6 +59,7 @@ public final class MineCommandHandler extends VerbTaskHandler<MineProcess> {
         return "mine";
     }
 
+    @Nullable
     @Override
     protected String validate(BotCommand command) {
         return validateArgs(command) ? null : "mine wants blockType count [timeoutTicks]";

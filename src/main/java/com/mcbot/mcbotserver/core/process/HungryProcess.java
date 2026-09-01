@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
+import javax.annotation.Nullable;
 
 /**
  * HungryProcess, the 0010 section 4.2 state machine (forage + hunt
@@ -73,13 +74,25 @@ public final class HungryProcess extends MissionShell implements DigMission {
     private final Set<String> foodTypes;
 
     private boolean succeeded;
+
+    @Nullable
     private String failure;
+
     private boolean digging;
     private Phase phase = Phase.ASSESS;
+
+    @Nullable
     private String preyId;
+
+    @Nullable
     private CellPos preyCell;
+
+    @Nullable
     private CellPos collectCell;
+
+    @Nullable
     private CellPos waterCell;
+
     private int collectTicks;
     // Null until a phase sets it - matches Attack/Defend. The old
     // initializer pointed the hold directive at the world origin
@@ -124,6 +137,7 @@ public final class HungryProcess extends MissionShell implements DigMission {
         this.forageTarget = Objects.requireNonNull(forageTarget, "forageTarget");
         this.catalog = Objects.requireNonNull(catalog, "catalog");
         this.foodTypes = Set.copyOf(foodTypes);
+        this.lastDirective = Directive.of(new GoalNear(positionSource.get(), 1));
     }
 
     @Override
@@ -208,12 +222,17 @@ public final class HungryProcess extends MissionShell implements DigMission {
      * @param world read surface for the water revalidation; never null
      */
     private void fishTick(WorldView world) {
-        BlockSnapshot snap = world.getBlock(waterCell, ViewMode.LIVE);
+        CellPos water = waterCell;
+        if (water == null) {
+            phase = Phase.ASSESS;
+            return;
+        }
+        BlockSnapshot snap = world.getBlock(water, ViewMode.LIVE);
         if (snap == null || !WATER_ID.equals(snap.blockId())) {
             phase = Phase.ASSESS;
             return;
         }
-        lastDirective = new Directive(new GoalNear(waterCell, 1), new Overrides(null, new Fish(waterCell)));
+        lastDirective = new Directive(new GoalNear(water, 1), new Overrides(null, new Fish(water)));
     }
 
     /**
@@ -240,6 +259,7 @@ public final class HungryProcess extends MissionShell implements DigMission {
      * @param body  the body's cell; never null
      * @return a water cell, or null when none is in range
      */
+    @Nullable
     private static CellPos findWater(WorldView world, CellPos body) {
         for (int dy = 0; dy >= -2; dy--) {
             for (int dx = -WATER_SCAN_RADIUS; dx <= WATER_SCAN_RADIUS; dx++) {
@@ -269,19 +289,25 @@ public final class HungryProcess extends MissionShell implements DigMission {
     }
 
     private void huntTick(WorldView world, CellPos body) {
-        EntitySnapshot prey = scanPrey(world, body, preyId);
-        if (prey != null) {
-            preyCell = prey.pos();
-            lastDirective = new Directive(new GoalNear(preyCell, 2), new Overrides(new Attack(preyId)));
+        String id = preyId;
+        if (id == null) {
+            phase = Phase.ASSESS;
             return;
         }
-        // Prey absent from the scan: dead (drops at the last cell) or
-        // fled - the bot cannot tell which, so it walks the last cell
-        // and lets pickup decide (issue 0006's honest-uncertainty
-        // shape; a false EXHAUSTED is cheap, a false success is not).
+        EntitySnapshot prey = scanPrey(world, body, id);
+        if (prey != null) {
+            preyCell = prey.pos();
+            lastDirective = new Directive(new GoalNear(preyCell, 2), new Overrides(new Attack(id)));
+            return;
+        }
         collectCell = preyCell;
+        CellPos collect = collectCell;
+        if (collect == null) {
+            fail(REASON_EXHAUSTED);
+            return;
+        }
         phase = Phase.COLLECT;
-        lastDirective = Directive.of(new GoalNear(collectCell, 0));
+        lastDirective = Directive.of(new GoalNear(collect, 0));
     }
 
     private void collectTick() {
@@ -290,7 +316,12 @@ public final class HungryProcess extends MissionShell implements DigMission {
             fail(REASON_EXHAUSTED);
             return;
         }
-        lastDirective = Directive.of(new GoalNear(collectCell, 0));
+        CellPos collect = collectCell;
+        if (collect == null) {
+            fail(REASON_EXHAUSTED);
+            return;
+        }
+        lastDirective = Directive.of(new GoalNear(collect, 0));
     }
 
     @Override
@@ -331,6 +362,7 @@ public final class HungryProcess extends MissionShell implements DigMission {
     }
 
     @Override
+    @Nullable
     public String failureReasonOrNull() {
         return failure;
     }
@@ -367,7 +399,8 @@ public final class HungryProcess extends MissionShell implements DigMission {
      * One scan for both hunt queries: with an id, the first matching
      * prey (id + type); without, the nearest food mob.
      */
-    private EntitySnapshot scanPrey(WorldView world, CellPos center, String id) {
+    @Nullable
+    private EntitySnapshot scanPrey(WorldView world, CellPos center, @Nullable String id) {
         EntitySnapshot nearest = null;
         for (EntitySnapshot e : world.getEntities(center, SCAN_RADIUS, ViewMode.LIVE)) {
             if (!foodTypes.contains(e.type())) {

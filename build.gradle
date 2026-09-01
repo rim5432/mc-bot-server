@@ -274,7 +274,7 @@ tasks.withType(JavaCompile).configureEach {
         // "may return null" everywhere, NullAway turns that into a
         // compile-time check. Runs on -Plint only (rides EP).
         check('NullAway', net.ltgt.gradle.errorprone.CheckSeverity.ERROR)
-        option('NullAway:AnnotatedPackages', 'com.mcbot.mcbotserver.api')
+        option('NullAway:AnnotatedPackages', 'com.mcbot.mcbotserver.api,com.mcbot.mcbotserver.core')
     }
 }
 

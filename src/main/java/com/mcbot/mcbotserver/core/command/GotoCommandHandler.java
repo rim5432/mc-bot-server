@@ -11,6 +11,7 @@ import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
+import javax.annotation.Nullable;
 
 /**
  * Boundary-D verb wiring for decision 18: "goto" turns a target cell
@@ -49,6 +50,7 @@ public final class GotoCommandHandler extends VerbTaskHandler<GotoProcess> {
         return "goto";
     }
 
+    @Nullable
     @Override
     protected String validate(BotCommand command) {
         try {
@@ -110,19 +112,19 @@ public final class GotoCommandHandler extends VerbTaskHandler<GotoProcess> {
      * @throws IllegalArgumentException when a required arg is missing
      *         or the raw value does not parse
      */
-    private <N> N numeric(Map<String, String> args, String key, N fallback, Function<String, N> parse) {
+    private <N> N numeric(Map<String, String> args, String key, @Nullable N fallback, Function<String, N> parse) {
         String raw = args.get(key);
-        if (raw == null) {
-            if (fallback == null) {
-                throw new IllegalArgumentException("missing arg: " + key);
+        if (raw != null) {
+            try {
+                return parse.apply(raw.trim());
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("arg " + key + " is not an integer: " + raw);
             }
-            return fallback;
         }
-        try {
-            return parse.apply(raw.trim());
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("arg " + key + " is not an integer: " + raw);
+        if (fallback == null) {
+            throw new IllegalArgumentException("missing arg: " + key);
         }
+        return fallback;
     }
 
     private record ParsedGoto(Goal goal, long timeoutTicks) {}

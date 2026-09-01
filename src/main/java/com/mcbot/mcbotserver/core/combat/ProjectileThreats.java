@@ -7,6 +7,7 @@ import com.mcbot.mcbotserver.api.world.ProjectileSnapshot;
 import com.mcbot.mcbotserver.api.world.ViewMode;
 import com.mcbot.mcbotserver.api.world.WorldView;
 import java.util.List;
+import javax.annotation.Nullable;
 
 /**
  * Incoming-projectile geometry over the projectile scan: which
@@ -68,6 +69,7 @@ public final class ProjectileThreats {
             deviation = "Bot-specific: straight-line closest-approach, no gravity term - inside the 15-block band the"
                     + " arrow drop fits inside the hit-course margin, and the 5-tick vanilla shield arm delay"
                     + "(isBlocking requires 5 held ticks) bounds useful precision harder than the geometry does.")
+    @Nullable
     public static ProjectileSnapshot incomingThreat(WorldView world, Vec3 body) {
         CellPos center =
                 new CellPos((int) Math.floor(body.x()), (int) Math.floor(body.y()), (int) Math.floor(body.z()));

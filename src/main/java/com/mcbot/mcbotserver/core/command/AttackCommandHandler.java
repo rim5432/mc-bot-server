@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
+import javax.annotation.Nullable;
 
 /**
  * Boundary-D verb wiring for "attack": one named entity becomes an
@@ -85,6 +86,7 @@ public final class AttackCommandHandler extends VerbTaskHandler<AttackProcess> {
         return "attack";
     }
 
+    @Nullable
     @Override
     protected String validate(BotCommand command) {
         return validateArgs(command) ? null : "attack wants a non-blank target id [timeoutTicks]";

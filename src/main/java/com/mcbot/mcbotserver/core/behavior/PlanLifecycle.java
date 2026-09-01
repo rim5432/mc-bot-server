@@ -11,6 +11,7 @@ import com.mcbot.mcbotserver.core.world.SnapshotWorldView;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import javax.annotation.Nullable;
 
 /**
  * The plan search lifecycle: launch a search, wait for it, decide
@@ -76,14 +77,21 @@ final class PlanLifecycle {
      * @param plan    the adopted waypoint chain when
      *                {@code outcome == ADOPTED}; null otherwise
      */
-    record Adoption(Outcome outcome, List<CellPos> plan) {}
+    record Adoption(Outcome outcome, @Nullable List<CellPos> plan) {}
 
     private final MoveGraph graph;
+
+    @Nullable
     private final PlanWorker worker;
     // Async plan bookkeeping; all fields touched on the tick thread
     // only - the future itself is the sole cross-thread object.
+    @Nullable
     private CompletableFuture<AStarPathFinder.PathResult> pendingPlan;
+
+    @Nullable
     private Goal pendingGoal;
+
+    @Nullable
     private CellPos pendingStart;
 
     /**
@@ -94,7 +102,7 @@ final class PlanLifecycle {
      * @param graph  edge supplier for planning; never null
      * @param worker search executor; may be null (sync mode)
      */
-    PlanLifecycle(MoveGraph graph, PlanWorker worker) {
+    PlanLifecycle(MoveGraph graph, @Nullable PlanWorker worker) {
         this.graph = Objects.requireNonNull(graph, "graph");
         this.worker = worker;
     }
@@ -212,7 +220,9 @@ final class PlanLifecycle {
         // Note: 1 cell is the v1 vocabulary's tightest tolerance;
         // future moves that span more cells per step must revisit
         // this constant in lockstep.
-        boolean fresh = currentGoal.equals(pendingGoal) && chebyshevDistance(cell, pendingStart) <= FRESHNESS_CELLS;
+        CellPos start = pendingStart;
+        boolean fresh =
+                start != null && currentGoal.equals(pendingGoal) && chebyshevDistance(cell, start) <= FRESHNESS_CELLS;
         pendingGoal = null;
         pendingStart = null;
         if (!fresh) {

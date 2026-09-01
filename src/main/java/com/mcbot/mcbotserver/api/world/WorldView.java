@@ -3,6 +3,7 @@ package com.mcbot.mcbotserver.api.world;
 import com.mcbot.mcbotserver.api.inventory.InventoryView;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import java.util.List;
+import javax.annotation.Nullable;
 
 /**
  * The read half of boundary A: pure perception queries with zero side
@@ -35,6 +36,7 @@ public interface WorldView {
      *         is not loaded — callers must treat that as "unknown",
      *         never as air
      */
+    @Nullable
     BlockSnapshot getBlock(CellPos pos, ViewMode mode);
 
     /**

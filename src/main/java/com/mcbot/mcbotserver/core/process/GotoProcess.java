@@ -5,6 +5,7 @@ import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.ExecutionReport;
 import com.mcbot.mcbotserver.api.process.InterruptionContext;
 import com.mcbot.mcbotserver.api.world.WorldView;
+import javax.annotation.Nullable;
 
 /**
  * Walk-to-a-goal mission: the first vertical-slice process. Holds a
@@ -34,6 +35,8 @@ public final class GotoProcess extends MissionShell {
 
     private final Goal goal;
     private boolean succeeded;
+
+    @Nullable
     private String failure;
 
     /**
@@ -115,6 +118,7 @@ public final class GotoProcess extends MissionShell {
         return succeeded;
     }
 
+    @Nullable
     @Override
     public String failureReasonOrNull() {
         return failure;

@@ -2,6 +2,7 @@ package com.mcbot.mcbotserver.core.tick;
 
 import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
+import javax.annotation.Nullable;
 
 /**
  * One-reflex-mission seat: bookkeeping for a mission a reflex
@@ -27,6 +28,7 @@ final class ReflexMissionSeat {
 
     private final int resubmitCooldownTicks;
 
+    @Nullable
     private BotProcess mission;
 
     /** Primed to the cooldown so the first verdict may submit at once. */

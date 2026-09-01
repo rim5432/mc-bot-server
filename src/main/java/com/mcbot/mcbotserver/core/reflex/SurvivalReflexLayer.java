@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import javax.annotation.Nullable;
 
 /**
  * The survival bypass: sense -> board -> rule table -> one winning
@@ -42,7 +43,10 @@ public final class SurvivalReflexLayer {
      * freeze hold.
      */
     public record ReflexDecision(
-            String ruleName, int priority, ReflexAction action, com.mcbot.mcbotserver.api.types.CellPos target) {
+            String ruleName,
+            int priority,
+            ReflexAction action,
+            @Nullable com.mcbot.mcbotserver.api.types.CellPos target) {
 
         /**
          * Creates a targetless decision (every kind but DIG).
@@ -134,6 +138,7 @@ public final class SurvivalReflexLayer {
      * @return the winning decision, or null when no rule fired and the
      *         mission stage may proceed
      */
+    @Nullable
     public ReflexDecision tick(WorldView world, float botHealth) {
         Objects.requireNonNull(world, "world");
         blackboard.beginTick(botHealth);

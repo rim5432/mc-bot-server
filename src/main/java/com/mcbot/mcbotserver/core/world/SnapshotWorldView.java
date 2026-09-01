@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import javax.annotation.Nullable;
 
 /**
  * Immutable copy of a bounded region - blocks, collision shapes, and
@@ -105,6 +106,7 @@ public final class SnapshotWorldView implements WorldView {
      * @return the captured snapshot or null when never captured
      */
     // runs on any thread; immutable after capture
+    @Nullable
     @Override
     public BlockSnapshot getBlock(CellPos pos, ViewMode mode) {
         return cells.get(Objects.requireNonNull(pos, "pos"));

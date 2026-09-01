@@ -140,7 +140,8 @@ public final class ReflexPreemption {
             case RETIRED_TERMINAL -> announceVerdict = true;
             case NO_CURRENT -> {}
         }
-        actor.submit(new Claim(Channel.MOVE, decision.priority(), ReflexAction.REFLEX_OWNER_PREFIX + decision.ruleName(), hold));
+        actor.submit(new Claim(
+                Channel.MOVE, decision.priority(), ReflexAction.REFLEX_OWNER_PREFIX + decision.ruleName(), hold));
         claimInjector.injectAux(decision);
         actor.flush();
         if (announceVerdict) {

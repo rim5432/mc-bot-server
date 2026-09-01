@@ -3,6 +3,7 @@ package com.mcbot.mcbotserver.core.reflex;
 import com.mcbot.mcbotserver.api.reflex.ReflexAction;
 import com.mcbot.mcbotserver.api.reflex.ReflexRule;
 import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
+import javax.annotation.Nullable;
 
 /**
  * The MLG water-bucket reflex: while descending over sensed ground
@@ -67,6 +68,7 @@ public final class WaterBucketOnFallRule implements ReflexRule {
         return ReflexAction.WATER_BUCKET;
     }
 
+    @Nullable
     @Override
     public com.mcbot.mcbotserver.api.types.CellPos actionTarget(ThreatBlackboard board) {
         return board.groundCell;

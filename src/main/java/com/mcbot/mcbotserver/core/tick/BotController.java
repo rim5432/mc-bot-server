@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
+import javax.annotation.Nullable;
 
 /**
  * The single tick entry: fixed four-stage pipeline plus the ADR-0005
@@ -106,6 +107,7 @@ public final class BotController {
      * decisions to the freeze hold (rigs without combat wiring park
      * the mission instead of fighting blind).
      */
+    @Nullable
     private final Supplier<BotProcess> engageMissionFactory;
     /** Mission TASK_* emission and hand-off edge detection. */
     private final MissionReporter missions;
@@ -122,8 +124,10 @@ public final class BotController {
      * decisions to the freeze hold (rigs without rescue wiring park
      * the mission instead of routing to safety).
      */
+    @Nullable
     private final Supplier<BotProcess> rescueMissionFactory;
     /** Supplies one fresh forage mission per acquire submission. */
+    @Nullable
     private final Supplier<BotProcess> hungryMissionFactory;
     /** Reflex-owned ESCAPE rescue seat bookkeeping. */
     private final ReflexMissionSeat rescueSeat;
@@ -244,9 +248,9 @@ public final class BotController {
             EventQueue events,
             CrashReporter crashReporter,
             ToolCatalog toolCatalog,
-            Supplier<BotProcess> engageMissionFactory,
-            Supplier<BotProcess> rescueMissionFactory,
-            Supplier<BotProcess> hungryMissionFactory) {
+            @Nullable Supplier<BotProcess> engageMissionFactory,
+            @Nullable Supplier<BotProcess> rescueMissionFactory,
+            @Nullable Supplier<BotProcess> hungryMissionFactory) {
         this.reflex = Objects.requireNonNull(reflex, "reflex");
         this.arbiter = Objects.requireNonNull(arbiter, "arbiter");
         this.behaviors = List.copyOf(behaviors);
@@ -679,7 +683,7 @@ public final class BotController {
      * (v1 has at most one; if more plan reporters are added later,
      * extract a small interface and merge their snapshots here).
      */
-    private void emitKeepalive(CellPos position, Directive directive, long day, long tod) {
+    private void emitKeepalive(CellPos position, @Nullable Directive directive, long day, long tod) {
         CellPos goalCell = goalCellOf(directive);
         Vec3 poseD = new Vec3(position.x(), position.y(), position.z());
         for (Behavior b : behaviors) {
@@ -705,7 +709,7 @@ public final class BotController {
      * Extract the active goal cell from a directive, or null if no
      * directive. Sealed over the current goal algebra.
      */
-    private static CellPos goalCellOf(Directive directive) {
+    private static @Nullable CellPos goalCellOf(@Nullable Directive directive) {
         return directive == null ? null : Goals.cellOf(directive.goal());
     }
 

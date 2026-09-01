@@ -2,6 +2,7 @@ package com.mcbot.mcbotserver.core.behavior;
 
 import com.mcbot.mcbotserver.api.types.Vec3;
 import java.util.List;
+import javax.annotation.Nullable;
 
 /**
  * Idle head-tracking policy (issue 0005 P0): whom the body looks at
@@ -74,6 +75,7 @@ public final class IdleLook {
      * @return angles toward the nearest candidate, or {@code null}
      *         when none is within the radius
      */
+    @Nullable
     public static Target nearestTarget(Vec3 eye, List<Vec3> candidateEyes) {
         Vec3 best = null;
         double bestDist = Double.MAX_VALUE;

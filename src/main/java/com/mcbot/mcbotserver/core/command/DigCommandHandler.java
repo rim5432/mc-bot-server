@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.LongSupplier;
+import javax.annotation.Nullable;
 
 /**
  * Boundary-D verb wiring for "dig" (issue 0013 R1): one block cell
@@ -50,6 +51,7 @@ public final class DigCommandHandler extends VerbTaskHandler<DigProcess> {
         return "dig";
     }
 
+    @Nullable
     @Override
     protected String validate(BotCommand command) {
         return validateArgs(command) ? null : "dig wants integer args x y z [timeoutTicks]";

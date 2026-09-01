@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.PriorityQueue;
 import java.util.Set;
+import javax.annotation.Nullable;
 
 /**
  * The A* engine over the move graph: g-scores, a binary-heap open set
@@ -334,7 +335,7 @@ public final class AStarPathFinder {
             Heuristic heuristic,
             Map<CellPos, CellPos> cameFrom,
             CellPos start,
-            CellPos bestPartial,
+            @Nullable CellPos bestPartial,
             double bestH,
             boolean searchCut,
             int expanded) {

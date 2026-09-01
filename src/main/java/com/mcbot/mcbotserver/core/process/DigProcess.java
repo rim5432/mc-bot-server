@@ -9,6 +9,7 @@ import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.BlockSnapshot;
 import com.mcbot.mcbotserver.api.world.ViewMode;
 import com.mcbot.mcbotserver.api.world.WorldView;
+import javax.annotation.Nullable;
 
 /**
  * One-block dig mission (issue 0013 R1): a submit-and-wait task, not
@@ -33,8 +34,13 @@ import com.mcbot.mcbotserver.api.world.WorldView;
 public final class DigProcess extends MissionShell implements DigMission {
 
     private final CellPos target;
+
+    @Nullable
     private String initialBlockId;
+
     private boolean succeeded;
+
+    @Nullable
     private String failure;
 
     /**
@@ -84,6 +90,7 @@ public final class DigProcess extends MissionShell implements DigMission {
      *
      * @return the block id; null before the first working tick
      */
+    @Nullable
     public String initialBlockId() {
         return initialBlockId;
     }
@@ -175,6 +182,7 @@ public final class DigProcess extends MissionShell implements DigMission {
     }
 
     @Override
+    @Nullable
     public String failureReasonOrNull() {
         return failure;
     }

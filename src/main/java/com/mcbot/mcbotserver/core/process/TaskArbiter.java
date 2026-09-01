@@ -8,6 +8,7 @@ import com.mcbot.mcbotserver.api.world.WorldView;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;
+import javax.annotation.Nullable;
 
 /**
  * Winner-take-all task arbiter: at most one mission runs; fresh intents
@@ -26,8 +27,14 @@ import java.util.Iterator;
 public final class TaskArbiter {
 
     private final Deque<BotProcess> pending = new ArrayDeque<>();
+
+    @Nullable
     private BotProcess current;
+
+    @Nullable
     private BotProcess paused;
+
+    @Nullable
     private InterruptionContext pauseContext;
     /**
      * Directive from the most recent {@link #tick}; consumed by the
@@ -35,6 +42,7 @@ public final class TaskArbiter {
      * re-runs the mission's own onTick, which produces a fresh
      * directive - so nulling it on park/retire loses nothing.
      */
+    @Nullable
     private Directive lastDirective;
 
     /**
@@ -197,7 +205,7 @@ public final class TaskArbiter {
      * @return what happened to the parked mission; never null
      */
     public PausedEviction requeuePausedOrDrop() {
-        if (paused == null) {
+        if (paused == null || pauseContext == null) {
             return PausedEviction.NONE;
         }
         BotProcess candidate = paused;
@@ -221,7 +229,7 @@ public final class TaskArbiter {
      * @return true when the paused mission resumed cleanly
      */
     public boolean tryResume() {
-        if (paused == null) {
+        if (paused == null || pauseContext == null) {
             return false;
         }
         BotProcess candidate = paused;
@@ -242,6 +250,7 @@ public final class TaskArbiter {
      *
      * @return latest directive; null when no mission ran this tick
      */
+    @Nullable
     public Directive lastDirective() {
         return lastDirective;
     }
@@ -251,6 +260,7 @@ public final class TaskArbiter {
      *
      * @return active winner; null when the body is idle or paused
      */
+    @Nullable
     public BotProcess current() {
         return current;
     }
@@ -260,10 +270,12 @@ public final class TaskArbiter {
      *
      * @return the parked process; null when nothing is paused
      */
+    @Nullable
     public BotProcess paused() {
         return paused;
     }
 
+    @Nullable
     private BotProcess selectWinner() {
         purgeInactive();
         if (pending.isEmpty()) {

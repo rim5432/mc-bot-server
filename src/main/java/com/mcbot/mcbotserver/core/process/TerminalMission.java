@@ -1,6 +1,7 @@
 package com.mcbot.mcbotserver.core.process;
 
 import java.util.Map;
+import javax.annotation.Nullable;
 
 /**
  * Missions that know how they ended. Implemented by processes with
@@ -27,6 +28,7 @@ public interface TerminalMission {
      * @return failure reason name, or null when succeeded or not yet
      *         terminal
      */
+    @Nullable
     String failureReasonOrNull();
 
     /**

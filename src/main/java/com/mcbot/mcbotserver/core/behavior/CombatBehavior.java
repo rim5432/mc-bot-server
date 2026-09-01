@@ -18,6 +18,7 @@ import com.mcbot.mcbotserver.api.world.WorldView;
 import com.mcbot.mcbotserver.core.combat.ProjectileThreats;
 import com.mcbot.mcbotserver.core.combat.RangedLoadouts;
 import java.util.Objects;
+import javax.annotation.Nullable;
 
 /**
  * Combat micro-execution per boundaries.md decision 11: aim at the
@@ -143,6 +144,8 @@ public final class CombatBehavior implements Behavior {
     // Starts EXPIRED, mirroring the reach memory: no block lingers
     // before a first sighting opens one.
     private int ticksSinceThreat = BLOCK_LINGER_TICKS + 1;
+
+    @Nullable
     private Vec3 blockAim;
 
     /**
@@ -195,7 +198,7 @@ public final class CombatBehavior implements Behavior {
     }
 
     @Override
-    public ExecutionReport tick(WorldView world, Directive directive, Actor actor) {
+    public ExecutionReport tick(WorldView world, @Nullable Directive directive, Actor actor) {
         if (directive == null || directive.overrides().combat() == null) {
             // A stale draw must not outlive its directive.
             abortDraw(actor);
@@ -451,15 +454,20 @@ public final class CombatBehavior implements Behavior {
                     + " arm ticks (isBlocking requires 5 held ticks), so full-draw arrows deep inside the band can"
                     + " still land first - draw anticipation is deferred, not modelled. Scoped to live combat"
                     + " orders; raising a shield outside combat is reflex-tier work.")
-    private ExecutionReport tickBlock(WorldView world, Actor actor, ProjectileSnapshot threat, int shieldSlot) {
+    private ExecutionReport tickBlock(
+            WorldView world, Actor actor, @Nullable ProjectileSnapshot threat, int shieldSlot) {
         blocking = true;
         if (threat != null) {
             blockAim = threat.pos();
         }
+        Vec3 aim = blockAim;
+        if (aim == null) {
+            aim = positionSource.get();
+        }
         Vec3 position = positionSource.get();
-        double dx = blockAim.x() - position.x();
-        double dy = blockAim.y() - position.y();
-        double dz = blockAim.z() - position.z();
+        double dx = aim.x() - position.x();
+        double dy = aim.y() - position.y();
+        double dz = aim.z() - position.z();
         double horizontal = Math.hypot(dx, dz);
         float yaw = lastYaw;
         if (horizontal >= AIM_MIN_HORIZONTAL) {

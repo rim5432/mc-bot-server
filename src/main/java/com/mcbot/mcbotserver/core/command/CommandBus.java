@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import javax.annotation.Nullable;
 
 /**
  * Reference command router: structural validation is synchronous, all
@@ -38,6 +39,7 @@ public final class CommandBus implements CommandChannel {
          * @param command the submitted command; never null
          * @return rejection reason, or null when structurally valid
          */
+        @Nullable
         String validate(BotCommand command);
 
         /**
@@ -71,6 +73,8 @@ public final class CommandBus implements CommandChannel {
     private final Map<String, String> taskIdToIdempotencyKey = new HashMap<>();
     private final EventQueue events;
     private long taskSequence;
+
+    @Nullable
     private CancelListener cancelListener;
 
     /** Hook for verb owners to react to harness cancellation. */
@@ -128,7 +132,7 @@ public final class CommandBus implements CommandChannel {
     }
 
     @Override
-    public SubmitResult submit(BotCommand command, String idempotencyKey) {
+    public SubmitResult submit(BotCommand command, @Nullable String idempotencyKey) {
         if (command == null) {
             return new SubmitResult.Rejected("null command");
         }

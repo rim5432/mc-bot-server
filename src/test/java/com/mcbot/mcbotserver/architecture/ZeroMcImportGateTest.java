@@ -45,7 +45,7 @@ class ZeroMcImportGateTest {
      * banned by AGENTS.md 1.4; catching it here is the gate's job).
      */
     private static final List<String> EXPECTED_CANARY_VIOLATIONS =
-            List.of("CanaryNotes.java:27: // canary(zeromc): import net.minecraft.world.level.Level;");
+            List.of("CanaryNotes.java:30: // canary(zeromc): import net.minecraft.world.level.Level;");
 
     /**
      * Fail with a per-file violation report when any api/ or core/

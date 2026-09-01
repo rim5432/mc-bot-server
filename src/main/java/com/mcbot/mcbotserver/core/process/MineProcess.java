@@ -14,8 +14,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
+import javax.annotation.Nullable;
 
 /**
  * Composite mining task (issue 0014): search for nearby blocks of a
@@ -89,11 +91,17 @@ public final class MineProcess extends MissionShell implements DigMission {
     private final CellPos initialPosition;
 
     private Phase phase = Phase.IDLE;
+
+    @Nullable
     private CellPos currentTarget;
+
     private int brokenCount;
     private long ticksInCurrentPhase;
     private boolean succeeded;
+
+    @Nullable
     private String failure;
+
     private final Set<CellPos> skipSet = new HashSet<>();
     private final ArrayDeque<BlockBreak> breaks = new ArrayDeque<>();
 
@@ -111,14 +119,14 @@ public final class MineProcess extends MissionShell implements DigMission {
      */
     public MineProcess(
             String taskId,
-            String blockType,
+            @Nullable String blockType,
             int targetCount,
             int priority,
             long timeoutTicks,
             Supplier<CellPos> botPosition) {
         super(taskId, priority, timeoutTicks);
         requireValid(blockType, targetCount, botPosition);
-        this.blockType = blockType;
+        this.blockType = Objects.requireNonNull(blockType, "blockType");
         this.targetCount = targetCount;
         this.searchRadius = DEFAULT_SEARCH_RADIUS;
         this.perTargetMoveBudget = DEFAULT_PER_TARGET_MOVE_BUDGET;
@@ -129,13 +137,13 @@ public final class MineProcess extends MissionShell implements DigMission {
     }
 
     /** Rejects constructor arguments before any field is assigned. */
-    private static void requireValid(String blockType, int targetCount, Supplier<CellPos> botPosition) {
+    private static void requireValid(@Nullable String blockType, int targetCount, Supplier<CellPos> botPosition) {
         requireText(blockType, "blockType");
         requirePositive(targetCount, "targetCount");
         requireNonNullPosition(botPosition);
     }
 
-    private static void requireText(String value, String name) {
+    private static void requireText(@Nullable String value, String name) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(name + " must not be null or blank");
         }
@@ -229,13 +237,19 @@ public final class MineProcess extends MissionShell implements DigMission {
      * target and return to SEARCH.
      */
     private Directive doMoving(WorldView world) {
-        if (ticksInCurrentPhase >= perTargetMoveBudget) {
-            skipSet.add(currentTarget);
+        CellPos target = currentTarget;
+        if (target == null) {
             phase = Phase.SEARCH;
             ticksInCurrentPhase = 0;
             return doSearch(world);
         }
-        return Directive.of(new GoalNear(currentTarget, 2));
+        if (ticksInCurrentPhase >= perTargetMoveBudget) {
+            skipSet.add(target);
+            phase = Phase.SEARCH;
+            ticksInCurrentPhase = 0;
+            return doSearch(world);
+        }
+        return Directive.of(new GoalNear(target, 2));
     }
 
     /**
@@ -247,30 +261,36 @@ public final class MineProcess extends MissionShell implements DigMission {
      * the target instead of failing the mission.
      */
     private Directive doDigging(WorldView world) {
-        if (ticksInCurrentPhase >= perTargetDigBudget) {
-            skipSet.add(currentTarget);
+        CellPos target = currentTarget;
+        if (target == null) {
             phase = Phase.SEARCH;
             ticksInCurrentPhase = 0;
             return doSearch(world);
         }
-        BlockSnapshot now = world.getBlock(currentTarget, ViewMode.LIVE);
+        if (ticksInCurrentPhase >= perTargetDigBudget) {
+            skipSet.add(target);
+            phase = Phase.SEARCH;
+            ticksInCurrentPhase = 0;
+            return doSearch(world);
+        }
+        BlockSnapshot now = world.getBlock(target, ViewMode.LIVE);
         if (now == null) {
-            skipSet.add(currentTarget);
+            skipSet.add(target);
             phase = Phase.SEARCH;
             ticksInCurrentPhase = 0;
             return doSearch(world);
         }
         if (BlockSnapshot.AIR.equals(now.blockId())) {
             brokenCount++;
-            breaks.add(new BlockBreak(currentTarget, blockType));
+            breaks.add(new BlockBreak(target, blockType));
             phase = Phase.COLLECTING;
             ticksInCurrentPhase = 0;
             // Walk over the broken cell: vanilla auto-pickup collects
             // the drop on contact (best-effort, not a gate).
-            return Directive.of(new GoalNear(currentTarget, 1));
+            return Directive.of(new GoalNear(target, 1));
         }
         // Hold position while digging.
-        return Directive.of(new GoalNear(currentTarget, 2));
+        return Directive.of(new GoalNear(target, 2));
     }
 
     /**
@@ -279,8 +299,14 @@ public final class MineProcess extends MissionShell implements DigMission {
      * count reached -> DONE, otherwise search for the next target.
      */
     private Directive doCollecting(WorldView world) {
+        CellPos target = currentTarget;
+        if (target == null) {
+            phase = Phase.SEARCH;
+            ticksInCurrentPhase = 0;
+            return doSearch(world);
+        }
         if (ticksInCurrentPhase < pickupWindow) {
-            return Directive.of(new GoalNear(currentTarget, 1));
+            return Directive.of(new GoalNear(target, 1));
         }
         if (brokenCount >= targetCount) {
             succeeded = true;
@@ -353,6 +379,7 @@ public final class MineProcess extends MissionShell implements DigMission {
     }
 
     @Override
+    @Nullable
     public String failureReasonOrNull() {
         return failure;
     }
@@ -361,7 +388,11 @@ public final class MineProcess extends MissionShell implements DigMission {
 
     @Override
     public CellPos digTarget() {
-        return currentTarget;
+        CellPos target = currentTarget;
+        if (target == null) {
+            throw new IllegalStateException("digTarget requires DIGGING phase");
+        }
+        return target;
     }
 
     @Override

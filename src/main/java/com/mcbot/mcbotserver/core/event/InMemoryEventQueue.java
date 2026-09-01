@@ -114,8 +114,12 @@ public final class InMemoryEventQueue implements EventQueue {
      * @return a fresh monotonic source; never null
      */
     private static LongSupplier sessionLocalEpochAllocator() {
-        java.util.concurrent.atomic.AtomicLong seq = new java.util.concurrent.atomic.AtomicLong();
-        return seq::incrementAndGet;
+        // Single-threaded counter: the queue is only accessed on the
+        // tick thread, so a plain long holder suffices. AtomicLong would
+        // be a concurrency primitive and trip the core/ concurrency gate
+        // (decision 60); the atomicity is unnecessary here.
+        long[] seq = {0};
+        return () -> ++seq[0];
     }
 
     @Override

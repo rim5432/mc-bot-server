@@ -8,6 +8,7 @@ import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.core.process.TerminalMission;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 
 /**
  * Mission-lifecycle reporting for the tick pipeline: stage-4 hand-off
@@ -31,6 +32,7 @@ final class MissionReporter {
     private final EventQueue events;
     /** The process seated at the last {@link #announceTransition}
      *  call; null when none was. */
+    @Nullable
     private BotProcess previousCurrent;
 
     /**
@@ -110,7 +112,7 @@ final class MissionReporter {
      * @param tod      time-of-day ticks for event stamping
      * @param detail   human-readable pause reason; never null
      */
-    void paused(String taskName, String taskId, long day, long tod, String detail) {
+    void paused(String taskName, @Nullable String taskId, long day, long tod, String detail) {
         emit(EventKind.TASK_PAUSED, day, tod, taskName, taskId, detail, Map.of());
     }
 
@@ -124,7 +126,7 @@ final class MissionReporter {
      * @param tod      time-of-day ticks for event stamping
      * @param detail   human-readable drop reason; never null
      */
-    void dropped(String taskName, String taskId, long day, long tod, String detail) {
+    void dropped(String taskName, @Nullable String taskId, long day, long tod, String detail) {
         emit(EventKind.TASK_DROPPED, day, tod, taskName, taskId, detail, Map.of());
     }
 
@@ -140,7 +142,7 @@ final class MissionReporter {
      * @param day      game day for event stamping
      * @param tod      time-of-day ticks for event stamping
      */
-    void resumeVerdict(boolean resumed, String taskName, String taskId, long day, long tod) {
+    void resumeVerdict(boolean resumed, String taskName, @Nullable String taskId, long day, long tod) {
         emit(
                 resumed ? EventKind.TASK_RESUMED : EventKind.TASK_DROPPED,
                 day,
@@ -165,7 +167,7 @@ final class MissionReporter {
             long day,
             long tod,
             String taskName,
-            String taskId,
+            @Nullable String taskId,
             String detail,
             Map<String, String> extraAttrs) {
         boolean urgent = EventKind.TASK_PAUSED.equals(kind) || EventKind.TASK_DROPPED.equals(kind);

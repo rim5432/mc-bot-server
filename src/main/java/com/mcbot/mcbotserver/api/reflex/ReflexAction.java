@@ -12,39 +12,6 @@ package com.mcbot.mcbotserver.api.reflex;
  * (which are boundary-A surface) owned by exactly one place.
  */
 public enum ReflexAction {
-
-    /**
-     * The owner prefix for all reflex-originated claims. The production
-     * side ({@code ReflexClaimInjector}) constructs claim owners as
-     * {@code REFLEX_OWNER_PREFIX + ruleName()}; the consumer side
-     * ({@code BindingActor}) detects reflex intent via
-     * {@code startsWith(REFLEX_OWNER_PREFIX)}. Shared constant so a
-     * rename on either side breaks the other at compile time instead of
-     * silently degrading intent detection.
-     */
-    public static final String REFLEX_OWNER_PREFIX = "reflex:";
-
-    /**
-     * Owner prefix for EAT-family reflex claims (rule names begin with
-     * {@code EAT_}, e.g. {@code EAT_WHEN_HUNGRY}). Used by
-     * {@code BindingActor} to distinguish a reflex eat intent from a
-     * generic harness USE claim (which may be a weapon swing).
-     */
-    public static final String REFLEX_EAT_OWNER_PREFIX = "reflex:EAT_";
-
-    /**
-     * Owner prefix for DRINK-family reflex claims (rule names begin with
-     * {@code DRINK_}, e.g. {@code DRINK_ON_LOW_HEALTH}). Used by
-     * {@code BindingActor} to distinguish a reflex drink intent from a
-     * generic harness USE claim.
-     */
-    public static final String REFLEX_DRINK_OWNER_PREFIX = "reflex:DRINK_";
-
-    /**
-     * Halt locomotion: MOVE(0, 0) under the reflex claim. The
-     * default for rules that only need the body to stop being a
-     * participant (low health, crash adjacency).
-     */
     FREEZE,
 
     /**
@@ -154,5 +121,32 @@ public enum ReflexAction {
      * reflex. Sits below ENGAGE (combat missions own their consumable
      * pacing) and above EAT (health is more urgent than hunger).
      */
-    DRINK
+    DRINK;
+
+    /**
+     * The owner prefix for all reflex-originated claims. The production
+     * side ({@code ReflexClaimInjector}) constructs claim owners as
+     * {@code REFLEX_OWNER_PREFIX + ruleName()}; the consumer side
+     * ({@code BindingActor}) detects reflex intent via
+     * {@code startsWith(REFLEX_OWNER_PREFIX)}. Shared constant so a
+     * rename on either side breaks the other at compile time instead of
+     * silently degrading intent detection.
+     */
+    public static final String REFLEX_OWNER_PREFIX = "reflex:";
+
+    /**
+     * Owner prefix for EAT-family reflex claims (rule names begin with
+     * {@code EAT_}, e.g. {@code EAT_WHEN_HUNGRY}). Used by
+     * {@code BindingActor} to distinguish a reflex eat intent from a
+     * generic harness USE claim (which may be a weapon swing).
+     */
+    public static final String REFLEX_EAT_OWNER_PREFIX = "reflex:EAT_";
+
+    /**
+     * Owner prefix for DRINK-family reflex claims (rule names begin with
+     * {@code DRINK_}, e.g. {@code DRINK_ON_LOW_HEALTH}). Used by
+     * {@code BindingActor} to distinguish a reflex drink intent from a
+     * generic harness USE claim.
+     */
+    public static final String REFLEX_DRINK_OWNER_PREFIX = "reflex:DRINK_";
 }

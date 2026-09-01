@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
+import javax.annotation.Nullable;
 
 /**
  * The harness-directed engagement: one named entity, chased and
@@ -102,7 +103,10 @@ public final class AttackProcess extends MissionShell {
     private final WeaponCatalog weapons;
 
     private boolean succeeded;
+
+    @Nullable
     private String failure;
+
     private boolean standoffOpening;
     private final TargetTracker tracker = new TargetTracker();
     private Directive lastDirective;
@@ -121,7 +125,11 @@ public final class AttackProcess extends MissionShell {
      * @param positionSource body cell accessor; never null
      */
     public AttackProcess(
-            String taskId, String targetId, int priority, long timeoutTicks, Supplier<CellPos> positionSource) {
+            String taskId,
+            @Nullable String targetId,
+            int priority,
+            long timeoutTicks,
+            Supplier<CellPos> positionSource) {
         this(taskId, targetId, priority, timeoutTicks, positionSource, WeaponCatalog.none());
     }
 
@@ -140,7 +148,7 @@ public final class AttackProcess extends MissionShell {
      */
     public AttackProcess(
             String taskId,
-            String targetId,
+            @Nullable String targetId,
             int priority,
             long timeoutTicks,
             Supplier<CellPos> positionSource,
@@ -152,6 +160,7 @@ public final class AttackProcess extends MissionShell {
         this.targetId = targetId;
         this.positionSource = Objects.requireNonNull(positionSource, "positionSource");
         this.weapons = Objects.requireNonNull(weapons, "weapons");
+        this.lastDirective = Directive.of(new GoalNear(positionSource.get(), 1));
     }
 
     /**
@@ -221,9 +230,13 @@ public final class AttackProcess extends MissionShell {
         // GoalNear to the swing rim.
         int bandMin = DefendProcess.RANGED_STANDOFF - 2;
         int bandMax = DefendProcess.RANGED_STANDOFF + 2;
-        Goal goal = standoffOpening
-                ? new GoalRange(tracker.targetCell(), bandMin, bandMax)
-                : new GoalNear(tracker.targetCell(), GOAL_RANGE);
+        CellPos targetCell = tracker.targetCell();
+        if (targetCell == null) {
+            fail(REASON_NO_TARGET);
+            return lastDirective;
+        }
+        Goal goal =
+                standoffOpening ? new GoalRange(targetCell, bandMin, bandMax) : new GoalNear(targetCell, GOAL_RANGE);
         lastDirective = new Directive(goal, new Overrides(new Attack(targetId)));
         return lastDirective;
     }
@@ -235,6 +248,7 @@ public final class AttackProcess extends MissionShell {
      * @param position scan center (the body cell); never null
      * @return the snapshot, or null when absent from the scan
      */
+    @Nullable
     private EntitySnapshot findById(WorldView world, CellPos position) {
         List<EntitySnapshot> found = world.getEntities(position, SCAN_RADIUS, ViewMode.LIVE);
         for (EntitySnapshot e : found) {
@@ -312,6 +326,7 @@ public final class AttackProcess extends MissionShell {
     }
 
     @Override
+    @Nullable
     public String failureReasonOrNull() {
         return live() ? null : failure;
     }

@@ -89,12 +89,12 @@ class GetDerefGateTest {
      * missing canary means the scan went blind (regex changed, scope
      * shrank, walk root moved); an extra violation means a real get-deref
      * appeared. The must-match canary (simple-arg chain) lives in
-     * core/CanaryNotes.java:28; the must-not-match canary (nested-arg
-     * chain, line 29) must NOT appear here — it pins the regex blind
+     * core/CanaryNotes.java:31; the must-not-match canary (nested-arg
+     * chain, line 32) must NOT appear here — it pins the regex blind
      * spot documented in the class Javadoc.
      */
     private static final List<String> EXPECTED_CANARY_VIOLATIONS =
-            List.of("src/main/java/com/mcbot/mcbotserver/core/CanaryNotes.java:28: "
+            List.of("src/main/java/com/mcbot/mcbotserver/core/CanaryNotes.java:31: "
                     + "// canary(getderef): state.get(ruleName).lastPriority");
 
     /** Fails when the violation set drifts from the canary set. */

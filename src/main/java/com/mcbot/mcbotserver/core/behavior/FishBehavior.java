@@ -13,6 +13,7 @@ import com.mcbot.mcbotserver.api.world.BobberSnapshot;
 import com.mcbot.mcbotserver.api.world.ViewMode;
 import com.mcbot.mcbotserver.api.world.WorldView;
 import java.util.List;
+import javax.annotation.Nullable;
 
 /**
  * Fishing micro-execution (issue 0010 section 7): hold the rod, cast
@@ -67,7 +68,10 @@ public final class FishBehavior implements Behavior {
     private boolean pressPending;
     private int castAge;
     private int settleTicks;
+
+    @Nullable
     private Double lastBobberY;
+
     private int noBiteTicks;
     private boolean budgetSpent;
     private boolean armed;
@@ -87,7 +91,7 @@ public final class FishBehavior implements Behavior {
     }
 
     @Override
-    public ExecutionReport tick(WorldView world, Directive directive, Actor actor) {
+    public ExecutionReport tick(WorldView world, @Nullable Directive directive, Actor actor) {
         Fish fish = directive != null ? directive.overrides().fish() : null;
         if (fish == null) {
             resetTransients();

@@ -5,6 +5,7 @@ import com.mcbot.mcbotserver.api.reflex.ReflexHysteresis;
 import com.mcbot.mcbotserver.api.reflex.ReflexRule;
 import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
 import com.mcbot.mcbotserver.api.types.CellPos;
+import javax.annotation.Nullable;
 
 /**
  * The suffocation reflex: dig the block at the eye out the instant the
@@ -103,6 +104,7 @@ public final class DigOnSuffocationRule implements ReflexRule, ReflexHysteresis 
         return ReflexAction.DIG;
     }
 
+    @Nullable
     @Override
     public CellPos actionTarget(ThreatBlackboard board) {
         return board.inWall ? board.suffocationBlock : null;

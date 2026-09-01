@@ -6,6 +6,7 @@ import com.mcbot.mcbotserver.api.goal.Goals;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
 import java.util.Objects;
+import javax.annotation.Nullable;
 
 /**
  * Unreachable-goal escalation: turns a repeating cycle of budget-cut
@@ -66,7 +67,10 @@ final class NoPathEscalator {
     static final int MAX_NODE_BUDGET = 320_000;
 
     private final int baseBudget;
+
+    @Nullable
     private Goal goal;
+
     private GoalDistance goalDistance = pos -> Double.MAX_VALUE;
     private double bestDistance = Double.MAX_VALUE;
     private int witnesses;

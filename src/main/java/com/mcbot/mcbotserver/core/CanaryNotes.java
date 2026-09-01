@@ -14,6 +14,9 @@ package com.mcbot.mcbotserver.core;
  *       commented-out imports (commented code is banned, AGENTS.md 1.4)</li>
  *   <li>getderef — simple-arg chained get-deref; proves the basic form
  *       matches</li>
+ *   <li>concurrency — commented thread-coordination block; proves
+ *       ConcurrencyPrimitiveGate catches concurrency keyword mentions in
+ *       core/ (single-threaded by policy)</li>
  * </ul>
  * Must-not-match (gate must NOT flag — pinned blind spots; a change that
  * starts matching them forces boundary re-registration):
@@ -27,5 +30,6 @@ public final class CanaryNotes {
     // canary(zeromc): import net.minecraft.world.level.Level;
     // canary(getderef): state.get(ruleName).lastPriority
     // canary(getderef-nested): cache.get(keyOf(msg)).size()
+    // canary(concurrency): synchronized (lock) {
     private CanaryNotes() {}
 }

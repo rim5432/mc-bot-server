@@ -8,6 +8,7 @@ import com.mcbot.mcbotserver.api.menu.SlotRole;
 import com.mcbot.mcbotserver.api.menu.SlotView;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 
 /**
  * Wear planning: the best wearable from the player region moves into
@@ -61,6 +62,7 @@ final class WearPlanner {
      * Highest-protection wearable for one armor slot; ties keep
      * snapshot order (the compare is strictly greater).
      */
+    @Nullable
     private static SlotView bestCandidate(List<SlotView> pool, int armorSlot, ArmorCatalog catalog) {
         SlotView best = null;
         int bestProtection = Integer.MIN_VALUE;
@@ -85,12 +87,12 @@ final class WearPlanner {
      * unclassifiable worn piece is never stripped: the planner
      * cannot rank what it does not know.
      */
-    private static boolean replaces(SlotView armor, ArmorPiece candidate, ArmorCatalog catalog) {
+    private static boolean replaces(SlotView armor, @Nullable ArmorPiece candidate, ArmorCatalog catalog) {
         if (armor.isEmpty()) {
             return true;
         }
         ArmorPiece worn = catalog.classify(armor.item().itemId());
-        return worn != null && candidate.protection() > worn.protection();
+        return worn != null && candidate != null && candidate.protection() > worn.protection();
     }
 
     private static void appendMove(List<MenuPlanner.Step> steps, int source, int armorSlot) {

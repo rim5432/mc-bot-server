@@ -1,6 +1,7 @@
 package com.mcbot.mcbotserver.core.process;
 
 import com.mcbot.mcbotserver.api.types.CellPos;
+import javax.annotation.Nullable;
 
 /**
  * The sighted/leashed/graced tracking state machine shared by the two
@@ -33,7 +34,9 @@ public final class TargetTracker {
     /** Ticks an absent target gets before counting as escaped/dead. */
     public static final int TARGET_GRACE_TICKS = 10;
 
+    @Nullable
     private CellPos targetCell;
+
     private int ticksSinceSeen;
     private boolean engaged;
 
@@ -51,6 +54,7 @@ public final class TargetTracker {
      *
      * @return the cell; null before the first sighting
      */
+    @Nullable
     public CellPos targetCell() {
         return targetCell;
     }
@@ -75,7 +79,11 @@ public final class TargetTracker {
      * @return true when the target is beyond the leash radius
      */
     public boolean leashed(CellPos from) {
-        return from.distanceTo(targetCell) > LEASH_RADIUS;
+        CellPos cell = targetCell;
+        if (cell == null) {
+            return false;
+        }
+        return from.distanceTo(cell) > LEASH_RADIUS;
     }
 
     /**

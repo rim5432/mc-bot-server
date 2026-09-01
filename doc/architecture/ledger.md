@@ -1005,3 +1005,37 @@ Amendment chains recorded so far (both sides annotated):
     dispatch marshals to tick thread, verified against decompiled tree
     2026-09-01). The three-element discipline (justification + target +
     status/trigger) is now declared in the exclude.xml header.
+
+    60. 2026-09-01 NullAway-core expansion + concurrency primitive gate +
+    B2 symmetric version pinning. Three rulings. (a) NullAway expanded
+    from api-only to api+core with full @Nullable annotation alignment
+    across 32 core/ files (97 initial warnings, 0 after paydown). The
+    full-annotation path (option A) was chosen over progressive
+    @NullUnmarked: every lifecycle field, method return, and constructor
+    param that can legitimately be null now carries @Nullable; call
+    sites either propagate @Nullable or add explicit null checks. Key
+    patterns: lastDirective fields made @NonNull with constructor
+    initialization (AttackProcess, DefendProcess, HungryProcess) rather
+    than propagating @Nullable through onTick returns; phase-state fields
+    (currentTarget, waterCell, preyId, collectCell) captured to locals
+    with null guards before use; TerminalMission.failureReasonOrNull()
+    and WorldView.getBlock() annotated @Nullable at the interface level
+    (Javadoc already documented null returns). Null defense topology is
+    now closed: chained get-deref (GetDerefGateTest, default test),
+    assignment-then-deref (NullAway, -Plint), constructor entry (record
+    compact constructors), cross-process boundary (api/ type contracts).
+    (b) B2 symmetric version pinning in LintPostureGateTest: errorprone
+    plugin 5.1.0, error_prone_core 2.42.0, nullaway 0.11.2, NullAway
+    CheckSeverity.ERROR, AnnotatedPackages api+core — all pinned alongside
+    the existing SpotBugs 4.10.4 pin. Version bumps force re-verification
+    of the corresponding analysis capability before the pin moves.
+    (c) ConcurrencyPrimitiveGateTest: core/ is single-threaded by policy;
+    synchronized, volatile, java.util.concurrent.atomic/locks/Concurrent
+    references are gated with canary set-equality (canary in
+    CanaryNotes.java:33). The sole pre-existing AtomicLong
+    (InMemoryEventQueue sessionLocalEpochAllocator, a single-threaded
+    local counter) was replaced with a long[] holder, giving zero
+    exemptions at launch. Semantic boundary documented: this is a
+    policy-breach proxy, not a thread-safety proof; CompletableFuture
+    (the cross-thread boundary itself) is excluded and registered in
+    decision 59.

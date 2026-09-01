@@ -9,7 +9,9 @@ import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.LongSupplier;
+import javax.annotation.Nullable;
 
 /**
  * Shared lifecycle scaffold for the task-verb handlers (goto, dig,
@@ -38,6 +40,7 @@ public abstract class VerbTaskHandler<P extends MissionShell> {
     private final Map<String, P> missions = new HashMap<>();
     // Set in attach(); the lifecycle sweep needs the bus to close
     // dedupe windows for deaths announced outside it.
+    @Nullable
     private CommandBus bus;
 
     /**
@@ -71,6 +74,7 @@ public abstract class VerbTaskHandler<P extends MissionShell> {
      * @return null when the arguments parse, else the wire rejection
      *         reason
      */
+    @Nullable
     protected abstract String validate(BotCommand command);
 
     /**
@@ -94,6 +98,7 @@ public abstract class VerbTaskHandler<P extends MissionShell> {
         this.bus = bus;
         bus.register(verb(), new CommandBus.Handler() {
             @Override
+            @Nullable
             public String validate(BotCommand command) {
                 return VerbTaskHandler.this.validate(command);
             }
@@ -121,11 +126,12 @@ public abstract class VerbTaskHandler<P extends MissionShell> {
      */
     public void tick() {
         beforeSweep();
+        CommandBus b = Objects.requireNonNull(bus, "bus not attached");
         missions.values().removeIf(m -> {
             if (m.isActive()) {
                 return false;
             }
-            bus.retire(m.missionTaskId());
+            b.retire(m.missionTaskId());
             onRetired(m);
             return true;
         });
@@ -182,10 +188,11 @@ public abstract class VerbTaskHandler<P extends MissionShell> {
      * @return number of missions actually cancelled
      */
     public int stopAll() {
+        CommandBus b = Objects.requireNonNull(bus, "bus not attached");
         List<String> ids = List.copyOf(missions.keySet());
         int cancelled = 0;
         for (String id : ids) {
-            if (bus.cancel(id)) {
+            if (b.cancel(id)) {
                 cancelled++;
             }
         }

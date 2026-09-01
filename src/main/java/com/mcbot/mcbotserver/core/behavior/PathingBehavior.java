@@ -19,6 +19,7 @@ import com.mcbot.mcbotserver.core.pathing.PlanSmoother;
 import com.mcbot.mcbotserver.core.pathing.PlanWorker;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 
 /**
  * Waypoint follower over the A* move graph: plans through the finder,
@@ -155,7 +156,10 @@ public final class PathingBehavior implements Behavior {
     private final ReplanGate gate = new ReplanGate();
     private final NoPathEscalator noPath = new NoPathEscalator(AStarPathFinder.DEFAULT_NODE_BUDGET);
     private int ticksSinceAdoption;
+
+    @Nullable
     private Goal lastGoal;
+
     private int departHoldTicks;
     /**
      * Body contact state accessor. Drives the vertical gate in
@@ -305,7 +309,7 @@ public final class PathingBehavior implements Behavior {
             BodyYawSource bodyYaw,
             OnGroundSource onGroundSource,
             MoveGraph graph,
-            PlanWorker worker) {
+            @Nullable PlanWorker worker) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("name must not be blank");
         }
@@ -320,7 +324,7 @@ public final class PathingBehavior implements Behavior {
     }
 
     @Override
-    public ExecutionReport tick(WorldView world, Directive directive, Actor actor) {
+    public ExecutionReport tick(WorldView world, @Nullable Directive directive, Actor actor) {
         if (directive == null) {
             lastGoal = null;
             departHoldTicks = 0;
@@ -426,6 +430,7 @@ public final class PathingBehavior implements Behavior {
      *         once between replan cooldowns); null when the tick
      *         should proceed to cursor advance
      */
+    @Nullable
     private ExecutionReport triggerVerdict(
             WorldView world, Goal goal, Vec3 position, CellPos cell, ReplanGate.TickWindow window) {
         evaluatePlanProgress(position, goal);
@@ -482,6 +487,7 @@ public final class PathingBehavior implements Behavior {
      * @return the terminal/interim report, or null when cursor advance
      *         should proceed
      */
+    @Nullable
     private ExecutionReport settleCursorVerdict(boolean fuseCondition) {
         if (cursor.isEmpty()) {
             // A search still running is not an answer: report
@@ -533,7 +539,10 @@ public final class PathingBehavior implements Behavior {
                 // adoption paths (sync and worker) get the simplified
                 // chain, and the corridor checks read the CURRENT
                 // world, not the search snapshot.
-                cursor.set(PlanSmoother.smooth(world, adoption.plan()));
+                var plan = adoption.plan();
+                if (plan != null) {
+                    cursor.set(PlanSmoother.smooth(world, plan));
+                }
                 ticksSinceAdoption = 0;
                 fuse.onAdopted(cursor.index());
                 // Complete routes retire the unreachability ledger;
@@ -594,7 +603,7 @@ public final class PathingBehavior implements Behavior {
      * @return a fresh {@code LinkedHashMap} of attribute strings;
      *         never null
      */
-    public Map<String, String> keepaliveAttrs(Vec3 position, CellPos goalCell) {
+    public Map<String, String> keepaliveAttrs(Vec3 position, @Nullable CellPos goalCell) {
         Map<String, String> attrs = new LinkedHashMap<>();
         attrs.put("pose", position.x() + "," + position.y() + "," + position.z());
         attrs.put("waypointIndex", String.valueOf(cursor.index()));

@@ -50,6 +50,15 @@ class LintPostureGateTest {
      * of Map.get() return values. A version bump must re-run the NP probe
      * before this pin moves — the gate's documented null-surface blind
      * spots depend on this fact.
+     *
+     * <p>Error Prone and NullAway versions are pinned for the same reason:
+     * NullAway's nullness inference is version-sensitive. 0.11.2 on EP
+     * 2.42.0 is verified clean across api+core (2026-09-01 full annotation
+     * wave, 0 warnings). A NullAway or EP core version bump must re-run
+     * a full compile -Plint before this pin moves; a plugin version bump
+     * (5.1.0) must verify the CheckSeverity enum and option wiring still
+     * match. The AnnotatedPackages value pins the nullness domain: api
+     * (harness contract) + core (implementation). Expanding it is a ruling.
      */
     private static final List<Posture> PINNED_POSTURES = List.of(
             new Posture(
@@ -67,9 +76,17 @@ class LintPostureGateTest {
             new Posture(
                     "spotbugs {",
                     List.of("toolVersion = '4.10.4'", "excludeFilter = file('config/spotbugs/exclude.xml')")),
-            new Posture("options.errorprone {", List.of("enabled = project.hasProperty('lint')")),
+            new Posture(
+                    "options.errorprone {",
+                    List.of(
+                            "enabled = project.hasProperty('lint')",
+                            "check('NullAway', net.ltgt.gradle.errorprone.CheckSeverity.ERROR)",
+                            "option('NullAway:AnnotatedPackages', 'com.mcbot.mcbotserver.api,com.mcbot.mcbotserver.core')")),
             new Posture("tasks.register('cpdCheck', JavaExec) {", List.of("enabled = project.hasProperty('lint')")),
-            new Posture("tasks.register('qualityCheck') {", List.of("'pmdMain'", "'spotbugsTest'", "'spotlessCheck'")));
+            new Posture("tasks.register('qualityCheck') {", List.of("'pmdMain'", "'spotbugsTest'", "'spotlessCheck'")),
+            new Posture("id 'net.ltgt.errorprone' version", List.of("'5.1.0'")),
+            new Posture("errorprone 'com.google.errorprone:error_prone_core:", List.of("2.42.0")),
+            new Posture("errorprone 'com.uber.nullaway:nullaway:", List.of("0.11.2")));
 
     /** Soft-posture budget: zero - suppressions live in the SpotBugs
      * exclude filter with a written reason, never in ignoreFailures. */
