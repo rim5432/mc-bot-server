@@ -63,10 +63,9 @@ from mcbot.capability.report import (
     evidence_for_faces,
     evidence_rollup,
     harness_axis,
+    integrity_for_faces,
     is_internal_face,
-    source_drift,
     spec_impl_gap,
-    staleness_for_faces,
     status_suggestions,
 )
 from mcbot.capability.validation import validate_db
@@ -548,19 +547,19 @@ def cmd_cap_status(args) -> int:
             print(f"    last green: {ev['last_green_at']}")
         if ev["last_red_at"]:
             print(f"    last red  : {ev['last_red_at']}")
-    st = staleness_for_faces().get(cap.id)
-    if st:
-        stale_label = st["state"].upper()
-        if st["state"] == "stale" and st["days_stale"] is not None:
-            stale_label += f" ({st['days_stale']:.1f}d since last green after code change)"
+    ig = integrity_for_faces().get(cap.id, {})
+    if ig:
+        stale_label = ig["stale_state"].upper()
+        if ig["stale_state"] == "stale" and ig["days_stale"] is not None:
+            stale_label += f" ({ig['days_stale']:.1f}d since last green after code change)"
         print(f"\n  staleness   : {stale_label}")
-        if st["last_code_change"]:
-            print(f"    code change: {st['last_code_change']}")
-        if st["last_green_at"]:
-            print(f"    last green : {st['last_green_at']}")
+        if ig["last_code_change"]:
+            print(f"    code change: {ig['last_code_change']}")
+        if ig["last_green_at"]:
+            print(f"    last green : {ig['last_green_at']}")
 
     # --- record integrity panel: six axes, one glance ---
-    drift = source_drift().get(cap.id, {})
+    drift = ig
     ev = ev or {"state": "untested", "red_runs": 0}
     print()
     print("  RECORD INTEGRITY")
@@ -768,8 +767,8 @@ def cmd_cap_domain(args) -> int:
               f"{', '.join(rep['faces_shipped_untested'])}")
         print()
 
-    staleness = staleness_for_faces()
-    stale_count = sum(1 for s in staleness.values() if s["state"] == "stale")
+    integrity = integrity_for_faces()
+    stale_count = sum(1 for s in integrity.values() if s["stale_state"] == "stale")
     if stale_count:
         print(f"  staleness: {stale_count} face(s) changed code since last green test")
     print(f"{'FACE':<28} {'STATUS':<10} {'EVID':<9} {'STALE':<8} {'VERIFIED':<12} {'SPECS':>5} {'IMPLS':>5}  FLAGS")
@@ -790,9 +789,9 @@ def cmd_cap_domain(args) -> int:
                 ev = f["evidence"]["state"].upper()
                 if f["evidence"]["state"] == "green" and f["evidence"]["red_runs"]:
                     ev += f"(x{f['evidence']['red_runs']})"
-                st = staleness.get(f["id"], {})
-                stale_str = st.get("state", "-").upper()
-                if st.get("state") == "stale" and st.get("days_stale") is not None:
+                st = integrity.get(f["id"], {})
+                stale_str = st.get("stale_state", "-").upper()
+                if st.get("stale_state") == "stale" and st.get("days_stale") is not None:
                     stale_str += f"({st['days_stale']:.0f}d)"
                 print(f"{f['id']:<28} {f['implementation_status'] + '*':<10} {ev:<9} {stale_str:<8} "
                       f"{f['verified_at'] or '-':<12} "
@@ -809,9 +808,9 @@ def cmd_cap_domain(args) -> int:
             ev = f["evidence"]["state"].upper()
             if f["evidence"]["state"] == "green" and f["evidence"]["red_runs"]:
                 ev += f"(x{f['evidence']['red_runs']})"
-            st = staleness.get(f["id"], {})
-            stale_str = st.get("state", "-").upper()
-            if st.get("state") == "stale" and st.get("days_stale") is not None:
+            st = integrity.get(f["id"], {})
+            stale_str = st.get("stale_state", "-").upper()
+            if st.get("stale_state") == "stale" and st.get("days_stale") is not None:
                 stale_str += f"({st['days_stale']:.0f}d)"
             print(f"{f['id']:<28} {f['implementation_status'] + '*':<10} {ev:<9} {stale_str:<8} "
                   f"{f['verified_at'] or '-':<12} "

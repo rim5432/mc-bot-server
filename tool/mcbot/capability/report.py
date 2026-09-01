@@ -299,102 +299,6 @@ def status_suggestions(db_path: Optional[Path] = None) -> list[dict]:
     return suggestions
 
 
-def staleness_for_faces(db_path: Optional[Path] = None, *, repo_root: Optional[Path] = None) -> dict:
-    """Per-face staleness: source code last changed vs. last green test.
-
-    Read-model that DOES touch git (the only report function that does) -
-    source_paths from the DB are fed to `git log -1` per file, then
-    compared against the most recent runGameTest receipt where this face's
-    linked impl cases did not fail. Faces with no impls are UNTESTED;
-    faces whose code changed after their last green are STALE.
-
-    Returns {face_id: {state, last_code_change, last_green_at, days_stale}}.
-    state in {fresh, stale, untested, no_green_ever}.
-    """
-    import subprocess
-    if repo_root is None:
-        repo_root = Path(__file__).resolve().parents[3]  # tool/mcbot/capability/ -> repo root
-    init_db(db_path)
-    with get_connection(db_path) as conn:
-        rows = conn.execute(
-            "SELECT id, source_paths FROM capabilities ORDER BY id"
-        ).fetchall()
-        impl_counts = {
-            r["capability_id"]: r["c"]
-            for r in conn.execute(
-                "SELECT capability_id, COUNT(*) as c FROM qa_test_cases "
-                "WHERE kind = 'impl' AND capability_id IS NOT NULL "
-                "GROUP BY capability_id"
-            ).fetchall()
-        }
-    result: dict[str, dict] = {}
-    for r in rows:
-        face = r["id"]
-        paths = json.loads(r["source_paths"] or "[]")
-        if impl_counts.get(face, 0) == 0:
-            result[face] = {"state": "untested", "last_code_change": None,
-                             "last_green_at": None, "days_stale": None}
-            continue
-        # Last code change: newest git commit touching any source_path
-        last_code_ts = None
-        for p in paths:
-            full = repo_root / "src/main/java/com/mcbot/mcbotserver" / p
-            if not full.exists():
-                continue
-            try:
-                out = subprocess.run(
-                    ["git", "log", "-1", "--format=%ct", "--", str(full)],
-                    cwd=repo_root, capture_output=True, text=True, timeout=10,
-                )
-                ts = out.stdout.strip()
-                if ts:
-                    last_code_ts = max(last_code_ts or 0, int(ts))
-            except (subprocess.TimeoutExpired, ValueError):
-                continue
-        last_code_dt = _dt.datetime.fromtimestamp(last_code_ts, _dt.timezone.utc) if last_code_ts else None
-        # Last green: most recent runGameTest receipt where this face's impls did not fail
-        with get_connection(db_path) as conn:
-            green_row = conn.execute(
-                """
-                SELECT MAX(r.finished_at) as last_green_at
-                FROM test_receipts r
-                WHERE r.test_type = 'runGameTest'
-                AND r.id NOT IN (
-                    SELECT cr.receipt_id
-                    FROM test_case_runs cr
-                    JOIN qa_test_cases c ON c.id = cr.test_case_id
-                    WHERE c.kind = 'impl' AND c.capability_id = ?
-                )
-                """,
-                (face,),
-            ).fetchone()
-        last_green_str = green_row["last_green_at"] if green_row else None
-        if not last_green_str:
-            result[face] = {"state": "no_green_ever", "last_code_change": last_code_dt.isoformat() if last_code_dt else None,
-                             "last_green_at": None, "days_stale": None}
-            continue
-        # Parse last_green_at (ISO format with or without timezone)
-        try:
-            last_green_dt = _dt.datetime.fromisoformat(last_green_str.replace("Z", "+00:00"))
-            if last_green_dt.tzinfo is None:
-                last_green_dt = last_green_dt.replace(tzinfo=_dt.timezone.utc)
-        except ValueError:
-            last_green_dt = None
-        if last_code_dt and last_green_dt:
-            days_stale = (last_code_dt - last_green_dt).total_seconds() / 86400
-            state = "stale" if days_stale > 0 else "fresh"
-        else:
-            days_stale = None
-            state = "fresh" if last_green_dt else "no_green_ever"
-        result[face] = {
-            "state": state,
-            "last_code_change": last_code_dt.isoformat() if last_code_dt else None,
-            "last_green_at": last_green_str,
-            "days_stale": round(days_stale, 1) if days_stale is not None else None,
-        }
-    return result
-
-
 def domain_report(category: str, *, db_path: Optional[Path] = None) -> Optional[dict]:
     """One capability domain: per-face evidence, coverage, deficiencies.
 
@@ -618,26 +522,32 @@ def _git_last_commit_ts(repo_root: Path, rel_path: str) -> Optional[int]:
         return None
 
 
-def source_drift(
+def integrity_for_faces(
     db_path: Optional[Path] = None,
     *,
     repo_root: Optional[Path] = None,
 ) -> dict[str, dict]:
-    """Per-face source-path integrity: missing files and code-vs-record drift.
+    """Per-face source integrity in one walk over the catalog.
 
-    Two checks per face:
-    1. MISSING — a catalogued source_path no longer exists on disk (the
-       implementation moved or was renamed and the seed was not updated).
-    2. DRIFT — a source_path's last git commit is newer than the face's
-       updated_at, meaning code changed after the catalog record was last
-       touched. The record may describe an outdated implementation.
+    One `git log -1` per source path feeds two comparators (this used
+    to be two near-identical functions, source_drift and
+    staleness_for_faces, that each paid the full git walk —
+    `capability status` paid it twice):
 
-    Faces with empty source_paths are UNMAPPED (not an error — the seed
-    may not have catalogued them yet, or the face is pure-decision-layer
-    with no single adapter file).
+    1. MISSING — a catalogued source_path no longer exists on disk.
+    2. DRIFT — the newest commit touching any path is newer than the
+       face record's updated_at; the record may describe stale code.
+       Faces with no source_paths are UNMAPPED (not an error — the
+       seed may not have catalogued them yet).
+    3. STALE — code changed after the face's most recent green engine
+       run (a receipt where no linked impl failed). Needs impl links;
+       a face with none is UNTESTED, never-green is NO_GREEN_EVER.
 
-    Returns {face_id: {state, missing, last_code_change, record_updated,
-    days_drift}} where state in {fresh, drift, missing, unmapped}.
+    Returns {face_id: {missing, state, days_drift, record_updated,
+    last_code_change, stale_state, days_stale, last_green_at}} where
+    state in {fresh, drift, missing, unmapped} is the record-integrity
+    verdict and stale_state in {fresh, stale, untested, no_green_ever}
+    the test-currency verdict.
     """
     if repo_root is None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -646,17 +556,19 @@ def source_drift(
         rows = conn.execute(
             "SELECT id, source_paths, updated_at FROM capabilities ORDER BY id"
         ).fetchall()
+        impl_counts = {
+            r["capability_id"]: r["c"]
+            for r in conn.execute(
+                "SELECT capability_id, COUNT(*) as c FROM qa_test_cases "
+                "WHERE kind = 'impl' AND capability_id IS NOT NULL "
+                "GROUP BY capability_id"
+            ).fetchall()
+        }
     result: dict[str, dict] = {}
     for r in rows:
         face = r["id"]
         paths = json.loads(r["source_paths"] or "[]")
-        if not paths:
-            result[face] = {
-                "state": "unmapped", "missing": [],
-                "last_code_change": None, "record_updated": r["updated_at"],
-                "days_drift": None,
-            }
-            continue
+        # shared plumbing: path existence + newest commit per path
         missing: list[str] = []
         last_code_ts: Optional[int] = None
         for p in paths:
@@ -667,17 +579,11 @@ def source_drift(
             ts = _git_last_commit_ts(repo_root, p)
             if ts:
                 last_code_ts = max(last_code_ts or 0, ts)
-        if missing:
-            result[face] = {
-                "state": "missing", "missing": missing,
-                "last_code_change": None, "record_updated": r["updated_at"],
-                "days_drift": None,
-            }
-            continue
         last_code_dt = (
             _dt.datetime.fromtimestamp(last_code_ts, _dt.timezone.utc)
             if last_code_ts else None
         )
+        # comparator 1: code vs record
         record_dt = None
         if r["updated_at"]:
             try:
@@ -688,17 +594,62 @@ def source_drift(
                     record_dt = record_dt.replace(tzinfo=_dt.timezone.utc)
             except ValueError:
                 record_dt = None
-        if last_code_dt and record_dt:
+        if not paths:
+            drift_state, days_drift = "unmapped", None
+        elif missing:
+            drift_state, days_drift = "missing", None
+        elif last_code_dt and record_dt:
             days_drift = (last_code_dt - record_dt).total_seconds() / 86400
-            state = "drift" if days_drift > 0 else "fresh"
+            drift_state = "drift" if days_drift > 0 else "fresh"
         else:
             days_drift = None
-            state = "fresh" if last_code_dt else "unmapped"
+            drift_state = "fresh" if last_code_dt else "unmapped"
+        # comparator 2: code vs last green
+        last_green_str = None
+        if impl_counts.get(face, 0) == 0:
+            stale_state, days_stale = "untested", None
+        else:
+            with get_connection(db_path) as conn:
+                green_row = conn.execute(
+                    """
+                    SELECT MAX(r.finished_at) as last_green_at
+                    FROM test_receipts r
+                    WHERE r.test_type = 'runGameTest'
+                    AND r.id NOT IN (
+                        SELECT cr.receipt_id
+                        FROM test_case_runs cr
+                        JOIN qa_test_cases c ON c.id = cr.test_case_id
+                        WHERE c.kind = 'impl' AND c.capability_id = ?
+                    )
+                    """,
+                    (face,),
+                ).fetchone()
+            last_green_str = green_row["last_green_at"] if green_row else None
+            last_green_dt = None
+            if last_green_str:
+                try:
+                    last_green_dt = _dt.datetime.fromisoformat(
+                        last_green_str.replace("Z", "+00:00")
+                    )
+                    if last_green_dt.tzinfo is None:
+                        last_green_dt = last_green_dt.replace(tzinfo=_dt.timezone.utc)
+                except ValueError:
+                    last_green_dt = None
+            if last_code_dt and last_green_dt:
+                days_stale = (last_code_dt - last_green_dt).total_seconds() / 86400
+                stale_state = "stale" if days_stale > 0 else "fresh"
+            else:
+                days_stale = None
+                stale_state = "fresh" if last_green_dt else "no_green_ever"
         result[face] = {
-            "state": state, "missing": [],
-            "last_code_change": last_code_dt.isoformat() if last_code_dt else None,
-            "record_updated": r["updated_at"],
+            "missing": missing,
+            "state": drift_state,
             "days_drift": round(days_drift, 1) if days_drift is not None else None,
+            "record_updated": r["updated_at"],
+            "last_code_change": last_code_dt.isoformat() if last_code_dt else None,
+            "stale_state": stale_state,
+            "days_stale": round(days_stale, 1) if days_stale is not None else None,
+            "last_green_at": last_green_str,
         }
     return result
 
@@ -756,7 +707,7 @@ def action_queue(
     all_faces = {c.id: c for c in repo.list()}
     evidence = evidence_for_faces(db_path)
     suggestions = status_suggestions(db_path)
-    drift = source_drift(db_path, repo_root=repo_root)
+    integrity = integrity_for_faces(db_path, repo_root=repo_root)
     harness = harness_axis(db_path)
     inv = inventory_coverage(db_path)
 
@@ -841,7 +792,7 @@ def action_queue(
             })
 
     # --- P2: source-path drift ---
-    for face_id, d in drift.items():
+    for face_id, d in integrity.items():
         if d["state"] == "missing":
             items.append({
                 "priority": "P2",
