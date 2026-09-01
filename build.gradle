@@ -109,6 +109,10 @@ tasks.named('test', Test).configure {
     // hard style gates ride every test run - user ruling 2026-08-27:
     // hygiene outweighs ~10s of build time; see doc/guide/build-and-run.md
     dependsOn 'checkstyleMain', 'checkstyleTest', 'spotlessCheck'
+    // coverage floor rides as a FINALIZER, not dependsOn: the JaCoCo
+    // verification task itself depends on test, so a dependsOn edge here
+    // would close a cycle. Finalizers still fail the build on violation.
+    finalizedBy 'jacocoTestCoverageVerification'
     testLogging {
         events 'failed', 'skipped'
         exceptionFormat 'full'
@@ -257,15 +261,63 @@ tasks.named('compileTestJava').configure {
     }
 }
 
-// ===== Test-quality lenses (manual runs only; never part of a gate) =====
-// JaCoCo answers "what do the offline tests touch"; PIT answers "what do
-// they actually kill". Coverage/mutation numbers drive the weakest-gate
-// review, they are not thresholds.
+// ===== Test-quality gates and lenses =====
+// JaCoCo carries ONE regression floor since the 2026-09-01 user ruling
+// (P2 of the external lint-posture report): pooled instruction coverage
+// over the offline-tested layers may not drop below 95% of the measured
+// baseline, plus a per-package catastrophic-collapse guard. PIT stays a
+// manual research lens - scoped rounds and reports, no thresholds.
+//
+// Engine-covered classes are dropped at the class-directory level, not
+// via rule excludes: the BUNDLE rule computes over the whole bundle
+// whatever its excludes contain (observed 09-01: dotted and slashed
+// rule excludes both left the ratio at the whole-bundle 35%), and
+// PACKAGE-rule excludes match dotted names only. Filtering the analysis
+// input once makes the report and the gate see the same 88.63% view.
+def coverageExclusions = [
+        'com/mcbot/mcbotserver/McBotServer*',   // mod entry, boots the engine
+        'com/mcbot/mcbotserver/adapter/**',     // device layer, engine-covered
+        'com/mcbot/mcbotserver/client/**',      // dev client entry
+        'com/mcbot/mcbotserver/gametest/**'     // engine scenarios
+]
 jacocoTestReport {
     dependsOn test
+    classDirectories.setFrom(files(classDirectories.files.collect {
+        fileTree(dir: it, exclude: coverageExclusions)
+    }))
     reports {
         xml.required = true   // machine-readable for gate analysis
         html.required = true
+    }
+}
+tasks.named('jacocoTestCoverageVerification') {
+    classDirectories.setFrom(files(classDirectories.files.collect {
+        fileTree(dir: it, exclude: coverageExclusions)
+    }))
+    // Baseline measured 2026-09-01: 88.63% pooled instruction over the
+    // 24 offline-tested packages. Floor = 95% of baseline, rounded down
+    // - it protects against decay, it is not an absolute bar (a bare
+    // percentage invites no-assertion tests; 95%-of-baseline only
+    // fires on real regression).
+    violationRules {
+        rule {
+            element = 'BUNDLE'
+            limit {
+                counter = 'INSTRUCTION'
+                minimum = 0.84
+            }
+        }
+        rule {
+            // collapse guard: no single offline-tested package below
+            // half-covered. Thinnest today is core/command at 51.7%
+            // (the watch list's known debt); a NEW package must ship
+            // with its tests per workplan discipline.
+            element = 'PACKAGE'
+            limit {
+                counter = 'INSTRUCTION'
+                minimum = 0.49
+            }
+        }
     }
 }
 
@@ -320,9 +372,9 @@ tasks.register('cpdCheck', JavaExec) {
 
 // One-command quality verdict: compile both source sets, then run every
 // gate and analyzer in its configured posture - checkstyle/spotless as
-// plain gates, PMD/CPD/SpotBugs as red walls. Coverage
-// and mutation lenses stay separate on purpose: they are research
-// rounds, not per-commit checks. Entry point: mcbot_tool.py lint.
+// plain gates, PMD/CPD/SpotBugs as red walls. The JaCoCo floor rides the
+// `test` flow, not qualityCheck; PIT stays a research lens outside every
+// per-commit check. Entry point: mcbot_tool.py lint.
 tasks.register('qualityCheck') {
     group = 'verification'
     description = 'Full static-analysis verdict (compile + style + walls + dashboards).'

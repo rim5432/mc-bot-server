@@ -37,7 +37,10 @@ hygiene outweighs ~10s of build time):
    `checkstyleTest` and `spotlessCheck` run on every
    `python tool/mcbot_tool.py test` and fail the build on
    violation - no opt-in, no memory required. Block-verified by
-   probe (an injected unused import fails `test` in 19s).
+   probe (an injected unused import fails `test` in 19s). The JaCoCo
+   coverage floor joined them on the 2026-09-01 ruling as a test
+   finalizer (`jacocoTestCoverageVerification`) - a finalizer, not a
+   dependsOn, because the verification task itself depends on `test`.
 2. **Everything else is one command.** PMD, CPD, SpotBugs (and
    Error Prone on the `-Plint` compiles) run behind `-Plint` through
    the consolidated `qualityCheck` task - one invocation, one verdict:
@@ -59,7 +62,7 @@ Postures after the 2026-08-27 promotion:
 | CPD | **RED WALL, `-Plint` fails at >=140 tokens** | main-side duplication cleared 2026-08-27 (CommandResponse, submitCommand, CommandHandlerGuards, BindingInventory.toView sharing, GametestRig.fillPool); the threshold sits above the largest surviving test-side copy (131), so only new main-scale duplication fires - sub-threshold dups stay periodic manual review |
 | SpotBugs (api+core scope only) | **RED WALL, `-Plint` fails on finding** | flipped from dashboard 2026-09-01 by the first triage round (22 findings: 3 fixed at root - DCN explicit arg null-checks on Mine/Dig, test stream close; 19 suppressed with inline justification in `config/spotbugs/exclude.xml` - ThreatBlackboard PA x9 per the ADR-0003 scratch-struct ruling, InMemoryEventQueue AT x4 per the single-thread policy with both wire paths marshalling to the tick thread, DI EI2 x2, MissionShell CT, test-fixture EI, assertThrows RV x2); `onlyAnalyze` limits to engine-free packages, which need no MC auxclasspath - a NEW finding fails lint and lands in the filter with a reason or gets fixed |
 | Error Prone (on `-Plint` compiles) | **11 checks at ERROR + NullAway, rest warnings** | core pinned 2.42.0 (last JDK17 runtime); ReferenceEquality OFF; promoted guards: StreamResourceLeak, JdkObsolete, DefaultCharset, StringCharset, MissingOverride, EqualsIncompatibleType, InterruptedExceptionSwallowed, StringCaseLocaleUsage, SystemOut, NonApiType — zero-violation baseline; NullAway enforces @Nullable/@NonNull on api.. (jsr305), 6 annotated nullable sites, off for test code |
-| JaCoCo coverage | **manual lens** (`gradle jacocoTestReport`) | offline-layer truth only: adapter/gametest/client read 0% by design (engine-covered), core layers 86-97%; watch `core/command`, `api/interrupt`, `api/state` |
+| JaCoCo coverage | **hard gate on the default `test` flow** (`jacocoTestCoverageVerification` finalizer; 2026-09-01 ruling reversing the lens-only doctrine) | floor = 95% of the measured baseline - 88.63% pooled instruction over the 24 offline-tested packages, so minimum 0.84 - plus a 0.49 per-package collapse guard; engine-covered adapter/gametest/client and the mod entry are excluded BY RULING (0% offline by design, truth lives in gametests); reports stay manual (`gradle jacocoTestReport`); watch `core/command` (51.7%), `api/state`, `api/goal` |
 | PIT mutation | **manual lens** (`gradle pitest`) | baseline 2026-08-27: 34.2% overall kill, ~82% within covered code; weakest gates: PathingBehavior 36 survivors, MineProcess 31, BasicMoves 14 |
 
 Deliberate deferrals recorded in the configs themselves: import ORDER

@@ -33,7 +33,10 @@ class LintPostureGateTest {
 
     /**
      * The pinned wiring. Hard gates: checkstyle and spotlessCheck hang
-     * off the test task. Red walls under -Plint: PMD (failing since
+     * off the test task, and the JaCoCo coverage floor rides it as a
+     * finalizer (user ruling 2026-09-01; a finalizer because the
+     * verification task itself depends on test - a dependsOn edge would
+     * close a cycle). Red walls under -Plint: PMD (failing since
      * the 2026-08-27 paydown), CPD (>= 140 tokens), and SpotBugs
      * (failing since the 2026-09-01 first-triage flip; its triaged
      * suppressions live in config/spotbugs/exclude.xml, each with an
@@ -42,7 +45,9 @@ class LintPostureGateTest {
     private static final List<Posture> PINNED_POSTURES = List.of(
             new Posture(
                     "tasks.named('test', Test).configure {",
-                    List.of("dependsOn 'checkstyleMain', 'checkstyleTest', 'spotlessCheck'")),
+                    List.of(
+                            "dependsOn 'checkstyleMain', 'checkstyleTest', 'spotlessCheck'",
+                            "finalizedBy 'jacocoTestCoverageVerification'")),
             new Posture("tasks.withType(Pmd).configureEach {", List.of("enabled = project.hasProperty('lint')")),
             new Posture(
                     "tasks.withType(com.github.spotbugs.snom.SpotBugsTask).configureEach {",
