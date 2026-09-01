@@ -330,6 +330,70 @@ SEED_CAPABILITIES: list[Capability] = [
         implementation_status="gap",
         vanilla_ref="ClimberHolder; LadderBlock; VineBlock (decompiled 1.20.1)",
     ),
+    # --- 9. Fishing behavior (rod micro-execution) ---
+    Capability(
+        id="fishing.bite_watch",
+        name="Bite watch and reel: bobber dip detection + rod retrieve",
+        category="fishing",
+        axis="offense",
+        description="FishBehavior equips the rod, casts (USE rising edge), settles the bobber (5 stable ticks after 30-tick cast grace), then watches consecutive BobberSnapshot Y values. A vertical drop >= 0.25 blocks in one tick is the bite — vanilla sets DATA_BITING=true which imparts -0.4*random(0.6,1.0) downward velocity. One reel (USE edge) lands the loot; hooked entity/item reels immediately. BITE_BUDGET_TICKS=600 no-bite timeout reels and stops. The HungryProcess per-tick food scan closes the mission.",
+        implementation_status="shipped",
+        vanilla_ref="FishingHook.catchingFish (timeUntilLured 100-600, timeUntilHooked 20-80, nibble 20-40); FishingHook.onSyncedDataUpdated (DATA_BITING -> deltaY -0.4); FishingHook.retrieve (BuiltInLootTables.FISHING, open water treasure, rod damage 1/3/5) (decompiled 1.20.1)",
+        source_paths=[
+            "core/behavior/FishBehavior.java",
+            "core/process/HungryProcess.java",
+            "api/process/Fish.java",
+            "api/process/Overrides.java",
+            "api/world/BobberSnapshot.java",
+        ],
+    ),
+    # --- 10. Farming (till / plant / grow / harvest cycle) ---
+    Capability(
+        id="farming.till_soil",
+        name="Hoe tilling: grass/dirt to farmland via right-click",
+        category="farming",
+        axis="interaction",
+        description="HoeItem.useOn converts grass_block, dirt_path, dirt to farmland; coarse_dirt to dirt; rooted_dirt to dirt plus hanging_roots drop. Precondition onlyIfAirAbove: clicked face must not be DOWN and the block above must be air. Each till deals 1 tool damage and plays HOE_TILL. FarmBlock default state MOISTURE=0; water within 4 blocks or rain hydrates to 7.",
+        implementation_status="gap",
+        vanilla_ref="HoeItem.useOn (line 48-75); HoeItem.onlyIfAirAbove (line 92); FarmBlock (decompiled 1.20.1)",
+    ),
+    Capability(
+        id="farming.plant_seeds",
+        name="Seed planting: right-click farmland with seeds",
+        category="farming",
+        axis="interaction",
+        description="ItemNameBlockItem.place on farmland places the crop at AGE=0. CropBlock.mayPlaceOn accepts only Blocks.FARMLAND. CropBlock.canSurvive requires rawBrightness >= 8 OR canSeeSky. Seed items: wheat_seeds, potato, carrot, beetroot_seeds, melon_seeds, pumpkin_seeds. Nether wart plants on soul_sand (separate face, not here).",
+        implementation_status="gap",
+        vanilla_ref="ItemNameBlockItem.place; CropBlock.mayPlaceOn (line 52); CropBlock.canSurvive (line 156) (decompiled 1.20.1)",
+    ),
+    Capability(
+        id="farming.crop_growth",
+        name="Crop growth: AGE 0-7 randomTick, growth speed, bonemeal",
+        category="farming",
+        axis="perception",
+        description="CropBlock.randomTick advances AGE 0->7 when rawBrightness >= 9. Growth speed getGrowthSpeed: base 1.0 + fertile farmland center 3.0 / diagonal 0.75; same-crop in row divides total by 2. Grow chance = nextInt((int)(25/f)+1)==0. BoneMealItem.applyBonemeal calls growCrops adding Mth.nextInt(random,2,5) age, consumes 1. FarmBlock.MOISTURE 0-7: water within 4 blocks (isNearWater) or rain sets 7; dry + no crop above turns to dirt. Trampling (fallOn) reverts to dirt via ForgeEventFactory.onFarmlandTrample.",
+        implementation_status="gap",
+        vanilla_ref="CropBlock.randomTick (line 82-95); CropBlock.getGrowthSpeed (line 111-153); CropBlock.growCrops (line 97-105); BoneMealItem.applyBonemeal (line 66-89); FarmBlock.randomTick (line 78-89); FarmBlock.isNearWater (line 112-122) (decompiled 1.20.1)",
+    ),
+    Capability(
+        id="farming.harvest_mature",
+        name="Harvest: break mature crops (AGE>=7), collect drops + seeds",
+        category="farming",
+        axis="action",
+        description="Break CropBlock at isMaxAge (AGE>=7) via the dig.pacing break sequence. Mature wheat drops 1 wheat + 0-3 seeds; potato/carrot drop 1-4 produce; beetroot drops 1 beetroot + 0-3 seeds. The face adds maturity detection (never break age<7) and seed-replant awareness (reserve seeds from drops for the next plant cycle). Reuses DigExecutor break progress; no new Intent kind.",
+        implementation_status="gap",
+        vanilla_ref="CropBlock.isMaxAge (line 72); CropBlock.getCloneItemStack (line 174-176); block loot tables (decompiled 1.20.1)",
+    ),
+    # --- 11. Water direct fishing (kill fish mobs in water) ---
+    Capability(
+        id="acquisition.water_fish",
+        name="Water fish hunt: chase and kill AbstractFish mobs for raw fish",
+        category="acquisition",
+        axis="offense",
+        description="Hunt fish mobs (cod, salmon, tropical_fish, pufferfish) directly in water. AbstractFish has MAX_HEALTH=3.0, WaterBoundPathNavigation, AvoidEntityGoal<Player> flee range 8.0, PanicGoal 1.25x. Cod drops raw_cod, salmon raw_salmon, tropical_fish clownfish (1 hunger), pufferfish pufferfish (poison effect). Underwater melee reuses combat.melee (no crits underwater). Fish flop on land (aiStep) — can be chased ashore. Alternative: Bucketable.bucketMobPickup with water bucket yields a fish bucket (transport, not direct food).",
+        implementation_status="gap",
+        vanilla_ref="AbstractFish (line 34, createAttributes MAX_HEALTH 3.0, registerGoals AvoidEntityGoal flee 8.0, WaterBoundPathNavigation); AbstractFish.aiStep flop (line 122-133); Bucketable.bucketMobPickup (line 137) (decompiled 1.20.1)",
+    ),
 ]
 
 
@@ -374,6 +438,14 @@ HARNESS_PATHS: dict[str, list[str]] = {
     # inventory: bag/free reads + station menu crafting
     "inventory.shape": ["cat /player/bag", "cat /player/inventory/free"],
     "inventory.menu_clicks": ["/stations", "/recipes/<slug>"],
+    # fishing: rod cast/reel USE edges
+    "fishing.bite_watch": ["write /player/held/use"],
+    # farming: hoe till and seed plant are held-item use; harvest reuses mine
+    "farming.till_soil": ["write /player/held/use"],
+    "farming.plant_seeds": ["write /player/held/use"],
+    "farming.harvest_mature": ["/tasks/mine"],
+    # water fish hunt reuses the attack task
+    "acquisition.water_fish": ["/entities/<id>/attack"],
 }
 
 
@@ -594,6 +666,39 @@ SOURCE_PATHS: dict[str, list[str]] = {
         "core/reflex/WaterBucketOnFallRule.java",
         "adapter/entity/BotBodyEntity.java",
         "adapter/InteractBlockExecutor.java",
+    ],
+    # fishing
+    "fishing.bite_watch": [
+        "core/behavior/FishBehavior.java",
+        "core/process/HungryProcess.java",
+        "api/process/Fish.java",
+        "api/process/Overrides.java",
+        "api/world/BobberSnapshot.java",
+        "adapter/sensing/LevelThreatSensor.java",
+    ],
+    # farming (adapter-side implementation pending; paths declared for staleness tracking)
+    "farming.till_soil": [
+        "adapter/InteractBlockExecutor.java",
+        "adapter/BotPlayerFacade.java",
+    ],
+    "farming.plant_seeds": [
+        "adapter/InteractBlockExecutor.java",
+        "adapter/BotPlayerFacade.java",
+    ],
+    "farming.crop_growth": [
+        "core/world/SnapshotWorldView.java",
+        "adapter/sensing/LevelThreatSensor.java",
+    ],
+    "farming.harvest_mature": [
+        "adapter/DigExecutor.java",
+        "core/actor/DigPacing.java",
+        "core/process/DigProcess.java",
+    ],
+    # water fish hunt
+    "acquisition.water_fish": [
+        "core/behavior/CombatBehavior.java",
+        "adapter/MeleeResolver.java",
+        "core/process/HungryProcess.java",
     ],
 }
 

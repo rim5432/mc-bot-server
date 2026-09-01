@@ -185,6 +185,27 @@ landed (archive). Remaining:
            FishBehaviorGateTest 5 cases + the fish-vocabulary transit
            pin; the engine pair (cast + bobber spawn) rides the
            staged gametest batch.   [dep: none]
+  - [x] S  Farming till_soil face SHIPPED (2026-09-02): hoe
+           right-click through InteractBlockExecutor triggers
+           HoeItem.useOn -> IForgeBlock.getToolModifiedState(HOE_TILL);
+           grass_block/dirt/dirt_path -> farmland, coarse_dirt -> dirt.
+           Forge 1.20.1 guard is above().isAir() only (vanilla
+           onlyIfAirAbove clicked-face check is bypassed by the
+           Forge hook). 3 gametests: dirt till, grass_block till,
+           covered-block no-till. capability face farming.till_soil
+           GREEN. fishing.bite_watch face formalized from existing
+           FishBehavior code (2 gametests, GREEN).
+  - [ ] M  Farming plant + grow + harvest faces: plant_seeds
+           (ItemNameBlockItem.place on farmland, CropBlock.mayPlaceOn
+           gate), crop_growth (randomTick light>=9, bonemeal
+           performBonemeal), harvest_mature (AGE==7 left-click dig
+           drops seeds + crop). Each needs a gametest anchor before
+           promote.                       [dep: till_soil]
+  - [ ] M  Water fish hunt face: acquisition.water_fish — melee
+           attack on AbstractFish in water (cod/salmon/tropical_fish
+           -> raw fish drops; pufferfish -> poison). Bucketable
+           bucketMobPickup is an alternative acquisition path.
+           [dep: combat.melee (existing)]
   - [ ] M  Loop acceptance: unattended mine -> craft -> equip ->
            fight -> eat driven through boundary-D verbs only,
            recorded verdict in tool/sessions/ (wait exit codes

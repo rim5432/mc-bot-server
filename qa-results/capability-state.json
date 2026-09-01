@@ -1,7 +1,13 @@
 {
   "schema": 2,
-  "exported_at": "2026-09-01T23:19:52",
+  "exported_at": "2026-09-02T00:45:33",
   "statuses": [
+    {
+      "id": "acquisition.water_fish",
+      "status": "gap",
+      "verified_at": "2026-08-29",
+      "deviation": ""
+    },
     {
       "id": "combat.bow_draw",
       "status": "shipped",
@@ -60,6 +66,36 @@
       "id": "dig.tool_speed",
       "status": "shipped",
       "verified_at": "2026-08-29",
+      "deviation": ""
+    },
+    {
+      "id": "farming.crop_growth",
+      "status": "gap",
+      "verified_at": "2026-08-29",
+      "deviation": ""
+    },
+    {
+      "id": "farming.harvest_mature",
+      "status": "gap",
+      "verified_at": "2026-08-29",
+      "deviation": ""
+    },
+    {
+      "id": "farming.plant_seeds",
+      "status": "gap",
+      "verified_at": "2026-08-29",
+      "deviation": ""
+    },
+    {
+      "id": "farming.till_soil",
+      "status": "shipped",
+      "verified_at": "2026-09-02",
+      "deviation": ""
+    },
+    {
+      "id": "fishing.bite_watch",
+      "status": "shipped",
+      "verified_at": "2026-09-02",
       "deviation": ""
     },
     {
@@ -477,14 +513,29 @@
       "link_source": "auto"
     },
     {
+      "case_id": "GT-BotFarmingGameTests-hoeDoesNotTillWhenCovered",
+      "capability_id": "farming.till_soil",
+      "link_source": "manual"
+    },
+    {
+      "case_id": "GT-BotFarmingGameTests-hoeTillsDirtIntoFarmland",
+      "capability_id": "farming.till_soil",
+      "link_source": "manual"
+    },
+    {
+      "case_id": "GT-BotFarmingGameTests-hoeTillsGrassBlockIntoFarmland",
+      "capability_id": "farming.till_soil",
+      "link_source": "manual"
+    },
+    {
       "case_id": "GT-BotFishingGameTests-biteDipTriggersReel",
-      "capability_id": "perception.projectiles",
-      "link_source": "auto"
+      "capability_id": "fishing.bite_watch",
+      "link_source": "manual"
     },
     {
       "case_id": "GT-BotFishingGameTests-hookedEntityTriggersImmediateReel",
-      "capability_id": "perception.projectiles",
-      "link_source": "annotated"
+      "capability_id": "fishing.bite_watch",
+      "link_source": "manual"
     },
     {
       "case_id": "GT-BotFishingGameTests-rodCastsAndReelsTheBobber",
@@ -578,6 +629,16 @@
     },
     {
       "case_id": "GT-BotHungerGameTests-eatReflexEmitsStartedAndCompletedEvents",
+      "capability_id": "hunger.eat_events",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotHungerGameTests-eatReflexEmptySlotEmitsSlotEmpty",
+      "capability_id": "hunger.eat_events",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotHungerGameTests-eatReflexNonFoodEmitsNotEdible",
       "capability_id": "hunger.eat_events",
       "link_source": "annotated"
     },
@@ -793,6 +854,11 @@
     },
     {
       "case_id": "GT-BotPotionGameTests-drinkCountTwoFullInventoryDropsContainer",
+      "capability_id": "consumable.potion",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotPotionGameTests-drinkCountTwoMergesBottleIntoExistingStack",
       "capability_id": "consumable.potion",
       "link_source": "annotated"
     },

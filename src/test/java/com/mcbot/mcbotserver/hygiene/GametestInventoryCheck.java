@@ -197,6 +197,9 @@ class GametestInventoryCheck {
                     "BotFishingGameTests",
                     Set.of("rodCastsAndReelsTheBobber", "biteDipTriggersReel", "hookedEntityTriggersImmediateReel")),
             Map.entry(
+                    "BotFarmingGameTests",
+                    Set.of("hoeTillsDirtIntoFarmland", "hoeTillsGrassBlockIntoFarmland", "hoeDoesNotTillWhenCovered")),
+            Map.entry(
                     "BotDiggingGameTests",
                     Set.of(
                             "pickaxeDigsStoneIntoCobblestone",

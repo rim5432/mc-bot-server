@@ -12,6 +12,12 @@ package com.mcbot.mcbotserver.api.reflex;
  * (which are boundary-A surface) owned by exactly one place.
  */
 public enum ReflexAction {
+    /**
+     * Hold the body still: no MOVE, ROT, USE, or INTERACT claims. The
+     * reflex that fires this has decided the correct response is to
+     * stop everything and wait — typically a higher-priority reflex
+     * that needs the body frozen while it resolves (ADR-0003 section 2).
+     */
     FREEZE,
 
     /**
