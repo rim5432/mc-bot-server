@@ -1,6 +1,6 @@
 ---
 title: Ladder gametest sits on a timing knife edge
-last_verified: 2026-09-01
+last_verified: 2026-09-02
 covers:
   - src/main/java/com/mcbot/mcbotserver/gametest/BotLocomotionGameTests.java
   - src/main/java/com/mcbot/mcbotserver/core/behavior/PathingBehavior.java

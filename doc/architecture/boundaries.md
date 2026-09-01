@@ -1,6 +1,6 @@
 ---
 title: Boundary Contracts
-last_verified: 2026-09-01
+last_verified: 2026-09-02
 covers:
   - doc/decisions/0002-capability-model-task-arbiter.md
   - doc/decisions/0003-reflex-layer-preemption.md
@@ -458,4 +458,4 @@ presence for enforcement. Decision 55 registers the same fact.
   failed prior decision: run the ADR reversal procedure explicitly -
   new ADR superseding the old - not quiet edits.
 
-Related: [Architecture Overview](overview.md), [ADR index](../README.md)
+Related: [Architecture Overview](overview.md), [ADR index](../decisions/)
