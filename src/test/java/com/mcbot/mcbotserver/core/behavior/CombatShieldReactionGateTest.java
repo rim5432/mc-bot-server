@@ -250,6 +250,31 @@ class CombatShieldReactionGateTest {
         assertTrue(useClaims(actor).isEmpty(), "a press on the held shield would re-raise it, never swing");
     }
 
+    @Test
+    void volleyTracksNearestArrival() {
+        CombatBehavior combat = new CombatBehavior("combat", () -> POS);
+        RecordingActor actor = new RecordingActor();
+        MockWorldView world = world(inventory(0, SWORD, SHIELD));
+        // Two arrows from different bearings: east arrives in eight ticks,
+        // south in twelve - the block must face the nearer (east) threat.
+        world.addProjectile(new ProjectileSnapshot(new Vec3(8, 64, 0), new Vec3(-1, 0, 0)));
+        world.addProjectile(new ProjectileSnapshot(new Vec3(0, 64, 12), new Vec3(0, 0, -1)));
+
+        combat.tick(world, orderAt(2), actor);
+        applySlotFeedback(world, actor);
+        combat.tick(world, orderAt(2), actor);
+
+        var rotClaims =
+                actor.submitted.stream().filter(c -> c.channel() == Channel.ROT).toList();
+        assertFalse(rotClaims.isEmpty(), "ROT tracks a threat through the volley");
+        var look = (com.mcbot.mcbotserver.api.actor.Intent.Look)
+                rotClaims.get(rotClaims.size() - 1).intent();
+        // East bearing: atan2(-(8-0), 0-0) = -90 degrees.
+        assertEquals(-90.0f, look.yawDeg(), 0.01f, "the nearer (east) arrow is the tracked threat, not the south one");
+        List<Boolean> presses = pressSequence(actor);
+        assertTrue(presses.get(presses.size() - 1), "the block holds through the volley");
+    }
+
     /** A combat order whose target sits at the given x distance (z=0). */
     private static Directive orderAt(int x) {
         return new Directive(new GoalNear(new CellPos(x, 64, 0), 1), new Overrides(new Attack("z1")));

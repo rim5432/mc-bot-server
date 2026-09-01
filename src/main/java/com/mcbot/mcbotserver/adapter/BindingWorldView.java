@@ -182,8 +182,17 @@ public final class BindingWorldView implements WorldView {
                 // Bobbers ride their own query; bite watching owns them.
                 continue;
             }
-            double dist = p.blockPosition().distSqr(toMc(center));
-            if (dist > radius * radius) {
+            // Exact-position spherical filter: the AABB pre-filter
+            // bounds the candidate set, and blockPosition() truncation
+            // would blur the edge by up to sqrt(3)/2 blocks - the
+            // snapshot carries sub-block precision, so the gate matches.
+            double cx = center.x() + 0.5;
+            double cy = center.y() + 0.5;
+            double cz = center.z() + 0.5;
+            double dx = p.getX() - cx;
+            double dy = p.getY() - cy;
+            double dz = p.getZ() - cz;
+            if (dx * dx + dy * dy + dz * dz > radius * radius) {
                 continue;
             }
             var motion = p.getDeltaMovement();

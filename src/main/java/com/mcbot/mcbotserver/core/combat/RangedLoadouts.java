@@ -34,9 +34,15 @@ public final class RangedLoadouts {
 
     /**
      * Whether the item id's USE press starts a hold instead of a
-     * swing. The two items the combat tier itself can leave in the
-     * held slot mid-transition (bow via the draw path, shield via the
-     * block path) - the melee press must wait for the weapon to land.
+     * swing. Scoped to the two items the combat tier itself can leave
+     * in the held slot mid-transition (bow via the draw path, shield
+     * via the block path) - the melee press must wait for the weapon
+     * to land. Crossbow and trident are also hold-items in vanilla,
+     * but deliberately excluded: the combat tier has no attack path
+     * for either, and adding them here would silently refuse to swing
+     * when {@code holdBestWeapon} ranks a trident first (it carries
+     * ATTACK_DAMAGE) - masking the missing path instead of surfacing
+     * it. Future weapon support lifts this scope.
      *
      * @param itemId registry id; may be null (answers false)
      * @return true when a USE press on this item raises or draws
