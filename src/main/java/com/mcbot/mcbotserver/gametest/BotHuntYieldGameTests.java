@@ -43,7 +43,11 @@ public final class BotHuntYieldGameTests {
      * Scenario: a cow spawned across the pad is hunted down by the
      * directed attack task, and raw beef from the cow's loot table
      * ends up in the carrier inventory - kill plus pickup, the full
-     * yield chain, driven only by the production task pipeline.
+     * yield chain, driven only by the production task pipeline. The
+     * attack task retires the moment the prey drops (drops scatter
+     * just past GroundPickup's reach envelope), so the scenario
+     * completes the excursion the way the harness would: a goto
+     * through the kill site walks the body over the drops.
      */
     // capability: acquisition.hunt_game
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
@@ -66,9 +70,14 @@ public final class BotHuntYieldGameTests {
                 .thenWaitUntil(driveUntil(
                         rig,
                         () -> check(
-                                !prey.isAlive() && beefCount(rig) > 0,
-                                "waiting for kill + beef pickup, cowAlive=" + prey.isAlive() + " beef="
-                                        + beefCount(rig))))
+                                !prey.isAlive() && !mission.isActive(),
+                                "waiting for the kill, cowAlive=" + prey.isAlive())))
+                .thenExecuteAfter(
+                        0,
+                        () -> GametestRig.submitGoto(
+                                rig, new CellPos(prey.getBlockX(), prey.getBlockY(), prey.getBlockZ())))
+                .thenWaitUntil(driveUntil(
+                        rig, () -> check(beefCount(rig) > 0, "waiting for beef pickup, beef=" + beefCount(rig))))
                 .thenExecuteFor(GametestRig.SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> rig.body().discard())
                 .thenSucceed();
