@@ -50,10 +50,9 @@ public final class LevelThreatSensor implements ThreatSensor {
     @Feature(
             id = "combat.hostile_acquisition.hostile_type_catalog",
             face = "combat.hostile_acquisition",
-            description =
-                    "Hostile type catalog: 10 mob types (creeper, zombie, skeleton, spider, witch, drowned, husk," +
-                    "stray, pillager, vindicator). Threat classification is data owned by the sensing side;" +
-                    "consumers read it here instead of re-listing mobs.",
+            description = "Hostile type catalog: 10 mob types (creeper, zombie, skeleton, spider, witch, drowned, husk,"
+                    + "stray, pillager, vindicator). Threat classification is data owned by the sensing side;"
+                    + "consumers read it here instead of re-listing mobs.",
             vanillaRef = "Monster base class + hostile mob registry (decompiled 1.20.1)")
     public static Set<String> hostileTypes() {
         return HOSTILE_TYPES;
@@ -73,14 +72,12 @@ public final class LevelThreatSensor implements ThreatSensor {
     @Feature(
             id = "combat.hostile_acquisition.ranged_type_catalog",
             face = "combat.hostile_acquisition",
-            description =
-                    "Ranged hostile type catalog: 4 types (skeleton, stray, pillager, witch) whose kite-and-shoot" +
-                    " tactics structurally defeat a melee-only bot. The combat planner reads this set to REFUSE" +
-                    " such engagements honestly instead of chasing to timeout.",
+            description = "Ranged hostile type catalog: 4 types (skeleton, stray, pillager, witch) whose kite-and-shoot"
+                    + " tactics structurally defeat a melee-only bot. The combat planner reads this set to REFUSE"
+                    + " such engagements honestly instead of chasing to timeout.",
             vanillaRef = "AbstractSkeleton, Pillager, Witch AI (decompiled 1.20.1)",
-            deviation =
-                    "Bot-specific: a melee-only bot cannot answer ranged threats, so their type classification" +
-                    " drives the ENGAGEMENT_REFUSED verdict — vanilla players can switch to a bow or close distance.")
+            deviation = "Bot-specific: a melee-only bot cannot answer ranged threats, so their type classification"
+                    + " drives the ENGAGEMENT_REFUSED verdict — vanilla players can switch to a bow or close distance.")
     public static Set<String> rangedTypes() {
         return RANGED_TYPES;
     }
@@ -185,15 +182,13 @@ public final class LevelThreatSensor implements ThreatSensor {
     @Feature(
             id = "combat.hostile_acquisition.omni_directional_scan",
             face = "combat.hostile_acquisition",
-            description =
-                    "Bearing-blind 16-block omnidirectional scan for nearest hostile. Includes rear threats — the" +
-                    " creeper-from-behind scenario is the reason the reflex layer exists, so the sensor must not" +
-                    " encode a forward bias. Matches vanilla hostile awareness scale.",
+            description = "Bearing-blind 16-block omnidirectional scan for nearest hostile. Includes rear threats — the"
+                    + " creeper-from-behind scenario is the reason the reflex layer exists, so the sensor must not"
+                    + " encode a forward bias. Matches vanilla hostile awareness scale.",
             vanillaRef = "Hostile mobs follow range + line-of-sight AI (decompiled 1.20.1)",
-            deviation =
-                    "Acquisition is the hostile mob's own AI (follow range, sight, idle target slot); the bot side" +
-                    " only needs a carrier-side presence pass. This sensor is threat detection for the bot's" +
-                    " reflexes, not the acquisition mechanism itself.")
+            deviation = "Acquisition is the hostile mob's own AI (follow range, sight, idle target slot); the bot side"
+                    + " only needs a carrier-side presence pass. This sensor is threat detection for the bot's"
+                    + " reflexes, not the acquisition mechanism itself.")
     @Override
     public void sense(WorldView world, ThreatBlackboard board) {
         // Vitals are body state, not world state - they cannot be read

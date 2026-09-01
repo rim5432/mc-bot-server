@@ -230,16 +230,14 @@ public final class DefendProcess extends MissionShell {
     @Feature(
             id = "combat.hostile_acquisition.tactical_engagement",
             face = "combat.hostile_acquisition",
-            description =
-                    "Tactical engagement decision: nearest hostile in 8-block engage radius. Ranged types are" +
-                    " REFUSED without a bow (ENGAGEMENT_REFUSED). Bow-only carriers open at the 10-block standoff" +
-                    " rim and fire while the target closes (point-blank bow), instead of charging to 2 and clubbing" +
-                    " for fist-tier damage. Melee-typed targets with a better melee weapon charge to 2.",
+            description = "Tactical engagement decision: nearest hostile in 8-block engage radius. Ranged types are"
+                    + " REFUSED without a bow (ENGAGEMENT_REFUSED). Bow-only carriers open at the 10-block standoff"
+                    + " rim and fire while the target closes (point-blank bow), instead of charging to 2 and clubbing"
+                    + " for fist-tier damage. Melee-typed targets with a better melee weapon charge to 2.",
             vanillaRef = "Hostile mob AI + player combat decision-making (decompiled 1.20.1)",
-            deviation =
-                    "Bot-specific: weapon-aware engagement routing — a bow-only carrier does not charge to melee" +
-                    " range; it keeps firing at standoff. Target switching is explicit (death/leash/policy), never" +
-                    " a side effect of nearestHostile ordering.")
+            deviation = "Bot-specific: weapon-aware engagement routing — a bow-only carrier does not charge to melee"
+                    + " range; it keeps firing at standoff. Target switching is explicit (death/leash/policy), never"
+                    + " a side effect of nearestHostile ordering.")
     @Override
     public Directive onTick(WorldView world) {
         if (!live()) {
@@ -359,14 +357,12 @@ public final class DefendProcess extends MissionShell {
     @Feature(
             id = "combat.hostile_acquisition.resume_blind_trust",
             face = "combat.hostile_acquisition",
-            description =
-                    "Resume blind-trust guard: after reflex preemption, resume() spends ALL grace credit so the" +
-                    " very next onTick scan adjudicates immediately. Prevents stale steering from a pre-pause" +
-                    " target from persisting through the full grace window.",
+            description = "Resume blind-trust guard: after reflex preemption, resume() spends ALL grace credit so the"
+                    + " very next onTick scan adjudicates immediately. Prevents stale steering from a pre-pause"
+                    + " target from persisting through the full grace window.",
             vanillaRef = "No direct vanilla counterpart — player-controlled combat has no reflex preemption",
-            deviation =
-                    "Bot-specific: boundary-C reflex preemption can park a fight mid-engagement; resume must not" +
-                    " blindly trust the pre-pause target state.")
+            deviation = "Bot-specific: boundary-C reflex preemption can park a fight mid-engagement; resume must not"
+                    + " blindly trust the pre-pause target state.")
     @Override
     public boolean resume(InterruptionContext c) {
         if (!live()) {
@@ -425,14 +421,12 @@ public final class DefendProcess extends MissionShell {
     @Feature(
             id = "combat.hostile_acquisition.engagement_range",
             face = "combat.hostile_acquisition",
-            description =
-                    "Engagement range selection: melee targets chase to GOAL_RANGE=2 (swing-adjacent), ranged" +
-                    " targets hold RANGED_STANDOFF=10 (bow band). Closing to 2 against a kiter hands the initiative" +
-                    " to a mob that backs away shooting.",
+            description = "Engagement range selection: melee targets chase to GOAL_RANGE=2 (swing-adjacent), ranged"
+                    + " targets hold RANGED_STANDOFF=10 (bow band). Closing to 2 against a kiter hands the initiative"
+                    + " to a mob that backs away shooting.",
             vanillaRef = "Skeleton follow range + shoot AI (decompiled 1.20.1)",
-            deviation =
-                    "Bot-specific: the standoff rim is a deliberate tactical choice, not a pathing limit. A" +
-                    " bow-only carrier holds 10 blocks to trade full-draw arrows instead of clubbing.")
+            deviation = "Bot-specific: the standoff rim is a deliberate tactical choice, not a pathing limit. A"
+                    + " bow-only carrier holds 10 blocks to trade full-draw arrows instead of clubbing.")
     private Directive directiveFor() {
         // Bow-answered fights hold the standoff rim instead of the
         // swing-adjacent chase rim: ranged targets because closing
@@ -459,15 +453,14 @@ public final class DefendProcess extends MissionShell {
             id = "combat.hostile_acquisition.scan_radius",
             face = "combat.hostile_acquisition",
             description =
-                    "Dual scan radius: non-engaged uses DETECTION_RADIUS=16 (full hostile awareness envelope, so a" +
-                    " kiting ranged mob at 9-15 blocks is seen and REFUSED); engaged uses max(ENGAGE_RADIUS=8," +
-                    "LEASH_RADIUS+2=14) so an escaping target between engage and leash stays visible. Same" +
-                    " hostile-type filter, same ViewMode for both paths.",
+                    "Dual scan radius: non-engaged uses DETECTION_RADIUS=16 (full hostile awareness envelope, so a"
+                            + " kiting ranged mob at 9-15 blocks is seen and REFUSED); engaged uses"
+                            + " max(ENGAGE_RADIUS=8, LEASH_RADIUS+2=14) so an escaping target between engage and"
+                            + " leash stays visible. Same hostile-type filter, same ViewMode for both paths.",
             vanillaRef = "Hostile mob follow range (decompiled 1.20.1)",
-            deviation =
-                    "Bot-specific: the engaged scan must extend past the leash radius to make leash-break" +
-                    " observable; the non-engaged scan must cover the full detection envelope so ranged hostiles at" +
-                    " standoff are not falsely reported as 'area clear'.")
+            deviation = "Bot-specific: the engaged scan must extend past the leash radius to make leash-break"
+                    + " observable; the non-engaged scan must cover the full detection envelope so ranged hostiles at"
+                    + " standoff are not falsely reported as 'area clear'.")
     private List<EntitySnapshot> scanHostiles(WorldView world, CellPos center) {
         // Engaged: tracking must see farther than engaging — an already-
         // locked target between ENGAGE and LEASH stays visible here, which

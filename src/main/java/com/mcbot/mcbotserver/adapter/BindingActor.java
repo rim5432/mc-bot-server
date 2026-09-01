@@ -277,16 +277,14 @@ public final class BindingActor implements Actor {
     @Feature(
             id = "combat.shield.body_blocking",
             face = "combat.shield",
-            description =
-                    "Shield raises on the BODY (never the facade): isDamageSourceBlocked reads the hurt entity's" +
-                    " own blocking stack, and the body is what takes the hit. Rising USE edge starts the hold;" +
-                    "falling edge or USE claim loss releases it (orphan protection, same as bow draw). Frontal" +
-                    " hemisphere only — rear sources bypass the block via vanilla's direction gate.",
+            description = "Shield raises on the BODY (never the facade): isDamageSourceBlocked reads the hurt entity's"
+                    + " own blocking stack, and the body is what takes the hit. Rising USE edge starts the hold;"
+                    + "falling edge or USE claim loss releases it (orphan protection, same as bow draw). Frontal"
+                    + " hemisphere only — rear sources bypass the block via vanilla's direction gate.",
             vanillaRef = "LivingEntity.isDamageSourceBlocked + ShieldItem (decompiled 1.20.1)",
-            deviation =
-                    "Bot-specific: the facade is a Player-shaped object for attribute/XP machinery, but it never" +
-                    " takes damage — the shield must be held on the body that actually receives the hurt call." +
-                    "Verified by issue 0003: a facade-raised shield did nothing.")
+            deviation = "Bot-specific: the facade is a Player-shaped object for attribute/XP machinery, but it never"
+                    + " takes damage — the shield must be held on the body that actually receives the hurt call."
+                    + "Verified by issue 0003: a facade-raised shield did nothing.")
     private void onUsePressEdge() {
         if (body.eatHeldItem()) {
             return;
