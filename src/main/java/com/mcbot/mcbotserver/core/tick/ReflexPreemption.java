@@ -6,6 +6,7 @@ import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.api.process.InterruptionContext;
+import com.mcbot.mcbotserver.api.reflex.ReflexAction;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.core.process.TerminalMission;
@@ -139,7 +140,7 @@ public final class ReflexPreemption {
             case RETIRED_TERMINAL -> announceVerdict = true;
             case NO_CURRENT -> {}
         }
-        actor.submit(new Claim(Channel.MOVE, decision.priority(), "reflex:" + decision.ruleName(), hold));
+        actor.submit(new Claim(Channel.MOVE, decision.priority(), ReflexAction.REFLEX_OWNER_PREFIX + decision.ruleName(), hold));
         claimInjector.injectAux(decision);
         actor.flush();
         if (announceVerdict) {

@@ -120,12 +120,12 @@ final class ReflexClaimInjector {
      */
     void injectAux(SurvivalReflexLayer.ReflexDecision decision) {
         if (decision.action() == ReflexAction.DIG && decision.target() != null) {
-            aimAndDig(decision.priority(), "reflex:" + decision.ruleName(), decision.target());
+            aimAndDig(decision.priority(), ReflexAction.REFLEX_OWNER_PREFIX + decision.ruleName(), decision.target());
         }
         if (decision.action() == ReflexAction.WATER_BUCKET && decision.target() != null) {
             int bucketSlot = mlgBucketSlot.getAsInt();
             if (bucketSlot >= 0) {
-                String owner = "reflex:" + decision.ruleName();
+                String owner = ReflexAction.REFLEX_OWNER_PREFIX + decision.ruleName();
                 // MLG needs a straight-down look (pitch=90) so the bucket
                 // raycast hits the block directly under the feet. IdleLook.pitchTo
                 // clamps to PITCH_LIMIT_DEG=60 (an idle-glance safeguard), which
@@ -152,7 +152,7 @@ final class ReflexClaimInjector {
                     default -> -1;
                 };
         if (slot >= 0) {
-            String owner = "reflex:" + decision.ruleName();
+            String owner = ReflexAction.REFLEX_OWNER_PREFIX + decision.ruleName();
             actor.submit(new Claim(Channel.SLOT, decision.priority(), owner, new Intent.SelectSlot(slot)));
             actor.submit(new Claim(Channel.USE, decision.priority(), owner, new Intent.Use(true)));
         }

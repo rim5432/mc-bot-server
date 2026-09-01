@@ -10,6 +10,7 @@ import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.event.EventQueue;
 import com.mcbot.mcbotserver.api.menu.MenuTransactions;
+import com.mcbot.mcbotserver.api.reflex.ReflexAction;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.actor.ChannelArbiter;
 import java.util.HashMap;
@@ -318,15 +319,18 @@ public final class BindingActor implements Actor {
                     + " takes damage — the shield must be held on the body that actually receives the hurt call."
                     + "Verified by issue 0003: a facade-raised shield did nothing.")
     private void onUsePressEdge(String owner) {
-        String source = owner != null && owner.startsWith("reflex:") ? "reflex" : "harness";
+        String source = owner != null && owner.startsWith(ReflexAction.REFLEX_OWNER_PREFIX) ? "reflex" : "harness";
         ItemStack held = body.getInventory().container().getItem(body.selectedSlot);
         // Reflex intent detection (P2-d): EAT_*/DRINK_* reflex claims carry
         // unambiguous consumable intent. For these, an empty slot or a
         // non-consumable item is a FAILED action, not a silent melee.
         // Generic harness USE claims are ambiguous (could be a weapon swing),
         // so they fall through to the melee fallback without a FAILED event.
-        boolean isEatReflex = owner != null && owner.startsWith("reflex:EAT_");
-        boolean isDrinkReflex = owner != null && owner.startsWith("reflex:DRINK_");
+        // Prefixes are shared constants in ReflexAction so a rule rename on
+        // the production side (ReflexClaimInjector) breaks the consumer side
+        // at compile time instead of silently degrading to melee.
+        boolean isEatReflex = owner != null && owner.startsWith(ReflexAction.REFLEX_EAT_OWNER_PREFIX);
+        boolean isDrinkReflex = owner != null && owner.startsWith(ReflexAction.REFLEX_DRINK_OWNER_PREFIX);
         boolean isConsumableReflex = isEatReflex || isDrinkReflex;
         if (held.isEmpty() && isConsumableReflex) {
             if (isEatReflex) {
