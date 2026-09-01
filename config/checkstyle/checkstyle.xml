@@ -83,6 +83,14 @@
             <property name="allowMissingParamTags" value="false"/>
             <property name="allowMissingReturnTag" value="false"/>
         </module>
+        <!-- IllegalBlockTag for @author (new in checkstyle 13.10):
+             AGENTS.md 1.4 bans author/date graffiti; the tree holds
+             zero @author tags, so tagTextPattern ^$ makes any
+             appearance a violation. -->
+        <module name="IllegalBlockTag">
+            <property name="tag" value="@author"/>
+            <property name="tagTextPattern" value="^$"/>
+        </module>
         <!-- Public constants need Javadoc: 29 public static final fields
              in api/ all carry docs today; this guards against bare
              constants leaking in. accessModifiers=public covers only
@@ -96,10 +104,48 @@
              formatter cannot own. -->
         <module name="ModifierOrder"/>
         <module name="SimplifyBooleanExpression"/>
+        <!-- SimplifyBooleanReturn: `if (x) return true; else return false;`
+             collapses to `return x;`. Zero-violation baseline verified
+             2026-09-01; promoted as a regression guard alongside
+             SimplifyBooleanExpression. -->
+        <module name="SimplifyBooleanReturn"/>
         <module name="StringLiteralEquality"/>
         <module name="EqualsHashCode"/>
         <module name="EmptyBlock">
             <property name="option" value="text"/>
+        </module>
+        <!-- FallThrough: traditional switch statements must not drop
+             through case labels without break/return/throw. Switch
+             expressions (the project's dominant form) are fall-through-
+             free by construction; this guards the day someone writes a
+             statement switch. Zero-violation baseline 2026-09-01. -->
+        <module name="FallThrough"/>
+        <!-- UseEnhancedSwitch (new in checkstyle 13.3, adopted with the
+             14.0.0 upgrade): a colon-label switch with no fall-through
+             must be an arrow switch. Makes the arrow-style doctrine
+             above mechanical - FallThrough guards the fall-through it
+             permits, this bans the convertible form itself. Zero-
+             violation baseline 2026-09-01 (whole tree incl. gametests
+             is arrow-style). -->
+        <module name="UseEnhancedSwitch"/>
+
+        <!-- ===== record doctrine (section 1.2: records are the data
+             carriers, sealed interfaces the sum types) =====
+             JEP 395: an explicitly declared record accessor overrides
+             the component's implicit accessor and must carry @Override.
+             Zero explicit accessors in the tree today; guards the api
+             sum-type hierarchies (Intent, SubmitResult, Goal) the day
+             someone customizes one. New in checkstyle 13.1. -->
+        <module name="MissingOverrideOnRecordAccessor"/>
+
+        <!-- ===== banned types (obsolete JDK classes) =====
+             java.util.Date -> java.time API; Vector/Hashtable/Stack ->
+             modern Collections (ArrayList, HashMap, ArrayDeque). Zero
+             usage in the tree today (scanned 2026-09-01); this is a
+             regression guard, not a paydown target. -->
+        <module name="IllegalType">
+            <property name="illegalClassNames"
+                      value="java.util.Date, java.util.Vector, java.util.Hashtable, java.util.Stack"/>
         </module>
 
         <!-- ===== exception hygiene (AGENTS.md 1.4 + crash-latch policy) =====
