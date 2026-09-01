@@ -10,6 +10,7 @@ no touching qa-results/.
 """
 from __future__ import annotations
 
+import datetime as _dt
 import json
 import os
 import tempfile
@@ -1402,6 +1403,296 @@ class LockTest(unittest.TestCase):
         self.assertFalse(_lock._pid_alive(0))
         self.assertFalse(_lock._pid_alive(-1))
         self.assertTrue(_lock._pid_alive(os.getpid()))
+
+
+class DocTest(unittest.TestCase):
+    """Documentation health checks — the PR gate that blocks rotten docs.
+    Zero tests before this round; a bug here either blocks valid PRs or
+    lets drifted docs through undetected."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.doc_dir = self.root / "doc"
+        self.doc_dir.mkdir()
+        import mcbot.docs as _docs
+        self._orig_project_root = _docs.PROJECT_ROOT
+        self._orig_doc_dir = _docs.DOC_DIR
+        self._orig_git_date = _docs._git_last_commit_date
+        _docs.PROJECT_ROOT = self.root
+        _docs.DOC_DIR = self.doc_dir
+        _docs._git_last_commit_date = lambda p: None
+        src = self.root / "src" / "main" / "java" / "Thing.java"
+        src.parent.mkdir(parents=True)
+        src.write_text("class Thing {}\n", encoding="utf-8")
+
+    def tearDown(self):
+        import mcbot.docs as _docs
+        _docs.PROJECT_ROOT = self._orig_project_root
+        _docs.DOC_DIR = self._orig_doc_dir
+        _docs._git_last_commit_date = self._orig_git_date
+        self._tmp.cleanup()
+
+    def _write_doc(self, rel_path, content):
+        p = self.doc_dir / rel_path
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content, encoding="utf-8")
+        return p
+
+    def _valid_doc(self, verified=None, covers="src/main/java/Thing.java"):
+        if verified is None:
+            verified = _dt.date.today().isoformat()
+        return (f"---\ntitle: Test Doc\nlast_verified: {verified}\n"
+                f"covers:\n  - {covers}\n---\n\n# Test Doc\n\nValid content.\n")
+
+    # -- _parse_frontmatter --
+
+    def test_parse_frontmatter_missing(self):
+        import mcbot.docs as _docs
+        _, _, err = _docs._parse_frontmatter("# No frontmatter\n")
+        self.assertIn("missing", err)
+
+    def test_parse_frontmatter_unclosed(self):
+        import mcbot.docs as _docs
+        _, _, err = _docs._parse_frontmatter("---\ntitle: x\nbody\n")
+        self.assertIn("not closed", err)
+
+    def test_parse_frontmatter_keys_and_body(self):
+        import mcbot.docs as _docs
+        text = "---\ntitle: My Doc\nlast_verified: 2026-01-01\n---\n# Body\n\nContent.\n"
+        meta, body, err = _docs._parse_frontmatter(text)
+        self.assertIsNone(err)
+        self.assertEqual(meta["title"], "My Doc")
+        self.assertIn("# Body", body)
+
+    def test_parse_frontmatter_list_values(self):
+        import mcbot.docs as _docs
+        text = "---\ncovers:\n  - src/a.java\n  - src/b.java\n---\nbody\n"
+        meta, _, _ = _docs._parse_frontmatter(text)
+        self.assertEqual(meta["covers"], ["src/a.java", "src/b.java"])
+
+    def test_parse_frontmatter_empty_list(self):
+        import mcbot.docs as _docs
+        meta, _, _ = _docs._parse_frontmatter("---\ncovers: []\n---\nbody\n")
+        self.assertEqual(meta["covers"], [])
+
+    # -- _strip_code_fences --
+
+    def test_strip_code_fences_removes_inner(self):
+        import mcbot.docs as _docs
+        result = _docs._strip_code_fences("before\n```python\nimport os\n```\nafter\n")
+        self.assertIn("before", result)
+        self.assertIn("after", result)
+        self.assertNotIn("import os", result)
+
+    # -- _doc_status_word --
+
+    def test_doc_status_word_levels(self):
+        import mcbot.docs as _docs
+        self.assertEqual(_docs._doc_status_word([]), "ok")
+        self.assertEqual(_docs._doc_status_word([("WARN", "X", "m")]), "warn")
+        self.assertEqual(_docs._doc_status_word([("ERR", "X", "m")]), "ERR")
+
+    # -- check_doc --
+
+    def test_check_doc_valid_no_issues(self):
+        import mcbot.docs as _docs
+        p = self._write_doc("guide/test.md", self._valid_doc())
+        self.assertEqual(_docs.check_doc(p), [])
+
+    def test_check_doc_missing_title(self):
+        import mcbot.docs as _docs
+        p = self._write_doc("guide/test.md", "---\nlast_verified: 2026-01-01\n---\nbody\n")
+        self.assertTrue(any(code == "DOC_FRONTMATTER" for _, code, _ in _docs.check_doc(p)))
+
+    def test_check_doc_missing_last_verified(self):
+        import mcbot.docs as _docs
+        p = self._write_doc("guide/test.md", "---\ntitle: X\n---\nbody\n")
+        self.assertTrue(any("last_verified" in m for _, _, m in _docs.check_doc(p)))
+
+    def test_check_doc_bad_date_format(self):
+        import mcbot.docs as _docs
+        p = self._write_doc("guide/test.md", "---\ntitle: X\nlast_verified: yesterday\n---\nbody\n")
+        self.assertTrue(any("YYYY-MM-DD" in m for _, _, m in _docs.check_doc(p)))
+
+    def test_check_doc_future_date(self):
+        import mcbot.docs as _docs
+        future = (_dt.date.today() + _dt.timedelta(days=30)).isoformat()
+        p = self._write_doc("guide/test.md", self._valid_doc(verified=future))
+        self.assertTrue(any(code == "DOC_FUTURE_DATE" for _, code, _ in _docs.check_doc(p)))
+
+    def test_check_doc_stale(self):
+        import mcbot.docs as _docs
+        old = (_dt.date.today() - _dt.timedelta(days=120)).isoformat()
+        p = self._write_doc("guide/test.md", self._valid_doc(verified=old))
+        self.assertTrue(any(code == "DOC_STALE" for _, code, _ in _docs.check_doc(p)))
+
+    def test_check_doc_archive_requires_successor(self):
+        import mcbot.docs as _docs
+        p = self._write_doc("archive/old.md", self._valid_doc())
+        self.assertTrue(any(code == "ARCHIVE_NO_SUCCESSOR" for _, code, _ in _docs.check_doc(p)))
+
+    def test_check_doc_archive_exempt_from_stale(self):
+        import mcbot.docs as _docs
+        successor = self.doc_dir / "guide" / "new.md"
+        successor.parent.mkdir(parents=True, exist_ok=True)
+        successor.write_text("---\ntitle: New\nlast_verified: 2026-01-01\n---\n", encoding="utf-8")
+        old = (_dt.date.today() - _dt.timedelta(days=365)).isoformat()
+        content = (f"---\ntitle: Old\nlast_verified: {old}\n"
+                   f"superseded_by: guide/new.md\n---\nbody\n")
+        p = self._write_doc("archive/old.md", content)
+        self.assertFalse(any(code == "DOC_STALE" for _, code, _ in _docs.check_doc(p)))
+
+    def test_check_doc_dead_cover(self):
+        import mcbot.docs as _docs
+        p = self._write_doc("guide/test.md", self._valid_doc(covers="src/does/not/Exist.java"))
+        self.assertTrue(any(code == "DEAD_COVER" for _, code, _ in _docs.check_doc(p)))
+
+    def test_check_doc_drift(self):
+        import mcbot.docs as _docs
+        old = (_dt.date.today() - _dt.timedelta(days=30)).isoformat()
+        p = self._write_doc("guide/test.md", self._valid_doc(verified=old))
+        _docs._git_last_commit_date = lambda path: _dt.date.today()
+        self.assertTrue(any(code == "DOC_DRIFT" for _, code, _ in _docs.check_doc(p)))
+
+    def test_check_doc_broken_link(self):
+        import mcbot.docs as _docs
+        content = self._valid_doc() + "\nSee [missing](nonexistent.md) for details.\n"
+        p = self._write_doc("guide/test.md", content)
+        self.assertTrue(any(code == "BROKEN_LINK" for _, code, _ in _docs.check_doc(p)))
+
+    def test_check_doc_dead_path_reference(self):
+        import mcbot.docs as _docs
+        content = self._valid_doc() + "\nSee `src/missing/File.java` for details.\n"
+        p = self._write_doc("guide/test.md", content)
+        self.assertTrue(any(code == "DEAD_PATH" for _, code, _ in _docs.check_doc(p)))
+
+    def test_check_doc_placeholder(self):
+        import mcbot.docs as _docs
+        content = self._valid_doc() + "\nTODO: write this section.\n"
+        p = self._write_doc("guide/test.md", content)
+        self.assertTrue(any(code == "PLACEHOLDER" for _, code, _ in _docs.check_doc(p)))
+
+    def test_check_doc_code_fence_exempt(self):
+        import mcbot.docs as _docs
+        content = self._valid_doc() + "\n```\nTODO: in code\n`src/missing.java`\n```\n"
+        p = self._write_doc("guide/test.md", content)
+        issues = _docs.check_doc(p)
+        self.assertFalse(any(code == "PLACEHOLDER" for _, code, _ in issues))
+        self.assertFalse(any(code == "DEAD_PATH" for _, code, _ in issues))
+
+    # -- _iter_doc_files --
+
+    def test_iter_doc_files_empty(self):
+        import mcbot.docs as _docs
+        self.assertEqual(_docs._iter_doc_files(), [])
+
+    def test_iter_doc_files_finds_md(self):
+        import mcbot.docs as _docs
+        self._write_doc("guide/a.md", self._valid_doc())
+        self._write_doc("guide/b.md", self._valid_doc())
+        self.assertEqual(len(_docs._iter_doc_files()), 2)
+
+
+class GradleTest(unittest.TestCase):
+    """Gradle discovery — the $MCBOT_GRADLE > wrapper-dist > PATH
+    resolution chain. Zero tests before this round; a bug here means
+    every build command fails with 'gradle not found'."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        import mcbot.gradle as _gradle
+        self._orig_project_root = _gradle.PROJECT_ROOT
+        _gradle.PROJECT_ROOT = self.root
+        self._orig_environ = dict(os.environ)
+
+    def tearDown(self):
+        import mcbot.gradle as _gradle
+        _gradle.PROJECT_ROOT = self._orig_project_root
+        os.environ.clear()
+        os.environ.update(self._orig_environ)
+        self._tmp.cleanup()
+
+    @staticmethod
+    def _patch_wrapper_version(return_none=True):
+        import mcbot.gradle as _gradle
+        orig = _gradle.read_wrapper_version
+        _gradle.read_wrapper_version = lambda: None
+        return orig
+
+    # -- read_wrapper_version --
+
+    def test_read_wrapper_version_missing(self):
+        import mcbot.gradle as _gradle
+        self.assertIsNone(_gradle.read_wrapper_version())
+
+    def test_read_wrapper_version_extracts(self):
+        import mcbot.gradle as _gradle
+        p = self.root / "gradle" / "wrapper" / "gradle-wrapper.properties"
+        p.parent.mkdir(parents=True)
+        p.write_text(
+            "distributionBase=GRADLE_USER_HOME\n"
+            "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.5-bin.zip\n",
+            encoding="utf-8")
+        self.assertEqual(_gradle.read_wrapper_version(), "8.5")
+
+    def test_read_wrapper_version_no_url(self):
+        import mcbot.gradle as _gradle
+        p = self.root / "gradle" / "wrapper" / "gradle-wrapper.properties"
+        p.parent.mkdir(parents=True)
+        p.write_text("distributionBase=GRADLE_USER_HOME\n", encoding="utf-8")
+        self.assertIsNone(_gradle.read_wrapper_version())
+
+    # -- find_gradle --
+
+    def test_find_gradle_env_var(self):
+        import mcbot.gradle as _gradle
+        fake = self.root / "custom-gradle.bat"
+        fake.write_text("@echo off\n", encoding="utf-8")
+        os.environ["MCBOT_GRADLE"] = str(fake)
+        os.environ["PATH"] = ""
+        orig = self._patch_wrapper_version()
+        try:
+            self.assertEqual(_gradle.find_gradle(), fake)
+        finally:
+            _gradle.read_wrapper_version = orig
+
+    def test_find_gradle_env_var_nonexistent_falls_through(self):
+        import mcbot.gradle as _gradle
+        os.environ["MCBOT_GRADLE"] = str(self.root / "nonexistent.bat")
+        os.environ["PATH"] = ""
+        orig = self._patch_wrapper_version()
+        try:
+            self.assertIsNone(_gradle.find_gradle())
+        finally:
+            _gradle.read_wrapper_version = orig
+
+    def test_find_gradle_path(self):
+        import mcbot.gradle as _gradle
+        bindir = self.root / "bin"
+        bindir.mkdir()
+        fake = bindir / "gradle.bat"
+        fake.write_text("@echo off\n", encoding="utf-8")
+        os.environ.pop("MCBOT_GRADLE", None)
+        os.environ["PATH"] = str(bindir)
+        orig = self._patch_wrapper_version()
+        try:
+            self.assertEqual(_gradle.find_gradle(), fake)
+        finally:
+            _gradle.read_wrapper_version = orig
+
+    def test_find_gradle_none(self):
+        import mcbot.gradle as _gradle
+        empty = self.root / "empty"
+        empty.mkdir()
+        os.environ.pop("MCBOT_GRADLE", None)
+        os.environ["PATH"] = str(empty)
+        orig = self._patch_wrapper_version()
+        try:
+            self.assertIsNone(_gradle.find_gradle())
+        finally:
+            _gradle.read_wrapper_version = orig
 
 
 if __name__ == "__main__":
