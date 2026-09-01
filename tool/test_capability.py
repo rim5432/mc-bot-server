@@ -11,6 +11,7 @@ no touching qa-results/.
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -46,6 +47,7 @@ from mcbot.capability.validation import (
     validate_spec_fields,
 )
 from mcbot.engine import parse_run_log, write_engine_receipt
+from mcbot.lock import BuildLock
 
 
 def _write_log(lines: list[str]) -> Path:
@@ -1207,6 +1209,199 @@ class EngineReceiptTest(unittest.TestCase):
         ])
         path = write_engine_receipt(log)
         self.assertRegex(path.name, r"^gametest-\d{8}-\d{6}\.json$")
+
+
+class LockTest(unittest.TestCase):
+    """Cross-process build lock — the infrastructure that prevents
+    concurrent builds from clobbering each other. Zero tests before
+    this round despite being the highest-risk blind spot: a bug here
+    means two agents compile simultaneously and Windows file locks
+    corrupt the build output."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+        import mcbot.lock as _lock
+        self._orig_lock_paths = _lock._lock_paths
+        self._orig_runtime_dir = _lock.RUNTIME_DIR
+        self._orig_ensure_runtime = _lock.ensure_runtime_dir
+        _lock.RUNTIME_DIR = self.tmp
+
+        def _fake_paths(name):
+            return (self.tmp / f"{name}.lock", self.tmp / f"{name}.meta.json")
+        _lock._lock_paths = _fake_paths
+        _lock.ensure_runtime_dir = lambda: None
+
+    def tearDown(self):
+        import mcbot.lock as _lock
+        _lock._lock_paths = self._orig_lock_paths
+        _lock.RUNTIME_DIR = self._orig_runtime_dir
+        _lock.ensure_runtime_dir = self._orig_ensure_runtime
+        self._tmp.cleanup()
+
+    # -- acquire / release --
+
+    def test_acquire_creates_lock_and_meta(self):
+        lock = BuildLock("build")
+        self.assertTrue(lock.acquire("test compile"))
+        self.assertTrue(lock._lock_path.exists())
+        meta = json.loads(lock._meta_path.read_text(encoding="utf-8"))
+        self.assertEqual(meta["pid"], os.getpid())
+        self.assertEqual(meta["command"], "test compile")
+        self.assertIn("start_iso", meta)
+        lock.release()
+
+    def test_release_removes_lock_and_meta(self):
+        lock = BuildLock("build")
+        lock.acquire("test")
+        self.assertTrue(lock._lock_path.exists())
+        self.assertTrue(lock._meta_path.exists())
+        lock.release()
+        self.assertFalse(lock._lock_path.exists())
+        self.assertFalse(lock._meta_path.exists())
+
+    def test_second_acquire_fails_when_lock_file_exists(self):
+        # Simulate another process holding the lock: lock file exists
+        # without meta (stale check passes, atomic create hits
+        # FileExistsError). Two BuildLock instances in the same process
+        # can't test this — meta carries os.getpid() and the second
+        # acquire hits the re-entrant branch, which is correct behavior.
+        import mcbot.lock as _lock
+        lock_path, _ = _lock._lock_paths("build")
+        lock_path.write_text("99999", encoding="utf-8")
+        lock = BuildLock("build")
+        self.assertFalse(lock.acquire("blocked"))
+
+    def test_reentrant_same_process(self):
+        lock1 = BuildLock("build")
+        self.assertTrue(lock1.acquire("first"))
+        # meta carries pid=os.getpid() -> acquire sees re-entrant
+        lock2 = BuildLock("build")
+        self.assertTrue(lock2.acquire("second"))
+        lock1.release()  # first release removes files (PID match)
+
+    # -- stale holder / auto-takeover --
+
+    def test_dead_holder_auto_takeover(self):
+        import mcbot.lock as _lock
+        orig = _lock._pid_alive
+        _lock._pid_alive = lambda pid: False
+        try:
+            meta = {"pid": 99999, "command": "crashed build",
+                    "start_iso": "2020-01-01T00:00:00"}
+            lock_path, meta_path = _lock._lock_paths("build")
+            meta_path.write_text(json.dumps(meta), encoding="utf-8")
+            lock_path.write_text("99999", encoding="utf-8")
+            lock = BuildLock("build")
+            self.assertTrue(lock.acquire("takeover"))
+            new_meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            self.assertEqual(new_meta["pid"], os.getpid())
+            self.assertEqual(new_meta["command"], "takeover")
+            lock.release()
+        finally:
+            _lock._pid_alive = orig
+
+    def test_live_holder_blocks(self):
+        import mcbot.lock as _lock
+        orig = _lock._pid_alive
+        _lock._pid_alive = lambda pid: True
+        try:
+            meta = {"pid": 12345, "command": "running build",
+                    "start_iso": "2020-01-01T00:00:00"}
+            lock_path, meta_path = _lock._lock_paths("build")
+            meta_path.write_text(json.dumps(meta), encoding="utf-8")
+            lock_path.write_text("12345", encoding="utf-8")
+            lock = BuildLock("build")
+            self.assertFalse(lock.acquire("blocked"))
+            # meta untouched — we never got past the stale check
+            self.assertEqual(json.loads(meta_path.read_text(encoding="utf-8"))["pid"], 12345)
+        finally:
+            _lock._pid_alive = orig
+
+    # -- context manager --
+
+    def test_context_manager_releases(self):
+        with BuildLock("build") as lock:
+            self.assertTrue(lock.acquire("ctx test"))
+            self.assertTrue(lock._lock_path.exists())
+        self.assertFalse(lock._lock_path.exists())
+        self.assertFalse(lock._meta_path.exists())
+
+    def test_release_without_acquire_is_noop(self):
+        lock = BuildLock("build")
+        lock.release()  # must not raise
+
+    # -- status / meta helpers --
+
+    def test_lock_status_free(self):
+        import mcbot.lock as _lock
+        status = _lock.lock_status("build")
+        self.assertFalse(status["locked"])
+        self.assertEqual(status["name"], "build")
+
+    def test_lock_status_held(self):
+        import mcbot.lock as _lock
+        lock = BuildLock("build")
+        lock.acquire("status test")
+        status = _lock.lock_status("build")
+        self.assertTrue(status["locked"])
+        self.assertEqual(status["pid"], os.getpid())
+        self.assertEqual(status["command"], "status test")
+        self.assertTrue(status["alive"])
+        lock.release()
+
+    def test_force_clear_lock(self):
+        import mcbot.lock as _lock
+        lock = BuildLock("build")
+        lock.acquire("to be cleared")
+        self.assertTrue(lock._lock_path.exists())
+        # Simulate holder dying: close the fd so Windows lets the file
+        # be unlinked (a live holder keeps the file open and unlink
+        # silently fails with PermissionError).
+        if lock._fd is not None:
+            os.close(lock._fd)
+            lock._fd = None
+        _lock._force_clear_lock("build")
+        self.assertFalse(lock._lock_path.exists())
+        self.assertFalse(lock._meta_path.exists())
+
+    def test_read_meta_missing(self):
+        import mcbot.lock as _lock
+        self.assertIsNone(_lock._read_meta("build"))
+
+    def test_read_meta_corrupt(self):
+        import mcbot.lock as _lock
+        _, meta_path = _lock._lock_paths("build")
+        meta_path.write_text("not valid json {{{", encoding="utf-8")
+        self.assertIsNone(_lock._read_meta("build"))
+
+    # -- all_locks --
+
+    def test_all_locks_empty(self):
+        import mcbot.lock as _lock
+        self.assertEqual(_lock.all_locks(), [])
+
+    def test_all_locks_build_first(self):
+        import mcbot.lock as _lock
+        lock_server = BuildLock("run.server")
+        lock_server.acquire("server")
+        lock_build = BuildLock("build")
+        lock_build.acquire("compile")
+        locks = _lock.all_locks()
+        self.assertEqual(len(locks), 2)
+        self.assertEqual(locks[0]["name"], "build")
+        self.assertEqual(locks[1]["name"], "run.server")
+        lock_server.release()
+        lock_build.release()
+
+    # -- _pid_alive edge cases --
+
+    def test_pid_alive_edge_cases(self):
+        import mcbot.lock as _lock
+        self.assertFalse(_lock._pid_alive(None))
+        self.assertFalse(_lock._pid_alive(0))
+        self.assertFalse(_lock._pid_alive(-1))
+        self.assertTrue(_lock._pid_alive(os.getpid()))
 
 
 if __name__ == "__main__":
