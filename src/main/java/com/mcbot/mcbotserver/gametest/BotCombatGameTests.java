@@ -892,9 +892,11 @@ public final class BotCombatGameTests {
                 // (20 charge ticks + flight) releases right around band
                 // arrival - an instant check at settle time races the
                 // impact and reads a clean kite as zero damage.
-                .thenWaitUntil(driveUntil(rig, () -> check(
-                        zombie.getHealth() < healthBefore[0],
-                        "the kite must land arrows after restoring range; health=" + zombie.getHealth())))
+                .thenWaitUntil(driveUntil(
+                        rig,
+                        () -> check(
+                                zombie.getHealth() < healthBefore[0],
+                                "the kite must land arrows after restoring range; health=" + zombie.getHealth())))
                 .thenExecuteFor(GametestRig.SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     check(rig.body().isAlive(), "the body must survive the kiting encounter");
