@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "task": "runGameTest",
+  "log": "D:\\mc-bot-server\\tool\\.runtime\\build-runGameTest-20260901-131326.log",
+  "git_rev": "53c574f",
+  "finished_at": "2026-09-01T13:15:30",
+  "scenarios_total": 80,
+  "failed_count": 0,
+  "failed": [],
+  "optional_failed_count": 1,
+  "failed_optional": [
+    "climbsladdertoplatform"
+  ],
+  "green": true
+}
