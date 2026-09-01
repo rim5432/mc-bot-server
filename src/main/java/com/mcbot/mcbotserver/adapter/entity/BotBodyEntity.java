@@ -104,6 +104,16 @@ public final class BotBodyEntity extends PathfinderMob {
     private boolean hasLastTickPos;
 
     /**
+     * Set by {@code consumeDrink} when the recovered container (glass
+     * bottle / bucket) could not fit in inventory and was dropped at the
+     * body's location instead. Read by {@code BindingActor} after a
+     * drink to attach the {@code containerDropped} attr to
+     * DRINK_COMPLETED. Single-threaded tick pipeline makes this safe
+     * without synchronization.
+     */
+    private boolean lastContainerDropped;
+
+    /**
      * Experience state (level/progress/total) with the vanilla
      * {@code Player.experience*} arithmetic, in the same
      * state-vs-math split as {@link HungerTicker}: the carrier owns
@@ -630,12 +640,26 @@ public final class BotBodyEntity extends PathfinderMob {
         if (held.isEmpty()) {
             // Count was 1: slot becomes the container.
             inventory.container().setItem(selectedSlot, new ItemStack(container));
+            lastContainerDropped = false;
         } else {
             // Count was > 1: keep the shrunk stack in the slot and route
             // the container to inventory (or drop if full).
             inventory.container().setItem(selectedSlot, held);
-            addOrDrop(new ItemStack(container));
+            lastContainerDropped = !addOrDrop(new ItemStack(container));
         }
+    }
+
+    /**
+     * Whether the most recent {@code consumeDrink} call dropped the
+     * recovered container (glass bottle / bucket) because inventory was
+     * full. Read by {@code BindingActor} to attach the
+     * {@code containerDropped} attr to DRINK_COMPLETED.
+     *
+     * @return true if the container was dropped, false if it was added
+     *         to inventory or placed in the selected slot (count-1 case)
+     */
+    public boolean wasLastContainerDropped() {
+        return lastContainerDropped;
     }
 
     /**
@@ -715,15 +739,18 @@ public final class BotBodyEntity extends PathfinderMob {
      * 1 and rarely contend for space.
      *
      * @param stack the single-item stack to route; never null
+     * @return true if the stack was added to an empty inventory slot,
+     *         false if it was dropped at the body's location (inventory full)
      */
-    private void addOrDrop(ItemStack stack) {
+    private boolean addOrDrop(ItemStack stack) {
         for (int i = 0; i < BindingInventory.CONTAINER_SIZE; i++) {
             if (inventory.container().getItem(i).isEmpty()) {
                 inventory.container().setItem(i, stack);
-                return;
+                return true;
             }
         }
         spawnAtLocation(stack);
+        return false;
     }
 
     /**

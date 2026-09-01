@@ -320,6 +320,22 @@ public final class BindingActor implements Actor {
     private void onUsePressEdge(String owner) {
         String source = owner != null && owner.startsWith("reflex:") ? "reflex" : "harness";
         ItemStack held = body.getInventory().container().getItem(body.selectedSlot);
+        // Reflex intent detection (P2-d): EAT_*/DRINK_* reflex claims carry
+        // unambiguous consumable intent. For these, an empty slot or a
+        // non-consumable item is a FAILED action, not a silent melee.
+        // Generic harness USE claims are ambiguous (could be a weapon swing),
+        // so they fall through to the melee fallback without a FAILED event.
+        boolean isEatReflex = owner != null && owner.startsWith("reflex:EAT_");
+        boolean isDrinkReflex = owner != null && owner.startsWith("reflex:DRINK_");
+        boolean isConsumableReflex = isEatReflex || isDrinkReflex;
+        if (held.isEmpty() && isConsumableReflex) {
+            if (isEatReflex) {
+                emitEatFailed("SLOT_EMPTY", body.selectedSlot, "", source);
+            } else {
+                emitDrinkFailed("SLOT_EMPTY", body.selectedSlot, "", source);
+            }
+            return;
+        }
         var props = held.getFoodProperties(body);
         if (props != null) {
             int foodBefore = body.getFoodData().getFoodLevel();
@@ -391,6 +407,18 @@ public final class BindingActor implements Actor {
                 emitDrinkCompleted("minecraft:milk", slot, clearedEffects, "bucket", source);
             } else {
                 emitDrinkFailed("NOT_DRINKABLE", slot, itemId, source);
+            }
+            return;
+        }
+        // Consumable reflex reached here: the item is not food, not a
+        // drinkable potion, not milk, and not a throwable potion. Emit
+        // the precise failure reason instead of silently meleeing.
+        if (isConsumableReflex) {
+            String itemId = BuiltInRegistries.ITEM.getKey(held.getItem()).toString();
+            if (isEatReflex) {
+                emitEatFailed("NOT_EDIBLE", body.selectedSlot, itemId, source);
+            } else {
+                emitDrinkFailed("NO_POTION", body.selectedSlot, itemId, source);
             }
             return;
         }
@@ -524,6 +552,10 @@ public final class BindingActor implements Actor {
             attrs.put("slot", Integer.toString(slot));
             attrs.put("effects", effects);
             attrs.put("containerType", containerType);
+            // P2-d: whether the recovered container was dropped because
+            // inventory was full (count>1 branch only; count=1 places the
+            // container in the selected slot and this is always false).
+            attrs.put("containerDropped", Boolean.toString(body.wasLastContainerDropped()));
             attrs.put("source", source);
             events.push(new BotEvent(
                     EventKind.DRINK_COMPLETED,

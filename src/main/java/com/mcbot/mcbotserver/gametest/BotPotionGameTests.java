@@ -466,6 +466,151 @@ public final class BotPotionGameTests {
     }
 
     // -----------------------------------------------------------------------
+    // P2-d: FAILED reason subdivision (SLOT_EMPTY / NO_POTION / containerDropped)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Scenario (P2-d): the DRINK_ON_LOW_HEALTH reflex submits a USE claim
+     * but the selected slot is empty — onUsePressEdge detects the reflex
+     * owner prefix and emits DRINK_FAILED("SLOT_EMPTY") instead of silently
+     * falling through to melee. The reflex owner prefix ("reflex:DRINK_")
+     * carries unambiguous consumable intent; generic harness claims are
+     * ambiguous and do NOT emit this failure.
+     */
+    // capability: consumable.potion
+    @GameTest(template = "empty16x8x16", timeoutTicks = 60)
+    public static void drinkReflexEmptySlotEmitsSlotEmpty(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, WALK_Y, 7));
+        var body = rig.body();
+        // Slot 0 explicitly empty: no potion, no item.
+        body.getInventory().container().setItem(0, ItemStack.EMPTY);
+
+        helper.startSequence()
+                .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
+                    // Reflex-owned claim: owner prefix triggers intent detection.
+                    rig.actor().submit(new Claim(
+                            Channel.USE, 50, "reflex:DRINK_ON_LOW_HEALTH", new Intent.Use(true)));
+                    GametestRig.assertEventSeen(rig.events(), EventKind.DRINK_FAILED);
+                }))
+                .thenExecuteAfter(0, () -> {
+                    var events = GametestRig.eventsOf(rig.events());
+                    BotEvent failed = events.stream()
+                            .filter(e -> EventKind.DRINK_FAILED.equals(e.kind()))
+                            .findFirst()
+                            .orElseThrow();
+                    check(
+                            "SLOT_EMPTY".equals(failed.attrs().get("reason")),
+                            "DRINK_FAILED reason must be SLOT_EMPTY, got " + failed.attrs().get("reason"));
+                    check(
+                            "0".equals(failed.attrs().get("slot")),
+                            "DRINK_FAILED slot must be 0, got " + failed.attrs().get("slot"));
+                    check(
+                            "reflex".equals(failed.attrs().get("source")),
+                            "DRINK_FAILED source must be reflex, got " + failed.attrs().get("source"));
+                    body.discard();
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Scenario (P2-d): the DRINK_ON_LOW_HEALTH reflex submits a USE claim
+     * but the selected slot holds a non-potion item (a stick) —
+     * onUsePressEdge emits DRINK_FAILED("NO_POTION") with the itemId of
+     * the wrong item, instead of silently meleeing with it. Pins the
+     * NOT_EDIBLE/NO_POTION branch: reflex intent + non-consumable item =
+     * precise failure, not a weapon swing.
+     */
+    // capability: consumable.potion
+    @GameTest(template = "empty16x8x16", timeoutTicks = 60)
+    public static void drinkReflexNonPotionEmitsNoPotion(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, WALK_Y, 7));
+        var body = rig.body();
+        // Slot 0 holds a stick: not a potion, not milk, not food.
+        body.getInventory().container().setItem(0, new ItemStack(Items.STICK));
+
+        helper.startSequence()
+                .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
+                    rig.actor().submit(new Claim(
+                            Channel.USE, 50, "reflex:DRINK_ON_LOW_HEALTH", new Intent.Use(true)));
+                    GametestRig.assertEventSeen(rig.events(), EventKind.DRINK_FAILED);
+                }))
+                .thenExecuteAfter(0, () -> {
+                    var events = GametestRig.eventsOf(rig.events());
+                    BotEvent failed = events.stream()
+                            .filter(e -> EventKind.DRINK_FAILED.equals(e.kind()))
+                            .findFirst()
+                            .orElseThrow();
+                    check(
+                            "NO_POTION".equals(failed.attrs().get("reason")),
+                            "DRINK_FAILED reason must be NO_POTION, got " + failed.attrs().get("reason"));
+                    check(
+                            "minecraft:stick".equals(failed.attrs().get("itemId")),
+                            "DRINK_FAILED itemId must be minecraft:stick, got " + failed.attrs().get("itemId"));
+                    check(
+                            "0".equals(failed.attrs().get("slot")),
+                            "DRINK_FAILED slot must be 0, got " + failed.attrs().get("slot"));
+                    check(
+                            "reflex".equals(failed.attrs().get("source")),
+                            "DRINK_FAILED source must be reflex, got " + failed.attrs().get("source"));
+                    body.discard();
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Scenario (P2-d): drinking from a count-2 potion stack while the
+     * entire inventory (slots 1-40, all non-selected) is full — the
+     * glass bottle cannot fit and is dropped at the body's location.
+     * DRINK_COMPLETED carries {@code containerDropped=true}. Pins the
+     * consumeDrink count{@code >}1 branch: the shrunk potion stack stays
+     * in slot 0, and addOrDrop scans all 41 slots, finds none empty,
+     * and calls spawnAtLocation.
+     */
+    // capability: consumable.potion
+    @GameTest(template = "empty16x8x16", timeoutTicks = 60)
+    public static void drinkCountTwoFullInventoryDropsContainer(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, WALK_Y, 7));
+        var body = rig.body();
+        body.setHealth(10.0f);
+        // Fill every non-selected slot (1 through 40 = main + armor + offhand)
+        // so addOrDrop has nowhere to put the glass bottle.
+        for (int i = 1; i < com.mcbot.mcbotserver.adapter.inventory.BindingInventory.CONTAINER_SIZE; i++) {
+            body.getInventory().container().setItem(i, new ItemStack(Items.COBBLESTONE));
+        }
+        // Count-2 healing potion in slot 0: after drinking, count 1 remains
+        // and the glass bottle must go somewhere — but inventory is full.
+        body.getInventory().container().setItem(
+                0, PotionUtils.setPotion(new ItemStack(Items.POTION, 2), Potions.HEALING));
+
+        helper.startSequence()
+                .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
+                    rig.actor().submit(new Claim(Channel.USE, 50, "test:drink", new Intent.Use(true)));
+                    GametestRig.assertEventSeen(rig.events(), EventKind.DRINK_COMPLETED);
+                }))
+                .thenExecuteAfter(0, () -> {
+                    var events = GametestRig.eventsOf(rig.events());
+                    BotEvent completed = events.stream()
+                            .filter(e -> EventKind.DRINK_COMPLETED.equals(e.kind()))
+                            .findFirst()
+                            .orElseThrow();
+                    check(
+                            "true".equals(completed.attrs().get("containerDropped")),
+                            "DRINK_COMPLETED containerDropped must be true (inventory full), got "
+                                    + completed.attrs().get("containerDropped"));
+                    check(
+                            "glass_bottle".equals(completed.attrs().get("containerType")),
+                            "DRINK_COMPLETED containerType must be glass_bottle, got "
+                                    + completed.attrs().get("containerType"));
+                    // Slot 0 keeps the shrunk potion stack (count 1).
+                    ItemStack slot0 = body.getInventory().container().getItem(0);
+                    check(slot0.is(Items.POTION), "slot 0 must keep the remaining potion; got " + slot0);
+                    check(slot0.getCount() == 1, "slot 0 potion count must be 1; got " + slot0.getCount());
+                    body.discard();
+                })
+                .thenSucceed();
+    }
+
+    // -----------------------------------------------------------------------
     // Brewing stand menu interactions (capability: inventory.menu_clicks)
     // -----------------------------------------------------------------------
 
