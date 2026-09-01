@@ -148,7 +148,7 @@ Core vocabulary (one concept, one word, everywhere):
 | spec case | A human-authored QA test specification (TC-*), imported from CSV. Declares the testing intent. |
 | impl case | A source-derived gametest method (GT-*), discovered by scan-gametest. The actual automated anchor. |
 | receipt | One test run result (gametest / boundary_d / qa_run), mirrored into the DB via backfill. Carries scenario counts, green/red, git rev, failed scenario names. |
-| evidence | Derived per-face from the newest engine run: GREEN (no linked impl failed), RED (a linked impl failed), UNTESTED (no linked impl). Computed on every read, never stored. |
+| evidence | Derived per-face from the newest engine run: GREEN (no linked impl failed AND the run postdates every linked impl), RED (a linked impl failed), UNTESTED (no linked impl, or a linked impl postdates the newest run - pending_impls counts those). Computed on every read, never stored. |
 | implementation_status | A DECLARED human ruling on vanilla alignment: shipped / partial / gap / deferred. NOT derived from tests. A face can be shipped but UNTESTED - that is a P0 audit item. |
 | honest convergence | The count of DECLARED-shipped faces that actually carry GREEN evidence. The status line prints this as N/M shipped w/ green evidence. This is the real progress number, not the shipped percentage. |
 | staleness | Code changed after the face last green engine run. A stale face may still be shipped but its evidence is outdated. |

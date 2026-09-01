@@ -149,15 +149,20 @@ def evidence_for_faces(db_path: Optional[Path] = None) -> dict:
     """Derived evidence axis: how the newest engine run treated each face.
 
     Pure read-model over receipts + links - computed on read, never
-    stored, never a transition. Every gametest scenario runs in every
-    runGameTest, so a face's evidence in the newest receipt is: RED
-    when any linked impl case failed there, GREEN when it did not
-    (absence from the failure list IS a pass at run granularity).
-    Faces with no linked impls are UNTESTED. When the newest run is
-    red for a face, last_green_at stays None - walking back to older
-    runs would claim greens that predate the case existing.
+    stored, never a transition. Within one receipt a linked impl case
+    either FAILED (recorded - Forge logs only failures) or was
+    executed and passed. A face's evidence in the newest receipt is
+    therefore RED when any linked impl failed there, GREEN when none
+    did - but only if the run actually postdates every linked impl
+    case: a case scanned after the run has no row in it, and
+    absence-of-failure for a scenario the run never executed is not
+    a pass. Faces whose newest run predates a linked impl (or with
+    no linked impls at all) are UNTESTED; ``pending_impls`` counts
+    the impls the newest run could not have executed, so the next
+    action is visible (write a gametest vs run the engine).
 
-    Returns {face_id: {state, red_runs, last_red_at, last_green_at}}.
+    Returns {face_id: {state, red_runs, last_red_at, last_green_at,
+    pending_impls}}.
     """
     init_db(db_path)
     with get_connection(db_path) as conn:
@@ -165,12 +170,15 @@ def evidence_for_faces(db_path: Optional[Path] = None) -> dict:
             "SELECT id, finished_at FROM test_receipts "
             "WHERE test_type = 'runGameTest' ORDER BY id DESC LIMIT 1"
         ).fetchone()
-        impl_counts = {
-            r["capability_id"]: r["c"]
+        impl_stats = {
+            r["capability_id"]: dict(r)
             for r in conn.execute(
-                "SELECT capability_id, COUNT(*) as c FROM qa_test_cases "
+                "SELECT capability_id, COUNT(*) as impls, "
+                "SUM(CASE WHEN :fin IS NULL OR created_at > :fin THEN 1 ELSE 0 END) as pending "
+                "FROM qa_test_cases "
                 "WHERE kind = 'impl' AND capability_id IS NOT NULL "
-                "GROUP BY capability_id"
+                "GROUP BY capability_id",
+                {"fin": newest["finished_at"] if newest else None},
             ).fetchall()
         }
         red_stats: dict[str, dict] = {}
@@ -194,19 +202,26 @@ def evidence_for_faces(db_path: Optional[Path] = None) -> dict:
     result: dict[str, dict] = {}
     faces = [r["id"] for r in _all_face_ids(db_path)]
     for face in faces:
-        impls = impl_counts.get(face, 0)
-        if impls == 0:
+        stats = impl_stats.get(face)
+        if not stats:
             result[face] = {"state": "untested", "red_runs": 0,
-                            "last_red_at": None, "last_green_at": None}
+                            "last_red_at": None, "last_green_at": None,
+                            "pending_impls": 0}
             continue
-        stats = red_stats.get(face)
-        if stats and stats["failed_newest"]:
-            result[face] = {"state": "red", "red_runs": stats["red_runs"],
-                            "last_red_at": stats["last_red_at"], "last_green_at": None}
+        reds = red_stats.get(face)
+        pending = stats["pending"]
+        if reds and reds["failed_newest"]:
+            result[face] = {"state": "red", "red_runs": reds["red_runs"],
+                            "last_red_at": reds["last_red_at"], "last_green_at": None,
+                            "pending_impls": pending}
+        elif pending == 0:
+            result[face] = {"state": "green", "red_runs": reds["red_runs"] if reds else 0,
+                            "last_red_at": reds["last_red_at"] if reds else None,
+                            "last_green_at": newest["finished_at"], "pending_impls": 0}
         else:
-            result[face] = {"state": "green", "red_runs": stats["red_runs"] if stats else 0,
-                            "last_red_at": stats["last_red_at"] if stats else None,
-                            "last_green_at": newest["finished_at"] if newest else None}
+            result[face] = {"state": "untested", "red_runs": reds["red_runs"] if reds else 0,
+                            "last_red_at": reds["last_red_at"] if reds else None,
+                            "last_green_at": None, "pending_impls": pending}
     return result
 
 
@@ -287,8 +302,14 @@ def status_suggestions(db_path: Optional[Path] = None) -> list[dict]:
                 suggestions.append({"face": face, "status": status, "suggestion": "recheck",
                                     "reason": "shipped but RED in newest engine run (possible regression)"})
             elif ev["state"] == "untested":
-                suggestions.append({"face": face, "status": status, "suggestion": "add_test_anchor",
-                                    "reason": "shipped but no impl (no automated test anchor)"})
+                pending = ev.get("pending_impls", 0)
+                if pending:
+                    suggestions.append({"face": face, "status": status, "suggestion": "run_engine",
+                                        "reason": f"shipped but {pending} impl(s) scanned after the newest "
+                                                  "engine run - the next runGameTest evidences or refutes them"})
+                else:
+                    suggestions.append({"face": face, "status": status, "suggestion": "add_test_anchor",
+                                        "reason": "shipped but no impl (no automated test anchor)"})
             elif c["spec"] == 0:
                 suggestions.append({"face": face, "status": status, "suggestion": "add_spec",
                                     "reason": "shipped but no spec (no declared testing intent in CSV)"})
@@ -363,7 +384,8 @@ def domain_report(category: str, *, db_path: Optional[Path] = None) -> Optional[
                 "failures": failures,
                 "evidence": evidence.get(cap["id"], {
                     "state": "untested", "red_runs": 0,
-                    "last_red_at": None, "last_green_at": None}),
+                    "last_red_at": None, "last_green_at": None,
+                    "pending_impls": 0}),
             })
         # last receipt that failed a scenario belonging to this domain
         last_red = conn.execute(
