@@ -13,11 +13,9 @@ Ordered by dependency, sized by relative effort: S < M < L < XL.
 No item depends on anything below it. Check items off in place;
 do not start an item before its blockers are checked.
 
-**Shipped Stage 0/1/2 items, completed survival-gate slices, and
-Stage 3 Phases 1-3 are archived in
-[workplan-archive.md](workplan-archive.md)** — immutable audit
-trail, do not edit. This file holds only OPEN / IN_PROGRESS items
-and deferred queues.
+**Shipped items are removed from this file when they land; their
+history lives in git commits and the ledger. This file holds only
+OPEN / IN_PROGRESS items and deferred queues.**
 
 ## v1 convergence criteria
 

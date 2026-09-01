@@ -93,7 +93,7 @@ rot the moment the next ruling lands:
 
 - **Work queue**: [workplan.md](../guide/workplan.md) — items ordered by
   dependency; the first item with all blockers checked off is the current
-  effort. Shipped items move to [workplan-archive.md](../guide/workplan-archive.md).
+  effort. Shipped items are removed; history lives in git commits.
 - **Latest rulings**: [ledger.md](ledger.md) tail — every architectural
   verdict, append-only, newest at the bottom. The
   [decision index in boundaries.md](boundaries.md#decision-ledger-binding)
