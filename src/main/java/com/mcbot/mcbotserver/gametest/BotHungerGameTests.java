@@ -8,6 +8,9 @@ import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
 
 import com.mcbot.mcbotserver.McBotServer;
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
+import com.mcbot.mcbotserver.api.actor.Channel;
+import com.mcbot.mcbotserver.api.actor.Claim;
+import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import net.minecraft.core.BlockPos;
@@ -548,6 +551,93 @@ public final class BotHungerGameTests {
                             startedIdx < completedIdx,
                             "EAT_STARTED must precede EAT_COMPLETED (started=" + startedIdx + " completed="
                                     + completedIdx + ")");
+                    body.discard();
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Scenario: a reflex EAT claim arrives with the selected slot empty.
+     * The adapter must emit EAT_FAILED(reason=SLOT_EMPTY, source=reflex)
+     * instead of silently falling through to melee. Pins the P2-d reflex
+     * intent detection for the EAT family: the owner prefix
+     * 'reflex:EAT_' carries unambiguous consumable intent, so an empty
+     * slot is a FAILED action, not a silent no-op. The claim is
+     * constructed directly (bypassing the reflex sensor) so the test
+     * isolates the adapter's failure-path dispatch, not the sensor's
+     * food-detection logic.
+     */
+    // capability: hunger.eat_events
+    @GameTest(template = "empty16x8x16", timeoutTicks = 60)
+    public static void eatReflexEmptySlotEmitsSlotEmpty(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, WALK_Y, 7));
+        var body = rig.body();
+        // Selected slot 0 is empty: no food, no item at all.
+        body.getInventory().container().setItem(0, ItemStack.EMPTY);
+
+        helper.startSequence()
+                .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
+                    rig.actor()
+                            .submit(new Claim(Channel.USE, 85, "reflex:EAT_WHEN_HUNGRY", new Intent.Use(true)));
+                    GametestRig.assertEventSeen(rig.events(), EventKind.EAT_FAILED);
+                }))
+                .thenExecuteAfter(0, () -> {
+                    var events = GametestRig.eventsOf(rig.events());
+                    BotEvent failed = events.stream()
+                            .filter(e -> EventKind.EAT_FAILED.equals(e.kind()))
+                            .findFirst()
+                            .orElseThrow();
+                    check(
+                            "SLOT_EMPTY".equals(failed.attrs().get("reason")),
+                            "EAT_FAILED reason must be SLOT_EMPTY, got " + failed.attrs().get("reason"));
+                    check(
+                            "reflex".equals(failed.attrs().get("source")),
+                            "EAT_FAILED source must be reflex, got " + failed.attrs().get("source"));
+                    check("0".equals(failed.attrs().get("slot")), "EAT_FAILED slot must be 0, got " + failed.attrs().get("slot"));
+                    body.discard();
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Scenario: a reflex EAT claim arrives with a non-food item (stick) in
+     * the selected slot. The adapter must emit EAT_FAILED(reason=NOT_EDIBLE,
+     * itemId=minecraft:stick, source=reflex) instead of silently meleeing
+     * with the stick. Pins the P2-d NOT_EDIBLE failure path for the EAT
+     * family: the food-properties check returns null for a stick, and the
+     * reflex intent detection routes it to EAT_FAILED rather than the
+     * melee fallback. The claim is constructed directly (bypassing the
+     * reflex sensor) to isolate the adapter's failure dispatch.
+     */
+    // capability: hunger.eat_events
+    @GameTest(template = "empty16x8x16", timeoutTicks = 60)
+    public static void eatReflexNonFoodEmitsNotEdible(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, WALK_Y, 7));
+        var body = rig.body();
+        // Selected slot 0: a stick (not food, not a weapon, not a tool).
+        body.getInventory().container().setItem(0, new ItemStack(Items.STICK));
+
+        helper.startSequence()
+                .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
+                    rig.actor()
+                            .submit(new Claim(Channel.USE, 85, "reflex:EAT_WHEN_HUNGRY", new Intent.Use(true)));
+                    GametestRig.assertEventSeen(rig.events(), EventKind.EAT_FAILED);
+                }))
+                .thenExecuteAfter(0, () -> {
+                    var events = GametestRig.eventsOf(rig.events());
+                    BotEvent failed = events.stream()
+                            .filter(e -> EventKind.EAT_FAILED.equals(e.kind()))
+                            .findFirst()
+                            .orElseThrow();
+                    check(
+                            "NOT_EDIBLE".equals(failed.attrs().get("reason")),
+                            "EAT_FAILED reason must be NOT_EDIBLE, got " + failed.attrs().get("reason"));
+                    check(
+                            "minecraft:stick".equals(failed.attrs().get("itemId")),
+                            "EAT_FAILED itemId must be minecraft:stick, got " + failed.attrs().get("itemId"));
+                    check(
+                            "reflex".equals(failed.attrs().get("source")),
+                            "EAT_FAILED source must be reflex, got " + failed.attrs().get("source"));
                     body.discard();
                 })
                 .thenSucceed();

@@ -194,6 +194,8 @@ class GametestInventoryCheck {
                             "walkAccumulatesExhaustionAtDeviatedRate",
                             "sprintAccumulatesExhaustionAtVanillaRate",
                             "eatReflexEmitsStartedAndCompletedEvents",
+                            "eatReflexEmptySlotEmitsSlotEmpty",
+                            "eatReflexNonFoodEmitsNotEdible",
                             "bowlFoodCountOneLeavesBowlInSlot",
                             "bowlFoodCountTwoKeepsStewAndAddsBowlToInventory",
                             "honeyBottleCountTwoKeepsBottleAndAddsGlassToInventory",
