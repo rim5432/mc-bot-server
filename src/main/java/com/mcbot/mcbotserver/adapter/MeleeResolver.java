@@ -2,6 +2,7 @@ package com.mcbot.mcbotserver.adapter;
 
 import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
 import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
+import com.mcbot.mcbotserver.api.capability.Feature;
 import com.mojang.logging.LogUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
@@ -87,6 +88,18 @@ final class MeleeResolver {
      *
      * @return cooldown in ticks; never negative
      */
+    @Feature(
+            id = "combat.melee.attack_cooldown",
+            face = "combat.melee",
+            description =
+                    "Attack cooldown derived live from the held item's ATTACK_SPEED attribute: 1.0 / speed * 20" +
+                    " ticks. Sword=12.5, axe=20-25, empty hand=5. Read live because the SLOT channel may swap" +
+                    " weapons mid-combat.",
+            vanillaRef = "Player.getAttackStrengthScale (decompiled 1.20.1)",
+            deviation =
+                    "Bot only deals damage at full charge; partial-charge damage is a Player-only affordance the" +
+                    " harness has no use for. Unready swings do not reset the cooldown to avoid a zero-damage" +
+                    " lockout from fast pulse.")
     private double getAttackCooldownTicks() {
         double speed = body.getAttributeValue(Attributes.ATTACK_SPEED);
         return 1.0 / speed * 20.0;
@@ -118,6 +131,14 @@ final class MeleeResolver {
      *
      * @return true when the next hit should be a critical strike
      */
+    @Feature(
+            id = "combat.melee.crit_hit",
+            face = "combat.melee",
+            description =
+                    "Critical hit conditions mirrored from vanilla: falling (fallDistance>0, not onGround) + not" +
+                    " in water + not blind + not on climbable block + not riding + not sprinting. 1.5x damage" +
+                    " multiplier when true.",
+            vanillaRef = "Player.attack critical-hit branch (decompiled 1.20.1)")
     private boolean isCriticalHit() {
         return body.fallDistance > 0.0F
                 && !body.onGround()
@@ -139,6 +160,18 @@ final class MeleeResolver {
      * one landed hit per cooldown window, vanilla's effective
      * output.
      */
+    @Feature(
+            id = "combat.melee.reach_and_cone",
+            face = "combat.melee",
+            description =
+                    "Melee hit resolution: 3.0 eye-to-surface reach (not center-to-center), 45-degree aim cone," +
+                    "nearest hostile wins. Candidate net prefiltered at reach+1.5 before the exact" +
+                    " surface-distance gate.",
+            vanillaRef = "Player.attack reach metric (decompiled 1.20.1)",
+            deviation =
+                    "Cone test instead of vanilla ray-clip because EntitySnapshot granularity is block-level and a" +
+                    " ray would whiff on sub-cell offsets. Surface-distance reach matches vanilla; old" +
+                    " center-to-center 3.5 read ~0.4 blocks too far.")
     void onUsePress() {
         body.swing(InteractionHand.MAIN_HAND);
         boolean ready = isAttackReady();
@@ -211,6 +244,17 @@ final class MeleeResolver {
      *
      * @param target the hurt entity; never null
      */
+    @Feature(
+            id = "combat.melee.damage_chain",
+            face = "combat.melee",
+            description =
+                    "Full melee damage chain: ATTACK_DAMAGE attribute + enchantment bonus + Fire Aspect +" +
+                    " knockback + post-hurt enchant effects. setLastHurtByPlayer makes the kill award vanilla XP" +
+                    " orbs (bot is PathfinderMob, mobAttack source does not set this flag).",
+            vanillaRef = "Mob.doHurtTarget + LivingEntity.die XP award (decompiled 1.20.1)",
+            deviation =
+                    "doHurtTarget cannot carry a damage multiplier (computes f internally), so the crit-aware" +
+                    " chain is inlined here — same deviation class as DigExecutor's manual break sequence.")
     private void performMeleeAttack(LivingEntity target) {
         float damage = (float) body.getAttributeValue(Attributes.ATTACK_DAMAGE);
         float knockback = (float) body.getAttributeValue(Attributes.ATTACK_KNOCKBACK);
@@ -268,6 +312,14 @@ final class MeleeResolver {
      * @param damage the main-hit damage after the crit multiplier
      * @param crit   whether the main hit was a critical strike
      */
+    @Feature(
+            id = "combat.melee.sweep_attack",
+            face = "combat.melee",
+            description =
+                    "Sword sweep: fully charged + not crit + not sprinting + onGround + SWORD_SWEEP action. Sweep" +
+                    " damage = 1.0 + SweepingEdge ratio * main damage; knockback = 0.4; plays PLAYER_ATTACK_SWEEP." +
+                    "Bystanders in getSweepHitBox (excluding self and main target, non-allied) take the sweep hit.",
+            vanillaRef = "Player.attack lines 1219-1274 (decompiled 1.20.1)")
     private void performSweepAttack(LivingEntity target, float damage, boolean crit) {
         if (!crit
                 && !body.isSprinting()
@@ -312,6 +364,14 @@ final class MeleeResolver {
      * @return true when solid terrain blocks the line before the
      *         target (grazes at the hitbox face stay clear)
      */
+    @Feature(
+            id = "combat.line_of_sight.terrain_clip",
+            face = "combat.line_of_sight",
+            description =
+                    "Terrain line-of-sight check: vanilla ClipContext with Block.COLLIDER / Fluid.NONE from eye to" +
+                    " target center. A hit before the target (minus 0.35 grazing slack) blocks the swing. Lava is" +
+                    " transparent to this clip — see lavaBetween for the complementary check.",
+            vanillaRef = "Player.hasLineOfSight (decompiled 1.20.1)")
     private boolean sightBlocked(Vec3 eye, Vec3 targetCenter) {
         var clip = body.level()
                 .clip(new ClipContext(eye, targetCenter, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, body));
@@ -331,6 +391,19 @@ final class MeleeResolver {
      * @param targetCenter candidate mid-height position; never null
      * @return true when any sampled point along the line sits in lava
      */
+    @Feature(
+            id = "combat.line_of_sight.lava_opaque",
+            face = "combat.line_of_sight",
+            description =
+                    "Lava is treated as opaque for melee line-of-sight: 0.5-block point sampling along" +
+                    " eye-to-target segment; any point in lava blocks the swing. Complementary to sightBlocked" +
+                    " because vanilla's ClipContext with Fluid.NONE treats lava as transparent.",
+            vanillaRef =
+                    "No direct vanilla counterpart — vanilla melee raycast uses Fluid.NONE and does not" +
+                    " special-case lava",
+            deviation =
+                    "Bot-specific: melee across lava is impossible, so pretending otherwise turns the bot into a" +
+                    " sandbag swinging at the far shore. Water stays transparent by v1 semantics.")
     private boolean lavaBetween(Vec3 eye, Vec3 targetCenter) {
         var delta = targetCenter.subtract(eye);
         int steps = (int) Math.ceil(delta.length() / 0.5);
