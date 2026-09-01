@@ -1,7 +1,13 @@
 {
   "schema": 2,
-  "exported_at": "2026-09-02T02:01:33",
+  "exported_at": "2026-09-02T03:34:13",
   "statuses": [
+    {
+      "id": "acquisition.hunt_game",
+      "status": "shipped",
+      "verified_at": "2026-09-02",
+      "deviation": ""
+    },
     {
       "id": "acquisition.water_fish",
       "status": "gap",
@@ -121,6 +127,24 @@
       "status": "shipped",
       "verified_at": "2026-09-01",
       "deviation": "BotBodyEntity.customServerAiStep accumulates no exhaustion naturally, so it is fed manually from horizontal distance traveled. Sprint matches vanilla at 0.1/block; walk charges 0.01/block (the vanilla swim rate, not vanilla's zero walk rate) \u2014 a non-zero baseline so a purely-walking carrier still drains hunger over time. Position is tracked manually (lastTickX/Z fields) because customServerAiStep runs BEFORE LivingEntity.travel() in the aiStep() chain (decompiled 1.20.1: serverAiStep at line 2609, travel at line 2662), so getX()-xo is always zero at that point \u2014 the original getX()-xo implementation was a latent bug that produced zero exhaustion for all movement."
+    },
+    {
+      "id": "husbandry.breed_loop",
+      "status": "gap",
+      "verified_at": "2026-08-29",
+      "deviation": ""
+    },
+    {
+      "id": "husbandry.passive_collect",
+      "status": "gap",
+      "verified_at": "2026-08-29",
+      "deviation": ""
+    },
+    {
+      "id": "husbandry.shear_wool",
+      "status": "gap",
+      "verified_at": "2026-08-29",
+      "deviation": ""
     },
     {
       "id": "interaction.blockitem_place",
@@ -709,6 +733,11 @@
       "link_source": "annotated"
     },
     {
+      "case_id": "GT-BotHuntYieldGameTests-huntsCowAndCollectsBeefYield",
+      "capability_id": "acquisition.hunt_game",
+      "link_source": "annotated"
+    },
+    {
       "case_id": "GT-BotInteractionGameTests-doorOpensThroughUseChain",
       "capability_id": "interaction.right_click_order",
       "link_source": "auto"
@@ -915,6 +944,11 @@
     },
     {
       "case_id": "GT-BotTamingGameTests-tameRejectsNonTameableTarget",
+      "capability_id": "taming.chain",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotTamingGameTests-tamesCatWithCod",
       "capability_id": "taming.chain",
       "link_source": "annotated"
     },
