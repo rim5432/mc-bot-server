@@ -138,6 +138,15 @@ public final class BotAnvilGameTests {
      * item costs more. Pins the anvil's repair-cost penalty
      * (the `BaseRepairCost` NBT field that AnvilMenu reads).
      */
+    /**
+     * Scenario: the anvil's prior-work penalty escalates across
+     * operations. A damaged iron sword is repaired with iron ingots
+     * (which triggers the RepairCost increase because k==0), then the
+     * same item is renamed — the second operation's cost must include
+     * the base RepairCost from the first, so it costs strictly more
+     * than a fresh rename. Pins the anvil's penalty-escalation path
+     * through createResult()'s k2 calculation.
+     */
     // capability: inventory.menu_clicks
     @GameTest(template = "empty16x8x16", timeoutTicks = 300)
     public static void anvilPriorWorkPenaltyIncreases(GameTestHelper helper) {
@@ -146,41 +155,58 @@ public final class BotAnvilGameTests {
         helper.setBlock(anvilLocal, Blocks.ANVIL);
         BlockPos anvilAbs = helper.absolutePos(anvilLocal);
 
-        rig.body().giveExperienceLevels(20);
-        rig.body().getInventory().container().setItem(0, new ItemStack(Items.IRON_SWORD));
+        rig.body().giveExperienceLevels(30);
+        // A damaged iron sword — repair will trigger RepairCost increase.
+        var damagedSword = new ItemStack(Items.IRON_SWORD);
+        damagedSword.setDamageValue(100);
+        rig.body().getInventory().container().setItem(0, damagedSword);
+        rig.body().getInventory().container().setItem(1, new ItemStack(Items.IRON_INGOT, 4));
 
         var tx = rig.actor().menuTransactions();
         var view = tx.openMenu(GametestRig.cellOf(anvilAbs));
         check(view != null, "opening the anvil must succeed");
 
         int hotbar0 = firstHotbarSlot(view);
-        // First rename.
+        // First operation: repair the damaged sword.
         view = tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
-        tx.setAnvilName("First");
+        view = tx.menuClick(hotbar0 + 1, 0, MenuClick.QUICK_MOVE);
+        view = tx.menuSnapshot();
+        check(!view.slot(2).isEmpty(), "the repair result must be available");
         view = tx.menuClick(2, 0, MenuClick.PICKUP);
         tx.menuClick(hotbar0, 0, MenuClick.PICKUP);
         tx.closeMenu();
-        int levelsAfterFirst = rig.body().getExperienceLevel();
-        check(levelsAfterFirst < 20, "first rename must cost at least 1 level");
+        int levelsAfterRepair = rig.body().getExperienceLevel();
+        var repaired = rig.body().getInventory().container().getItem(0);
+        check(repaired.getBaseRepairCost() > 0, "repair must increase the item's RepairCost");
+        check(levelsAfterRepair < 30, "repair must cost experience levels");
 
-        // Second rename on the same item — penalty should be higher.
+        // Second operation: rename the same item. The base cost now
+        // includes the RepairCost from the repair, so it costs more
+        // than a fresh rename on an undamaged item.
         var tx2 = rig.actor().menuTransactions();
         var view2 = tx2.openMenu(GametestRig.cellOf(anvilAbs));
         check(view2 != null, "reopening the anvil must succeed");
         view2 = tx2.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
-        tx2.setAnvilName("Second");
+        tx2.setAnvilName("Renamed");
+        view2 = tx2.menuSnapshot();
+        check(!view2.slot(2).isEmpty(), "the rename result must be available");
         view2 = tx2.menuClick(2, 0, MenuClick.PICKUP);
         tx2.menuClick(hotbar0, 0, MenuClick.PICKUP);
         tx2.closeMenu();
-        int levelsAfterSecond = rig.body().getExperienceLevel();
+        int levelsAfterRename = rig.body().getExperienceLevel();
 
-        int costFirst = 20 - levelsAfterFirst;
-        int costSecond = levelsAfterFirst - levelsAfterSecond;
-        check(costFirst >= 1, "first rename must cost at least 1 level");
-        check(costSecond >= 1, "second rename must cost at least 1 level");
-        // Verify both renames applied to the item name.
-        var renamed = rig.body().getInventory().container().getItem(0);
-        checkEquals("Second", renamed.getHoverName().getString(), "the item must carry the second rename");
+        int costRepair = 30 - levelsAfterRepair;
+        int costRename = levelsAfterRepair - levelsAfterRename;
+        check(costRepair >= 1, "repair must cost at least 1 level");
+        check(costRename >= 1, "rename must cost at least 1 level");
+        // The rename on a penalty-bearing item costs baseRepairCost + 1,
+        // which is strictly more than a fresh rename (1 level).
+        check(
+                costRename > 1,
+                "rename on a penalty-bearing item must cost more than 1 level (base RepairCost + rename), got "
+                        + costRename);
+        var finalItem = rig.body().getInventory().container().getItem(0);
+        checkEquals("Renamed", finalItem.getHoverName().getString(), "the item must carry the rename");
         rig.body().discard();
         helper.succeed();
     }
@@ -221,11 +247,26 @@ public final class BotAnvilGameTests {
         var result = rig.body().getInventory().container().getItem(0);
         check(result.is(Items.IRON_SWORD), "the result must be an iron sword");
         check(result.getEnchantmentLevel(Enchantments.SHARPNESS) == 0, "the result must have no sharpness enchantment");
-        // Note: grindstone XP return spawns experience orbs that require
-        // player pickup; the bot carrier does not auto-collect them, so
-        // the disenchant side-effect (no enchantment) is the pin here.
-        rig.body().discard();
-        helper.succeed();
+
+        // Grindstone onTake spawns experience orbs at the block position
+        // via ContainerLevelAccess.execute. The bot stands adjacent, so
+        // the orbs are attracted and picked up within a few ticks. Wait
+        // for the pickup to land, then verify XP increased.
+        helper.runAfterDelay(20, () -> {
+            int xpAfter = rig.body().getExperienceLevel();
+            boolean xpIncreased = xpAfter > xpBefore;
+            long orbCount = helper.getLevel()
+                    .getEntitiesOfClass(
+                            net.minecraft.world.entity.ExperienceOrb.class,
+                            rig.body().getBoundingBox().inflate(8))
+                    .size();
+            check(
+                    xpIncreased || orbCount > 0,
+                    "grindstone must return experience (level increased or experience orbs spawned); " + "xpBefore="
+                            + xpBefore + " xpAfter=" + xpAfter + " orbs=" + orbCount);
+            rig.body().discard();
+            helper.succeed();
+        });
     }
 
     /**
