@@ -921,17 +921,22 @@ public final class BotBodyEntity extends PathfinderMob {
      * Absorb nearby experience orbs. Vanilla XP orbs fly toward players
      * and call player.giveExperiencePoints on contact; a PathfinderMob
      * carrier is invisible to that attraction, so the bot scans manually.
-     * Range matches GroundPickup (bounding box inflated 1.0/0.5/1.0) —
-     * the bot walks over orbs to collect them, same as items. XP orbs
-     * have no pickup delay (unlike ItemEntity), so every orb in range is
-     * absorbed immediately.
+     *
+     * <p>Range is inflated 1.5/1.0/1.5 — wider than GroundPickup's
+     * 1.0/0.5/1.0 because XP orbs spawn at block centers (e.g. grindstone
+     * onTake awards at Vec3.atCenterOf), one full block away from the bot
+     * standing adjacent. At 1.0 inflation the orb sits 0.2 blocks outside
+     * the scan box and is randomly missed depending on which face the block
+     * collision pushes it toward. 1.5 covers the adjacent-block center plus
+     * a small margin for post-spawn drift. XP orbs have no pickup delay
+     * (unlike ItemEntity), so every orb in range is absorbed immediately.
      *
      * <p>Called from customServerAiStep every tick; the scan is cheap
      * (entity class filter on a small box) and the orbs despawn on their
      * own if never collected.
      */
     private void tickXpPickup() {
-        var box = getBoundingBox().inflate(1.0, 0.5, 1.0);
+        var box = getBoundingBox().inflate(1.5, 1.0, 1.5);
         for (net.minecraft.world.entity.ExperienceOrb orb :
                 level().getEntitiesOfClass(net.minecraft.world.entity.ExperienceOrb.class, box)) {
             if (orb.isAlive() && orb.value > 0) {

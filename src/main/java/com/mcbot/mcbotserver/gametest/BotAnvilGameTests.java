@@ -241,6 +241,8 @@ public final class BotAnvilGameTests {
 
         view = tx.menuClick(2, 0, MenuClick.PICKUP);
         check(view.carried() != null && !view.carried().isEmpty(), "the disenchanted result must be takeable");
+        // onTake clears both input slots (ForgeHooks.onGrindstoneTake) — verifies the callback fired.
+        check(view.slot(0).isEmpty() && view.slot(1).isEmpty(), "grindstone onTake must clear both input slots");
         tx.menuClick(hotbar0, 0, MenuClick.PICKUP);
         tx.closeMenu();
 
@@ -248,22 +250,15 @@ public final class BotAnvilGameTests {
         check(result.is(Items.IRON_SWORD), "the result must be an iron sword");
         check(result.getEnchantmentLevel(Enchantments.SHARPNESS) == 0, "the result must have no sharpness enchantment");
 
-        // Grindstone onTake spawns experience orbs at the block position
-        // via ContainerLevelAccess.execute. The bot stands adjacent, so
-        // the orbs are attracted and picked up within a few ticks. Wait
-        // for the pickup to land, then verify XP increased.
+        // Grindstone onTake spawns experience orbs at the block center via
+        // ContainerLevelAccess.execute. The bot's tickXpPickup scan covers
+        // adjacent-block centers (inflated 1.5), so orbs are absorbed within
+        // a tick or two. Wait briefly, then verify XP increased.
         helper.runAfterDelay(20, () -> {
             int xpAfter = rig.body().getExperienceLevel();
-            boolean xpIncreased = xpAfter > xpBefore;
-            long orbCount = helper.getLevel()
-                    .getEntitiesOfClass(
-                            net.minecraft.world.entity.ExperienceOrb.class,
-                            rig.body().getBoundingBox().inflate(8))
-                    .size();
             check(
-                    xpIncreased || orbCount > 0,
-                    "grindstone must return experience (level increased or experience orbs spawned); " + "xpBefore="
-                            + xpBefore + " xpAfter=" + xpAfter + " orbs=" + orbCount);
+                    xpAfter > xpBefore,
+                    "grindstone must return experience (level increased); xpBefore=" + xpBefore + " xpAfter=" + xpAfter);
             rig.body().discard();
             helper.succeed();
         });
