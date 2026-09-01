@@ -131,6 +131,52 @@ boundary-D consumer) review against
 with boundary severity: its anti-patterns are reject reasons, not
 advice.
 
+### 0.5 Capability Matrix (the convergence tool)
+
+The project tracks player-behavior parity in a SQLite-backed
+capability matrix under tool/mcbot/capability/. It is the single
+source of truth for what the bot can do, what is tested, and what is
+claimed vs proven. Every agent working on features or QA must use its
+vocabulary and commands; never re-derive coverage by hand.
+
+Core vocabulary (one concept, one word, everywhere):
+
+| Term | Meaning |
+|------|---------|
+| capability face | One player-behavior capability (e.g. dig.pacing, combat.bow_draw, hunger.eat_chain). The atomic unit of the matrix. Has id, name, category, axis, implementation_status, vanilla_ref, deviation, source_paths, harness_paths. A user asking about capability faces / faces means this. |
+| feature | A behavioral sub-unit WITHIN a face, declared in Java source via the @Feature annotation and discovered by scan-features. Never hand-seeded. |
+| spec case | A human-authored QA test specification (TC-*), imported from CSV. Declares the testing intent. |
+| impl case | A source-derived gametest method (GT-*), discovered by scan-gametest. The actual automated anchor. |
+| receipt | One test run result (gametest / boundary_d / qa_run), mirrored into the DB via backfill. Carries scenario counts, green/red, git rev, failed scenario names. |
+| evidence | Derived per-face from the newest engine run: GREEN (no linked impl failed), RED (a linked impl failed), UNTESTED (no linked impl). Computed on every read, never stored. |
+| implementation_status | A DECLARED human ruling on vanilla alignment: shipped / partial / gap / deferred. NOT derived from tests. A face can be shipped but UNTESTED - that is a P0 audit item. |
+| honest convergence | The count of DECLARED-shipped faces that actually carry GREEN evidence. The status line prints this as N/M shipped w/ green evidence. This is the real progress number, not the shipped percentage. |
+| staleness | Code changed after the face last green engine run. A stale face may still be shipped but its evidence is outdated. |
+| drift | Code changed after the face record updated_at. The record may describe stale code. |
+| action queue | The priority-sorted what-needs-a-human list (audit): P0 = shipped-without-evidence or shipped-RED; P1 = coverage gaps (unmapped items, pathless faces, gap/deferred); P2 = hygiene (drift, promote candidates, missing specs). |
+| ref inventory | The vanilla item-action inventory enumerated from the decompiled tree, mapped to faces via face-map.json. ref-coverage gives the mapped/unmapped denominator. |
+| harness axis | The face to boundary-D path mapping. Pathless non-internal faces are P1 audit candidates; internal reflex/sense faces (listed in report._INTERNAL_FACE_IDS) are pathless by design. |
+
+Commands every session needs (all via python tool/mcbot_tool.py capability action):
+
+  capability overview     macro: per-category status + evidence + convergence
+  capability audit        P0/P1/P2 action queue - what do I do next
+  capability status id    one face: evidence, staleness, integrity, NEXT action
+  capability list         all faces; filter by category / --status
+  capability gaps         all gap/deferred faces
+  capability domain cat   per-face evidence + deficiency for one category
+  capability set id --status shipped --verify   promote a face (human ruling)
+  capability scan-gametest --strict   re-scan @GameTest methods, fail on unlinked
+  capability backfill     mirror committed receipts into DB (idempotent)
+  capability validate     schema/vocabulary/FK checks (CI-gateable)
+
+Workflow after landing a feature: implement + test green ->
+scan-gametest (links new impl cases) -> set id --status level
+--verify (human ruling, writes through to qa-results/capability-state.json)
+-> commit the state file with the code. status prints the matrix summary
+line automatically; overview + audit are the two commands that answer
+where are we and what next without reading four other tools.
+
 ## 1. Code Style
 
 ### 1.1 Packages and Classes
