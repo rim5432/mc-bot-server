@@ -107,7 +107,7 @@ class DepartureBrakeGateTest {
             mover.tick(world, directive, actor);
         }
         assertTrue(
-                PathingTestAccess.waypoints(mover).size() >= 1, "a plan must be adopted before the wind-down scenario");
+                !PathingTestAccess.waypoints(mover).isEmpty(), "a plan must be adopted before the wind-down scenario");
 
         // Force the exact defect geometry: the body stands 0.75 from
         // the terminal waypoint centre (inside WAYPOINT_REACH) but in

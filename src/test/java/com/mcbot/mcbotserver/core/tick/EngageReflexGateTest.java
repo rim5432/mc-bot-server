@@ -262,7 +262,7 @@ class EngageReflexGateTest {
         assertTrue(resumed, "the parked mission must resume once the rule quiets");
         assertNull(rig.arbiter.paused());
         assertTrue(rig.mission.resumedCalls >= 1);
-        assertTrue(rig.eventsOf(EventKind.TASK_RESUMED).size() >= 1);
+        assertTrue(!rig.eventsOf(EventKind.TASK_RESUMED).isEmpty());
         assertEquals(1, rig.factoryCalls, "the engagement tail must not mint a spurious defend");
     }
 
@@ -404,7 +404,7 @@ class EngageReflexGateTest {
         rig.health[0] = 3f;
         rig.tick();
         assertTrue(rig.mission.invalidatedCalls >= 1, "a refusing original must be dropped via onContextInvalidated");
-        assertTrue(rig.eventsOf(EventKind.TASK_DROPPED).size() >= 1, "the drop must reach the harness as TASK_DROPPED");
+        assertTrue(!rig.eventsOf(EventKind.TASK_DROPPED).isEmpty(), "the drop must reach the harness as TASK_DROPPED");
         assertSame(rig.fights[0], rig.arbiter.paused(), "the fight occupies the paused slot after the eviction");
     }
 

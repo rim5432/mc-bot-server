@@ -89,7 +89,7 @@ class AdoptFreshnessGateTest {
             Thread.sleep(10);
             mover.tick(world, directive, new NullActor());
             // Once claims flow, the plan was adopted.
-            if (PathingTestAccess.waypoints(mover).size() > 0) {
+            if (!PathingTestAccess.waypoints(mover).isEmpty()) {
                 break;
             }
         }
@@ -130,7 +130,7 @@ class AdoptFreshnessGateTest {
         for (int i = 0; i < 100; i++) {
             Thread.sleep(10);
             mover.tick(world, directive, new NullActor());
-            if (PathingTestAccess.waypoints(mover).size() > 0) {
+            if (!PathingTestAccess.waypoints(mover).isEmpty()) {
                 break;
             }
         }

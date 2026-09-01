@@ -252,6 +252,22 @@ tasks.withType(JavaCompile).configureEach {
         // @SuppressWarnings("SystemOut") as the ADR-0005 D4 fallback.
         check('NonApiType', net.ltgt.gradle.errorprone.CheckSeverity.ERROR)
 
+        // ===== Promoted guards (2026-09-01 static-analysis wave) =====
+        // Zero-violation baseline verified at promotion; each is a
+        // regression guard, not a paydown target.
+        // CollectionIncompatibleType: catches Collection.contains/remove
+        // calls with a type the collection can never hold (e.g.
+        // List<String>.contains(Integer)) - a real-bug shape that
+        // compiles clean because Collection methods take Object.
+        check('CollectionIncompatibleType', net.ltgt.gradle.errorprone.CheckSeverity.ERROR)
+        // MissingCasesInEnumSwitch: enum switch that omits a constant
+        // (and has no default) fails compile. Switch expressions are
+        // already exhaustive by construction; this guards statement
+        // switches and future enum growth. Replaces the checkstyle
+        // MissingSwitchDefault idea, which false-positives on
+        // exhaustive switch expressions.
+        check('MissingCasesInEnumSwitch', net.ltgt.gradle.errorprone.CheckSeverity.ERROR)
+
         // ===== NullAway (2026-08-27 static-analysis wave) =====
         // @Nullable/@NonNull enforcement for the api.. layer only.
         // api is the harness contract; Javadoc says "never null" /

@@ -348,11 +348,11 @@ public final class WorldCommands {
         }
         String word = com.mojang.brigadier.arguments.StringArgumentType.getString(ctx, "state")
                 .toLowerCase(java.util.Locale.ROOT);
-        if (!word.equals("on") && !word.equals("off")) {
+        if (!"on".equals(word) && !"off".equals(word)) {
             return CommandResponse.answer(
                     ctx.getSource(), CommandResponse.err("unknown state: " + word + " (on, off)"));
         }
-        boolean enable = word.equals("on");
+        boolean enable = "on".equals(word);
         l.sneak().accept(enable);
         JsonObject root = CommandResponse.ok();
         root.addProperty("sneak", enable);

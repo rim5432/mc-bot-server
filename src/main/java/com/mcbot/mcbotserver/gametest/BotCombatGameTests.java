@@ -879,10 +879,10 @@ public final class BotCombatGameTests {
                 // then movement. 120 ticks is generous.
                 .thenWaitUntil(driveUntil(rig, () -> {
                     int dist = Math.abs(rig.body().getBlockX() - zombie.getBlockX());
-                    if (dist < 8) {
-                        throw new RuntimeException("still inside min: bodyX=" + rig.body().getBlockX()
-                                + " targetX=" + zombie.getBlockX() + " dist=" + dist);
-                    }
+                    check(
+                            dist >= 8,
+                            "still inside min: bodyX=" + rig.body().getBlockX() + " targetX=" + zombie.getBlockX()
+                                    + " dist=" + dist);
                 }))
                 .thenExecuteFor(GametestRig.SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {

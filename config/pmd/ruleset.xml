@@ -29,12 +29,21 @@
     <rule ref="category/java/errorprone.xml/SuspiciousEqualsMethodName"/>
     <rule ref="category/java/errorprone.xml/SuspiciousHashcodeMethodName"/>
     <rule ref="category/java/errorprone.xml/AvoidDecimalLiteralsInBigDecimalConstructor"/>
+    <!-- PositionLiteralsFirstInComparisons was removed in PMD 7 (probed
+         2026-09-01: "Unable to find referenced rule"). The one live
+         site (WorldCommands.sneak) was flipped to literal-first as a
+         review-enforced idiom; a machine guard returns if PMD ships a
+         replacement or a checkstyle RegexpSinglelineJava is written. -->
 
     <!-- ===== bestpractices: dead code that hides intent ===== -->
     <rule ref="category/java/bestpractices.xml/UnusedFormalParameter"/>
     <rule ref="category/java/bestpractices.xml/UnusedPrivateMethod"/>
     <!-- lives in bestpractices since PMD 7 -->
     <rule ref="category/java/bestpractices.xml/UnusedLocalVariable"/>
+    <!-- UseCollectionIsEmpty: `list.size() == 0` -> `list.isEmpty()`.
+         Zero findings at promotion (2026-09-01 scan); guards the
+         idiom from creeping back in. -->
+    <rule ref="category/java/bestpractices.xml/UseCollectionIsEmpty"/>
 
     <!-- ===== design: god-class metrics =====
          The code-health ledger grades classes manually today; these give
