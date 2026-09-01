@@ -12,8 +12,8 @@ import javax.annotation.Nullable;
  * eye is inside solid geometry, and hold the dig until the condition
  * clears.
  *
- * <p>Contract: see ADR-0003 section 2 (rule-table row), issue 0008
- * F4/D3 for the original FREEZE ruling and issue 0009 for the upgrade:
+ * <p>Contract: see ADR-0003 section 2 (rule-table row), boundaries.md
+ * decision 24 F4/D3 for the original FREEZE ruling and issue 0009 for the upgrade:
  * with dig capability the rescue direction is no longer unknown - it
  * is the eye block itself, so freezing (the stopgap whose whole
  * argument was "a guessed direction can push deeper") is superseded

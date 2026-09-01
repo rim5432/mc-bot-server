@@ -52,8 +52,8 @@ final class PresenceLayer {
      * selection semantics live in the policy so layer-1 tests pin
      * them.
      */
-    // contract: see issues/0005-player-feel-motion-layer.md P0 (idle
-    // look is adapter-local presentation, never an Intent)
+    // contract: see player-behavior-RE.md section 8 (motion feel layer):
+    // idle look is adapter-local presentation, never an Intent
     void tickIdleRot() {
         var eye = body.getEyePosition();
         List<Vec3> candidates = new ArrayList<>();
@@ -90,8 +90,8 @@ final class PresenceLayer {
      * yaw at the moment idleness began. Deterministic by construction
      * - a counter flip, no randomness.
      */
-    // contract: see issues/0005-player-feel-motion-layer.md P2 (idle
-    // sweep is adapter-local presentation, never an Intent)
+    // contract: see player-behavior-RE.md section 8 (motion feel layer):
+    // idle sweep is adapter-local presentation, never an Intent
     private void applyIdleSweep() {
         if (idleTicks == 0) {
             idleBaseYaw = body.getYRot();
@@ -145,8 +145,8 @@ final class PresenceLayer {
      * arbiter (a USE claim or a combat-priority ROT claim this tick)
      * - never swing idly mid-fight.
      */
-    // contract: see issues/0005-player-feel-motion-layer.md P3 (the
-    // marker that prevents promotion into Intent.Use)
+    // contract: see player-behavior-RE.md section 8 (motion feel layer) -
+    // the marker that prevents promotion into Intent.Use
     void tickWalkFidget(Map<Channel, Claim> winners, Claim move, Claim rot) {
         boolean walking = move != null && move.intent() instanceof Intent.Move m && m.forward() >= 0.5;
         boolean combatOwnsArbiter =

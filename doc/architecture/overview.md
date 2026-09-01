@@ -108,7 +108,6 @@ Reverse-engineered vanilla player-behavior truths are collected in
 
 Related: [Boundary Contracts & Ledger](boundaries.md),
 [Work Plan](../guide/workplan.md),
-[Toolchain Reference](../reference/toolchain.md),
 [Build & Run Guide](../guide/build-and-run.md),
 [ADR-0002 capability/arbiter](../decisions/0002-capability-model-task-arbiter.md),
 [ADR-0003 reflex layer](../decisions/0003-reflex-layer-preemption.md)

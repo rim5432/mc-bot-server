@@ -32,7 +32,7 @@ Admission protocol:
   inside an entry.
 - Engine-debugging narrative (session.lock wedges, pooled-run
   cross-contamination, workarounds for tooling quirks) belongs in
-  `doc/reference/toolchain.md` or the tool README, never in a verdict
+  the build-and-run guide or the tool README, never in a verdict
   entry. An entry records the ruling and its contract; the war story
   of how it was verified is commit history and tooling docs.
 

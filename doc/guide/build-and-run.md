@@ -4,6 +4,10 @@ last_verified: 2026-09-02
 covers:
   - tool/mcbot_tool.py
   - tool/mcbot/
+  - gradle.properties
+  - build.gradle
+  - settings.gradle
+  - gradle/wrapper
 ---
 
 # Build & Run Guide
@@ -71,7 +75,7 @@ Deliberate deferrals recorded in the configs themselves: import ORDER
 is whatever the formatter emits (single source of truth), and
 identity-comparison checks are absent from both PMD and Error Prone
 sets (see BytecodeArchitectureGateTest sibling comments). JavadocMethod
-tag completeness left its deferral on 2026-08-27 - all 35 live gaps
+tag completeness left its deferral on 2026-08-27 - all 75 live gaps
 fixed at root and the rule now runs with the rest of checkstyle.
 
 God-class paydown progress (PMD dashboard): 31 -> 17 findings after the
@@ -203,7 +207,33 @@ crashes every test with "Failed to load structure".
 ## First launch after a clean
 
 The first `runClient` after `build clean` re-runs NeoForm decompilation
-(roughly 5 extra minutes). `compileJava` / `jar` stay fast because the
-artifact task is shared and cached.
+(roughly 5 extra minutes; first `compileJava` ~6 min total including
+NeoForm download/merge/decompile/patch/Parchment/recompile). Later runs
+are seconds thanks to configuration cache + up-to-date checks.
+`compileJava` / `jar` stay fast because the artifact task is shared
+and cached. Gradle itself may run on JDK 21; compilation uses the
+declared Java 17 toolchain. Test stack: JUnit 5.10.2 BOM plus gson
+2.10.1.
 
-Related: [Toolchain Reference](../reference/toolchain.md)
+## Toolchain constraints
+
+1. **Gradle >= 8.8 required.** The `net.neoforged.moddev.legacyforge`
+   plugin does not configure on older Gradle. PMD 7 needs Gradle >= 8.6;
+   Gradle 8.8 supports it via explicit `pmd.toolVersion` (default stays
+   6.55.0).
+2. **Wrapper distribution mirror**: `distributionUrl` points at the
+   Tencent mirror for fast CN downloads. Switch back to
+   `services.gradle.org` if mirroring lags behind new releases.
+3. **Never re-run project init generators** over this repo: a previous
+   re-run silently reset `gradle-wrapper.properties` back to an old
+   version and left a stray root-level `META-INF/` directory.
+4. **PMD 7 wiring note**: the plugin's default `config/pmd` path is NOT
+   honored on the PMD-7 route; `ruleSetFiles` must stay wired explicitly
+   in `build.gradle`, otherwise the built-in ruleset runs silently. The
+   custom `cpdCheck` JavaExec task invokes `net.sourceforge.pmd.cli.PmdCli cpd`
+   — since PMD 7, CPD is a subcommand of the unified CLI launcher.
+5. **Known deprecation warnings**: `FMLJavaModLoadingContext.get()` at
+   `McBotServer.java:87` is deprecated in Forge 47.4.10 (non-blocking).
+   `ResourceLocation(String, String)` constructor also deprecated
+   (`ReflexRuleReloader:65`, `GametestRig:139`); migration to
+   `ResourceLocation.fromNamespaceAndPath` is deferred.

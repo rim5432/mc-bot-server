@@ -18,7 +18,7 @@ import java.util.function.Supplier;
  * (lava shore vs water source), scans the world for the nearest
  * reachable target, and returns a GotoProcess to that cell.
  *
- * <p>Contract: see issue 0008 D2 (lava escape) and D5-revised (fire
+ * <p>Contract: see boundaries.md decisions 24/26 (lava escape and fire
  * find-water). The factory is the adapter-side half of the ESCAPE
  * handoff: the reflex notices the threat and names the kind, this
  * factory finds the concrete target cell and mints the mission. A

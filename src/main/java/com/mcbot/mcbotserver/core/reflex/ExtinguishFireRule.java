@@ -12,7 +12,7 @@ import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
  * extinguishes fire (vanilla {@code isInWaterRainOrBubble} clears
  * remainingFireTicks), so reaching water resolves the threat.
  *
- * <p>Contract: see issue 0008 F3/D5 (revised). The original D5 ruling
+ * <p>Contract: see boundaries.md decision 24 (fire ruling, revised). The original D5 ruling
  * was "sense-only, no rule" on the assumption that fire is self-
  * limiting and self-answering. That holds for non-lethal fire (the
  * bot's route will eventually touch water, or the fire expires below

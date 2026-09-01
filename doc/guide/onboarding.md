@@ -37,9 +37,10 @@ Cold-start reading order; each step assumes the ones before it.
    full verdict texts (use the number you got from boundaries'
    index), [architecture/code-health.md](../architecture/code-health.md)
    the rule registry plus health/refactor round queue,
-   [reference/toolchain.md](../reference/toolchain.md) the lint-stack
-   versions and gate postures, the `reference/*-notes.md` design
-   distillations, [guide/build-and-run.md](build-and-run.md) plus
+   [guide/build-and-run.md](build-and-run.md) the lint-stack
+   versions, gate postures, and toolchain constraints, the
+   `reference/*-notes.md` design distillations, `tool/README.md`
+   the moment you actually run something, and the
    `tool/README.md` the moment you actually run something, and the
    decompiled MC/Forge tree under
    `D:/mc-decompiled/forge-1.20.1-47.4.10/` for vanilla API

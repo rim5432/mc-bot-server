@@ -771,8 +771,8 @@ public final class BindingActor implements Actor {
      * walls - sprinting into a step is the sprint-jump gait, not a
      * collision.
      */
-    // contract: see issues/0005-player-feel-motion-layer.md P1 +
-    // issue 0004 D4 (sprint is an adapter policy, no Intent field)
+    // contract: see player-behavior-RE.md section 8 (motion feel layer)
+    // and the sprint ruling (sprint is an adapter policy, no Intent field)
     private boolean sprintClearAhead(Intent.Move m) {
         if (m.forward() < SPRINT_FORWARD_MIN || body.isInWater() || body.isInLava()) {
             return false;
