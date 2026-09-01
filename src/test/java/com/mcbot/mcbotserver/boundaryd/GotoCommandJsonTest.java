@@ -1,7 +1,9 @@
 package com.mcbot.mcbotserver.boundaryd;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.google.gson.JsonParseException;
 import com.mcbot.mcbotserver.api.command.BotCommand;
 import com.mcbot.mcbotserver.core.command.GotoCommandJson;
 import java.util.Map;
@@ -33,5 +35,11 @@ class GotoCommandJsonTest {
     void emptyArgsRoundTrip() {
         BotCommand cmd = new BotCommand("goto", Map.of());
         assertEquals(cmd, GotoCommandJson.fromJson(GotoCommandJson.toJson(cmd)));
+    }
+
+    /** Missing verb violates the required-shape contract and must throw JsonParseException, not NPE. */
+    @Test
+    void missingVerbThrowsJsonParseException() {
+        assertThrows(JsonParseException.class, () -> GotoCommandJson.fromJson("{\"args\":{\"x\":\"1\"}}"));
     }
 }

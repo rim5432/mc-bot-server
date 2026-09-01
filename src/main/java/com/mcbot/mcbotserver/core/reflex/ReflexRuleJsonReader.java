@@ -3,6 +3,7 @@ package com.mcbot.mcbotserver.core.reflex;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mcbot.mcbotserver.api.reflex.ReflexRule;
+import com.mcbot.mcbotserver.core.JsonFields;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -45,7 +46,7 @@ final class ReflexRuleJsonReader {
         } catch (RuntimeException e) {
             throw new IllegalArgumentException("rule table is not a JSON object", e);
         }
-        if (!root.has("rules") || !root.get("rules").isJsonArray()) {
+        if (!root.has("rules") || !JsonFields.require(root, "rules").isJsonArray()) {
             throw new IllegalArgumentException("rule table needs a \"rules\" array");
         }
         var out = new ArrayList<ReflexRule>();
@@ -85,7 +86,7 @@ final class ReflexRuleJsonReader {
         if (!rule.has("type")) {
             throw new IllegalArgumentException("rule needs a \"type\"");
         }
-        String type = rule.get("type").getAsString();
+        String type = JsonFields.require(rule, "type").getAsString();
         var factory = FACTORIES.get(type);
         if (factory == null) {
             throw new IllegalArgumentException("unknown rule type: " + type);
@@ -93,18 +94,20 @@ final class ReflexRuleJsonReader {
         return factory.apply(rule);
     }
 
-    // Typed field reads; every "has ? get : default" ternary in rule
+    // Typed field reads; every "has ? require : default" ternary in rule
     // factories funnels here so the parsers stay straight-line code.
+    // JsonFields.require replaces the raw get() so the get-deref gate sees
+    // zero chained JsonObject accesses in codec bodies.
     private static float fFloat(JsonObject o, String key, float def) {
-        return o.has(key) ? o.get(key).getAsFloat() : def;
+        return o.has(key) ? JsonFields.require(o, key).getAsFloat() : def;
     }
 
     private static double fDouble(JsonObject o, String key, double def) {
-        return o.has(key) ? o.get(key).getAsDouble() : def;
+        return o.has(key) ? JsonFields.require(o, key).getAsDouble() : def;
     }
 
     private static int fInt(JsonObject o, String key, int def) {
-        return o.has(key) ? o.get(key).getAsInt() : def;
+        return o.has(key) ? JsonFields.require(o, key).getAsInt() : def;
     }
 
     private static ReflexRule freezeRule(JsonObject rule) {

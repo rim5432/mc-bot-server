@@ -43,15 +43,16 @@ final class CraftingPlanner {
     /** Every position must address an existing cell on the open surface. */
     private static void requirePositionsInBounds(CraftingView menu, int[] gridPos) {
         for (int p : gridPos) {
-            if (p >= 0 && p < menu.grid().size() && menu.grid().get(p).isEmpty()) {
+            if (p < 0 || p >= menu.grid().size()) {
+                throw new IllegalArgumentException("grid position " + p + " out of range for a " + menu.gridSide() + "x"
+                        + menu.gridSide() + " grid");
+            }
+            var slot = menu.grid().get(p);
+            if (slot.isEmpty()) {
                 continue;
             }
-            String why = (p < 0 || p >= menu.grid().size())
-                    ? "grid position " + p + " out of range for a " + menu.gridSide() + "x" + menu.gridSide() + " grid"
-                    : "target cell " + p + " already holds "
-                            + menu.grid().get(p).item().itemId()
-                            + " — refusing to overwrite";
-            throw new IllegalArgumentException(why);
+            throw new IllegalArgumentException(
+                    "target cell " + p + " already holds " + slot.item().itemId() + " — refusing to overwrite");
         }
     }
 
@@ -125,12 +126,12 @@ final class CraftingPlanner {
      */
     static Map<String, List<Integer>> resolvePattern(RecipeView recipe, Map<String, Integer> supply, int gridSide) {
         Map<String, List<Integer>> chosen = new LinkedHashMap<>();
-        List<Integer> positions = new ArrayList<>(recipe.placements().keySet());
-        positions.sort(
-                Comparator.comparingInt(pos -> recipe.placements().get(pos).size()));
-        for (Integer pos : positions) {
+        var placements = new ArrayList<>(recipe.placements().entrySet());
+        placements.sort(Comparator.comparingInt(e -> e.getValue().size()));
+        for (var placement : placements) {
+            int pos = placement.getKey();
             String picked = null;
-            for (String candidate : recipe.placements().get(pos)) {
+            for (String candidate : placement.getValue()) {
                 Integer left = supply.get(candidate);
                 if (left != null && left > 0) {
                     picked = candidate;
@@ -141,7 +142,7 @@ final class CraftingPlanner {
             if (picked == null) {
                 throw new IllegalArgumentException("cannot source cell " + pos + " of "
                         + recipe.recipeId() + ": none of "
-                        + recipe.placements().get(pos)
+                        + placement.getValue()
                         + " remain in the player region");
             }
             int cell =

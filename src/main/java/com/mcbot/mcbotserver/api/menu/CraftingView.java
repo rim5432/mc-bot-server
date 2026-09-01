@@ -108,6 +108,7 @@ public record CraftingView(MenuView menu, List<SlotView> grid, SlotView result) 
      * @throws IndexOutOfBoundsException when gridPos is out of range
      */
     public int flatGridIndex(int gridPos) {
-        return grid.get(gridPos).index();
+        var slot = grid.get(gridPos);
+        return slot.index();
     }
 }

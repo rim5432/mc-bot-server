@@ -103,9 +103,13 @@ public final class PlanSmoother {
         out.add(runs.get(0));
         int i = 0;
         while (i < runs.size() - 1) {
+            CellPos from = runs.get(i);
             int j = runs.size() - 1;
-            while (j > i + 1
-                    && (runs.get(i).y() != runs.get(j).y() || !corridorStandable(world, runs.get(i), runs.get(j)))) {
+            while (j > i + 1) {
+                CellPos to = runs.get(j);
+                if (from.y() == to.y() && corridorStandable(world, from, to)) {
+                    break;
+                }
                 j--;
             }
             out.add(runs.get(j));

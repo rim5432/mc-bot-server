@@ -3,6 +3,7 @@ package com.mcbot.mcbotserver.core.command;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mcbot.mcbotserver.api.command.BotCommand;
+import com.mcbot.mcbotserver.core.JsonFields;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -32,12 +33,15 @@ public final class GotoCommandJson {
      */
     public static BotCommand fromJson(String json) {
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
-        String verb = root.get("verb").getAsString();
+        String verb = JsonFields.require(root, "verb").getAsString();
         Map<String, String> args = new HashMap<>();
-        if (root.has("args") && root.get("args").isJsonObject()) {
-            JsonObject raw = root.getAsJsonObject("args");
-            for (Map.Entry<String, ?> e : raw.entrySet()) {
-                args.put(e.getKey(), raw.get(e.getKey()).getAsString());
+        if (root.has("args")) {
+            var argsEl = JsonFields.require(root, "args");
+            if (argsEl.isJsonObject()) {
+                JsonObject raw = argsEl.getAsJsonObject();
+                for (Map.Entry<String, com.google.gson.JsonElement> e : raw.entrySet()) {
+                    args.put(e.getKey(), e.getValue().getAsString());
+                }
             }
         }
         return new BotCommand(verb, args);

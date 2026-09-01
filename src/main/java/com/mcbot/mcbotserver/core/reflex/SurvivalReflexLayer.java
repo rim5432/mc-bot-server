@@ -145,14 +145,13 @@ public final class SurvivalReflexLayer {
             boolean shouldFire;
             int effectivePriority;
             if (rule instanceof ReflexHysteresis h) {
-                shouldFire = decideHysteresis(h, rule.name(), rawPriority);
+                HysteresisState s = decideHysteresis(h, rule.name(), rawPriority);
+                shouldFire = s.active;
                 // When held, the rule still reports as firing but the
                 // raw priority is negative (signal above trigger) -
                 // use the last positive priority we saw so the
                 // arbiter sees a stable number across the hold.
-                effectivePriority = shouldFire
-                        ? (rawPriority > 0 ? rawPriority : hysteresisState.get(rule.name()).lastPriority)
-                        : -1;
+                effectivePriority = shouldFire ? (rawPriority > 0 ? rawPriority : s.lastPriority) : -1;
             } else {
                 shouldFire = rawPriority > 0;
                 effectivePriority = rawPriority;
@@ -172,14 +171,20 @@ public final class SurvivalReflexLayer {
      * (current state dictates which threshold applies) and a
      * per-rule hold window.
      *
+     * <p>Returns the live state object so the caller can read
+     * {@code lastPriority} without a second map lookup — the
+     * computeIfAbsent here IS the non-null guarantee, and returning
+     * the state turns a temporal invariant (call order) into a
+     * data dependency (the caller consumes what this method returns).
+     *
      * @param h            the hysteretic rule
      * @param ruleName     stable name for state lookup
      * @param rawPriority  the rule's raw computed priority this tick;
      *                     positive when the rule's base condition
      *                     fires
-     * @return true when the layer should report the rule as firing
+     * @return the live hysteresis state for this rule; never null
      */
-    private boolean decideHysteresis(ReflexHysteresis h, String ruleName, int rawPriority) {
+    private HysteresisState decideHysteresis(ReflexHysteresis h, String ruleName, int rawPriority) {
         HysteresisState s = hysteresisState.computeIfAbsent(ruleName, k -> new HysteresisState());
         if (rawPriority > 0) {
             s.lastPriority = rawPriority;
@@ -192,18 +197,18 @@ public final class SurvivalReflexLayer {
         // a mismatch would shift the effective trigger by one tick.
         boolean wantsActive = s.active ? signal < h.releaseThreshold() : signal <= h.triggerThreshold();
         if (wantsActive == s.active) {
-            return s.active;
+            return s;
         }
         // Wants to change state: gate by the hold window. Increment
         // first so a single wants-change tick that arrives exactly
         // at the window boundary still has to wait one more tick.
         if (s.ticksSinceChange < h.minHoldTicks()) {
             s.ticksSinceChange++;
-            return s.active;
+            return s;
         }
         s.active = wantsActive;
         s.ticksSinceChange = 0;
-        return s.active;
+        return s;
     }
 
     /**

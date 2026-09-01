@@ -100,9 +100,8 @@ public final class AttackCommandHandler extends VerbTaskHandler<AttackProcess> {
 
     private static boolean validateArgs(BotCommand command) {
         Map<String, String> args = command.args();
-        if (!args.containsKey("targetId")
-                || args.get("targetId") == null
-                || args.get("targetId").isBlank()) {
+        String targetId = args.get("targetId");
+        if (targetId == null || targetId.isBlank()) {
             return false;
         }
         if (args.containsKey("timeoutTicks")) {

@@ -828,3 +828,54 @@ Amendment chains recorded so far (both sides annotated):
     Goal algebra or heuristic — offline gates are the receipt this
     round. Compile also intermittently blocked by concurrent-session
     WIP (BotHungerGameTests lambda / BotController emitEatStarted).
+    55. 2026-09-01 Core nullness strategy: get-deref audit, JsonFields.require
+    convergence, and the GetDerefGateTest regression guard. Triggered by a
+    six-site audit of chained get-deref patterns (receiver.get(key).member)
+    in the offline-testable layers. The audit found three invariant classes:
+    (1) temporal - SurvivalReflexLayer:154 read hysteresisState.get(name)
+    after decideHysteresis had computeIfAbsent'ed the same key; the non-null
+    guarantee lived in call order, not in data flow. Fixed by returning the
+    HysteresisState from decideHysteresis so the caller consumes s.lastPriority
+    directly - temporal invariant becomes data dependency. (2) structural -
+    CraftingPlanner iterated recipe.placements().keySet() then reverse-lookup get(pos)
+    three times; GotoCommandJson:40 did raw.get(e.getKey()) inside an
+    entrySet loop. Fixed by entrySet iteration: e.getValue() replaces the
+    get reverse-lookup, key origin becomes the entry itself. (3) guarded - GotoCommandJson
+    had root.get("verb").getAsString() with no has-check (the only behavior
+    defect: missing verb threw NPE, not the Javadoc-promised JsonParseException);
+    AttackCommandHandler chained args.get("targetId").isBlank() behind a
+    containsKey||get==null short-circuit; PlanSmoother chained runs.get(i).y()
+    and runs.get(j).y() inside a while condition. All fixed by local-variable
+    extraction. The shared JsonFields.require(obj, key) helper converges both
+    JSON codecs (GotoCommandJson, ReflexRuleJsonReader) on a single
+    checked entry point - require() throws JsonParseException on absent keys,
+    and the helper name does not match the get-deref gate pattern, so codec
+    bodies stay zero-hit. Key analyzer-capability fact: SpotBugs NP checks
+    are SILENT on the computeIfAbsent-then-get pattern (no NP_ suppression
+    exists in config/spotbugs/exclude.xml for SurvivalReflexLayer) - the
+    analyzer does not track that a preceding method call computeIfAbsent'ed
+    the same key on the same map. This is why a source-scan gate is needed:
+    the pattern is invisible to bytecode analysis. GetDerefGateTest scans
+    api/ + core/ (matching SpotBugs onlyAnalyze scope) for the literal
+    pattern \.get\([^)]*\)\s*\.[a-zA-Z] and asserts zero violations, with an
+    EXEMPT_FILES set (empty at launch) following the EnglishOnlyScan /
+    SpotBugs-exclude inline-justification discipline. Documented blind spots:
+    assignment-then-unchecked-use (get and deref on different lines - covered
+    by SpotBugs NP on core/) and List-vs-Map distinction (no type info in a
+    source scan). The deferred upgrade path is an Error Prone custom BugChecker
+    (AST + type resolution, can distinguish Map.get from List.get and can see
+    across statements); trigger condition: EXEMPT_FILES non-empty growth or
+    List.get false-positive friction. NullAway core/ expansion is explicitly
+    deferred: the api/-contract / core/-construct-reject split is a deliberate
+    design fork, and pre-paydown expansion would flag every keySet-origin and
+    computeIfAbsent-then-get site as possibly-null (the gradual-migration baseline law).
+    Registration (outside-repo-unverifiable): the CI static-analysis job
+    (.github/workflows/ci.yml, runs qualityCheck -Plint on every push and PR)
+    is asserted to be a required branch-protection check. This assertion cannot
+    be proven from repository content - branch protection lives in GitHub
+    Settings, not in any git object. Verification is a one-time human check of
+    the Settings/Branches page; the assertion is recorded here so a future
+    agent does not infer "CI runs it" from ci.yml alone and mistake presence
+    for enforcement. Scope note: this entry covers the offline layers only;
+    adapter/ get chains ride MC types and are excluded from the gate (same
+    scope as SpotBugs onlyAnalyze and JaCoCo offline exclusions).
