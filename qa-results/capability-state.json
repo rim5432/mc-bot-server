@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "exported_at": "2026-08-31T22:18:32",
+  "exported_at": "2026-09-01T15:30:17",
   "statuses": [
     {
       "id": "combat.bow_draw",
@@ -70,9 +70,9 @@
     },
     {
       "id": "hunger.movement_exhaustion",
-      "status": "partial",
-      "verified_at": "2026-08-29",
-      "deviation": "BotBodyEntity.customServerAiStep accumulates no exhaustion naturally, so it is fed manually from horizontal distance. Sprint matches vanilla at 0.1/block; walk charges 0.01/block (the vanilla swim rate, not vanilla's zero walk rate) \u2014 a non-zero baseline so a purely-walking carrier still drains hunger over time."
+      "status": "shipped",
+      "verified_at": "2026-09-01",
+      "deviation": "BotBodyEntity.customServerAiStep accumulates no exhaustion naturally, so it is fed manually from horizontal distance traveled. Sprint matches vanilla at 0.1/block; walk charges 0.01/block (the vanilla swim rate, not vanilla's zero walk rate) \u2014 a non-zero baseline so a purely-walking carrier still drains hunger over time. Position is tracked manually (lastTickX/Z fields) because customServerAiStep runs BEFORE LivingEntity.travel() in the aiStep() chain (decompiled 1.20.1: serverAiStep at line 2609, travel at line 2662), so getX()-xo is always zero at that point \u2014 the original getX()-xo implementation was a latent bug that produced zero exhaustion for all movement."
     },
     {
       "id": "interaction.blockitem_place",
@@ -215,44 +215,79 @@
   ],
   "links": [
     {
+      "case_id": "GT-BotCombatGameTests-blocksIncomingArrowsMidCombat",
+      "capability_id": "combat.shield",
+      "link_source": "feature_annotated"
+    },
+    {
       "case_id": "GT-BotCombatGameTests-bowChargedShotDamagesDistantTarget",
       "capability_id": "combat.bow_draw",
-      "link_source": "auto"
+      "link_source": "feature_annotated"
     },
     {
       "case_id": "GT-BotCombatGameTests-bowTapShotDealsWeakDamage",
       "capability_id": "combat.bow_draw",
-      "link_source": "auto"
+      "link_source": "feature_annotated"
+    },
+    {
+      "case_id": "GT-BotCombatGameTests-defendsByKillingZombie",
+      "capability_id": "combat.melee",
+      "link_source": "feature_annotated"
     },
     {
       "case_id": "GT-BotCombatGameTests-equipmentMirrorFeedsAttributes",
-      "capability_id": "inventory.equipment_mirror",
-      "link_source": "auto"
+      "capability_id": "combat.melee",
+      "link_source": "feature_annotated"
     },
     {
       "case_id": "GT-BotCombatGameTests-hostilesAggroOnSight",
       "capability_id": "combat.hostile_acquisition",
-      "link_source": "auto"
+      "link_source": "feature_annotated"
+    },
+    {
+      "case_id": "GT-BotCombatGameTests-killsGrantXpLevels",
+      "capability_id": "combat.melee",
+      "link_source": "feature_annotated"
     },
     {
       "case_id": "GT-BotCombatGameTests-raisedShieldBlocksFrontalMelee",
       "capability_id": "combat.shield",
-      "link_source": "auto"
+      "link_source": "feature_annotated"
     },
     {
       "case_id": "GT-BotCombatGameTests-raisedShieldBlocksIncomingArrow",
       "capability_id": "combat.shield",
-      "link_source": "auto"
+      "link_source": "feature_annotated"
     },
     {
       "case_id": "GT-BotCombatGameTests-rearArrowBypassesTheRaisedShield",
       "capability_id": "combat.shield",
-      "link_source": "auto"
+      "link_source": "feature_annotated"
     },
     {
       "case_id": "GT-BotCombatGameTests-refusesRangedItCannotAnswer",
-      "capability_id": "interaction.right_click_order",
-      "link_source": "auto"
+      "capability_id": "combat.hostile_acquisition",
+      "link_source": "feature_annotated"
+    },
+    {
+      "case_id": "GT-BotCombatGameTests-survivesRetaliatingZombie",
+      "capability_id": "combat.melee",
+      "link_source": "feature_annotated"
+    },
+    {
+      "case_id": "GT-BotCombatGameTests-sweepClipsBystanders",
+      "capability_id": "combat.melee",
+      "link_source": "feature_annotated"
+    },
+    {
+      "case_id": "GT-BotCombatGameTests-swordCooldownSpacesTheHits",
+      "capability_id": "combat.melee",
+      "link_source": "feature_annotated"
+    },
+    {
+      "case_id": "GT-BotCombatGameTests-underwaterSwingsNeverCrit",
+      "capability_id": "combat.melee",
+      "link_source": "feature_annotated"
     },
     {
       "case_id": "GT-BotCraftingGameTests-catalogsShapedRecipes",
@@ -320,6 +355,11 @@
       "link_source": "auto"
     },
     {
+      "case_id": "GT-BotDiggingGameTests-diamondOreSeedsXpOrbs",
+      "capability_id": "dig.enchantment_loot",
+      "link_source": "annotated"
+    },
+    {
       "case_id": "GT-BotDiggingGameTests-digWearsThePickaxeOncePerBlock",
       "capability_id": "dig.pacing",
       "link_source": "auto"
@@ -330,9 +370,19 @@
       "link_source": "auto"
     },
     {
+      "case_id": "GT-BotDiggingGameTests-shearsClipLeavesIntoBlocks",
+      "capability_id": "dig.tool_speed",
+      "link_source": "annotated"
+    },
+    {
       "case_id": "GT-BotDiggingGameTests-swordDigsAtDoubleWear",
       "capability_id": "dig.pacing",
       "link_source": "auto"
+    },
+    {
+      "case_id": "GT-BotDiggingGameTests-toolSelectorPicksShearsForLeaves",
+      "capability_id": "dig.tool_speed",
+      "link_source": "annotated"
     },
     {
       "case_id": "GT-BotDiggingGameTests-toolSelectorPicksThePickaxeForStone",
@@ -343,6 +393,11 @@
       "case_id": "GT-BotFishingGameTests-biteDipTriggersReel",
       "capability_id": "perception.projectiles",
       "link_source": "auto"
+    },
+    {
+      "case_id": "GT-BotFishingGameTests-hookedEntityTriggersImmediateReel",
+      "capability_id": "perception.projectiles",
+      "link_source": "annotated"
     },
     {
       "case_id": "GT-BotFishingGameTests-rodCastsAndReelsTheBobber",
@@ -370,6 +425,11 @@
       "link_source": "auto"
     },
     {
+      "case_id": "GT-BotHazardReflexGameTests-findsWaterWhenBurning",
+      "capability_id": "vitals.fire",
+      "link_source": "annotated"
+    },
+    {
       "case_id": "GT-BotHazardReflexGameTests-surfacesWhenAirRunsLow",
       "capability_id": "vitals.air_supply",
       "link_source": "auto"
@@ -378,6 +438,41 @@
       "case_id": "GT-BotHazardReflexGameTests-waterBucketBreaksAFall",
       "capability_id": "vitals.mlg_water",
       "link_source": "auto"
+    },
+    {
+      "case_id": "GT-BotHungerGameTests-exhaustionCascadeDrainsSaturationThenFood",
+      "capability_id": "hunger.fooddata",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotHungerGameTests-naturalRegenDisabledStopsHealingButNotStarvation",
+      "capability_id": "hunger.fooddata",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotHungerGameTests-saturatedFastRegenHealsAndCostsExhaustion",
+      "capability_id": "hunger.fooddata",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotHungerGameTests-slowRegenFiresAtFoodLevelEighteen",
+      "capability_id": "hunger.fooddata",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotHungerGameTests-sprintAccumulatesExhaustionAtVanillaRate",
+      "capability_id": "hunger.movement_exhaustion",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotHungerGameTests-starvationDealsDamageAtZeroFood",
+      "capability_id": "hunger.fooddata",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotHungerGameTests-walkAccumulatesExhaustionAtDeviatedRate",
+      "capability_id": "hunger.movement_exhaustion",
+      "link_source": "annotated"
     },
     {
       "case_id": "GT-BotInteractionGameTests-doorOpensThroughUseChain",
@@ -393,6 +488,11 @@
       "case_id": "GT-BotInteractionGameTests-stairsFaceTheirPlacer",
       "capability_id": "vitals.air_supply",
       "link_source": "auto"
+    },
+    {
+      "case_id": "GT-BotInventoryGameTests-anvilRenamesAndChargesLevels",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
     },
     {
       "case_id": "GT-BotInventoryGameTests-clickThrowsWhenBotWalksAway",
@@ -420,6 +520,11 @@
       "link_source": "auto"
     },
     {
+      "case_id": "GT-BotInventoryGameTests-opensDoubleChestFullWidth",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
       "case_id": "GT-BotInventoryGameTests-picksUpFromBackpackSlot",
       "capability_id": "combat.bow_slot",
       "link_source": "auto"
@@ -433,6 +538,11 @@
       "case_id": "GT-BotInventoryGameTests-rejectsMenuBeyondReach",
       "capability_id": "inventory.menu_clicks",
       "link_source": "auto"
+    },
+    {
+      "case_id": "GT-BotInventoryGameTests-storesAndRetrievesFromChest",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
     },
     {
       "case_id": "GT-BotInventoryGameTests-villagerTradeMenuOpens",
@@ -455,9 +565,19 @@
       "link_source": "auto"
     },
     {
+      "case_id": "GT-BotLocomotionGameTests-crossesDeepPool",
+      "capability_id": "vitals.swimming",
+      "link_source": "annotated"
+    },
+    {
       "case_id": "GT-BotLocomotionGameTests-crossesLavaTrench",
       "capability_id": "combat.line_of_sight",
       "link_source": "auto"
+    },
+    {
+      "case_id": "GT-BotLocomotionGameTests-crossesWaterTrench",
+      "capability_id": "vitals.swimming",
+      "link_source": "annotated"
     },
     {
       "case_id": "GT-BotLocomotionGameTests-sneakCrawlFitsThroughGap",

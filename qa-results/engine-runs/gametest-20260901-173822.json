@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "task": "runGameTest",
+  "log": "D:\\mc-bot-server\\tool\\.runtime\\build-runGameTest-20260901-173705.log",
+  "git_rev": "5aab63a",
+  "finished_at": "2026-09-01T17:38:22",
+  "scenarios_total": 99,
+  "failed_count": 3,
+  "failed": [
+    "consecutiveeatsproducetwocompleteeventpairs",
+    "rangedbotbacksawaywhentargetclosesinsidemin",
+    "bowtapshotdealsweakdamage"
+  ],
+  "optional_failed_count": 1,
+  "failed_optional": [
+    "climbsladdertoplatform"
+  ],
+  "green": false
+}
