@@ -18,7 +18,9 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.CraftingTableBlock;
+import net.minecraft.world.level.block.EnderChestBlock;
 import net.minecraft.world.level.block.SmithingTableBlock;
+import net.minecraft.world.level.block.entity.EnderChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
@@ -107,6 +109,30 @@ public final class MenuOpener {
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();
 
+        // EnderChestBlock has no getMenuProvider — vanilla opens it directly
+        // in EnderChestBlock.use() via SimpleMenuProvider, so the generic
+        // fallback returns null and the bot could never open an ender chest.
+        // Replicate vanilla: threeRows ChestMenu backed by the facade's
+        // PlayerEnderChestContainer. Blocked if the block above is a redstone
+        // conductor (vanilla parity — EnderChestBlock.use checks this).
+        if (block instanceof EnderChestBlock) {
+            BlockPos above = pos.above();
+            if (level.getBlockState(above).isRedstoneConductor(level, above)) {
+                return Optional.empty();
+            }
+            var enderInventory = facade.getEnderChestInventory();
+            var blockEntity = level.getBlockEntity(pos);
+            if (enderInventory != null && blockEntity instanceof EnderChestBlockEntity enderBe) {
+                enderInventory.setActiveChest(enderBe);
+                facade.syncPosition();
+                var enderMenu = ChestMenu.threeRows(
+                        NEXT_ID.getAndIncrement(), facade.getInventory(), enderInventory);
+                facade.containerMenu = enderMenu;
+                return Optional.of(new BindingMenu(enderMenu, facade, "ender_chest", toCellPos(pos)));
+            }
+            return Optional.empty();
+        }
+
         // SmithingTableBlock extends CraftingTableBlock, so it must be
         // checked first — otherwise the instanceof below routes it to
         // openCraftingTable and the snapshot type comes out "crafting_table"
@@ -116,7 +142,8 @@ public final class MenuOpener {
             MenuProvider smithingProvider = state.getMenuProvider(level, pos);
             if (smithingProvider != null) {
                 facade.syncPosition();
-                var smithingMenu = smithingProvider.createMenu(NEXT_ID.getAndIncrement(), facade.getInventory(), facade);
+                var smithingMenu =
+                        smithingProvider.createMenu(NEXT_ID.getAndIncrement(), facade.getInventory(), facade);
                 if (smithingMenu != null) {
                     facade.containerMenu = smithingMenu;
                     return Optional.of(new BindingMenu(smithingMenu, facade, "smithing_table", toCellPos(pos)));

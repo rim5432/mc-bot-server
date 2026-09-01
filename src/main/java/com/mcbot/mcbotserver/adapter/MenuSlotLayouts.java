@@ -13,6 +13,7 @@ import net.minecraft.world.inventory.EnchantmentMenu;
 import net.minecraft.world.inventory.GrindstoneMenu;
 import net.minecraft.world.inventory.HorseInventoryMenu;
 import net.minecraft.world.inventory.InventoryMenu;
+import net.minecraft.world.inventory.LecternMenu;
 import net.minecraft.world.inventory.LoomMenu;
 import net.minecraft.world.inventory.MerchantMenu;
 import net.minecraft.world.inventory.SmithingMenu;
@@ -210,6 +211,16 @@ final class MenuSlotLayouts {
         return index <= size - 10 ? SlotRole.MAIN : SlotRole.HOTBAR;
     }
 
+    /**
+     * Lectern layout: a single book slot (index 0), no player region —
+     * the lectern menu is a read-only book viewer, not an inventory.
+     * The containerRole fallback would mislabel slot 0 as HOTBAR because
+     * size-37 is negative, so LecternMenu needs its own row.
+     */
+    public static SlotRole lecternRole(int index, int size) {
+        return SlotRole.CONTAINER;
+    }
+
     /** Role table for one kind: pure index->role arithmetic. */
     @FunctionalInterface
     interface RoleTable {
@@ -247,6 +258,7 @@ final class MenuSlotLayouts {
             new KindRow(GrindstoneMenu.class, List.of("grindstone"), MenuSlotLayouts::anvilRole),
             new KindRow(StonecutterMenu.class, List.of("stonecutter"), MenuSlotLayouts::stonecutterRole),
             new KindRow(CartographyTableMenu.class, List.of("cartography_table"), MenuSlotLayouts::anvilRole),
+            new KindRow(LecternMenu.class, List.of("lectern"), MenuSlotLayouts::lecternRole),
             new KindRow(SmithingMenu.class, List.of("smithing_table"), MenuSlotLayouts::threeInputRole),
             new KindRow(LoomMenu.class, List.of("loom"), MenuSlotLayouts::threeInputRole),
             new KindRow(EnchantmentMenu.class, List.of("enchanting_table"), MenuSlotLayouts::enchantingRole),
