@@ -342,7 +342,9 @@ public final class BotHungerGameTests {
     // capability: hunger.movement_exhaustion
     @GameTest(template = "empty16x8x16", timeoutTicks = 100)
     public static void walkAccumulatesExhaustionAtDeviatedRate(GameTestHelper helper) {
-        var rig = rig(helper, new BlockPos(7, WALK_Y, 7));
+        // Row 3, not the center: a pinned-yaw 30-tick walk covers ~9m and
+        // must stay on the 16-wide pad to keep the path straight.
+        var rig = rig(helper, new BlockPos(7, WALK_Y, 3));
         var body = rig.body();
         var food = body.getFoodData();
         primeFood(body, 20, 5.0f, 0f);
@@ -363,7 +365,7 @@ public final class BotHungerGameTests {
                     check(
                             Math.abs(exhDelta - expected) < expected * 0.25f + 0.005f,
                             "walk exhaustion should be ~distance*0.01=" + expected + "; got " + exhDelta + " (distance="
-                                    + distance + ")");
+                                    + distance + ", endYaw=" + body.getYRot() + ")");
                     body.discard();
                 })
                 .thenSucceed();
@@ -379,7 +381,9 @@ public final class BotHungerGameTests {
     // capability: hunger.movement_exhaustion
     @GameTest(template = "empty16x8x16", timeoutTicks = 100)
     public static void sprintAccumulatesExhaustionAtVanillaRate(GameTestHelper helper) {
-        var rig = rig(helper, new BlockPos(7, WALK_Y, 7));
+        // Same off-center start as the walk scenario: the pinned-yaw
+        // sprint covers ~10m and must stay on the pad.
+        var rig = rig(helper, new BlockPos(7, WALK_Y, 3));
         var body = rig.body();
         var food = body.getFoodData();
         primeFood(body, 20, 5.0f, 0f);
@@ -458,6 +462,13 @@ public final class BotHungerGameTests {
             float[] startExh,
             int[] counter) {
         return driveUntil(rig, () -> {
+            // Own the ROT channel at a priority above every behavior:
+            // without a claim, the idle head sweep turns the body a few
+            // degrees per tick, and body-relative drive then walks a
+            // curve - the measured displacement collapses while the
+            // exhaustion accrues on the full arc (the same hand-pump
+            // owns-ROT doctrine the combat scenarios pin).
+            rig.actor().submit(new Claim(Channel.ROT, 50, "gametest:drive", new Intent.Look(0f, 0f)));
             if (counter[0] == 0) {
                 startPos[0] = body.getX();
                 startPos[1] = body.getZ();

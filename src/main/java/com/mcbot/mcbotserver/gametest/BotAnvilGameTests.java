@@ -3,6 +3,8 @@ package com.mcbot.mcbotserver.gametest;
 import static com.mcbot.mcbotserver.gametest.GametestRig.WALK_Y;
 import static com.mcbot.mcbotserver.gametest.GametestRig.check;
 import static com.mcbot.mcbotserver.gametest.GametestRig.checkEquals;
+import static com.mcbot.mcbotserver.gametest.GametestRig.driveOnly;
+import static com.mcbot.mcbotserver.gametest.GametestRig.driveTick;
 import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
 
 import com.mcbot.mcbotserver.McBotServer;
@@ -218,7 +220,7 @@ public final class BotAnvilGameTests {
      * gains experience levels. Pins the grindstone's disenchant path.
      */
     // capability: inventory.menu_clicks
-    @GameTest(template = "empty16x8x16", timeoutTicks = 200)
+    @GameTest(template = "empty16x8x16", timeoutTicks = 600)
     public static void grindstoneRemovesEnchantmentsAndReturnsXP(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(7, WALK_Y, 7));
         BlockPos grindLocal = new BlockPos(7, WALK_Y, 8);
@@ -226,7 +228,13 @@ public final class BotAnvilGameTests {
         BlockPos grindAbs = helper.absolutePos(grindLocal);
 
         var sword = new ItemStack(Items.IRON_SWORD);
-        sword.enchant(Enchantments.SHARPNESS, 2);
+        // Sharpness V, not a low level: the grindstone returns
+        // ceil(minCost(level)/2) + random(min) points (Sharpness minCost
+        // = 11*level - 10), so a Sharpness II yield of 6..11 points
+        // sometimes never crosses the 7-point level-up floor. Level V
+        // yields 23..45 points - the level increase is deterministic,
+        // which is what the scenario pins.
+        sword.enchant(Enchantments.SHARPNESS, 5);
         rig.body().getInventory().container().setItem(0, sword);
         int xpBefore = rig.body().getExperienceLevel();
 
@@ -251,18 +259,32 @@ public final class BotAnvilGameTests {
         check(result.getEnchantmentLevel(Enchantments.SHARPNESS) == 0, "the result must have no sharpness enchantment");
 
         // Grindstone onTake spawns experience orbs at the block center via
-        // ContainerLevelAccess.execute. The bot's tickXpPickup scan covers
-        // adjacent-block centers (inflated 1.5), so orbs are absorbed within
-        // a tick or two. Wait briefly, then verify XP increased.
-        helper.runAfterDelay(20, () -> {
-            int xpAfter = rig.body().getExperienceLevel();
-            check(
-                    xpAfter > xpBefore,
-                    "grindstone must return experience (level increased); xpBefore=" + xpBefore + " xpAfter="
-                            + xpAfter);
-            rig.body().discard();
-            helper.succeed();
-        });
+        // ContainerLevelAccess.execute, and the body's tickXpPickup scan
+        // absorbs them in customServerAiStep. In production the world's
+        // entity tick runs that scan every tick; in a pooled gametest
+        // batch the world's entity tick for this body lands at
+        // unpredictable offsets (a 200-tick poll has gone without one),
+        // so the poll drives the body's own production tick explicitly
+        // - the same customServerAiStep the world would run - and never
+        // races the scheduler.
+        helper.startSequence()
+                .thenWaitUntil(() -> {
+                    driveTick(rig);
+                    rig.body().tick();
+                    check(
+                            rig.body().getExperienceLevel() > xpBefore,
+                            "waiting for grindstone XP pickup (level > " + xpBefore + ")");
+                })
+                .thenExecuteFor(3, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    check(
+                            rig.body().getExperienceLevel() > xpBefore,
+                            "grindstone must return experience (level increased); xpBefore=" + xpBefore + " xpAfter="
+                                    + rig.body().getExperienceLevel());
+                    rig.body().discard();
+                    helper.succeed();
+                })
+                .thenSucceed();
     }
 
     /**

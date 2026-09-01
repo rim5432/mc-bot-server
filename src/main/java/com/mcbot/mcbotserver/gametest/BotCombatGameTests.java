@@ -1056,6 +1056,16 @@ public final class BotCombatGameTests {
         // not six: outside the engage reflex's trigger (see Javadoc).
         Zombie fullDraw = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(4, GametestRig.WALK_Y, 9));
         fullDraw.setNoAi(true);
+        // The scenario pins the BOW's damage, not the target's armor: a
+        // vanilla zombie carries 2 armor points, and their 1.6% reduction
+        // on a base-6 shot (the crit-0 edge of the full draw) lands at
+        // health 14.096 - above the 14.05 bound and the source of the
+        // flake. Zero the armor attribute so "6+ base" reads directly
+        // off the health bar.
+        var armorAttr = fullDraw.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.ARMOR);
+        if (armorAttr != null) {
+            armorAttr.setBaseValue(0.0);
+        }
         // The full-draw miss with health untouched is the pooled-run
         // contamination class (a leaked entity absorbing the shot) -
         // sweep the structure so the only thing on the firing column
@@ -1090,7 +1100,7 @@ public final class BotCombatGameTests {
                         () -> check(
                                 fullDraw.getHealth() <= 14.05f,
                                 "the full draw must land heavy damage (6+ base; the crit bonus is"
-                                        + " random 0-3 so exactly 6 is legal), health=" + fullDraw.getHealth())))
+                                        + " random 0-4 so exactly 6 is legal), health=" + fullDraw.getHealth())))
                 .thenExecuteAfter(0, () -> afterFull[0] = fullDraw.getHealth())
                 .thenExecuteFor(4, () -> {
                     rig.actor().submit(new Claim(Channel.ROT, 50, "test:aim", new Intent.Look(aimYaw, aimPitch)));
