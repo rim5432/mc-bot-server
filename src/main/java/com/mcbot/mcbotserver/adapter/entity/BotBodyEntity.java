@@ -13,6 +13,7 @@ import net.minecraft.world.item.HoneyBottleItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.MilkBucketItem;
 import net.minecraft.world.item.PotionItem;
 import net.minecraft.world.item.SuspiciousStewItem;
 import net.minecraft.world.level.Level;
@@ -565,19 +566,70 @@ public final class BotBodyEntity extends PathfinderMob {
         }
         // finishUsingItem applies effects but does not shrink for Mob
         // callers — the Player-only shrink in PotionItem.finishUsingItem
-        // line 63 is skipped, so we must shrink manually below.
+        // line 63 is skipped, so consumeDrink shrinks manually below.
         held.finishUsingItem(level(), this);
+        consumeDrink(Items.GLASS_BOTTLE);
+        return true;
+    }
+
+    /**
+     * Drink the held milk bucket (consumable-face Phase 2): the vanilla
+     * mob-safe chain — {@code finishUsingItem} calls {@code
+     * curePotionEffects} to clear all curable effects and fires the
+     * DRINK game event, but does NOT shrink the stack or return a bucket
+     * for non-Player callers ({@code MilkBucketItem.finishUsingItem}
+     * line 34-36 are Player-only). This method implements the vanilla
+     * Player resolution: count 1 replaces the slot with a bucket;
+     * count{@code >}1 keeps the shrunk stack in the slot and routes the
+     * bucket to inventory (or drops it if full).
+     *
+     * <p>Effect-clearing semantics: {@code curePotionEffects} removes all
+     * curable {@code MobEffectInstance}s (the default for most effects;
+     * effects marked non-curable in their constructor survive). The caller
+     * captures the active effect list BEFORE calling this method so the
+     * DRINK_COMPLETED event can report what was cleared.
+     *
+     * @return true when a milk bucket was consumed
+     */
+    public boolean drinkMilk() {
+        ItemStack held = inventory.container().getItem(selectedSlot);
+        if (!(held.getItem() instanceof MilkBucketItem)) {
+            return false;
+        }
+        // finishUsingItem cures effects but does not shrink for Mob callers
+        // — consumeDrink handles the manual shrink and bucket recovery.
+        held.finishUsingItem(level(), this);
+        consumeDrink(Items.BUCKET);
+        return true;
+    }
+
+    /**
+     * Shared drink-consumption tail: manually shrink the held stack (Mob
+     * callers skip the Player-only shrink in PotionItem/MilkBucketItem
+     * finishUsingItem) and recover the container. Count 1 replaces the
+     * slot with the container; count{@code >}1 keeps the shrunk stack in
+     * the slot and routes the container to inventory via addOrDrop.
+     *
+     * <p>Extracted so potion and milk drink paths share identical container
+     * resolution — the only difference is the container item (glass bottle
+     * vs bucket) and the effect side effect (add vs cure), both handled
+     * by the caller before this method runs.
+     *
+     * @param container the container item left behind (GLASS_BOTTLE /
+     *                  BUCKET); never null
+     */
+    private void consumeDrink(Item container) {
+        ItemStack held = inventory.container().getItem(selectedSlot);
         held.shrink(1);
         if (held.isEmpty()) {
-            // Count was 1: slot becomes the glass bottle.
-            inventory.container().setItem(selectedSlot, new ItemStack(Items.GLASS_BOTTLE));
+            // Count was 1: slot becomes the container.
+            inventory.container().setItem(selectedSlot, new ItemStack(container));
         } else {
-            // Count was > 1: keep the shrunk stack in the slot and
-            // route the glass bottle to inventory (or drop if full).
+            // Count was > 1: keep the shrunk stack in the slot and route
+            // the container to inventory (or drop if full).
             inventory.container().setItem(selectedSlot, held);
-            addOrDrop(new ItemStack(Items.GLASS_BOTTLE));
+            addOrDrop(new ItemStack(container));
         }
-        return true;
     }
 
     /**

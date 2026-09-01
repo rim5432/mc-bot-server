@@ -27,6 +27,7 @@ import net.minecraft.world.item.FishingRodItem;
 import net.minecraft.world.item.HoneyBottleItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.MilkBucketItem;
 import net.minecraft.world.item.PotionItem;
 import net.minecraft.world.item.ShieldItem;
 import net.minecraft.world.item.SuspiciousStewItem;
@@ -353,6 +354,22 @@ public final class BindingActor implements Actor {
             boolean consumed = body.drinkHeldItem();
             if (consumed) {
                 emitDrinkCompleted(potionId, slot, effects, "glass_bottle", source);
+            } else {
+                emitDrinkFailed("NOT_DRINKABLE", slot, itemId, source);
+            }
+            return;
+        }
+        if (held.getItem() instanceof MilkBucketItem) {
+            int slot = body.selectedSlot;
+            String itemId = BuiltInRegistries.ITEM.getKey(held.getItem()).toString();
+            // Milk cures all curable effects: capture the active effect list
+            // BEFORE drinking so DRINK_COMPLETED can report what was cleared.
+            String clearedEffects = serializeEffects(List.copyOf(body.getActiveEffects()));
+            float health = body.getHealth();
+            emitDrinkStarted("minecraft:milk", slot, health, source);
+            boolean consumed = body.drinkMilk();
+            if (consumed) {
+                emitDrinkCompleted("minecraft:milk", slot, clearedEffects, "bucket", source);
             } else {
                 emitDrinkFailed("NOT_DRINKABLE", slot, itemId, source);
             }

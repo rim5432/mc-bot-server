@@ -9,6 +9,8 @@ import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.alchemy.PotionUtils;
@@ -73,16 +75,17 @@ public final class BotPotionGameTests {
         // Damage the body so instant_health has room to heal.
         float healthBefore = 10.0f;
         body.setHealth(healthBefore);
-        // Healing potion = instant_health I: heals 4 hearts = 8 HP.
+        // Healing potion = instant_health I: heals 2 hearts = 4 HP.
         ItemStack potion = PotionUtils.setPotion(new ItemStack(Items.POTION), Potions.HEALING);
         body.getInventory().container().setItem(0, potion);
 
         boolean consumed = body.drinkHeldItem();
         check(consumed, "healing potion must be consumable via drinkHeldItem");
-        // instant_health I heals 8 HP (4 << 0 = 4 hearts = 8 HP).
+        // instant_health I heals 4 HP (2 hearts): the vanilla formula is
+        // (4 << amplifier) * healthFactor, amplifier=0, healthFactor=1.0.
         check(
-                body.getHealth() == healthBefore + 8.0f,
-                "healing potion must restore 8 HP; got " + body.getHealth() + " (expected " + (healthBefore + 8.0f)
+                body.getHealth() == healthBefore + 4.0f,
+                "healing potion must restore 4 HP; got " + body.getHealth() + " (expected " + (healthBefore + 4.0f)
                         + ")");
         // Count 1: slot becomes glass bottle.
         ItemStack slot0 = body.getInventory().container().getItem(0);
@@ -129,6 +132,41 @@ public final class BotPotionGameTests {
             }
         }
         check(foundBottle, "glass bottle must be added to inventory after count>1 drink");
+        body.discard();
+        helper.succeed();
+    }
+
+    /**
+     * Scenario: a milk bucket clears all active potion effects and leaves
+     * an iron bucket in the selected slot. Pins the milk drink path —
+     * MilkBucketItem.finishUsingItem calls curePotionEffects (line 26)
+     * but the shrink (line 34-36) and bucket return (line 38) are
+     * Player-only, so drinkMilk must shrink manually and recover the
+     * bucket via the shared consumeDrink helper.
+     *
+     * <p>Night vision is used as the canary effect: it is curable
+     * (default for all effects except those constructed with
+     * curative=false), so milk must remove it. The test verifies both
+     * the effect-clearing side effect and the container recovery.
+     */
+    // capability: consumable.potion
+    @GameTest(template = "empty16x8x16", timeoutTicks = 40)
+    public static void milkBucketClearsEffectsAndLeavesBucket(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, WALK_Y, 7));
+        BotBodyEntity body = rig.body();
+        // Apply night vision (200 ticks, amplifier 0) as the canary effect.
+        body.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 200, 0));
+        check(body.hasEffect(MobEffects.NIGHT_VISION), "night vision must be active before milk");
+        body.getInventory().container().setItem(0, new ItemStack(Items.MILK_BUCKET));
+
+        boolean consumed = body.drinkMilk();
+        check(consumed, "milk bucket must be consumable via drinkMilk");
+        // Milk cures all curable effects: night vision must be gone.
+        check(!body.hasEffect(MobEffects.NIGHT_VISION), "milk must clear night vision effect");
+        // Count 1: slot becomes the iron bucket.
+        ItemStack slot0 = body.getInventory().container().getItem(0);
+        check(slot0.is(Items.BUCKET), "slot 0 must have iron bucket after milk; got " + slot0);
+        check(slot0.getCount() == 1, "bucket count must be 1; got " + slot0.getCount());
         body.discard();
         helper.succeed();
     }

@@ -123,7 +123,8 @@ class GametestInventoryCheck {
                     "BotPotionGameTests",
                     Set.of(
                             "healingPotionRestoresHealthAndLeavesGlassBottle",
-                            "potionStackCountTwoKeepsRemainderAndAddsBottle")),
+                            "potionStackCountTwoKeepsRemainderAndAddsBottle",
+                            "milkBucketClearsEffectsAndLeavesBucket")),
             Map.entry("CrashRecoveryGameTests", Set.of("latchesAndRecoversAfterCrash")),
             Map.entry("ProductionWiringGameTests", Set.of("walksViaCommandAndServerTick")),
             Map.entry(
