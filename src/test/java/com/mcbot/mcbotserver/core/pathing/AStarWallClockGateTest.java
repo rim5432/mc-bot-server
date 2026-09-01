@@ -94,10 +94,11 @@ class AStarWallClockGateTest {
             }
         }
         // 6 ms per nanotime read: the arming read lands at 6 ms, the
-        // deadline at 11 ms, the first 64-expansion check at 12 ms -
-        // the cut fires at expansion 64, where the frontier fan has
-        // moved ~4 cells toward a 155-block goal (confidence ~0.03,
-        // under MIN_PARTIAL_CONFIDENCE).
+        // deadline at 11 ms, the first checkpoint (expansion 0,
+        // 0 % 64 == 0) reads 12 ms and cuts immediately — zero
+        // frontier progress, the exact starved-worker shape behind the
+        // pullscrafts flake (a thread starved past its budget before
+        // the first checkpoint returns a zero-progress cut).
         long[] nanos = {0};
         var finder = new AStarPathFinder(
                 BasicMoves::from,
