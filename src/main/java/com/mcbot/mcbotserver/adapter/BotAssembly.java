@@ -157,6 +157,12 @@ public final class BotAssembly {
         Behavior mover = new PathingBehavior(
                 "mover",
                 () -> finePoseOf(body),
+                // Live yaw frame: the combat aim's ROT claim (priority
+                // 20) beats the mover's look claim, so the MOVE
+                // decomposition must run against the body's actual
+                // facing or a standoff kite marches into its target
+                // (ledger 56).
+                steer -> body.getYRot(),
                 () -> body.onGround(),
                 com.mcbot.mcbotserver.core.pathing.BasicMoves::from,
                 new com.mcbot.mcbotserver.core.pathing.PlanWorker());

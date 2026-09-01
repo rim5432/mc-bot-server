@@ -33,6 +33,17 @@ import java.util.Map;
  * exhausted, body drifted beyond {@value #REPLAN_DISTANCE} of the active
  * waypoint, or {@value PlanProgressFuse#STUCK_WINDOW} ticks without plan-progress.
  *
+ * <p>Steering frame (ledger 56): the MOVE intent is body-relative and
+ * the adapter resolves it along the live facing, so the steer step is
+ * decomposed against the yaw reported by {@link BodyYawSource} - the
+ * live body yaw in production, the steer bearing in frame-aligned
+ * offline rigs. When a higher-priority ROT claim owns the facing
+ * (combat aim during a standoff kite), the plan still executes, as
+ * strafe/backpedal - the vanilla skeleton kiting pattern - instead of
+ * marching forward into the aimed target. The ROT claim below priority
+ * 20 keeps uncontested walks facing their waypoint, where the
+ * decomposition degenerates to the historical forward-only drive.
+ *
  * <p>Decomposition: this class is the orchestration shell - it owns the
  * tuning constants, the constructor surface, steering, and the
  * STUCK / NO_PATH verdicts; each concern's state machine lives beside
@@ -136,6 +147,7 @@ public final class PathingBehavior implements Behavior {
 
     private final String name;
     private final BodyPositionSource positionSource;
+    private final BodyYawSource bodyYaw;
     private final OnGroundSource onGroundSource;
     private final PlanLifecycle lifecycle;
     private final WaypointCursor cursor = new WaypointCursor();
@@ -168,10 +180,42 @@ public final class PathingBehavior implements Behavior {
     }
 
     /**
+     * The yaw frame a body-relative MOVE intent will execute in. The
+     * drive adapter resolves {@code Intent.Move(forward, strafe)} along
+     * the body's live facing, so when a higher-priority ROT claim
+     * (combat aim, reflex look) owns the facing, the plan's world-frame
+     * step must be decomposed against THAT yaw - walking away from an
+     * aimed target executes as strafe/backpedal, the vanilla skeleton
+     * kiting pattern - instead of marching forward into whatever the
+     * body faces (ledger 56).
+     *
+     * <p>For real entities the wiring is
+     * {@code steer -> body.getYRot()}; constructors without a live yaw
+     * source pass the identity {@code steer -> steer}, which reproduces
+     * the frame-aligned forward-only drive of offline rigs and every
+     * pre-56 behavior. The argument is the steer bearing so the source
+     * can fall back to it; live sources ignore it.
+     */
+    @FunctionalInterface
+    public interface BodyYawSource {
+
+        /**
+         * The yaw the drive executes in for this steer.
+         *
+         * @param steerYawDeg the bearing toward the current steer
+         *                    waypoint, degrees
+         * @return the live body yaw, or the given bearing when no live
+         *         yaw exists
+         */
+        double yawDeg(double steerYawDeg);
+    }
+
+    /**
      * Creates a follower over one move graph, planning synchronously
-     * on the tick thread, assuming the body is always grounded.
-     * Offline tests and tiny graphs only - real bots use the worker
-     * constructor (or the four-/five-argument variants below).
+     * on the tick thread, assuming the body is always grounded and its
+     * yaw aligned with the steer bearing. Offline tests and tiny graphs
+     * only - real bots use the six-argument constructor (or the
+     * four-/five-argument variants below).
      *
      * @param name       stable identity for claims and diagnostics;
      *                   never null or blank
@@ -179,14 +223,14 @@ public final class PathingBehavior implements Behavior {
      * @param graph      edge supplier for planning; never null
      */
     public PathingBehavior(String name, BodyPositionSource positionSource, MoveGraph graph) {
-        this(name, positionSource, () -> true, graph, null);
+        this(name, positionSource, steer -> steer, () -> true, graph, null);
     }
 
     /**
      * Creates a follower that plans off-thread through the given
-     * worker, assuming the body is always grounded. Offline tests
-     * and tiny graphs only - real bots use the five-argument
-     * constructor below.
+     * worker, assuming the body is always grounded and its yaw aligned
+     * with the steer bearing. Offline tests and tiny graphs only -
+     * real bots use the six-argument constructor below.
      *
      * @param name       stable identity for claims and diagnostics;
      *                   never null or blank
@@ -195,14 +239,14 @@ public final class PathingBehavior implements Behavior {
      * @param worker     search executor; never null
      */
     public PathingBehavior(String name, BodyPositionSource positionSource, MoveGraph graph, PlanWorker worker) {
-        this(name, positionSource, () -> true, graph, worker);
+        this(name, positionSource, steer -> steer, () -> true, graph, worker);
     }
 
     /**
      * Creates a follower over one move graph, planning synchronously
-     * on the tick thread, with an explicit ground-state accessor.
-     * Offline tests and tiny graphs only - real bots use the
-     * five-argument constructor.
+     * on the tick thread, with an explicit ground-state accessor and
+     * the frame-aligned yaw default. Offline tests and tiny graphs
+     * only - real bots use the six-argument constructor.
      *
      * @param name            stable identity for claims and
      *                        diagnostics; never null or blank
@@ -212,19 +256,45 @@ public final class PathingBehavior implements Behavior {
      */
     public PathingBehavior(
             String name, BodyPositionSource positionSource, OnGroundSource onGroundSource, MoveGraph graph) {
-        this(name, positionSource, onGroundSource, graph, null);
+        this(name, positionSource, steer -> steer, onGroundSource, graph, null);
     }
 
     /**
-     * Creates a follower that plans off-thread through the given
-     * worker, with an explicit ground-state accessor. Searches
-     * read an immutable snapshot captured here on the tick thread;
-     * results are adopted only when still fresh (goal unchanged,
-     * start cell still ours) - decision 17b's staleness guard.
+     * Creates a follower over one move graph, planning synchronously
+     * on the tick thread, with explicit ground-state and yaw-frame
+     * accessors. Offline tests and tiny graphs only - real bots use
+     * the six-argument constructor.
      *
      * @param name            stable identity for claims and
      *                        diagnostics; never null or blank
      * @param positionSource      body position accessor; never null
+     * @param bodyYaw         yaw frame the MOVE decomposition executes
+     *                        in; never null
+     * @param onGroundSource  body contact-state accessor; never null
+     * @param graph           edge supplier for planning; never null
+     */
+    public PathingBehavior(
+            String name,
+            BodyPositionSource positionSource,
+            BodyYawSource bodyYaw,
+            OnGroundSource onGroundSource,
+            MoveGraph graph) {
+        this(name, positionSource, bodyYaw, onGroundSource, graph, null);
+    }
+
+    /**
+     * Creates a follower that plans off-thread through the given
+     * worker, with explicit ground-state and yaw-frame accessors.
+     * Searches read an immutable snapshot captured here on the tick
+     * thread; results are adopted only when still fresh (goal
+     * unchanged, start cell still ours) - decision 17b's staleness
+     * guard.
+     *
+     * @param name            stable identity for claims and
+     *                        diagnostics; never null or blank
+     * @param positionSource      body position accessor; never null
+     * @param bodyYaw         yaw frame the MOVE decomposition executes
+     *                        in; never null
      * @param onGroundSource  body contact-state accessor; never null
      * @param graph           edge supplier for planning; never null
      * @param worker          search executor; never null
@@ -232,6 +302,7 @@ public final class PathingBehavior implements Behavior {
     public PathingBehavior(
             String name,
             BodyPositionSource positionSource,
+            BodyYawSource bodyYaw,
             OnGroundSource onGroundSource,
             MoveGraph graph,
             PlanWorker worker) {
@@ -240,6 +311,7 @@ public final class PathingBehavior implements Behavior {
         }
         this.name = name;
         this.positionSource = positionSource;
+        this.bodyYaw = bodyYaw;
         this.onGroundSource = onGroundSource;
         // Null worker is the deliberate synchronous-planning mode
         // used by offline tests; see the two-, three-, and
@@ -633,12 +705,71 @@ public final class PathingBehavior implements Behavior {
         boolean sneakForWaypoint = sneakForLeg(wp, floor, liquid(world, floor));
         // Arrival brake (issue 0005 P2.2): scale drive down as the
         // terminal waypoint closes, floored at ARRIVE_MIN_DRIVE so
-        // the body always creeps into the goal predicate.
+        // the body always creeps into the goal predicate. The brake
+        // bounds the drive VECTOR magnitude; with the frame aligned
+        // (legacy rigs, uncontested ROT) the vector is pure forward
+        // and identical to the pre-56 scalar.
         CellPos end = cursor.last();
         double endDist = Math.hypot(end.x() + 0.5 - position.x(), end.z() + 0.5 - position.z());
-        double forward = Math.min(1.0, Math.max(ARRIVE_MIN_DRIVE, endDist / BRAKE_DISTANCE));
-        actor.submit(new Claim(Channel.MOVE, 10, name, new Intent.Move(forward, 0, jumpForWaypoint, sneakForWaypoint)));
+        double brake = Math.min(1.0, Math.max(ARRIVE_MIN_DRIVE, endDist / BRAKE_DISTANCE));
+        // The MOVE intent is body-relative and the adapter resolves it
+        // along the live facing: when a higher-priority ROT claim owns
+        // the facing (combat aim during a kite), the plan's world-frame
+        // step must be decomposed against that yaw or the body marches
+        // forward into what it aims at (ledger 56). The frame is the
+        // yaw as of last tick's claim application - a moving aim
+        // target lags one tick, bounded and self-correcting.
+        double frameYaw = bodyYaw.yawDeg(yaw);
+        double forward = brake * forwardComponent(dx, dz, frameYaw);
+        double strafe = brake * strafeComponent(dx, dz, frameYaw);
+        actor.submit(
+                new Claim(Channel.MOVE, 10, name, new Intent.Move(forward, strafe, jumpForWaypoint, sneakForWaypoint)));
         actor.submit(new Claim(Channel.ROT, 10, name, new Intent.Look(yaw, steerPitch(position, wp))));
+    }
+
+    /**
+     * Forward component of the world-frame step {@code (dx, dz)} in
+     * the body-relative drive frame at yaw {@code frameYawDeg}, per
+     * vanilla {@code Entity.getInputVector}: the forward basis is
+     * {@code (-sin Y, cos Y)}. Unit magnitude for a unit step.
+     *
+     * @param dx          X delta toward the steer target; finite
+     * @param dz          Z delta toward the steer target; finite
+     * @param frameYawDeg the yaw the drive executes in; the live body
+     *                    yaw, or the steer bearing when frame-aligned
+     * @return forward drive in [-1, 1]; 0 for a zero step
+     */
+    static double forwardComponent(double dx, double dz, double frameYawDeg) {
+        double len = Math.hypot(dx, dz);
+        if (len < 1.0E-9) {
+            return 0.0;
+        }
+        double rad = Math.toRadians(frameYawDeg);
+        return (-Math.sin(rad) * dx + Math.cos(rad) * dz) / len;
+    }
+
+    /**
+     * Strafe component of the world-frame step {@code (dx, dz)} in
+     * the body-relative drive frame at yaw {@code frameYawDeg}, per
+     * vanilla {@code Entity.getInputVector}: the strafe basis is
+     * {@code (cos Y, sin Y)} and positive strafe drives LEFT ({@code
+     * xxa} convention, decompiled 1.20.1). Unit magnitude for a unit
+     * step.
+     *
+     * @param dx          X delta toward the steer target; finite
+     * @param dz          Z delta toward the steer target; finite
+     * @param frameYawDeg the yaw the drive executes in; the live body
+     *                    yaw, or the steer bearing when frame-aligned
+     * @return strafe drive in [-1, 1], positive = left; 0 for a zero
+     *         step
+     */
+    static double strafeComponent(double dx, double dz, double frameYawDeg) {
+        double len = Math.hypot(dx, dz);
+        if (len < 1.0E-9) {
+            return 0.0;
+        }
+        double rad = Math.toRadians(frameYawDeg);
+        return (Math.cos(rad) * dx + Math.sin(rad) * dz) / len;
     }
 
     /**

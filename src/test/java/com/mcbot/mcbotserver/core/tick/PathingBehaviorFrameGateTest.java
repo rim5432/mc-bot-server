@@ -31,6 +31,14 @@ import org.junit.jupiter.api.Test;
  * <li>{@code STUCK_WINDOW} and {@code REPLAN_COOLDOWN} are ticks
  * (no spatial frame; not pinned here).</li>
  * </ul>
+ *
+ * <p>Also pins the MOVE drive frame (ledger 56): {@code Intent.Move}
+ * is body-relative, decomposed against the {@code BodyYawSource}
+ * yaw per vanilla {@code getInputVector} (forward basis
+ * {@code (-sin Y, cos Y)}, strafe basis {@code (cos Y, sin Y)},
+ * positive strafe = LEFT). The frame-aligned default must stay
+ * pure-forward; an opposed frame must backpedal, never march into
+ * the facing.
  */
 class PathingBehaviorFrameGateTest {
 
@@ -230,9 +238,111 @@ class PathingBehaviorFrameGateTest {
         assertFalse(goal.isInGoal(new CellPos(5, 63, 0)), "Y-1 must NOT satisfy the goal: isInGoal is 3D, not 2.5D");
 
         // Different X or Z: false.
-        assertFalse(goal.isInGoal(new CellPos(4, 64, 0)), "X-1 must NOT satisfy the goal");
-        assertFalse(goal.isInGoal(new CellPos(6, 64, 0)), "X+1 must NOT satisfy the goal");
-        assertFalse(goal.isInGoal(new CellPos(5, 64, 1)), "Z+1 must NOT satisfy the goal");
-        assertFalse(goal.isInGoal(new CellPos(5, 64, -1)), "Z-1 must NOT satisfy the goal");
+        assertFalse(goal.isInGoal(new CellPos(4, 64, 0)), "X-1 must NOT satisfy the goal predicate");
+        assertFalse(goal.isInGoal(new CellPos(6, 64, 0)), "X+1 must NOT satisfy the goal predicate");
+        assertFalse(goal.isInGoal(new CellPos(5, 64, 1)), "Z+1 must NOT satisfy the goal predicate");
+        assertFalse(goal.isInGoal(new CellPos(5, 64, -1)), "Z-1 must NOT satisfy the goal predicate");
+    }
+
+    /**
+     * Walks east until the departure hold releases and returns the
+     * latest MOVE intent. The goal sits 40 cells east on the same z
+     * column, so the steer step is pure +X and the brake is 1.0 -
+     * the decomposition is exactly the sign geometry under test.
+     */
+    private static com.mcbot.mcbotserver.api.actor.Intent.Move driveEastClaim(
+            PathingBehavior mover, Directive directive, RecordingActor actor, MockWorldView world) {
+        for (int i = 1; i <= 6; i++) {
+            mover.tick(world, directive, actor);
+        }
+        com.mcbot.mcbotserver.api.actor.Claim move = actor.lastClaim(com.mcbot.mcbotserver.api.actor.Channel.MOVE);
+        assertTrue(move != null, "a MOVE claim must flow once the departure hold releases");
+        assertTrue(
+                move.intent() instanceof com.mcbot.mcbotserver.api.actor.Intent.Move,
+                "the MOVE claim must carry a Move intent");
+        return (com.mcbot.mcbotserver.api.actor.Intent.Move) move.intent();
+    }
+
+    /**
+     * The MOVE drive frame is body-relative (ledger 56): with a live
+     * yaw source reporting the steer bearing (the frame-aligned
+     * default offline rigs inherit), the decomposition must be pure
+     * forward with zero strafe - bit-identical to the pre-56 scalar
+     * drive. This pins the legacy identity so the decomposition
+     * cannot drift uncontested walks.
+     */
+    @Test
+    void frameAlignedYawDrivesPureForward() {
+        MockWorldView world = MockWorldView.pavedFloor(60);
+        Vec3[] position = {new Vec3(0.5, 64, 0.5)};
+        PathingBehavior mover = new PathingBehavior("mover", () -> position[0], BasicMoves::from);
+        RecordingActor actor = new RecordingActor();
+        Directive directive = Directive.of(new GoalBlock(new CellPos(40, 64, 0)));
+
+        var drive = driveEastClaim(mover, directive, actor, world);
+        assertTrue(drive.forward() > 0.99, "aligned frame must drive forward, got " + drive.forward());
+        assertEquals(0.0, drive.strafe(), 1.0E-9, "aligned frame must not strafe");
+    }
+
+    /**
+     * A body facing AWAY from its steer target (west-facing, plan
+     * east - the rangedBot geometry under a lost ROT arbitration)
+     * must backpedal: forward is negative, strafe stays zero. If the
+     * decomposition were dropped, forward would be +1 along the
+     * facing and the body would march into what it aims at.
+     */
+    @Test
+    void opposedYawBackpedalsInsteadOfMarching() {
+        Vec3[] position = {new Vec3(0.5, 64, 0.5)};
+        // Facing west is +90 degrees; the plan runs east.
+        PathingBehavior mover =
+                new PathingBehavior("mover", () -> position[0], steer -> 90.0, () -> true, BasicMoves::from);
+        RecordingActor actor = new RecordingActor();
+        Directive directive = Directive.of(new GoalBlock(new CellPos(40, 64, 0)));
+
+        var drive = driveEastClaim(mover, directive, actor, MockWorldView.pavedFloor(60));
+        assertTrue(drive.forward() < -0.99, "opposed frame must backpedal, got " + drive.forward());
+        assertEquals(0.0, drive.strafe(), 1.0E-9, "a collinear opposed frame has no strafe component");
+    }
+
+    /**
+     * A body facing south (yaw 0, forward basis +Z) with a plan east
+     * (+X) must strafe LEFT: positive strafe per the vanilla {@code
+     * xxa} convention (positive = left, decompiled 1.20.1
+     * KeyboardInput), zero forward. This pins the sign of the strafe
+     * basis against the decompiled getInputVector math.
+     */
+    @Test
+    void crossFrameStrafesLeftPerXxaConvention() {
+        Vec3[] position = {new Vec3(0.5, 64, 0.5)};
+        PathingBehavior mover =
+                new PathingBehavior("mover", () -> position[0], steer -> 0.0, () -> true, BasicMoves::from);
+        RecordingActor actor = new RecordingActor();
+        Directive directive = Directive.of(new GoalBlock(new CellPos(40, 64, 0)));
+
+        var drive = driveEastClaim(mover, directive, actor, MockWorldView.pavedFloor(60));
+        assertEquals(0.0, drive.forward(), 1.0E-9, "an orthogonal frame has no forward component");
+        assertTrue(
+                drive.strafe() > 0.99,
+                "east is LEFT of a south-facing body; strafe must be positive, got " + drive.strafe());
+    }
+
+    /**
+     * Diagonal frames split the brake across both axes with the
+     * vector magnitude preserved (vanilla normalizes only above 1):
+     * facing south-west (yaw +45, plan east) drives forward at
+     * -sin(45) and strafe at cos(45), each within [-1, 1].
+     */
+    @Test
+    void diagonalFrameSplitsBrakeAcrossAxes() {
+        Vec3[] position = {new Vec3(0.5, 64, 0.5)};
+        PathingBehavior mover =
+                new PathingBehavior("mover", () -> position[0], steer -> 45.0, () -> true, BasicMoves::from);
+        RecordingActor actor = new RecordingActor();
+        Directive directive = Directive.of(new GoalBlock(new CellPos(40, 64, 0)));
+
+        var drive = driveEastClaim(mover, directive, actor, MockWorldView.pavedFloor(60));
+        assertEquals(-Math.sin(Math.PI / 4), drive.forward(), 1.0E-6, "forward is -sin(45) for an east step");
+        assertEquals(Math.cos(Math.PI / 4), drive.strafe(), 1.0E-6, "strafe is cos(45) for an east step");
     }
 }
