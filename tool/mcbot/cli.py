@@ -78,6 +78,33 @@ from mcbot.proc import list_gradle_processes
 # ---------------------------------------------------------------------------
 # commands
 # ---------------------------------------------------------------------------
+def _run_gradle_locked(
+    g,
+    gradle_args: list,
+    command: str,
+    *,
+    lock_name: str = "build",
+    no_daemon: bool = False,
+    with_cc: bool = False,
+    log_name: str | None = None,
+) -> int:
+    """Acquire the build lock, then run gradle. Shared by build/test/gradle/lint.
+
+    Returns 2 if the lock is busy (holder pid printed), otherwise the gradle
+    exit code. All four gradle-fronting commands follow this exact shape;
+    extracting it removes ~50 lines of copy-paste.
+    """
+    with BuildLock(lock_name) as lock:
+        if not lock.acquire(command):
+            return _print_busy(lock_name)
+        return run_gradle(g, gradle_args, no_daemon=no_daemon, with_cc=with_cc, log_name=log_name)
+
+
+def _with_cc(args) -> bool:
+    """Resolve --configuration-cache from flag or env."""
+    return args.cc or os.environ.get("MCBOT_CC") == "1"
+
+
 def cmd_build(args) -> int:
     g = _resolve_gradle()
     if not g:
@@ -100,20 +127,14 @@ def cmd_build(args) -> int:
         return 2
     gradle_args = list(base) + list(args.passthrough or [])
     no_daemon = args.no_daemon or tuple(gradle_args[: len(base)]) in NEEDS_NO_DAEMON
-    with_cc = args.cc or os.environ.get("MCBOT_CC") == "1"
-    command = f"build {sub}"
-    # Long-running game tasks only READ build outputs, so each gets
-    # its own lock namespace: a dedicated server and a dev client can
-    # be alive at the same time. Anything that writes build/ still
-    # serializes on the global "build" lock.
-    if sub in {"runClient", "runServer", "runGameTest", "runData"}:
-        lock_name = f"run.{sub}"
-    else:
-        lock_name = "build"
-    with BuildLock(lock_name) as lock:
-        if not lock.acquire(command):
-            return _print_busy(lock_name)
-        return run_gradle(g, gradle_args, no_daemon=no_daemon, with_cc=with_cc, log_name=sub)
+    # Long-running game tasks only READ build outputs, so each gets its own
+    # lock namespace: a dedicated server and a dev client can be alive at the
+    # same time. Anything that writes build/ still serializes on "build".
+    lock_name = f"run.{sub}" if sub in {"runClient", "runServer", "runGameTest", "runData"} else "build"
+    return _run_gradle_locked(
+        g, gradle_args, f"build {sub}",
+        lock_name=lock_name, no_daemon=no_daemon, with_cc=_with_cc(args), log_name=sub,
+    )
 
 
 def cmd_test(args) -> int:
@@ -121,11 +142,10 @@ def cmd_test(args) -> int:
     if not g:
         return 2
     gradle_args = TEST_TASK + list(args.passthrough or [])
-    with_cc = args.cc or os.environ.get("MCBOT_CC") == "1"
-    with BuildLock() as lock:
-        if not lock.acquire("test"):
-            return _print_busy()
-        return run_gradle(g, gradle_args, no_daemon=True, with_cc=with_cc, log_name="test")
+    return _run_gradle_locked(
+        g, gradle_args, "test",
+        no_daemon=True, with_cc=_with_cc(args), log_name="test",
+    )
 
 
 def cmd_gradle(args) -> int:
@@ -135,12 +155,10 @@ def cmd_gradle(args) -> int:
     if not args.gradle_args:
         print("[mcbot] gradle passthrough: provide at least one arg", file=sys.stderr)
         return 2
-    with_cc = args.cc or os.environ.get("MCBOT_CC") == "1"
-    command = f"gradle {args.gradle_args[0]}"
-    with BuildLock() as lock:
-        if not lock.acquire(command):
-            return _print_busy()
-        return run_gradle(g, args.gradle_args, no_daemon=args.no_daemon, with_cc=with_cc)
+    return _run_gradle_locked(
+        g, args.gradle_args, f"gradle {args.gradle_args[0]}",
+        no_daemon=args.no_daemon, with_cc=_with_cc(args),
+    )
 
 
 def cmd_lint(args) -> int:
@@ -148,11 +166,10 @@ def cmd_lint(args) -> int:
     if not g:
         return 2
     gradle_args = LINT_TASKS + list(args.passthrough or [])
-    with_cc = args.cc or os.environ.get("MCBOT_CC") == "1"
-    with BuildLock() as lock:
-        if not lock.acquire("lint"):
-            return _print_busy()
-        return run_gradle(g, gradle_args, no_daemon=args.no_daemon, with_cc=with_cc, log_name="lint")
+    return _run_gradle_locked(
+        g, gradle_args, "lint",
+        no_daemon=args.no_daemon, with_cc=_with_cc(args), log_name="lint",
+    )
 
 
 def cmd_passthrough_no_lock(args) -> int:
@@ -308,6 +325,29 @@ def cmd_log(args) -> int:
     return 2
 
 
+def _clear_dead_locks(verb: str) -> int:
+    """Clear all locks whose holder process is dead. Shared by clear/takeover."""
+    refused = False
+    cleared = 0
+    for s in all_locks():
+        if not s.get("locked"):
+            continue
+        if s.get("alive"):
+            print(
+                f"[mcbot] refusing to {verb} '{s['name']}': holder pid {s.get('pid')} is still alive",
+                file=sys.stderr,
+            )
+            refused = True
+            continue
+        _force_clear_lock(s["name"])
+        cleared += 1
+        suffix = " (previous holder was dead)" if verb == "takeover" else ""
+        print(f"lock[{s['name']}] {verb}ed{suffix}")
+    if verb == "takeover" and cleared == 0 and not refused:
+        print("no locks present, nothing to take over")
+    return 1 if refused else 0
+
+
 def cmd_lock(args) -> int:
     if args.action == "status":
         for s in all_locks():
@@ -324,37 +364,9 @@ def cmd_lock(args) -> int:
                 print(f"  (holder is dead — run `lock clear` to remove {s['name']})")
         return 0
     if args.action == "clear":
-        refused = False
-        for s in all_locks():
-            if not s.get("locked"):
-                continue
-            if s.get("alive"):
-                print(
-                    f"[mcbot] refusing to clear '{s['name']}': holder pid {s.get('pid')} is still alive",
-                    file=sys.stderr,
-                )
-                refused = True
-                continue
-            _force_clear_lock(s["name"])
-            print(f"lock[{s['name']}] cleared")
-        return 1 if refused else 0
+        return _clear_dead_locks("clear")
     if args.action == "takeover":
-        refused = False
-        for s in all_locks():
-            if not s.get("locked"):
-                continue
-            if s.get("alive"):
-                print(
-                    f"[mcbot] refusing to takeover '{s['name']}': holder pid {s.get('pid')} is still alive",
-                    file=sys.stderr,
-                )
-                refused = True
-                continue
-            _force_clear_lock(s["name"])
-            print(f"lock[{s['name']}] taken over (previous holder was dead)")
-        if not any(s.get("locked") for s in all_locks()) and not refused:
-            print("no locks present, nothing to take over")
-        return 1 if refused else 0
+        return _clear_dead_locks("takeover")
     print(f"[mcbot] unknown lock action: {args.action}", file=sys.stderr)
     return 2
 
