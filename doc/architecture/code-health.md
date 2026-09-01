@@ -32,6 +32,11 @@ hygiene work. Feature and stage work lives in
 in [issues/](issues/); this ledger owns everything that makes the
 existing code *better* without making it do more.
 
+**Machine-readable state lives in [`doc/_state/code-health.yaml`](../_state/code-health.yaml)** —
+rule statuses, abstraction inventory, and open/closed items. This file
+carries the narrative; the YAML is the source of truth for status fields.
+When they disagree, the YAML wins and this file needs a touch.
+
 ## Scope and policy
 
 An entry belongs here when the change is behavior-preserving by
@@ -326,8 +331,10 @@ without an anchor is a workplan item, not a row here.
   pairs; the pre-sorted list is `python tool/mcbot_tool.py gradle
   cpdCheck -Plint` away, so the round starts from evidence, not
   memory.
-- **OPEN - JavadocMethod tag-completeness graduation.** 75 live
-  @param/@return tag gaps across public API; presence is gated
-  (H-R10), completeness returns when the tag debt is paid down or
-  the rule is consciously re-scoped (config comment in
-  checkstyle.xml carries the deferral).
+- **CLOSED 2026-08-27 - JavadocMethod tag-completeness graduation.**
+  75 live @param/@return tag gaps across public API cleared in the
+  paydown round; checkstyle.xml now runs with
+  `allowMissingParamTags=false` and `allowMissingReturnTag=false`.
+  Presence was already gated (H-R10); completeness joined it the same
+  day. (This row was incorrectly listed as OPEN until the 2026-09-02
+  state-file migration — the YAML SSOT corrected it.)

@@ -1,0 +1,201 @@
+# Single source of truth for code-health rule status, abstractions, and open items.
+# code-health.md carries the narrative (why each rule exists, round history,
+# ruling anchors); this file carries the machine-readable state.
+# doc check verifies that code-health.md's status claims match this file.
+# Update this file FIRST when a rule changes status or an item opens/closes,
+# then update code-health.md to match.
+
+meta:
+  last_updated: 2026-09-02
+  source_doc: doc/architecture/code-health.md
+
+rules:
+  - id: H-R1
+    name: Reflection is the exception
+    invariant: "Collaborator unit tests live same-package with direct package-private access; reflection exists only in PathingTestAccess for integration-level mid-drive state"
+    gate: hygiene.ReflectionDoorCheck
+    status: gated
+    gated_date: 2026-08-24
+
+  - id: H-R2
+    name: No inline FQNs
+    invariant: "A type used in code is imported; FQNs appear only where Java demands them"
+    gate: null
+    status: review-only
+
+  - id: H-R3
+    name: English-only everywhere
+    invariant: "Zero CJK codepoints in any .md file and any Java source"
+    gate: hygiene.EnglishOnlyScan
+    status: gated
+    gated_date: 2026-08-24
+
+  - id: H-R4
+    name: Wire keys frozen
+    invariant: "Serialized boundary-D keys survive field renames"
+    gate: boundaryd.WireVocabularyGateTest
+    status: gated
+    gated_date: 2026-08-25
+
+  - id: H-R5
+    name: Gametest inventory
+    invariant: "The registered @GameTest set cannot silently shrink; verification currency is receipt-backed"
+    gate: hygiene.GametestInventoryCheck
+    status: gated
+    gated_date: null
+
+  - id: H-R6
+    name: Geometry spectrum rationale
+    invariant: "Threshold constants document their partial-top-spectrum reasoning"
+    gate: null
+    status: review-only
+
+  - id: H-R7
+    name: Package structure
+    invariant: "Main modules single-level, module names never reused as subpackages; test packages mirror main or are sanctioned metas"
+    gate: architecture.PackageStructureGateTest
+    status: gated
+    gated_date: 2026-08-25
+
+  - id: H-R8
+    name: Contract markers present
+    invariant: "Every src/main implementer of a boundary interface carries its contract: see pointer (AGENTS.md 1.4.3.1)"
+    gate: architecture.BoundaryContractMarkerTest
+    status: gated
+    gated_date: 2026-08-25
+
+  - id: H-R9
+    name: Review claims cite or are unverified
+    invariant: "Every factual claim in a review carries a file:line or doc-anchor citation; quoted promises checked against anchor; abstraction proposals check abstraction-status table first"
+    gate: null
+    status: review-only
+    status_date: 2026-08-27
+
+  - id: H-R10
+    name: Style law is machine-owned
+    invariant: "AGENTS section 1 semantic rules (naming, javadoc presence, import purity, width) fail checkstyle; layout is formatter-canonical (Spotless/palantir) and never hand-reformatted"
+    gate: checkstyleMain + checkstyleTest + spotlessCheck (default test flow)
+    status: gated
+    gated_date: 2026-08-27
+
+  - id: H-R11
+    name: Lint postures are pinned
+    invariant: "The split between hard gates (default test flow) and -Plint dashboards cannot silently shift; a posture change is a ruling landing gate + posture table + ruling together"
+    gate: architecture.LintPostureGateTest
+    status: gated
+    gated_date: 2026-08-27
+
+  - id: H-R12
+    name: Decision index parity
+    invariant: "boundaries.md decision index max equals ledger.md body max; every verdict has a citation-resolution row"
+    gate: architecture.DecisionIndexSyncGateTest
+    status: gated
+    gated_date: 2026-08-29
+
+abstractions:
+  - name: ReflexMissionSeat
+    location: core/tick
+    implementations: "one parameterized seat serving fight/rescue/forage handoffs (ledger 35); ReflexSeat interface folded 2026-08-29"
+    next_promotion_trigger: "a second seat IMPLEMENTATION (fourth seat kind with distinct policy) re-raises an interface"
+
+  - name: DigMission
+    location: api/process
+    implementations: "DigProcess + MineProcess; new dig-family mission costs zero controller change"
+    next_promotion_trigger: "a second CLAIM KIND (attack for hunt, use for eat) lifts process-driven claim injection to a declared BotProcess capability"
+
+  - name: submitAimAndDig
+    location: BotController
+    implementations: "mission-dig path + preemptDigClaims"
+    next_promotion_trigger: "a second non-dig per-tick interaction widens the pair"
+
+  - name: MenuTransactions
+    location: api/menu
+    implementations: "BindingActor; ruled form (ledger 29, not-claims-not-second-controller)"
+    next_promotion_trigger: "eat/use-item decides claim-vs-transaction; design agenda belongs to issue 0010"
+
+  - name: mc-skill pattern
+    location: skills/
+    implementations: "patrol.py"
+    next_promotion_trigger: "a second skill extracts the conventions (wait-chain, per-leg events drain)"
+
+  - name: recipes materialization
+    location: harness
+    implementations: "dump-recipes + ~/.mc/recipes + grep"
+    next_promotion_trigger: "a second heavy-read class earns the next dump verb"
+
+open_items:
+  - id: cpd-dedup-round
+    title: CPD dedup round
+    status: open
+    description: "~18 duplicate blocks >=100 tokens at install time, dominated by known mock-vs-server implementation pairs"
+    evidence_command: "python tool/mcbot_tool.py gradle cpdCheck -Plint"
+
+  - id: javadoc-tag-completeness
+    title: JavadocMethod tag-completeness graduation
+    status: closed
+    closed_date: 2026-08-27
+    evidence: "checkstyle.xml JavadocMethod: allowMissingParamTags=false, allowMissingReturnTag=false; 75 gaps cleared in paydown round"
+    note: "code-health.md body still lists this as OPEN with '75 live gaps' as of 2026-09-02 — that is doc drift. YAML is SSOT; markdown needs update."
+
+closed_rounds:
+  - id: deep-clean
+    date: 2026-08-23
+    commits: [183c8e0, b954651, 030b49c, dbc3bd1, f233b3a, b33cb6a, a1a1f89]
+    summary: "stdlib adoption, FQNs to imports, pose->position wire-key-safe rename"
+
+  - id: gametest-harness-consolidation
+    date: 2026-08-23
+    commits: [450bf48, 160ca4c]
+    summary: "GametestRig extracted, redundant scenario removed"
+
+  - id: pathingbehavior-decomposition
+    date: 2026-08-23
+    commits: [1a68dd9, cee9a2c, 81897b8, f60c3ea]
+    summary: "shell + WaypointCursor/PlanProgressFuse/ReplanGate/PlanLifecycle; routesThroughFenceGap incident (H-R5 lesson)"
+
+  - id: controller-actor-decomposition
+    date: 2026-08-25
+    commits: [29c6a3b, 1623dab, 7f87136, 72a476b, 281a147]
+    summary: "MissionReporter, ReflexEngageSeat, MeleeResolver, PresenceLayer, triggerVerdict"
+
+  - id: inline-fqn-second-sweep
+    date: 2026-08-25
+    commits: [c23cf35, 1c6d331]
+    summary: "H7 closed (H10 opened)"
+
+  - id: test-package-mirroring
+    date: 2026-08-25
+    commits: [888fc97]
+    summary: "H8 closed alongside H-R7 admission"
+
+  - id: sensor-interface-ruling
+    date: 2026-08-25
+    commits: [0e290ad]
+    summary: "H9 closed (BodyPositionSource dedup)"
+
+  - id: preemptdigclaims-extraction
+    date: 2026-08-25
+    commits: [5e26c15]
+    summary: "H10 closed; park semantics pinned by ArbiterGateTest/ReflexChainGateTest"
+
+  - id: static-analysis-stack
+    date: 2026-08-27
+    commits: [11631bd, 8b18e64, 7bd7804, b3d1e80, 2529455, b3cc623, 95e1a64, 8ea8554]
+    summary: "H-R10 admitted, promoted to default test flow same day; Error Prone 24->20->0"
+
+  - id: api-thick-interface-trimming
+    date: 2026-08-29
+    commits: [88568bd]
+    summary: "H1 api/ thick-interface trimming; ~8% thickness measured, 10 dead/single-tier members removed"
+
+  - id: god-class-paydown
+    date: 2026-08-28
+    summary: "install-time 18 PMD findings cleared; MenuVerbs/MenuSlotLayouts/ReflexRuleJsonReader/PlayerRegion/CraftingPlanner/TransferPlanner splits"
+
+  - id: pmd-red-wall-restore
+    date: 2026-08-31
+    summary: "7 findings cleared without softening thresholds; MeleeResolver sweep extraction, BotBodyEntity XP/edge-guard split"
+
+  - id: spotbugs-first-triage
+    date: 2026-09-01
+    summary: "22 api/core findings triaged: 3 fixed at root, 19 suppressed with inline rulings; SpotBugs promoted to red wall"
