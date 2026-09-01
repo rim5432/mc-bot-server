@@ -828,6 +828,11 @@ Amendment chains recorded so far (both sides annotated):
     Goal algebra or heuristic — offline gates are the receipt this
     round. Compile also intermittently blocked by concurrent-session
     WIP (BotHungerGameTests lambda / BotController emitEatStarted).
+    [Amended by 56: the engine failure recorded here was NOT
+    environmental — it was the steering-frame coupling between the
+    combat aim's ROT claim and the body-relative MOVE intent; the
+    offline-green / engine-red asymmetry is exactly that no offline
+    rig carries a competing aim claim. Root-caused and fixed in 56.]
     55. 2026-09-01 Core nullness strategy: get-deref audit, JsonFields.require
     convergence, and the GetDerefGateTest regression guard. Triggered by a
     six-site audit of chained get-deref patterns (receiver.get(key).member)
@@ -879,3 +884,37 @@ Amendment chains recorded so far (both sides annotated):
     for enforcement. Scope note: this entry covers the offline layers only;
     adapter/ get chains ride MC types and are excluded from the gate (same
     scope as SpotBugs onlyAnalyze and JaCoCo offline exclusions).
+    56. 2026-09-01 Steering frame decoupling + band-aware progress (amends 54).
+    Decision 54's engine failure was misattributed as environmental.
+    The MOVE intent is body-relative and the drive adapter resolves it
+    along the live facing (vanilla Entity.getInputVector: forward basis
+    (-sin Y, cos Y), strafe basis (cos Y, sin Y), positive strafe is
+    LEFT per the xxa convention), while the combat aim's ROT claim
+    (priority 20) beats the mover's look claim (10). A GoalRange plan
+    away from an aimed target therefore marched the body INTO the
+    target — the exact opposite of the kite. Ruling: PathingBehavior
+    decomposes the steer step into forward/strafe against a
+    BodyYawSource — the live body yaw wired in BotAssembly, the
+    identity steer-bearing default in every legacy constructor, so
+    uncontested walks keep the bit-identical forward-only drive and
+    the 43 offline construction sites change nothing. This is the
+    vanilla skeleton kiting pattern: strafe and backpedal while
+    facing the target. The arrival brake bounds the drive vector
+    magnitude; sprint already requires forward >= 0.95, so backpedal
+    and strafe never sprint. Second organ, same disease: the progress
+    tier still measured against Goals.cellOf(goal) = the center, so
+    an inside-min kite's correct outward motion read as regression
+    (false STUCK accumulation, false NO_PATH witnesses on long kite
+    legs). Goals.distanceOf now supplies the position-space distance
+    to the goal set — continuous Chebyshev band-edge for GoalRange,
+    the exact historical Euclidean-to-anchor-centre for point goals
+    so goto STUCK timing is untouched — feeding PlanProgressFuse
+    criterion 2 and NoPathEscalator witnesses. Pinned by
+    PathingBehaviorFrameGateTest drive-frame cases (aligned identity,
+    opposed backpedal, xxa left sign, diagonal split),
+    GoalRangeGeometryTest distanceOf cases, NoPathEscalatorTest band
+    witnesses, PlanProgressFuseSegmentTest criterion-2 kite case.
+    Rig companion: GametestRig.sweepForeignEntities clears a
+    structure's footprint of foreign entities before aimed-shot
+    scenarios (ledger 46 cross-contamination family, the bowtap
+    clean-miss class).
