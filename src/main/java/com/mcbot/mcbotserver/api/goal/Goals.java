@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.api.goal;
 
+import com.mcbot.mcbotserver.api.pathing.Heuristic;
 import com.mcbot.mcbotserver.api.types.CellPos;
 
 /**
@@ -31,6 +32,37 @@ public final class Goals {
         if (goal instanceof GoalNear n) {
             return n.center();
         }
+        if (goal instanceof GoalRange r) {
+            return r.center();
+        }
         throw new IllegalStateException("unhandled goal variant: " + goal.getClass());
+    }
+
+    /**
+     * The search heuristic appropriate for the goal's geometry.
+     * GoalBlock and GoalNear keep the historical straight-line pull
+     * to the anchor; GoalRange uses Chebyshev distance to the nearest
+     * band edge so a body inside the minimum radius is pulled outward
+     * rather than toward the center it is already too close to. The
+     * band-edge distance is zero on the goal set and admissible
+     * elsewhere (each move changes Chebyshev distance by at most one).
+     *
+     * @param goal the goal to build a heuristic for; never null
+     * @return an admissible heuristic; never null
+     */
+    public static Heuristic heuristicOf(Goal goal) {
+        if (goal instanceof GoalRange r) {
+            return from -> {
+                int dist = from.chebyshevTo(r.center());
+                if (dist < r.min()) {
+                    return r.min() - dist;
+                }
+                if (dist > r.max()) {
+                    return dist - r.max();
+                }
+                return 0.0;
+            };
+        }
+        return Heuristic.euclideanTo(cellOf(goal));
     }
 }

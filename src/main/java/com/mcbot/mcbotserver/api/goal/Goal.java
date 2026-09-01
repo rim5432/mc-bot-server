@@ -13,7 +13,7 @@ import com.mcbot.mcbotserver.api.types.CellPos;
  * consumers like PathingBehavior can switch exhaustively — a new goal
  * variant is a compiler event, never a silent ClassCastException.
  */
-public sealed interface Goal permits GoalBlock, GoalNear {
+public sealed interface Goal permits GoalBlock, GoalNear, GoalRange {
 
     /**
      * Arrival test.

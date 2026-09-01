@@ -6,7 +6,7 @@ covers:
   - src/main/java/com/mcbot/mcbotserver/core/behavior/CombatBehavior.java
   - src/main/java/com/mcbot/mcbotserver/core/behavior/PathingBehavior.java
   - src/main/java/com/mcbot/mcbotserver/core/process/DefendProcess.java
-status: open
+status: resolved (ledger 54: GoalRange vocabulary growth)
 ---
 
 # Problem
@@ -55,3 +55,25 @@ Reopens when a verdict requires a maintained range under fire
 second behavior independently needs to constrain locomotion. Until
 then the point-blank fire path is the accepted answer to a closed
 standoff.
+
+# Resolution (2026-09-01, ledger 54)
+
+Resolved via the GoalRange vocabulary growth — the cheapest candidate
+named in the Contract section. `GoalRange(center, min, max)` extends
+the sealed Goal algebra; `isInGoal` is a band predicate (a cell
+inside min is NOT in the goal, so A* terminates at the nearest outward
+edge); `Goals.heuristicOf` returns band-edge distance for GoalRange
+and keeps euclideanTo for GoalBlock/GoalNear. `PlanLifecycle` swaps
+its hardcoded `euclideanTo(cellOf(goal))` for `Goals.heuristicOf(goal)`.
+`DefendProcess` and `AttackProcess` ranged standoff migrates from
+`GoalNear(target, 10)` to `GoalRange(target, 8, 12)`.
+
+No claim-model change, no behavior-coordination channel — the process
+tier owns the range decision and the pathing tier owns the motion,
+exactly as boundary B prescribes. The claim-overlay designs named in
+the Contract section remain rejected per the same-kind promotion rule.
+
+Gametest `rangedBotBacksAwayWhenTargetClosesInsideMin` pins the
+behavior: a NoAi target at distance 10 is teleported to distance 7,
+and the body backs away to restore >= 8 separation while landing
+arrows.

@@ -53,19 +53,21 @@ class AttackProcessTest {
         world.addEntity(cow("cow-7", 6));
 
         Directive first = m.onTick(world);
-        com.mcbot.mcbotserver.api.goal.GoalNear goal = (com.mcbot.mcbotserver.api.goal.GoalNear) first.goal();
+        com.mcbot.mcbotserver.api.goal.GoalRange goal = (com.mcbot.mcbotserver.api.goal.GoalRange) first.goal();
         assertEquals(
-                DefendProcess.RANGED_STANDOFF,
-                goal.range(),
-                "bow-only opens at the standoff rim instead of charging into clubbing");
+                DefendProcess.RANGED_STANDOFF - 2,
+                goal.min(),
+                "bow-only opens a band whose inner edge backs the bot away");
+        assertEquals(DefendProcess.RANGED_STANDOFF + 2, goal.max(), "the band outer edge is the approach limit");
 
         // Later ticks hold the frozen decision even as the target
         // closes - no per-tick flip-flop.
         world.removeEntity("cow-7");
         world.addEntity(cow("cow-7", 3));
         Directive second = m.onTick(world);
-        com.mcbot.mcbotserver.api.goal.GoalNear held = (com.mcbot.mcbotserver.api.goal.GoalNear) second.goal();
-        assertEquals(DefendProcess.RANGED_STANDOFF, held.range(), "the engage-time range decision is frozen");
+        com.mcbot.mcbotserver.api.goal.GoalRange held = (com.mcbot.mcbotserver.api.goal.GoalRange) second.goal();
+        assertEquals(DefendProcess.RANGED_STANDOFF - 2, held.min(), "the engage-time band is frozen");
+        assertEquals(DefendProcess.RANGED_STANDOFF + 2, held.max(), "the engage-time band is frozen");
     }
 
     /**

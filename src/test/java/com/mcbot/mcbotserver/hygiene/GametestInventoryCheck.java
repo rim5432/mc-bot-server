@@ -72,7 +72,8 @@ class GametestInventoryCheck {
                             "bowChargedShotDamagesDistantTarget",
                             "rearArrowBypassesTheRaisedShield",
                             "bowTapShotDealsWeakDamage",
-                            "blocksIncomingArrowsMidCombat")),
+                            "blocksIncomingArrowsMidCombat",
+                            "rangedBotBacksAwayWhenTargetClosesInsideMin")),
             Map.entry(
                     "BotHazardReflexGameTests",
                     Set.of(

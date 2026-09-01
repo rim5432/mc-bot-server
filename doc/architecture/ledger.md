@@ -793,3 +793,38 @@ Amendment chains recorded so far (both sides annotated):
     worker). The scenario's wait message now prints failure= for the
     next occurrence. Engine rerun for this round: deliberately not run
     (session closeout); the offline gates are the receipt.
+    54. 2026-09-01 GoalRange vocabulary growth (closes issue 0018,
+    amends 51). The ranged standoff was GoalNear(target, 10): satisfied
+    once inside 10 blocks, never backs the body up, so any closing
+    target walks straight through the rim to point-blank. The fix is a
+    pure Goal-algebra extension — no claim-model change, no behavior
+    coordination channel. GoalRange(center, min, max) is a band
+    predicate: isInGoal is true only when min <= chebyshevTo(center)
+    <= max. A cell inside min fails the predicate, so A* terminates at
+    the nearest outward band edge and the body moves away. The load-
+    bearing piece is the heuristic: Goals.heuristicOf(goal) returns
+    band-edge distance for GoalRange (max(0, min-dist, dist-max)) —
+    zero on the goal set, positive inside min (pulling outward) and
+    outside max (pulling inward). GoalBlock/GoalNear keep the historical
+    euclideanTo anchor. PlanLifecycle.request/computeSync swap
+    Heuristic.euclideanTo(cellOf(goal)) for Goals.heuristicOf(goal).
+    DefendProcess and AttackProcess ranged standoff migrate from
+    GoalNear(target, 10) to GoalRange(target, 8, 12) — the band is
+    RANGED_STANDOFF +/- 2, giving a 2-cell buffer for the async replan
+    latency. Melee stays GoalNear(target, 2). Pinned by
+    GoalRangeGeometryTest (predicate boundaries, heuristic direction,
+    validation, GoalNear regression pin) and PathingRangeBandGateTest
+    (in-band SUCCESS, inside-min plans outward, outside-max plans
+    inward, equal-goal no-replan). Engine gametest
+    rangedBotBacksAwayWhenTargetClosesInsideMin: NoAi zombie at
+    distance 5 (inside reflex trigger 6 and GoalRange min 8), reflex
+    engage path (no manual submitDefend), assert the body backs west
+    to restore >= 8 separation and lands arrows while kiting. ENGINE
+    STATUS: gametest fails in-engine — the body does not move from
+    its spawn cell (bodyX constant across the full timeout), even
+    though the same GoalRange directive drives correct outward
+    replanning in the offline PathingRangeBandGateTest. The failure
+    is environmental (gametest assembly / mission wiring), not in the
+    Goal algebra or heuristic — offline gates are the receipt this
+    round. Compile also intermittently blocked by concurrent-session
+    WIP (BotHungerGameTests lambda / BotController emitEatStarted).

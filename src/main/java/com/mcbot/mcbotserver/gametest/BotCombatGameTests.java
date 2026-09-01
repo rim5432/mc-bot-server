@@ -839,6 +839,67 @@ public final class BotCombatGameTests {
                 })
                 .thenSucceed();
     }
+
+    /**
+     * Scenario: the range-band goal makes the bot back away when a
+     * target is inside the minimum standoff. A bow-only carrier faces
+     * a NoAi zombie at Chebyshev distance 5 — inside the reflex's
+     * engage trigger (6) and inside GoalRange's lower bound (8). The
+     * reflex-engaged DefendProcess must select the ranged loadout,
+     * emit a GoalRange directive, and the body must walk west to
+     * restore at least 8 blocks of separation while landing arrows.
+     * This is the issue 0018 pin: GoalNear would satisfy at distance
+     * &lt;=10 and never back the body up; GoalRange's lower bound
+     * drives backward motion.
+     *
+     * <p>Rides the reflex engage path (no manual submitDefend) so the
+     * mission identity, priority and weapon catalog match production
+     * exactly — the same seam {@code defendsByKillingZombie} pins.
+     */
+    // feature: combat.hostile_acquisition.engagement_range
+    @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
+    public static void rangedBotBacksAwayWhenTargetClosesInsideMin(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
+        var container = rig.body().getInventory().container();
+        container.setItem(0, new ItemStack(Items.BOW));
+        container.setItem(1, new ItemStack(Items.ARROW, 64));
+
+        // Distance 5: x 3 -> 8, same z. Inside reflex trigger (6) and
+        // inside GoalRange min (8), so the predicate fails from tick one.
+        Zombie zombie = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(8, GametestRig.WALK_Y, 8));
+        zombie.setNoAi(true);
+        final float[] healthBefore = {zombie.getHealth()};
+
+        helper.startSequence()
+                // The reflex engages on the first ground tick the threat
+                // sensor sees the zombie (distance 5 <= trigger 6). Then
+                // DefendProcess locks on, emits GoalRange, and PathingBehavior
+                // replans outward. Reaction window: lock-on (~2 ticks),
+                // replan, worker compute, adoption, departure hold (4),
+                // then movement. 120 ticks is generous.
+                .thenWaitUntil(driveUntil(rig, () -> {
+                    int dist = Math.abs(rig.body().getBlockX() - zombie.getBlockX());
+                    if (dist < 8) {
+                        throw new RuntimeException("still inside min: bodyX=" + rig.body().getBlockX()
+                                + " targetX=" + zombie.getBlockX() + " dist=" + dist);
+                    }
+                }))
+                .thenExecuteFor(GametestRig.SETTLE_TICKS, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    check(rig.body().isAlive(), "the body must survive the kiting encounter");
+                    int finalDist = Math.abs(rig.body().getBlockX() - zombie.getBlockX());
+                    check(
+                            finalDist >= 8,
+                            "after backing away the separation must be at least the band min; dist=" + finalDist
+                                    + " bodyX=" + rig.body().getBlockX() + " targetX=" + zombie.getBlockX());
+                    check(
+                            zombie.getHealth() < healthBefore[0],
+                            "the bot must land arrows while kiting; before=" + healthBefore[0] + " after="
+                                    + zombie.getHealth());
+                    rig.body().discard();
+                })
+                .thenSucceed();
+    }
     /**
      * Scenario: a raised shield blocks only the frontal hemisphere -
      * an arrow from BEHIND lands full damage through the same raised

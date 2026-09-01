@@ -1,6 +1,8 @@
 package com.mcbot.mcbotserver.core.process;
 
+import com.mcbot.mcbotserver.api.goal.Goal;
 import com.mcbot.mcbotserver.api.goal.GoalNear;
+import com.mcbot.mcbotserver.api.goal.GoalRange;
 import com.mcbot.mcbotserver.api.inventory.WeaponCatalog;
 import com.mcbot.mcbotserver.api.process.Attack;
 import com.mcbot.mcbotserver.api.process.Directive;
@@ -213,8 +215,16 @@ public final class AttackProcess extends MissionShell {
                 && !RangedLoadouts.meleeWeaponBeatsBow(world, weapons)) {
             standoffOpening = true;
         }
-        int range = standoffOpening ? DefendProcess.RANGED_STANDOFF : GOAL_RANGE;
-        lastDirective = new Directive(new GoalNear(tracker.targetCell(), range), new Overrides(new Attack(targetId)));
+        // Standoff opening uses a GoalRange band (8..12, centered on
+        // RANGED_STANDOFF) so a closing target triggers a backward replan
+        // rather than walking through the rim (issue 0018). Melee stays
+        // GoalNear to the swing rim.
+        int bandMin = DefendProcess.RANGED_STANDOFF - 2;
+        int bandMax = DefendProcess.RANGED_STANDOFF + 2;
+        Goal goal = standoffOpening
+                ? new GoalRange(tracker.targetCell(), bandMin, bandMax)
+                : new GoalNear(tracker.targetCell(), GOAL_RANGE);
+        lastDirective = new Directive(goal, new Overrides(new Attack(targetId)));
         return lastDirective;
     }
 

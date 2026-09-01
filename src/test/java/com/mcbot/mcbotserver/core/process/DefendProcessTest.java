@@ -302,8 +302,9 @@ class DefendProcessTest {
         Directive directive = m.onTick(world);
         assertTrue(m.isActive(), "armed means the fight is taken, not refused");
         assertEquals("S1", directive.overrides().combat().targetId());
-        com.mcbot.mcbotserver.api.goal.GoalNear goal = (com.mcbot.mcbotserver.api.goal.GoalNear) directive.goal();
-        assertEquals(DefendProcess.RANGED_STANDOFF, goal.range(), "the chase holds the standoff rim");
+        com.mcbot.mcbotserver.api.goal.GoalRange goal = (com.mcbot.mcbotserver.api.goal.GoalRange) directive.goal();
+        assertEquals(DefendProcess.RANGED_STANDOFF - 2, goal.min(), "the band inner edge backs the bot away");
+        assertEquals(DefendProcess.RANGED_STANDOFF + 2, goal.max(), "the band outer edge is the approach limit");
     }
 
     @Test
@@ -339,11 +340,12 @@ class DefendProcessTest {
         Directive directive = m.onTick(world);
         assertTrue(m.isActive(), "the fight is taken at standoff, not refused");
         assertEquals("Z1", directive.overrides().combat().targetId());
-        com.mcbot.mcbotserver.api.goal.GoalNear goal = (com.mcbot.mcbotserver.api.goal.GoalNear) directive.goal();
+        com.mcbot.mcbotserver.api.goal.GoalRange goal = (com.mcbot.mcbotserver.api.goal.GoalRange) directive.goal();
         assertEquals(
-                DefendProcess.RANGED_STANDOFF,
-                goal.range(),
-                "the bow-only carrier opens at the standoff rim instead of the swing rim");
+                DefendProcess.RANGED_STANDOFF - 2,
+                goal.min(),
+                "the bow-only carrier holds a band whose inner edge triggers backward replanning");
+        assertEquals(DefendProcess.RANGED_STANDOFF + 2, goal.max(), "the band outer edge is the approach limit");
     }
 
     /**

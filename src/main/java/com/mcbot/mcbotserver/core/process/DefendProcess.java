@@ -1,7 +1,9 @@
 package com.mcbot.mcbotserver.core.process;
 
 import com.mcbot.mcbotserver.api.capability.Feature;
+import com.mcbot.mcbotserver.api.goal.Goal;
 import com.mcbot.mcbotserver.api.goal.GoalNear;
+import com.mcbot.mcbotserver.api.goal.GoalRange;
 import com.mcbot.mcbotserver.api.inventory.WeaponCatalog;
 import com.mcbot.mcbotserver.api.process.Attack;
 import com.mcbot.mcbotserver.api.process.Directive;
@@ -96,18 +98,21 @@ public final class DefendProcess extends MissionShell {
     public static final int GOAL_RANGE = 2;
 
     /**
-     * Standoff range for fights answered with the bow: inside the bow
-     * band (CombatBehavior.BOW_RANGE = 15) so the body can answer,
-     * beyond ATTACK_REACH so the fight does not collapse into a sword
-     * chase of a kiting target. The mover closes to this rim and
-     * holds; the combat behavior's draw pacing does the rest.
+     * Center of the standoff band for fights answered with the bow:
+     * inside the bow band (CombatBehavior.BOW_RANGE = 15) so the body
+     * can answer, beyond ATTACK_REACH so the fight does not collapse
+     * into a sword chase of a kiting target. The actual goal is a
+     * {@link GoalRange} band of {@code RANGED_STANDOFF ± 2} (8..12):
+     * the mover closes to the outer edge and holds; a closing target
+     * that pushes the body inside 8 triggers a backward replan to the
+     * nearest band edge. This is the issue-0018 keep-range channel.
      *
-     * <p>Against a closing melee target the rim is the OPENING
-     * posture, not a maintained range: GoalNear holds position while
-     * the rim is satisfied but never backs the body up, so the target
-     * closes through it and the fight finishes inside the behavior
-     * tier's point-blank fire. A genuinely maintained range needs the
-     * behavior-coordination channel (issue 0018) and is deferred.
+     * <p>Against a closing melee target the band is a maintained range,
+     * not just an opening posture: the lower bound makes the bot back
+     * away rather than let the target walk through to point-blank.
+     * Point-blank fire still answers if the bot cannot escape (cornered,
+     * no path outward), but the planner's first choice is to hold the
+     * band.
      */
     public static final int RANGED_STANDOFF = 10;
 
@@ -421,20 +426,27 @@ public final class DefendProcess extends MissionShell {
     @Feature(
             id = "combat.hostile_acquisition.engagement_range",
             face = "combat.hostile_acquisition",
-            description = "Engagement range selection: melee targets chase to GOAL_RANGE=2 (swing-adjacent), ranged"
-                    + " targets hold RANGED_STANDOFF=10 (bow band). Closing to 2 against a kiter hands the initiative"
-                    + " to a mob that backs away shooting.",
+            description = "Engagement range selection: melee targets chase to GOAL_RANGE=2 (swing-adjacent, GoalNear)."
+                    + " Ranged targets hold a GoalRange band 8..12 around the target (centered on RANGED_STANDOFF=10):"
+                    + " the planner paths inward when outside 12 and outward when inside 8, so a closing target is"
+                    + " kited rather than walked through. Closing to 2 against a kiter hands the initiative to a mob"
+                    + " that backs away shooting.",
             vanillaRef = "Skeleton follow range + shoot AI (decompiled 1.20.1)",
-            deviation = "Bot-specific: the standoff rim is a deliberate tactical choice, not a pathing limit. A"
-                    + " bow-only carrier holds 10 blocks to trade full-draw arrows instead of clubbing.")
+            deviation = "Bot-specific: the standoff band is a deliberate tactical choice, not a pathing limit. A"
+                    + " bow-only carrier holds 8-12 blocks to trade full-draw arrows instead of clubbing; the lower"
+                    + " bound makes the bot back away when a target closes, which GoalNear could never express.")
     private Directive directiveFor() {
-        // Bow-answered fights hold the standoff rim instead of the
-        // swing-adjacent chase rim: ranged targets because closing
-        // to 2 hands the initiative to a kiter that backs away
-        // shooting, bow-only carriers because closing trades
-        // full-draw arrows for fist-tier clubbing (ledger 51).
-        int range = targetRanged ? RANGED_STANDOFF : GOAL_RANGE;
-        lastDirective = new Directive(new GoalNear(tracker.targetCell(), range), new Overrides(new Attack(targetId)));
+        // Bow-answered fights hold a range band instead of the swing-
+        // adjacent chase rim: ranged targets because closing to 2 hands
+        // the initiative to a kiter that backs away shooting, bow-only
+        // carriers because closing trades full-draw arrows for fist-tier
+        // clubbing (ledger 51). GoalRange gives the band a lower bound so
+        // a closing target triggers a backward replan rather than walking
+        // straight through the rim (issue 0018).
+        Goal goal = targetRanged
+                ? new GoalRange(tracker.targetCell(), RANGED_STANDOFF - 2, RANGED_STANDOFF + 2)
+                : new GoalNear(tracker.targetCell(), GOAL_RANGE);
+        lastDirective = new Directive(goal, new Overrides(new Attack(targetId)));
         return lastDirective;
     }
 

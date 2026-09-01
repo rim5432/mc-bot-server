@@ -407,6 +407,7 @@ ordering-critical numbers sit behind test gates, not behind prose.
 | 51 | Combat range routing stateful + weapon-aware: committed draws finish through band flips, bow answers point-blank when unarmed of better melee, bow-only opens at standoff (amends 37) | 2026-09-01 |
 | 52 | Reactive shield: WorldView.getProjectiles + ProjectileThreats geometry; combat order + hit-course flight + carried shield preempts both attack paths; melee hold-item gate closes the bow/shield-held press race | 2026-09-01 |
 | 53 | Async planner verdict weight: PathResult.drainedOpenSet separates drained open sets (NO_PATH) from budget cuts and failed futures (CUT = re-ask); starved-worker flake root-caused | 2026-09-01 |
+| 54 | Goal vocabulary growth: GoalRange(center, min, max) band predicate + band-edge heuristic in Goals.heuristicOf; DefendProcess/AttackProcess ranged standoff migrates from GoalNear(10) to GoalRange(8,12) so a closing target triggers backward replan (closes issue 0018, amends 51) | 2026-09-01 |
 
 ## Deferred, with reopen conditions
 

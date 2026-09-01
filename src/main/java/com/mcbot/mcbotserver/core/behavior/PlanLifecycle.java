@@ -2,7 +2,6 @@ package com.mcbot.mcbotserver.core.behavior;
 
 import com.mcbot.mcbotserver.api.goal.Goal;
 import com.mcbot.mcbotserver.api.goal.Goals;
-import com.mcbot.mcbotserver.api.pathing.Heuristic;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.WorldView;
 import com.mcbot.mcbotserver.core.pathing.AStarPathFinder;
@@ -155,13 +154,7 @@ final class PlanLifecycle {
         pendingStart = start;
         var snapshot = SnapshotWorldView.capture(world, start, anchor);
         pendingPlan = worker.submit(
-                snapshot,
-                graph,
-                start,
-                goal,
-                Heuristic.euclideanTo(anchor),
-                nodeBudget,
-                PathingBehavior.PLAN_WALL_CLOCK_MS);
+                snapshot, graph, start, goal, Goals.heuristicOf(goal), nodeBudget, PathingBehavior.PLAN_WALL_CLOCK_MS);
         return new Adoption(Outcome.NOT_READY, null);
     }
 
@@ -177,9 +170,9 @@ final class PlanLifecycle {
      * @return the waypoint chain, or empty for no route
      */
     java.util.Optional<List<CellPos>> computeSync(WorldView world, CellPos start, Goal goal, int nodeBudget) {
-        CellPos anchor = Goals.cellOf(goal);
-        var finder = new AStarPathFinder(graph, Heuristic.euclideanTo(anchor), nodeBudget);
-        var result = finder.compute(world, start, goal, Heuristic.euclideanTo(anchor));
+        var heuristic = Goals.heuristicOf(goal);
+        var finder = new AStarPathFinder(graph, heuristic, nodeBudget);
+        var result = finder.compute(world, start, goal, heuristic);
         if (!result.reachedGoal() && result.waypoints().isEmpty()) {
             return java.util.Optional.empty();
         }
