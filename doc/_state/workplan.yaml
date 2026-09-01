@@ -1,0 +1,247 @@
+# Single source of truth for workplan item status.
+# workplan.md carries the narrative (design notes, acceptance criteria,
+# dependency context); this file carries the machine-readable state.
+# Shipped items are removed from both files — their history lives in
+# git commits and the ledger.
+# Update this file FIRST when an item opens/closes/changes status,
+# then update workplan.md to match.
+
+meta:
+  last_updated: 2026-09-02
+  source_doc: doc/guide/workplan.md
+  current_stage: "stage-3-phase-4"
+
+convergence_criteria:
+  - id: 1
+    text: "Every shipped item has offline tests plus in-engine gametests; no red suite at commit time"
+    status: in_progress
+  - id: 2
+    text: "A programmatic driver (no LLM) keeps one body alive >= 10 minutes of mixed day/night overworld using only boundary-D verbs, surviving at least one reflex preemption and one failed-task recovery"
+    status: open
+  - id: 3
+    text: "Any capability a harness might assume that is not shipped is answered by a row in the deferred queues or an issue, never by silence"
+    status: in_progress
+
+open_items:
+  # --- Stage 2 closeout follow-ups ---
+  - id: closeout-4
+    title: "RCON console bridge acceptance"
+    stage: "stage-2-closeout"
+    status: open
+    size: S
+    deps: []
+    closes: [criterion-2]
+    note: "RCON bridge shipped (boundary-D command surface + tool/rcon.py); acceptance = survival-gate 10-min rehearsal verdict"
+
+  - id: closeout-5
+    title: "Swim vocabulary + datapack water/lava trait JSON"
+    stage: "stage-2-closeout"
+    status: open
+    size: S
+    deps: []
+    note: "Vocabulary landed 2026-08-23 (PLAN_WALL_CLOCK_MS 50->200); residue: datapack trait JSON supersedes code baseline"
+
+  - id: closeout-6
+    title: "NoPathEscalator live rerun acceptance"
+    stage: "stage-2-closeout"
+    status: open
+    size: S
+    deps: []
+    note: "Escalator landed 2026-08-24 (boundaries.md decision 21); acceptance = live rerun of verif-1 scenario: NO_PATH within seconds"
+
+  - id: closeout-7
+    title: "gameTestServer / runServer directory lock coexistence"
+    stage: "stage-2-closeout"
+    status: open
+    size: S
+    deps: []
+    note: "gameTestServer shares run/world with runServer -> DirectoryLock deadlock. Fix: dedicated gameDirectory (run/gametest) or serialize"
+
+  # --- Pre-Stage-3 survival gate ---
+  - id: survival-10min-rehearsal
+    title: "10-minute acceptance rehearsal through RCON bridge"
+    stage: "pre-stage-3-survival-gate"
+    status: open
+    size: M
+    deps: [air, idle, recovery]
+    closes: [criterion-2, closeout-4, closeout-5]
+    note: "Programmatic driver, boundary-D verbs only, mixed day/night, >=1 reflex preemption + >=1 failed-task recovery; verdict in tool/sessions/"
+
+  - id: survival-bookkeeping
+    title: "Datapack water/lava trait JSON supersedes code baseline"
+    stage: "pre-stage-3-survival-gate"
+    status: open
+    size: S
+    deps: []
+    note: "Closeout follow-up 5 residue; bookkeeping only"
+
+  # --- Stage 3 Phase 4 ---
+  - id: wear-slice-armor
+    title: "Wear slice (armor): menu wear verb + core wear planner + armor classification"
+    stage: "stage-3-phase-4"
+    status: open
+    size: M
+    deps: [H-R4-pass]
+    note: "armor clicks already landed (equipsArmorThroughMenuClicks); verb name is 'wear' (equip taken by 0013 hotbar selection); needs canon root table row + H-R4 friction + harness-interaction audit reopen"
+
+  - id: farming-plant-grow-harvest
+    title: "Farming plant + grow + harvest faces"
+    stage: "stage-3-phase-4"
+    status: open
+    size: M
+    deps: [till_soil]
+    note: "plant_seeds (ItemNameBlockItem.place on farmland), crop_growth (randomTick light>=9, bonemeal), harvest_mature (AGE==7 dig); each needs gametest anchor before promote"
+
+  - id: water-fish-hunt
+    title: "Water fish hunt face (acquisition.water_fish)"
+    stage: "stage-3-phase-4"
+    status: open
+    size: M
+    deps: [combat.melee]
+    note: "melee attack on AbstractFish in water (cod/salmon/tropical_fish -> raw fish; pufferfish -> poison); bucketMobPickup alternative path"
+
+  - id: loop-acceptance
+    title: "Loop acceptance: unattended mine -> craft -> equip -> fight -> eat"
+    stage: "stage-3-phase-4"
+    status: open
+    size: M
+    deps: [equip, loadout, HungryProcess]
+    note: "Driven through boundary-D verbs only; recorded verdict in tool/sessions/; 0015 live chain-halt check rides here"
+
+  - id: botcontroller-reflex-extraction
+    title: "BotController reflex-preemption extraction"
+    stage: "stage-3-phase-4"
+    status: open
+    size: M
+    deps: []
+    note: "routeReflexDecision/preemptAndHold/handoffToSeat/evict/resumeParkedMission into ReflexPreemption collaborator; retires PMD.GodClass suppression on BotController (TCC axis)"
+
+  # --- Lean-round deferrals ---
+  - id: lean-deterministic-clock
+    title: "Deterministic clock seam for wall-clock gates"
+    stage: "lean-round"
+    status: open
+    size: S
+    deps: []
+    note: "AStarWallClockGateTest arms real 1ms budget; AdoptFreshness/PlanWorkerGateTest sleep-poll. Inject deadline/clock into AStarPathFinder + PlanWorker"
+
+  - id: lean-recipecatalog-pagination
+    title: "RecipeCatalog.list(offset, limit) / RecipePage offline test"
+    stage: "lean-round"
+    status: open
+    size: S
+    deps: []
+    note: "ships without offline test; add clamping/ordering coverage"
+
+  - id: lean-menu-family-disposition
+    title: "Menu-family disposition (BridgeInventory vs BindingInventory overlap)"
+    stage: "lean-round"
+    status: open
+    size: S
+    deps: [issue-0010-ruling]
+    note: "rides issue 0010 BotPlayerFacade ruling; do not churn vanilla-interaction adapter code twice"
+
+  - id: lean-combatorder-flatten
+    title: "CombatOrder permits exactly Attack: flatten onto Overrides payload"
+    stage: "lean-round"
+    status: open
+    size: S
+    deps: [stage-3-review]
+    note: "boundary-B Directive shape frozen until Stage 3 review"
+
+  - id: lean-interruptioncontext-flatten
+    title: "InterruptionContext.interruptedTask() written-never-read flatten"
+    stage: "lean-round"
+    status: open
+    size: S
+    deps: [stage-3-review]
+    note: "boundary-C frozen vocabulary, not cuttable outside review"
+
+  # --- Movement-vocabulary seeds (from issue 0004) ---
+  - id: mv-yya-depth-control
+    title: "yya dive / ascend adapter translation for deliberate depth control"
+    stage: "movement-vocabulary"
+    status: open
+    size: M
+    deps: []
+    note: "descent half landed 2026-08-29 (applyWaterDescent + SwimDown edge, 68dec65); ascent predates (jumpInFluid). Remaining: harness-facing deliberate-depth story if demanded"
+
+  - id: mv-pose-swimming
+    title: "Pose.SWIMMING getDimensions override + pose-aware collision predicates"
+    stage: "movement-vocabulary"
+    status: open
+    size: S
+    deps: [issue-0003-unpark]
+    note: "carrier can crawl 1-block flooded gaps; rides issue 0003's pickup"
+
+  - id: mv-depth-tiered-costs
+    title: "Depth-tiered fluid costs measured by gametest then re-derived"
+    stage: "movement-vocabulary"
+    status: open
+    size: S
+    deps: []
+    note: "shallow ~= walk, surface lane cheap-ish, sub-surface expensive; surface-lane preference falls out of tiers instead of flat Swim cost"
+
+  - id: mv-construction-movements
+    title: "Construction Movements (pillar-up / bridge / tunnel)"
+    stage: "movement-vocabulary"
+    status: open
+    size: L
+    deps: [frozen-boundary-lift]
+    note: "ruling D5 sequencing: inventory model -> Place/Break intents -> Movements; Movement.isViable never grows bot-state parameter (MoveGraph injection instead)"
+
+  # --- Deferred infrastructure ---
+  - id: infra-eventqueue-journal
+    title: "EventQueue JsonlJournal persistence for cross-restart replay"
+    stage: "deferred-infrastructure"
+    status: open
+    size: S
+    deps: []
+    note: "event queue ships in-memory only today; resetAt epoch honesty queued as issue 0015 section 7"
+
+  # --- Capability gaps ---
+  - id: gap-follow-escort
+    title: "Follow / escort and harvest-and-place loops"
+    stage: "capability-gaps"
+    status: open
+    size: M
+    deps: []
+    note: "demand anchors issue 0009 F3/F4 cite"
+
+  - id: gap-multistep-crafting
+    title: "Multi-step crafting chains (log -> planks -> sticks as one request)"
+    stage: "capability-gaps"
+    status: open
+    size: S
+    deps: []
+    note: "device fills one recipe per call; harness orchestrates chains today"
+
+  - id: gap-multitarget-combat
+    title: "Multi-target combat and retreat choreography"
+    stage: "capability-gaps"
+    status: open
+    size: M
+    deps: []
+
+  - id: gap-climb
+    title: "Climb (ladders / vines) engine scenario"
+    stage: "capability-gaps"
+    status: open
+    size: S
+    deps: []
+    note: "PARTIAL 2026-08-29: deliberate move landed (BasicMoves.ClimbUp, trait-driven, offline-gated, 68dec65); no engine scenario exercises real ladder ascent yet — gametest is remaining half"
+
+  - id: gap-spatial-memory
+    title: "Spatial memory / waypoint persistence across sessions"
+    stage: "capability-gaps"
+    status: open
+    size: S
+    deps: []
+
+  - id: gap-transport-beyond-rcon
+    title: "Transport beyond RCON console bridge (MCP / HTTP / stdio)"
+    stage: "capability-gaps"
+    status: open
+    size: M
+    deps: []
+    note: "bot stays blind to the choice"

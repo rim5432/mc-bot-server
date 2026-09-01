@@ -13,9 +13,11 @@ Ordered by dependency, sized by relative effort: S < M < L < XL.
 No item depends on anything below it. Check items off in place;
 do not start an item before its blockers are checked.
 
-**Shipped items are removed from this file when they land; their
-history lives in git commits and the ledger. This file holds only
-OPEN / IN_PROGRESS items and deferred queues.**
+**Machine-readable state lives in [`doc/_state/workplan.yaml`](../_state/workplan.yaml)** —
+item statuses, sizes, dependencies, and stage grouping. This file
+carries the narrative (design notes, acceptance criteria); the YAML
+is the source of truth for status fields. Shipped items are removed
+from both files — their history lives in git commits and the ledger.
 
 ## v1 convergence criteria
 
