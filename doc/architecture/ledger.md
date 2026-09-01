@@ -1,6 +1,6 @@
 ---
 title: Decision Ledger (append-only)
-last_verified: 2026-08-31
+last_verified: 2026-09-01
 covers:
   - doc/architecture/boundaries.md
   - src/main/resources/data/mcbotserver/reflex_rules.json
@@ -41,6 +41,9 @@ Admission protocol:
 Amendment chains recorded so far (both sides annotated):
 
 - 14 <- 25: INTERACT joins as the fifth channel.
+- 37 <- 51: range routing stateful + weapon-aware (committed draws,
+  point-blank bow when unarmed of better melee, bow-only standoff
+  opening at the process tier).
 - 39 <- 40: attack kill-confirmation (health-zero sighting =
   SUCCESS; absence-past-grace ESCAPED unchanged).
   <- 37: USE hold is first-class (sustained press charges a draw,
@@ -577,7 +580,11 @@ Amendment chains recorded so far (both sides annotated):
     point rises by ARROW_DROP_PER_BLOCK_SQUARED * range squared, a
     constant-velocity parabola fit honest to within a block across
     the bow band. The engine pair (draw-release onto a live target)
-    rides the staged gametest batch.
+    rides the staged gametest batch. Amendment (ledger 51,
+    2026-09-01): range routing is stateful and weapon-aware - a
+    committed draw finishes through band-edge flips, the bow answers
+    point-blank under the weapon-aware configuration, and bow-only
+    carriers open melee-target fights at the standoff rim.
     38. Grammar fold executed: every write addresses its noun
     (user release 2026-08-28 of the 0015 section-3 trigger, then
     extended by user ruling in the same session - utilities must
@@ -674,3 +681,42 @@ Amendment chains recorded so far (both sides annotated):
     49. 2026-08-30 ranged/survival batch 2 (closes the round): three scenarios landed - a rear arrow lands through the raised shield (the hurt-side direction gate, LivingEntity:1307-1313, is the mechanism the frontal pin's sibling), the 4-tick bow tap stays in the weak band against the 25-tick full draw on one south-column target, and the tool selector swaps to shears for leaves. Two round verdicts closed by audit, not scenarios: the rescue surface (TC-021) is engine-backed through the existing escapesLavaToShore / findsWaterWhenBurning pins - RescueMissionFactory's null-to-FREEZE degradation path is the only uncovered residual (deferred); the shield 0-4-tick latency premise (TC-015) is NOT-A-APPLICABLE in 1.20.1 - isBlocking has no warmup (LivingEntity:3131; the warmup mechanic is 1.21+), recorded with the citation. The batch also paid one pooled-flake tax: a stray angled tap arrow once took down crossesLavaTrench in a neighbour structure (the ledger-46 cross-contamination class, third sighting) - projectile scenarios now keep every shot path inside the structure walls. Scope note (post-review annotation): this entry's own commits are scenario/doc/closeout only; the ROUND's three product fixes (facade getItemBySlot/getProjectile bridging, eye-line ballistics, bobber Vec3) landed in batch 1 under ledger 48 (09ad5ae/5f422fa/1ba8a6c); any "seven fixes" figure counts both QA rounds cumulatively (mechanics round: harvest gate + compensation removal; ranged round: the three above).
 
     50. 2026-08-31 boundary-D honesty round, receipt-closed: the black-box QA round (qa-results/boundary-d, ledger-of-record in its round-summary) pinned both known section-S gaps of issue 0015 with red receipts and closed them the same day. (1) resetAt epoch honesty: the marker was queue-instance state, so every /botspawn and every JVM boot minted 1 - colliding with client bookmarks at epoch 1 and silently stranding new events below the stale cursor (loss, not replay). The marker now draws from an allocator at construction and on reset; the production source is EventEpochStore, a SavedData sequence in the overworld (crash window = last world save, detected by the client's id-space backstop). ResetEpochGateTest pins the queue-side contract; boundary-D cases C2b/C2-post flipped red->green live. (2) entity-ticking ticket: BotChunkTicket follows the body with a forceload grant from BotAssembly.tickOnce (before the pipeline reads), released on despawn/replace/death, re-granted while the body is UNLOADED_TO_CHUNK (unload is not death - the load re-materializes the body, the mechanism C1's manual-forceload probe proved). Mechanism verdict with probes: a TicketType.create region ticket at distance 3 LOGGED as granted yet never loaded its chunk (setblock kept answering "not loaded"); setChunkForced proved itself twice live, is operator-visible via forceload query, and costs one entity-tick skip per border crossing (accepted, momentum persists). Verification instrument is the boundary-D runner, not a gametest: the gametest world is void outside structures, so a far tp lands in ungenerated chunks and the bare-server shape is unreachable in-engine (a first-cut scenario also cross-contaminated a neighbour structure - removed, GametestInventoryCheck repinned). Open engine observation (not this round's scope, pinned live): the mission directly after a NO_PATH failure can itself NO_PATH instantly; a completing mission heals the window. Declined: streamGeneration as a second restart signal (resetAt is the stream generation - one concept one owner) and the MAX_DISTANCE goto precheck (+80 STUCK, +150 still-walking controls show no distance fast-fail; the +400 NO_PATH was genuine unreachability on that seed).
+    51. 2026-09-01 Combat range routing goes stateful and weapon-aware
+    (amends 37; exposed by the 08-31 pooled receipt where the ranged
+    scenario never landed an arrow). Three rulings, one concern: (1)
+    ROUTING HYSTERESIS - CombatBehavior's ranged/melee route was a
+    per-tick distance reflex, so a draw aborted the tick the target
+    crossed ATTACK_REACH and a target oscillating across 3 blocks
+    (or a chase closing through it) restarted the draw every approach
+    tick and never released; a draw past BOW_COMMIT_TICKS (half
+    charge) now finishes its shot through BOTH band-edge flips, with
+    the waste bounded at one draw and the release under half a draw
+    away. (2) POINT-BLANK POLICY - the bow never answered inside
+    melee reach even for a carrier with no other weapon; under the
+    weapon-aware configuration (the catalog-carrying constructor; the
+    no-catalog constructor keeps the legacy melee band) the bow
+    answers at every distance while nothing in the hotbar outranks
+    it - full-draw arrows replace fist-tier clubbing, with the
+    ranking predicate shared as RangedLoadouts.meleeWeaponBeatsBow.
+    (3) WEAPON-AWARE ENGAGEMENT - DefendProcess charged every
+    melee-typed target to the swing rim regardless of loadout; a
+    bow-only carrier (no hotbar weapon outranking the bow) now opens
+    those fights at the standoff rim and fires on the close, the
+    decision frozen at engage time; AttackProcess gains the same
+    first-sighting freeze, and the two tiers read ONE catalog
+    instance (BotAssembly wires VanillaWeaponCatalog into both). The
+    standoff rim is an OPENING posture, not a maintained range -
+    GoalNear never backs the body up; a genuinely maintained range
+    needs the behavior-coordination channel and is deferred to issue
+    0018. Pinned offline by the CombatRangedGateTest commit/abort
+    pairs and the DefendProcess/AttackProcess standoff tests; the
+    engine bow scenarios close through the new standoff path. The
+    same round's second receipt line (bowtap landing full-draw
+    damage, double RED at delta 9.2/10.2) diagnosed to its root: the
+    hand-pumped scenario spawns its target at exactly
+    EngageOnHostileProximityRule's 6.0 trigger boundary, so on the
+    fire side of the knife edge the reflex-owned CombatBehavior
+    fights the pump for the USE channel and the release edges
+    corrupt (the bowtap 14.096 flake family). Fixed at the scenario
+    layer - target re-spaced to seven cells, a no-reflex-verdict pin
+    added - hand-pumped scenarios own their channels exclusively.

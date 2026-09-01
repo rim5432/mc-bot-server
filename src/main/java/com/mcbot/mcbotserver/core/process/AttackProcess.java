@@ -1,6 +1,7 @@
 package com.mcbot.mcbotserver.core.process;
 
 import com.mcbot.mcbotserver.api.goal.GoalNear;
+import com.mcbot.mcbotserver.api.inventory.WeaponCatalog;
 import com.mcbot.mcbotserver.api.process.Attack;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.ExecutionReport;
@@ -10,6 +11,7 @@ import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.EntitySnapshot;
 import com.mcbot.mcbotserver.api.world.ViewMode;
 import com.mcbot.mcbotserver.api.world.WorldView;
+import com.mcbot.mcbotserver.core.combat.RangedLoadouts;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -22,9 +24,13 @@ import java.util.function.Supplier;
  * for the nearest threat, attack is HANDED the target, so there is
  * no hostile-type filter and no engagement refusal: the harness
  * chose this entity (a cow, a specific zombie, whatever), and the
- * only honest verdicts are machine-checkable ones. Weapon choice,
- * bow standoff, and swing timing stay the behavior tier's craft
- * (CombatBehavior; ledger 37).
+ * only honest verdicts are machine-checkable ones. Swing timing stays
+ * the behavior tier's craft (CombatBehavior; ledger 37); the
+ * engagement RANGE is a process decision shared with defend: a
+ * bow-only carrier (no hotbar weapon outranks the bow) opens the
+ * fight at the standoff rim and fires while the target closes
+ * instead of charging into fist-tier bow clubbing, frozen at first
+ * sight exactly like defend's engage-time decision.
  *
  * <p>Terminal semantics mirror DefendProcess deliberately, with one
  * sharpening (ledger 40): death is DIRECTLY machine-judged - the
@@ -91,14 +97,18 @@ public final class AttackProcess extends MissionShell {
 
     private final String targetId;
     private final Supplier<CellPos> positionSource;
+    private final WeaponCatalog weapons;
 
     private boolean succeeded;
     private String failure;
+    private boolean standoffOpening;
     private final TargetTracker tracker = new TargetTracker();
     private Directive lastDirective;
 
     /**
-     * Creates a directed engagement.
+     * Creates a directed engagement, read without a weapon catalog: a
+     * carried bow then always outranks everything, so bow carriers
+     * open at the standoff rim.
      *
      * @param taskId         boundary-D task id for tracing; never
      *                       null or blank
@@ -110,12 +120,36 @@ public final class AttackProcess extends MissionShell {
      */
     public AttackProcess(
             String taskId, String targetId, int priority, long timeoutTicks, Supplier<CellPos> positionSource) {
+        this(taskId, targetId, priority, timeoutTicks, positionSource, WeaponCatalog.none());
+    }
+
+    /**
+     * Creates a directed engagement with the weapon ranking the
+     * standoff decision reads.
+     *
+     * @param taskId         boundary-D task id for tracing; never
+     *                       null or blank
+     * @param targetId       {@link EntitySnapshot#id()} of the entity
+     *                       to fight; never null or blank
+     * @param priority       band-legal priority per PriorityBands
+     * @param timeoutTicks   tick budget; positive
+     * @param positionSource body cell accessor; never null
+     * @param weapons        per-hit melee damage ranking; never null
+     */
+    public AttackProcess(
+            String taskId,
+            String targetId,
+            int priority,
+            long timeoutTicks,
+            Supplier<CellPos> positionSource,
+            WeaponCatalog weapons) {
         super(taskId, priority, timeoutTicks);
         if (targetId == null || targetId.isBlank()) {
             throw new IllegalArgumentException("targetId must not be blank");
         }
         this.targetId = targetId;
         this.positionSource = Objects.requireNonNull(positionSource, "positionSource");
+        this.weapons = Objects.requireNonNull(weapons, "weapons");
     }
 
     /**
@@ -166,13 +200,21 @@ public final class AttackProcess extends MissionShell {
             return lastDirective;
         }
 
+        // Engage-time range freeze, the defend symmetry: the first
+        // sighting decides chase-versus-standoff for the whole fight.
+        boolean firstSighting = !tracker.engaged();
         tracker.sighted(target.pos());
         if (tracker.leashed(position)) {
             fail(REASON_LOST);
             return lastDirective;
         }
-        lastDirective =
-                new Directive(new GoalNear(tracker.targetCell(), GOAL_RANGE), new Overrides(new Attack(targetId)));
+        if (firstSighting
+                && RangedLoadouts.hotbarBowSlot(world) >= 0
+                && !RangedLoadouts.meleeWeaponBeatsBow(world, weapons)) {
+            standoffOpening = true;
+        }
+        int range = standoffOpening ? DefendProcess.RANGED_STANDOFF : GOAL_RANGE;
+        lastDirective = new Directive(new GoalNear(tracker.targetCell(), range), new Overrides(new Attack(targetId)));
         return lastDirective;
     }
 

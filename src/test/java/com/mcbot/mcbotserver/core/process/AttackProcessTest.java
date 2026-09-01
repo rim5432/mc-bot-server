@@ -4,6 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.mcbot.mcbotserver.api.inventory.InventoryView;
+import com.mcbot.mcbotserver.api.inventory.ItemView;
+import com.mcbot.mcbotserver.api.inventory.WeaponCatalog;
 import com.mcbot.mcbotserver.api.process.Attack;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.InterruptionContext;
@@ -35,6 +38,88 @@ class AttackProcessTest {
 
     private EntitySnapshot cow(String id, int x) {
         return new EntitySnapshot(id, COW, new CellPos(x, 64, 0), 10f, 10f);
+    }
+
+    /**
+     * A bow-only carrier opens the directed fight at the standoff rim
+     * - the same weapon-aware engagement defend uses - and the
+     * decision freezes at first sight for the whole fight.
+     */
+    @Test
+    void bowOnlyCarrierOpensAtStandoffAndFreezesTheDecision() {
+        MockWorldView world = new MockWorldView();
+        world.setInventory(inventoryWithBow());
+        AttackProcess m = new AttackProcess("t1", "cow-7", 50, 1000L, () -> BOT, WeaponCatalog.none());
+        world.addEntity(cow("cow-7", 6));
+
+        Directive first = m.onTick(world);
+        com.mcbot.mcbotserver.api.goal.GoalNear goal = (com.mcbot.mcbotserver.api.goal.GoalNear) first.goal();
+        assertEquals(
+                DefendProcess.RANGED_STANDOFF,
+                goal.range(),
+                "bow-only opens at the standoff rim instead of charging into clubbing");
+
+        // Later ticks hold the frozen decision even as the target
+        // closes - no per-tick flip-flop.
+        world.removeEntity("cow-7");
+        world.addEntity(cow("cow-7", 3));
+        Directive second = m.onTick(world);
+        com.mcbot.mcbotserver.api.goal.GoalNear held = (com.mcbot.mcbotserver.api.goal.GoalNear) second.goal();
+        assertEquals(DefendProcess.RANGED_STANDOFF, held.range(), "the engage-time range decision is frozen");
+    }
+
+    /**
+     * A carried sword outranking the bow restores the plain chase:
+     * the standoff opening is bow-only policy, not a general tax.
+     */
+    @Test
+    void meleeWeaponKeepsTheDirectedChase() {
+        MockWorldView world = new MockWorldView();
+        world.setInventory(inventoryWithBowAndSword());
+        WeaponCatalog catalog = id -> id.endsWith("iron_sword") ? 7f : 0f;
+        AttackProcess m = new AttackProcess("t1", "cow-7", 50, 1000L, () -> BOT, catalog);
+        world.addEntity(cow("cow-7", 6));
+
+        Directive d = m.onTick(world);
+        com.mcbot.mcbotserver.api.goal.GoalNear goal = (com.mcbot.mcbotserver.api.goal.GoalNear) d.goal();
+        assertEquals(AttackProcess.GOAL_RANGE, goal.range(), "a real melee weapon charges the swing rim");
+    }
+
+    /**
+     * An own-inventory snapshot carrying a bow in slot 0 and arrows in
+     * the backpack - the minimal ranged loadout.
+     *
+     * @return the inventory view; never null
+     */
+    private static InventoryView inventoryWithBow() {
+        java.util.List<ItemView> main =
+                new java.util.ArrayList<>(java.util.Collections.nCopies(InventoryView.MAIN_SIZE, ItemView.EMPTY));
+        main.set(0, new ItemView("minecraft:bow", 1));
+        main.set(InventoryView.HOTBAR_SIZE, new ItemView("minecraft:arrow", 32));
+        return new InventoryView(
+                main,
+                0,
+                java.util.List.copyOf(java.util.Collections.nCopies(InventoryView.ARMOR_SIZE, ItemView.EMPTY)),
+                ItemView.EMPTY);
+    }
+
+    /**
+     * The bow-plus-sword loadout: a ranged loadout that must NOT
+     * trigger the standoff opening.
+     *
+     * @return the inventory view; never null
+     */
+    private static InventoryView inventoryWithBowAndSword() {
+        java.util.List<ItemView> main =
+                new java.util.ArrayList<>(java.util.Collections.nCopies(InventoryView.MAIN_SIZE, ItemView.EMPTY));
+        main.set(0, new ItemView("minecraft:bow", 1));
+        main.set(1, new ItemView("minecraft:iron_sword", 1));
+        main.set(InventoryView.HOTBAR_SIZE, new ItemView("minecraft:arrow", 32));
+        return new InventoryView(
+                main,
+                0,
+                java.util.List.copyOf(java.util.Collections.nCopies(InventoryView.ARMOR_SIZE, ItemView.EMPTY)),
+                ItemView.EMPTY);
     }
 
     @Test

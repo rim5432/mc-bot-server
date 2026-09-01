@@ -2,6 +2,7 @@ package com.mcbot.mcbotserver.core.command;
 
 import com.mcbot.mcbotserver.api.command.BotCommand;
 import com.mcbot.mcbotserver.api.event.EventQueue;
+import com.mcbot.mcbotserver.api.inventory.WeaponCatalog;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.process.AttackProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
@@ -29,9 +30,11 @@ public final class AttackCommandHandler extends VerbTaskHandler<AttackProcess> {
     public static final long DEFAULT_TIMEOUT_TICKS = 1200L;
 
     private final Supplier<CellPos> positionSource;
+    private final WeaponCatalog weapons;
 
     /**
-     * Creates the handler over the task channel and event stream.
+     * Creates the handler over the task channel and event stream,
+     * read without a weapon catalog (bow carriers always stand off).
      *
      * @param arbiter           mission selector; never null
      * @param events            completion/cancellation stream; never
@@ -48,8 +51,33 @@ public final class AttackCommandHandler extends VerbTaskHandler<AttackProcess> {
             LongSupplier daySupplier,
             LongSupplier timeOfDaySupplier,
             Supplier<CellPos> positionSource) {
+        this(arbiter, events, daySupplier, timeOfDaySupplier, positionSource, WeaponCatalog.none());
+    }
+
+    /**
+     * Creates the handler over the task channel and event stream.
+     *
+     * @param arbiter           mission selector; never null
+     * @param events            completion/cancellation stream; never
+     *                          null
+     * @param daySupplier       game-day stamp accessor; never null
+     * @param timeOfDaySupplier time-of-day stamp accessor; never
+     *                          null
+     * @param positionSource    body cell accessor feeding the scan
+     *                          center; never null
+     * @param weapons           per-hit melee damage ranking feeding
+     *                          the standoff decision; never null
+     */
+    public AttackCommandHandler(
+            TaskArbiter arbiter,
+            EventQueue events,
+            LongSupplier daySupplier,
+            LongSupplier timeOfDaySupplier,
+            Supplier<CellPos> positionSource,
+            WeaponCatalog weapons) {
         super(arbiter, events, daySupplier, timeOfDaySupplier);
         this.positionSource = Objects.requireNonNull(positionSource, "positionSource");
+        this.weapons = Objects.requireNonNull(weapons, "weapons");
     }
 
     @Override
@@ -67,7 +95,7 @@ public final class AttackCommandHandler extends VerbTaskHandler<AttackProcess> {
         Map<String, String> args = command.args();
         long timeout =
                 args.containsKey("timeoutTicks") ? Long.parseLong(args.get("timeoutTicks")) : DEFAULT_TIMEOUT_TICKS;
-        return new AttackProcess(taskId, args.get("targetId"), 50, timeout, positionSource);
+        return new AttackProcess(taskId, args.get("targetId"), 50, timeout, positionSource, weapons);
     }
 
     private static boolean validateArgs(BotCommand command) {

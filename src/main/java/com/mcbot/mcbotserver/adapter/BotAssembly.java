@@ -168,7 +168,12 @@ public final class BotAssembly {
         // dy overstates the target elevation by the full eye height -
         // every ranged shot sailed high over close targets until this
         // split from the pathing supplier.
-        Behavior combat = new CombatBehavior("combat", () -> eyePoseOf(body), new VanillaWeaponCatalog());
+        // One shared ranking: the combat behavior's held-weapon policy
+        // and DefendProcess's engagement decision must read the same
+        // damage table, or the two tiers can disagree about whether a
+        // carried sword beats the bow.
+        var weaponCatalog = new VanillaWeaponCatalog();
+        Behavior combat = new CombatBehavior("combat", () -> eyePoseOf(body), weaponCatalog);
         Behavior fisher = new com.mcbot.mcbotserver.core.behavior.FishBehavior("fish");
 
         // One fresh reflex-owned defend per engage submission; the
@@ -180,7 +185,8 @@ public final class BotAssembly {
                 ENGAGE_MISSION_TIMEOUT_TICKS,
                 () -> poseOf(body),
                 LevelThreatSensor.hostileTypes(),
-                LevelThreatSensor.rangedTypes());
+                LevelThreatSensor.rangedTypes(),
+                weaponCatalog);
 
         // One fresh reflex-owned rescue per ESCAPE submission: the
         // factory reads body state (lava vs fire) and scans for the
@@ -241,7 +247,8 @@ public final class BotAssembly {
                 events,
                 () -> level.getDayTime() / 24000L,
                 () -> level.getDayTime() % 24000L,
-                () -> poseOf(body));
+                () -> poseOf(body),
+                weaponCatalog);
         attackHandler.attach(bus);
         List<VerbTaskHandler<?>> taskHandlers = List.of(gotoHandler, digHandler, mineHandler, attackHandler);
         // The bus has ONE cancel-listener slot: route to every verb

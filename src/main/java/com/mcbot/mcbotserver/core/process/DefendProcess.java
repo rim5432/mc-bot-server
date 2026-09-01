@@ -1,6 +1,8 @@
 package com.mcbot.mcbotserver.core.process;
 
+import com.mcbot.mcbotserver.api.capability.Feature;
 import com.mcbot.mcbotserver.api.goal.GoalNear;
+import com.mcbot.mcbotserver.api.inventory.WeaponCatalog;
 import com.mcbot.mcbotserver.api.process.Attack;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.ExecutionReport;
@@ -40,6 +42,14 @@ import java.util.function.Supplier;
  * unless the inventory carries a ranged loadout (bow + arrows), in
  * which case the fight is engaged at RANGED_STANDOFF and answered
  * with the bow (ledger 37's USE hold-draw).
+ *
+ * <p>Engagement is weapon-aware, not only target-aware: a melee-
+ * typed hostile is charged to the swing rim only when the hotbar
+ * answers melee better than the bow. A bow-only carrier that runs to
+ * the swing rim trades full-draw arrows for fist-tier clubbing, so
+ * it opens the same fights at the standoff rim instead and fires
+ * while the target closes - inside melee reach the behavior tier
+ * keeps the bow answering until the fight ends.
  *
  * <p>Implementation note: runs on the server tick thread only.
  */
@@ -86,11 +96,18 @@ public final class DefendProcess extends MissionShell {
     public static final int GOAL_RANGE = 2;
 
     /**
-     * Standoff range for RANGED targets engaged with a bow loadout:
-     * inside the bow band (CombatBehavior.BOW_RANGE = 15) so the body
-     * can answer, beyond ATTACK_REACH so the fight does not collapse
-     * into a sword chase of a kiting target. The mover closes to this
-     * rim and holds; the combat behavior's draw pacing does the rest.
+     * Standoff range for fights answered with the bow: inside the bow
+     * band (CombatBehavior.BOW_RANGE = 15) so the body can answer,
+     * beyond ATTACK_REACH so the fight does not collapse into a sword
+     * chase of a kiting target. The mover closes to this rim and
+     * holds; the combat behavior's draw pacing does the rest.
+     *
+     * <p>Against a closing melee target the rim is the OPENING
+     * posture, not a maintained range: GoalNear holds position while
+     * the rim is satisfied but never backs the body up, so the target
+     * closes through it and the fight finishes inside the behavior
+     * tier's point-blank fire. A genuinely maintained range needs the
+     * behavior-coordination channel (issue 0018) and is deferred.
      */
     public static final int RANGED_STANDOFF = 10;
 
@@ -125,6 +142,7 @@ public final class DefendProcess extends MissionShell {
     private final Supplier<CellPos> positionSource;
     private final Set<String> hostileTypes;
     private final Set<String> rangedTypes;
+    private final WeaponCatalog weapons;
     private String lastRefusedType;
 
     private boolean succeeded;
@@ -135,7 +153,10 @@ public final class DefendProcess extends MissionShell {
     private Directive lastDirective;
 
     /**
-     * Creates a defend mission that engages every hostile type.
+     * Creates a defend mission that engages every hostile type, read
+     * without a weapon catalog: any carried bow then outranks
+     * everything, so bow carriers open melee-target fights at the
+     * standoff rim too.
      *
      * @param taskId       boundary-D task id for tracing; never null
      * @param priority     band-legal priority per PriorityBands
@@ -151,11 +172,12 @@ public final class DefendProcess extends MissionShell {
             long timeoutTicks,
             Supplier<CellPos> positionSource,
             Set<String> hostileTypes) {
-        this(taskId, priority, timeoutTicks, positionSource, hostileTypes, Set.of());
+        this(taskId, priority, timeoutTicks, positionSource, hostileTypes, Set.of(), WeaponCatalog.none());
     }
 
     /**
-     * Creates a defend mission with an explicit ranged-refusal set.
+     * Creates a defend mission with an explicit ranged-refusal set,
+     * read without a weapon catalog (see the seven-arg form).
      *
      * @param taskId       boundary-D task id for tracing; never null
      * @param priority     band-legal priority per PriorityBands
@@ -173,12 +195,51 @@ public final class DefendProcess extends MissionShell {
             Supplier<CellPos> positionSource,
             Set<String> hostileTypes,
             Set<String> rangedTypes) {
+        this(taskId, priority, timeoutTicks, positionSource, hostileTypes, rangedTypes, WeaponCatalog.none());
+    }
+
+    /**
+     * Creates a defend mission with an explicit ranged-refusal set and
+     * the weapon ranking the engagement decision reads.
+     *
+     * @param taskId       boundary-D task id for tracing; never null
+     * @param priority     band-legal priority per PriorityBands
+     * @param timeoutTicks tick budget; positive
+     * @param positionSource   body cell accessor; never null
+     * @param hostileTypes entity types worth engaging; never null
+     * @param rangedTypes  hostile types whose tactics defeat melee -
+     *                     these are REFUSED at engage time instead of
+     *                     chased; never null
+     * @param weapons      per-hit melee damage ranking; never null
+     */
+    public DefendProcess(
+            String taskId,
+            int priority,
+            long timeoutTicks,
+            Supplier<CellPos> positionSource,
+            Set<String> hostileTypes,
+            Set<String> rangedTypes,
+            WeaponCatalog weapons) {
         super(taskId, priority, timeoutTicks);
         this.positionSource = Objects.requireNonNull(positionSource, "positionSource");
         this.hostileTypes = Set.copyOf(Objects.requireNonNull(hostileTypes, "hostileTypes"));
         this.rangedTypes = Set.copyOf(Objects.requireNonNull(rangedTypes, "rangedTypes"));
+        this.weapons = Objects.requireNonNull(weapons, "weapons");
     }
 
+    @Feature(
+            id = "combat.hostile_acquisition.tactical_engagement",
+            face = "combat.hostile_acquisition",
+            description =
+                    "Tactical engagement decision: nearest hostile in 8-block engage radius. Ranged types are" +
+                    " REFUSED without a bow (ENGAGEMENT_REFUSED). Bow-only carriers open at the 10-block standoff" +
+                    " rim and fire while the target closes (point-blank bow), instead of charging to 2 and clubbing" +
+                    " for fist-tier damage. Melee-typed targets with a better melee weapon charge to 2.",
+            vanillaRef = "Hostile mob AI + player combat decision-making (decompiled 1.20.1)",
+            deviation =
+                    "Bot-specific: weapon-aware engagement routing — a bow-only carrier does not charge to melee" +
+                    " range; it keeps firing at standoff. Target switching is explicit (death/leash/policy), never" +
+                    " a side effect of nearestHostile ordering.")
     @Override
     public Directive onTick(WorldView world) {
         if (!live()) {
@@ -211,6 +272,16 @@ public final class DefendProcess extends MissionShell {
                     fail(REASON_REFUSED);
                     return lastDirective;
                 }
+                engageRanged(nearest);
+                return directiveFor();
+            }
+            // Melee-typed target: charge the swing rim only when the
+            // hotbar answers melee better than the bow. A bow-only
+            // carrier that closes to 2 trades full-draw arrows for
+            // bow clubbing, so it opens at the standoff rim and fires
+            // while the target closes; the behavior tier keeps the
+            // bow answering point-blank when the target arrives.
+            if (RangedLoadouts.hotbarBowSlot(world) >= 0 && !RangedLoadouts.meleeWeaponBeatsBow(world, weapons)) {
                 engageRanged(nearest);
                 return directiveFor();
             }
@@ -285,6 +356,17 @@ public final class DefendProcess extends MissionShell {
         // fight by itself; resume() decides whether it may continue.
     }
 
+    @Feature(
+            id = "combat.hostile_acquisition.resume_blind_trust",
+            face = "combat.hostile_acquisition",
+            description =
+                    "Resume blind-trust guard: after reflex preemption, resume() spends ALL grace credit so the" +
+                    " very next onTick scan adjudicates immediately. Prevents stale steering from a pre-pause" +
+                    " target from persisting through the full grace window.",
+            vanillaRef = "No direct vanilla counterpart — player-controlled combat has no reflex preemption",
+            deviation =
+                    "Bot-specific: boundary-C reflex preemption can park a fight mid-engagement; resume must not" +
+                    " blindly trust the pre-pause target state.")
     @Override
     public boolean resume(InterruptionContext c) {
         if (!live()) {
@@ -340,10 +422,23 @@ public final class DefendProcess extends MissionShell {
         targetRanged = true;
     }
 
+    @Feature(
+            id = "combat.hostile_acquisition.engagement_range",
+            face = "combat.hostile_acquisition",
+            description =
+                    "Engagement range selection: melee targets chase to GOAL_RANGE=2 (swing-adjacent), ranged" +
+                    " targets hold RANGED_STANDOFF=10 (bow band). Closing to 2 against a kiter hands the initiative" +
+                    " to a mob that backs away shooting.",
+            vanillaRef = "Skeleton follow range + shoot AI (decompiled 1.20.1)",
+            deviation =
+                    "Bot-specific: the standoff rim is a deliberate tactical choice, not a pathing limit. A" +
+                    " bow-only carrier holds 10 blocks to trade full-draw arrows instead of clubbing.")
     private Directive directiveFor() {
-        // Ranged targets hold the standoff rim instead of the swing-
-        // adjacent chase rim: closing to 2 hands the initiative to a
-        // kiter that backs away shooting.
+        // Bow-answered fights hold the standoff rim instead of the
+        // swing-adjacent chase rim: ranged targets because closing
+        // to 2 hands the initiative to a kiter that backs away
+        // shooting, bow-only carriers because closing trades
+        // full-draw arrows for fist-tier clubbing (ledger 51).
         int range = targetRanged ? RANGED_STANDOFF : GOAL_RANGE;
         lastDirective = new Directive(new GoalNear(tracker.targetCell(), range), new Overrides(new Attack(targetId)));
         return lastDirective;
@@ -360,6 +455,19 @@ public final class DefendProcess extends MissionShell {
      * @return hostile-typed entities within the active scan radius;
      *         never null, possibly empty
      */
+    @Feature(
+            id = "combat.hostile_acquisition.scan_radius",
+            face = "combat.hostile_acquisition",
+            description =
+                    "Dual scan radius: non-engaged uses DETECTION_RADIUS=16 (full hostile awareness envelope, so a" +
+                    " kiting ranged mob at 9-15 blocks is seen and REFUSED); engaged uses max(ENGAGE_RADIUS=8," +
+                    "LEASH_RADIUS+2=14) so an escaping target between engage and leash stays visible. Same" +
+                    " hostile-type filter, same ViewMode for both paths.",
+            vanillaRef = "Hostile mob follow range (decompiled 1.20.1)",
+            deviation =
+                    "Bot-specific: the engaged scan must extend past the leash radius to make leash-break" +
+                    " observable; the non-engaged scan must cover the full detection envelope so ranged hostiles at" +
+                    " standoff are not falsely reported as 'area clear'.")
     private List<EntitySnapshot> scanHostiles(WorldView world, CellPos center) {
         // Engaged: tracking must see farther than engaging — an already-
         // locked target between ENGAGE and LEASH stays visible here, which

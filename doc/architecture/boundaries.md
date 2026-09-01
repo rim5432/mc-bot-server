@@ -1,6 +1,6 @@
 ---
 title: Boundary Contracts
-last_verified: 2026-08-29
+last_verified: 2026-09-01
 covers:
   - doc/decisions/0002-capability-model-task-arbiter.md
   - doc/decisions/0003-reflex-layer-preemption.md
@@ -404,6 +404,7 @@ ordering-critical numbers sit behind test gates, not behind prose.
 | 48 | Ranged/survival QA batch 1: facade getItemBySlot/getProjectile bridging (private-field trap family), eye-line ballistics, bobber Vec3; 72 green twice | 2026-08-30 |
 | 49 | Ranged/survival batch 2: rear-shield direction gate, bow tap band, shears select; rescue covered by existing pins, shield warmup N/A in 1.20.1; 75 green | 2026-08-30 |
 | 50 | Boundary-D honesty round, receipt-closed: resetAt epoch allocator (EventEpochStore SavedData) + BotChunkTicket forceload; C2b/C2-post red->green live | 2026-08-31 |
+| 51 | Combat range routing stateful + weapon-aware: committed draws finish through band flips, bow answers point-blank when unarmed of better melee, bow-only opens at standoff (amends 37) | 2026-09-01 |
 
 ## Deferred, with reopen conditions
 

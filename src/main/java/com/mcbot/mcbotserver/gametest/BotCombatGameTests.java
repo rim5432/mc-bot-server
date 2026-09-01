@@ -10,6 +10,7 @@ import static com.mcbot.mcbotserver.gametest.GametestRig.spawnHostile;
 
 import com.mcbot.mcbotserver.McBotServer;
 import com.mcbot.mcbotserver.adapter.BotAssembly;
+import com.mcbot.mcbotserver.adapter.VanillaWeaponCatalog;
 import com.mcbot.mcbotserver.adapter.inventory.BindingInventory;
 import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
 import com.mcbot.mcbotserver.api.actor.Channel;
@@ -77,6 +78,7 @@ public final class BotCombatGameTests {
      * container changes, so melee damage and armor reduction ride
      * vanilla with no wiring beyond the mirror itself.
      */
+    // feature: combat.melee.vanilla_weapon_catalog
     @GameTest(template = "empty16x8x16", timeoutTicks = 100)
     public static void equipmentMirrorFeedsAttributes(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
@@ -120,6 +122,7 @@ public final class BotCombatGameTests {
      * window: a regression to chasing keeps the mission alive past
      * the window and fails here, not at timeout.
      */
+    // feature: combat.hostile_acquisition.tactical_engagement
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void refusesRangedItCannotAnswer(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
@@ -182,6 +185,7 @@ public final class BotCombatGameTests {
      * bot actually won the fight; the mission verdict is the honest
      * uncertainty signal, not a behavioral failure. See issue 0006.
      */
+    // feature: combat.melee.damage_chain
     // capability: combat.melee
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void defendsByKillingZombie(GameTestHelper helper) {
@@ -221,7 +225,8 @@ public final class BotCombatGameTests {
                 GametestRig.MISSION_BUDGET,
                 () -> GametestRig.positionOf(rig.body()),
                 LevelThreatSensor.hostileTypes(),
-                LevelThreatSensor.rangedTypes());
+                LevelThreatSensor.rangedTypes(),
+                new VanillaWeaponCatalog());
         rig.arbiter().register(mission);
         rig.arbiter().requestControl(mission);
         return mission;
@@ -260,6 +265,7 @@ public final class BotCombatGameTests {
      * sun-sensitive - without the roof the target burns instead of
      * fighting, which would test daylight, not retaliation.
      */
+    // feature: combat.melee.damage_chain
     // capability: combat.melee
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void survivesRetaliatingZombie(GameTestHelper helper) {
@@ -314,6 +320,7 @@ public final class BotCombatGameTests {
      * - that zero-damage fact is the pin. If the LOS clip regresses,
      * swings land and this fails with a damaged zombie.
      */
+    // feature: combat.line_of_sight.terrain_clip
     @GameTest(template = "empty16x8x16", timeoutTicks = (int) BotAssembly.ENGAGE_MISSION_TIMEOUT_TICKS + 100)
     public static void holdsFireWhenSightBlocked(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(4, GametestRig.WALK_Y, 8));
@@ -362,6 +369,7 @@ public final class BotCombatGameTests {
      * Weakened to 8 health like the retaliation scenario - the pin is
      * the acquisition and the fight, not a duel.
      */
+    // feature: combat.hostile_acquisition.omni_directional_scan
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void hostilesAggroOnSight(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
@@ -436,6 +444,7 @@ public final class BotCombatGameTests {
      * crit, no sprint), so inter-drop gaps below 11 ticks can only
      * mean the cooldown gate regressed.
      */
+    // feature: combat.melee.attack_cooldown
     // capability: combat.melee
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT + 100)
     public static void swordCooldownSpacesTheHits(GameTestHelper helper) {
@@ -491,6 +500,7 @@ public final class BotCombatGameTests {
      * xpNeededPerLevelMatchesVanilla. The roof keeps daylight from
      * burning the kill away from the bot.
      */
+    // feature: combat.melee.damage_chain
     // capability: combat.melee
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void killsGrantXpLevels(GameTestHelper helper) {
@@ -557,6 +567,7 @@ public final class BotCombatGameTests {
      * shielded phase — a regression where the USE edge fails to raise
      * the shield fails here before the damage check.
      */
+    // feature: combat.shield.body_blocking
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void raisedShieldBlocksFrontalMelee(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(5, GametestRig.WALK_Y, 8));
@@ -614,6 +625,7 @@ public final class BotCombatGameTests {
      * the exact poll the main target's death is first seen, before
      * the rescan can engage the bystander as a fresh main target.
      */
+    // feature: combat.melee.sweep_attack
     // capability: combat.melee
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void sweepClipsBystanders(GameTestHelper helper) {
@@ -664,6 +676,7 @@ public final class BotCombatGameTests {
      * production path swings reliably mid-fall, and staging one
      * would pin bot-controlled physics, not the crit gate.
      */
+    // feature: combat.melee.crit_hit
     // capability: combat.melee
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void underwaterSwingsNeverCrit(GameTestHelper helper) {
@@ -728,6 +741,7 @@ public final class BotCombatGameTests {
      * fires an identical arrow with the USE claim holding and the
      * health must not move.
      */
+    // feature: combat.shield.body_blocking
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void raisedShieldBlocksIncomingArrow(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(5, GametestRig.WALK_Y, 8));
@@ -791,6 +805,7 @@ public final class BotCombatGameTests {
      * weak-arrow floor interacts with the facade draw pacing, and
      * the heavy-damage pin alone proves charge flows into damage.
      */
+    // feature: combat.bow_draw.draw_and_release
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void bowChargedShotDamagesDistantTarget(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(5, GametestRig.WALK_Y, 2));
@@ -825,6 +840,7 @@ public final class BotCombatGameTests {
      * negative to block; a rear source fails it). The body faces
      * east with the shield up; the archer stands west.
      */
+    // feature: combat.shield.body_blocking
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void rearArrowBypassesTheRaisedShield(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(11, GametestRig.WALK_Y, 8));
@@ -875,10 +891,17 @@ public final class BotCombatGameTests {
      * Scenario: the charge flows into the damage - a 4-tick tap
      * release stays in the weak band (below the 0.1 charge floor no
      * arrow spawns at all; just above it the damage is a fraction of
-     * the full draw) on one target while the 25-tick hold on another
-     * lands the heavy band. Two NoAi zombies, one hand-pumped shot
-     * each.
+     * the full draw) on one hand-pumped shot per NoAi zombie.
+     *
+     * <p>The target sits SEVEN cells out, deliberately outside
+     * {@code EngageOnHostileProximityRule.TRIGGER_DISTANCE} (6): at
+     * the trigger boundary the reflex mints its own defend mission
+     * and the pipeline's CombatBehavior fights the hand pump for the
+     * USE channel - the release edges corrupt and the tap lands full
+     * draw (the 2026-09-01 double RED, the bowtap 14.096 flake
+     * family). Hand-pumped scenarios own their channels exclusively.
      */
+    // feature: combat.bow_draw.draw_and_release
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT + 100)
     public static void bowTapShotDealsWeakDamage(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(4, GametestRig.WALK_Y, 2));
@@ -888,31 +911,48 @@ public final class BotCombatGameTests {
         // ONE target straight south, both shots down the same column:
         // a second target at an angle sends stray tap arrows out of
         // the structure into neighbouring pooled scenarios (the lava
-        // trench cross-contamination class, ledger 46).
-        Zombie fullDraw = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(4, GametestRig.WALK_Y, 8));
+        // trench cross-contamination class, ledger 46). Seven cells,
+        // not six: outside the engage reflex's trigger (see Javadoc).
+        Zombie fullDraw = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(4, GametestRig.WALK_Y, 9));
         fullDraw.setNoAi(true);
+        // The hand pump owns ROT as well as USE: without an aim claim
+        // the arrow flies wherever the idle look channel points, not
+        // at the target (the 7-cell clean-miss class). Same bearing
+        // and ballistic lift the behavior tier computes.
+        double dx = fullDraw.getX() - rig.body().getX();
+        double dy = fullDraw.getY() + 1.0 - rig.body().getEyeY();
+        double dz = fullDraw.getZ() - rig.body().getZ();
+        double lift = com.mcbot.mcbotserver.core.behavior.CombatBehavior.ARROW_DROP_PER_BLOCK_SQUARED
+                * (dx * dx + dy * dy + dz * dz);
+        float aimYaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+        float aimPitch = (float) -Math.toDegrees(Math.atan2(dy + lift, Math.max(Math.hypot(dx, dz), 0.001)));
         final float[] afterFull = {20.0f};
 
         helper.startSequence()
                 .thenExecuteFor(25, () -> {
+                    rig.actor().submit(new Claim(Channel.ROT, 50, "test:aim", new Intent.Look(aimYaw, aimPitch)));
                     rig.actor().submit(new Claim(Channel.USE, 50, "test:draw", new Intent.Use(true)));
                     GametestRig.driveTick(rig);
                 })
                 .thenExecuteFor(2, () -> {
+                    rig.actor().submit(new Claim(Channel.ROT, 50, "test:aim", new Intent.Look(aimYaw, aimPitch)));
                     rig.actor().submit(new Claim(Channel.USE, 50, "test:draw", new Intent.Use(false)));
                     GametestRig.driveTick(rig);
                 })
                 .thenWaitUntil(driveUntil(
                         rig,
                         () -> check(
-                                fullDraw.getHealth() < 14f,
-                                "the full draw must land heavy damage, health=" + fullDraw.getHealth())))
+                                fullDraw.getHealth() <= 14.05f,
+                                "the full draw must land heavy damage (6+ base; the crit bonus is"
+                                        + " random 0-3 so exactly 6 is legal), health=" + fullDraw.getHealth())))
                 .thenExecuteAfter(0, () -> afterFull[0] = fullDraw.getHealth())
                 .thenExecuteFor(4, () -> {
+                    rig.actor().submit(new Claim(Channel.ROT, 50, "test:aim", new Intent.Look(aimYaw, aimPitch)));
                     rig.actor().submit(new Claim(Channel.USE, 50, "test:tap", new Intent.Use(true)));
                     GametestRig.driveTick(rig);
                 })
                 .thenExecuteFor(2, () -> {
+                    rig.actor().submit(new Claim(Channel.ROT, 50, "test:aim", new Intent.Look(aimYaw, aimPitch)));
                     rig.actor().submit(new Claim(Channel.USE, 50, "test:tap", new Intent.Use(false)));
                     GametestRig.driveTick(rig);
                 })
@@ -923,6 +963,10 @@ public final class BotCombatGameTests {
                             tapDelta <= 4.0f,
                             "a 4-tick tap must stay in the weak band (<=4 damage, or no arrow at all"
                                     + " below the 0.1 charge floor), delta=" + tapDelta);
+                    check(
+                            reflexEngageVerdict(rig.events()) == null,
+                            "the hand pump must own the USE channel: a reflex-engage mission here means"
+                                    + " the target spawned inside the trigger radius");
                     rig.body().discard();
                 })
                 .thenSucceed();

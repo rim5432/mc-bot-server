@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.mcbot.mcbotserver.api.inventory.InventoryView;
 import com.mcbot.mcbotserver.api.inventory.ItemView;
+import com.mcbot.mcbotserver.api.inventory.WeaponCatalog;
 import com.mcbot.mcbotserver.api.process.Attack;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.InterruptionContext;
@@ -34,6 +35,7 @@ class DefendProcessTest {
     private static final CellPos BOT = new CellPos(0, 64, 0);
     private static final String ZOMBIE = "minecraft:zombie";
     private static final String SKELETON = "minecraft:skeleton";
+    private static final String SWORD = "minecraft:iron_sword";
     private static final Set<String> HOSTILES = Set.of(ZOMBIE);
     private static final InterruptionContext CTX =
             new InterruptionContext(1L, BOT, "defend:t1", "reflex-preempt:test", "");
@@ -318,6 +320,73 @@ class DefendProcessTest {
     }
 
     /**
+     * Engagement is weapon-aware, not only target-aware: a bow-only
+     * carrier opens a MELEE-target fight at the standoff rim instead
+     * of charging the swing rim - charging would trade full-draw
+     * arrows for fist-tier bow clubbing once the target arrives.
+     * The blind catalog (none()) conservatively trusts the bow, so
+     * the standoff applies there too.
+     */
+    @Test
+    void bowOnlyCarrierStandsOffMeleeTarget() {
+        MockWorldView world = new MockWorldView();
+        DefendProcess m = new DefendProcess(
+                "t1", PriorityBands.DEFEND_PRIORITY, 1000L, () -> BOT, Set.of(ZOMBIE), Set.of(), WeaponCatalog.none());
+        world.setInventory(inventoryWithBow());
+
+        world.addEntity(zombie("Z1", 6));
+
+        Directive directive = m.onTick(world);
+        assertTrue(m.isActive(), "the fight is taken at standoff, not refused");
+        assertEquals("Z1", directive.overrides().combat().targetId());
+        com.mcbot.mcbotserver.api.goal.GoalNear goal = (com.mcbot.mcbotserver.api.goal.GoalNear) directive.goal();
+        assertEquals(
+                DefendProcess.RANGED_STANDOFF,
+                goal.range(),
+                "the bow-only carrier opens at the standoff rim instead of the swing rim");
+    }
+
+    /**
+     * The standoff opening is bow-only policy: a carried sword
+     * outranking the bow restores the chase to the swing rim - the
+     * melee band stays melee when the hotbar can actually answer it.
+     */
+    @Test
+    void meleeWeaponRecoversTheChargeForMeleeTargets() {
+        MockWorldView world = new MockWorldView();
+        WeaponCatalog catalog = id -> SWORD.equals(id) ? 7f : 0f;
+        DefendProcess m = new DefendProcess(
+                "t1", PriorityBands.DEFEND_PRIORITY, 1000L, () -> BOT, Set.of(ZOMBIE), Set.of(), catalog);
+        world.setInventory(inventoryWithBowAndSword());
+
+        world.addEntity(zombie("Z1", 6));
+
+        Directive directive = m.onTick(world);
+        assertTrue(m.isActive());
+        assertEquals("Z1", directive.overrides().combat().targetId());
+        com.mcbot.mcbotserver.api.goal.GoalNear goal = (com.mcbot.mcbotserver.api.goal.GoalNear) directive.goal();
+        assertEquals(DefendProcess.GOAL_RANGE, goal.range(), "a real melee weapon charges the swing rim as before");
+    }
+
+    /**
+     * Unarmed carriers keep the plain melee charge: the standoff
+     * opening requires a ranged loadout to open WITH.
+     */
+    @Test
+    void unarmedCarrierChargesMeleeTarget() {
+        MockWorldView world = new MockWorldView();
+        DefendProcess m = new DefendProcess(
+                "t1", PriorityBands.DEFEND_PRIORITY, 1000L, () -> BOT, Set.of(ZOMBIE), Set.of(), WeaponCatalog.none());
+
+        world.addEntity(zombie("Z1", 6));
+
+        Directive directive = m.onTick(world);
+        assertTrue(m.isActive());
+        com.mcbot.mcbotserver.api.goal.GoalNear goal = (com.mcbot.mcbotserver.api.goal.GoalNear) directive.goal();
+        assertEquals(DefendProcess.GOAL_RANGE, goal.range(), "no bow, no standoff - the plain chase");
+    }
+
+    /**
      * An own-inventory snapshot carrying a bow in slot 0 and arrows in
      * the backpack - the minimal ranged loadout.
      *
@@ -327,6 +396,25 @@ class DefendProcessTest {
         java.util.List<ItemView> main =
                 new java.util.ArrayList<>(java.util.Collections.nCopies(InventoryView.MAIN_SIZE, ItemView.EMPTY));
         main.set(0, new ItemView("minecraft:bow", 1));
+        main.set(InventoryView.HOTBAR_SIZE, new ItemView("minecraft:arrow", 32));
+        return new InventoryView(
+                main,
+                0,
+                java.util.List.copyOf(java.util.Collections.nCopies(InventoryView.ARMOR_SIZE, ItemView.EMPTY)),
+                ItemView.EMPTY);
+    }
+
+    /**
+     * Bow, arrows, and a real melee weapon: the loadout where the
+     * engagement decision must charge the swing rim, not the standoff.
+     *
+     * @return the inventory view; never null
+     */
+    private static InventoryView inventoryWithBowAndSword() {
+        java.util.List<ItemView> main =
+                new java.util.ArrayList<>(java.util.Collections.nCopies(InventoryView.MAIN_SIZE, ItemView.EMPTY));
+        main.set(0, new ItemView("minecraft:bow", 1));
+        main.set(1, new ItemView(SWORD, 1));
         main.set(InventoryView.HOTBAR_SIZE, new ItemView("minecraft:arrow", 32));
         return new InventoryView(
                 main,
