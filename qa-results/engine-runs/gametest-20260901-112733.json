@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "task": "runGameTest",
+  "log": "D:\\mc-bot-server\\tool\\.runtime\\build-runGameTest-20260901-112611.log",
+  "git_rev": "73c7b5b",
+  "finished_at": "2026-09-01T11:27:33",
+  "scenarios_total": 79,
+  "failed_count": 1,
+  "failed": [
+    "bowtapshotdealsweakdamage"
+  ],
+  "optional_failed_count": 1,
+  "failed_optional": [
+    "climbsladdertoplatform"
+  ],
+  "green": false
+}
