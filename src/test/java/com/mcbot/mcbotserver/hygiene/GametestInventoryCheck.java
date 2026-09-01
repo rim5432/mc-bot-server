@@ -134,7 +134,15 @@ class GametestInventoryCheck {
                             "swordDigsAtDoubleWear",
                             "breakingBlocksBuildsExhaustion",
                             "toolSelectorPicksThePickaxeForStone",
-                            "toolSelectorPicksShearsForLeaves")));
+                            "toolSelectorPicksShearsForLeaves")),
+            Map.entry(
+                    "BotHungerGameTests",
+                    Set.of(
+                            "exhaustionCascadeDrainsSaturationThenFood",
+                            "naturalRegenDisabledStopsHealingButNotStarvation",
+                            "saturatedFastRegenHealsAndCostsExhaustion",
+                            "slowRegenFiresAtFoodLevelEighteen",
+                            "starvationDealsDamageAtZeroFood")));
     /** Pulls the method name out of each
      * {@code @GameTest(...)} declaration in a source file. */
     private static final Pattern GAME_TEST_METHOD =
