@@ -91,7 +91,7 @@ declared-shipped faces carry green evidence.
 |---|---|
 | `capability init` / `db-status` | seed the faces / show table health |
 | `capability overview` / `list` / `status <id>` / `gaps` | macro counts, filtered lists, one face's detail, gap inventory |
-| `capability set <id> --status ... --verify` | flip a status (audited transition) — regenerates the state file in the same command |
+| `capability set <id> --status ... --verify` | flip a status — regenerates the state file in the same command |
 | `capability qa-import <csv>` | import spec rows; the CSV is authoritative for spec links (re-import overwrites verb edits; blank/unknown ids → unlinked) |
 | `capability scan-gametest` | sync impl rows from source: insert/update/prune; manual links and their `link_source` survive |
 | `capability link <case> <cap>` | manual triage (impls mainly; spec links belong in the CSV) — write-through |
@@ -99,8 +99,9 @@ declared-shipped faces carry green evidence.
 | `capability backfill` | mirror committed receipts into the DB (idempotent): engine-runs (gametest; re-parses surviving logs for failed names lost to the pre-6583cd4 regex bug) + boundary-d wire runs |
 | `capability paths` | face → boundary-D path axis (18/35 mapped, curated in seed), pathless review list, wire-run evidence streak |
 | `capability ref-generate` / `ref-import` / `ref-coverage` | the vanilla action baseline: **machine-enumerated** from the decompiled tree (every item class overriding use/useOn/releaseUsing/finishUsingItem — 55 classes, file-anchored, complete by construction) → `qa-results/vanilla-reference/inventory.json` → DB; face-map.json is the one curated layer (class → face); coverage = mapped/unmapped with a falsifiable denominator (currently 14/55 mapped, 41 unmapped engine actions) |
-| `capability diff [--since YYYY-MM-DD]` | what changed: status transitions, run green/red split + scenario growth, RED details with per-scenario failures, new faces |
-| `capability domain <category>` | per-face evidence: status, SPECS/IMPLS counts, NO-SPEC / NO-IMPL / DEVIATION flags, failure history, domain green streak |
+| `capability diff [--since YYYY-MM-DD]` | what changed: run green/red split + scenario growth, RED details with per-scenario failures, new faces (status history lives in git + the state overlay) |
+| `capability domain <category>` | per-face table: declared status, evidence, staleness, SPECS/IMPLS counts, NO-SPEC / NO-IMPL / DEVIATION flags, failure history, domain green streak |
+| `capability validate` | schema/vocabulary/FK checks on every test artifact in the DB (exit 1 on errors; coverage questions belong to `audit`) |
 | `capability restore` | apply the committed overlay after a rebuild |
 | `capability audit` | the single priority-sorted action queue: P0 shipped-without-evidence/red, P1 coverage gaps (unmapped items, pathless, gap/deferred faces), P2 hygiene (source drift, promote candidates, missing specs) — every row carries a copy-pasteable action |
 | `capability scan-features` / `features [face]` / `feature <id>` | `@Feature` annotation inventory: SOURCE-retained Java annotations declare a face's atomic design points (id/face/description/vanillaRef/deviation), scanned into the `features` table; `// feature: <id>` comments link gametests at feature granularity (highest-priority link source) |
@@ -113,11 +114,12 @@ Known honest limits: green evidence is run-granular (Forge logs
 failures per scenario, never passes — a face absent from a run's
 failure list passed); the newest engine run decides a face's
 evidence state, and no false greens are claimed by walking back past
-a red newest; per-face staleness needs source_paths (0/35 curated
-today — deferred until the catalog grows them); the transitions
-table was born 2026-08-31; impl auto-links are keyword guesses —
-audit with `capability status <id>` before trusting per-face
-rollups.
+a red newest; impl auto-links are keyword guesses — audit with
+`capability status <id>` before trusting per-face rollups. Status
+vocabulary is exactly two axes: the DECLARED `implementation_status`
+and the receipt-derived evidence state — feature annotations carry
+no status of their own (they are an inventory, `feature <id>` shows
+raw test links).
 
 Implementation lives in `tool/mcbot/` (split from the old
 monolithic `mcbot_tool.py`): `paths/config/gradle/lock/proc/engine/
