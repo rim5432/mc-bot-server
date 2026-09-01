@@ -418,47 +418,6 @@ def staleness_for_faces(db_path: Optional[Path] = None, *, repo_root: Optional[P
     return result
 
 
-def _detect_weak_mapping(face_id: str, source_paths: list[str]) -> Optional[str]:
-    """Auto-detect whether a face is adapter-only.
-
-    A face is adapter-only when its implementation lives only in the
-    adapter/ layer (net.minecraft bindings) and no core decision layer
-    invokes it. The decision layers are:
-      - core/behavior/  — behavior trees (CombatBehavior, PathingBehavior)
-      - core/process/   — process state machines (AttackProcess, DefendProcess)
-      - core/reflex/    — reflex rules (EngageOnHostileProximityRule)
-
-    Paths under core/tick/ (BotController routing), core/combat/
-    (utility classes like RangedLoadouts), core/command/ (command
-    handlers), and core/world/ (world view) are NOT decision layers —
-    they route or support but do not make the combat decision to invoke
-    the mechanic.
-
-    Detection is based on source_paths layering. Returns a reason string
-    when adapter-only is detected, None otherwise. Returns None when
-    source_paths is empty (cannot determine — the face may simply not
-    have catalogued its source paths yet).
-    """
-    if not source_paths:
-        return None
-    decision_prefixes = ("core/behavior/", "core/process/", "core/reflex/",
-                         "core\\behavior\\", "core\\process\\", "core\\reflex\\")
-    has_decision_layer = any(
-        any(p.startswith(pfx) for pfx in decision_prefixes)
-        for p in source_paths
-    )
-    has_adapter = any(
-        p.startswith("adapter/") or p.startswith("adapter\\")
-        for p in source_paths
-    )
-    if has_adapter and not has_decision_layer:
-        return (
-            "adapter-only: implementation lives in adapter/ layer, "
-            "no core behavior/process/reflex decision layer invokes it"
-        )
-    return None
-
-
 def domain_report(category: str, *, db_path: Optional[Path] = None) -> Optional[dict]:
     """One capability domain: per-face evidence, coverage, deficiencies.
 
