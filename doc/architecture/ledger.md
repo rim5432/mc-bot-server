@@ -918,3 +918,56 @@ Amendment chains recorded so far (both sides annotated):
     structure's footprint of foreign entities before aimed-shot
     scenarios (ledger 46 cross-contamination family, the bowtap
     clean-miss class).
+    57. 2026-09-01 Pooled-run hostile leaks: open structures recruit
+    strays into later scenarios. The sneakcrawlfitsthroughgap flake
+    (green 17:49, red 18:35/18:53, green 19:04 - all with 4eda7da's
+    forceload BotChunkTicket live) was NOT the bare-server ticket
+    gap: that gap was already closed, so a chunk-level theory cannot
+    explain a flake that persisted past it. Root-cause chain, every
+    link code-verified: the shared empty16x8x16 template carries
+    zero blocks (no walls); GameTestBatchRunner places structures 5
+    blocks apart; scenarios that end without their target dying
+    (rangedBot's kite, bowtap's weak tap, the standoff skeleton, the
+    NoAi standoff zombie, the villager trade) leave a live entity in
+    the pool; BotBodyEntity.tickPresence re-targets target-less
+    monsters within FOLLOW_RANGE (35 blocks, many structures) at the
+    RUNNING body; reaching a body west of a wall segment funnels the
+    recruit through the scenario's 1-wide crawl gap - head-on jam,
+    X frozen at 7 with the pose applied, timeout. The blocking event
+    itself is inferred from geometry plus the family's prior
+    receipts, not from a captured stray. Ruling, two layers: every
+    leak-site scenario tail now retires its surviving entity beside
+    the body, and the sneakcrawl scenario sweeps foreign entities
+    every drive tick so it measures the crawl contract rather than
+    contamination luck (the ledger-56 sweep doctrine promoted from
+    start-of-sequence to per-tick where the passable geometry is one
+    cell wide). Known limit, recorded not fixed: entities leaked by
+    a FAILED scenario linger until some later rig() start or sweep
+    encounters them - vanilla 1.20.1 exposes no pass/fail listener
+    from scenario code (GameTestHelper.testInfo is private with no
+    accessor), and standing up a mixin module for test hygiene is
+    disproportionate. Method note: the 19:04 green run had "confirmed"
+    the ticket-gap attribution - a green rerun of a flaky scenario
+    confirms nothing about its cause.
+    58. 2026-09-01 DefendProcess re-routes the ranged stance on
+    mid-fight loadout change. targetRanged was frozen at engage:
+    arrows running out left an empty bow holding the standoff band
+    it could no longer service, and a weapon gained mid-fight never
+    closed from standoff. Ruling: the engaged branch re-derives the
+    stance every tick through the same predicate family the engage
+    decision uses - ranged-typed target iff a bow loadout exists,
+    melee-typed target iff a loadout exists and no hotbar weapon
+    outranks the bow (RangedLoadouts, one decision function, no
+    drift between the two sites). Ammunition depletion charges the
+    swing rim; a gained loadout opens the standoff; a ranked melee
+    weapon closes from it. One direction refuses instead of
+    re-routing: a ranged-typed target whose loadout vanished
+    mid-fight fails ENGAGEMENT_REFUSED with the threat type - the
+    unarmed chase against a kiting skeleton is the bleed the
+    engage-time refusal exists to prevent, mid-fight included.
+    Target identity stays locked; only the stance re-routes
+    (leash/escape/timeout semantics untouched). Pinned offline by
+    DefendProcessTest mid-fight cases (arrows-out charge, sword
+    pickup close, bow pickup open, skeleton refusal, churn guard)
+    and in-engine by arrowsRunOutMidFightReroutesToMelee (NoAi
+    invulnerable target, stance-only assertions).
