@@ -212,7 +212,73 @@ deviation cited.
 - **Ladders and vines are climbable traits** with no deliberate move
   yet (workplan gap inventory).
 
-## 9. Hunting yield: kill, herd, harvest (survey, 2026-09-02)
+## 9. Taming and companion animals (survey + mirror, 2026-09-02)
+
+Pet-domestication truths read from the decompiled tree. The tame
+press chain is mirrored live by the `taming.chain` face; the
+companion behaviors and mounts behind it are survey-stage records
+feeding future face proposals.
+
+### 10.1 The tame press (mirrored)
+
+- TamableAnimal: tame is synched byte bit 4; the owner is a synched
+  `Optional<UUID>` (`DATA_OWNERUUID_ID`); sitting is a server-side
+  `orderedToSit` flag (NBT `Sitting`) plus pose bit 1; the tame
+  result is broadcast as entity event byte 7 (hearts) / 6 (smoke).
+- Per-species press: Wolf takes a bone only while not angry,
+  consumes it, tames on `nextInt(3) == 0` (Wolf.mobInteract:382)
+  and auto-sits on success; Cat takes raw cod or salmon at the same
+  1/3 (Cat.mobInteract:405); Parrot takes any of six seed kinds at
+  `nextInt(10) == 0` (Parrot.mobInteract:273) and a cookie is
+  instant death (POISON 900 ticks + MAX-damage hurt).
+- Mirror (landed): TameProcess hands the id and owns the typed
+  verdicts; TameFoodCatalog owns the species-to-items map; the
+  behavior equips via SLOT and presses via INTERACT
+  (`Intent.InteractEntity`) every 12 ticks; InteractEntityExecutor
+  resolves the UUID against the server level and rides
+  `Player.interactOn`. Deliberate deviation: the device presses by
+  id within reach 3.0, not by crosshair.
+
+### 10.2 Companion behaviors (survey, no mirror)
+
+- Sit/stand toggle: an owner right-click flips `setOrderedToSit`
+  (Wolf:367, Cat:384, Parrot:293) - an empty-hand press on an owned
+  pet toggles sit, which is why the tame press cadence retires the
+  directive between presses. A damaged wolf stands up.
+- Follow + teleport: FollowOwnerGoal `TELEPORT_WHEN_DISTANCE_IS =
+  12` (distanceToSqr >= 144); 10 attempts at the owner's block plus
+  offsets x/z in [-3,3], y in [-1,1]; sitting, leashed, or
+  passenger pets do not follow.
+- Lead: `Mob.canBeLeashed` refuses Enemies (Wolf also refuses angry
+  wolves); beyond 10 blocks the lead drops (tickLeash), 6..10
+  applies elastic tug; `LeadItem.useOn` transfers leads held by the
+  player within a +/-7 block box to a fence knot.
+- Horse armor: `HorseArmorItem` equips into the horse inventory
+  (slot 1) via AbstractHorse.mobInteract:702; donkey, mule, and
+  undead horses report `canWearArmor() == false`; llamas accept
+  wool carpets only and are never saddleable.
+
+### 10.3 Mounts (survey, no mirror)
+
+- Horse taming is the ride-bucking temper loop, not an item press:
+  while ridden untamed, RunAroundLikeCrazyGoal rolls
+  temper/maxTemper roughly every 50 ticks; failure ejects the
+  rider, adds +5 temper, and rears. maxTemper 100 (llama 30);
+  feeding wheat/sugar/apple +3, golden carrot +5, golden apple +10
+  temper (AbstractHorse.handleEating:469).
+- Control gates on the saddle: `AbstractHorse.getControllingPassenger`
+  hands steering to the rider only `isSaddled()`; pig needs saddle
+  plus carrot-on-a-stick, strider saddle plus warped fungus on a
+  stick. Rider input arrives as `ServerboundPlayerInputPacket(xxa,
+  zza, jumping, shift)` and the VEHICLE runs `travel` - riding a
+  bot would mean driving another entity, not walking one. Jump is
+  the charge model (`START_RIDING_JUMP`, `floor(scale * 100)`);
+  dismount is shift with a 60-tick remount cooldown.
+- NOT in 1.20.1 (common assumptions): wolf armor (1.20.5+), the
+  `Leashable` interface (1.21+), saddle-less horse or pig control,
+  cat armor.
+
+## 10. Hunting yield: kill, herd, harvest (survey, 2026-09-02)
 
 Survey-stage truths for the animal-yield gameplay; read from the
 decompiled sources and the vanilla data pack extracted from

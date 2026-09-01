@@ -67,7 +67,8 @@ public record Claim(Channel channel, int priority, String holder, Intent intent)
             case INTERACT ->
                 intent instanceof Intent.Dig
                         || intent instanceof Intent.DropSelected
-                        || intent instanceof Intent.InteractBlock;
+                        || intent instanceof Intent.InteractBlock
+                        || intent instanceof Intent.InteractEntity;
         };
     }
 }

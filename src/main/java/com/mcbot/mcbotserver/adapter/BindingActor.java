@@ -69,6 +69,8 @@ public final class BindingActor implements Actor {
     private final DigExecutor dig;
     /** One-shot right-click chain from the selected hotbar slot (0007). */
     private final InteractBlockExecutor interact;
+    /** One-shot use-on-entity chain (taming feeds, leads, saddles). */
+    private final InteractEntityExecutor entityInteract;
 
     /**
      * The one-shot place executor for the synchronous /bot place verb
@@ -168,6 +170,7 @@ public final class BindingActor implements Actor {
     private boolean lastUsePressing;
     private boolean lastDropClaimed;
     private boolean lastInteractClaimed;
+    private boolean lastEntityClaimed;
 
     /** Boundary-D event sink for eat lifecycle disclosure (ledger 34). */
     private final EventQueue events;
@@ -197,6 +200,7 @@ public final class BindingActor implements Actor {
         // the containerMenu state the MenuOpener owns.
         this.facade = new BotPlayerFacade(body);
         this.interact = new InteractBlockExecutor(body, facade);
+        this.entityInteract = new InteractEntityExecutor(body, facade);
         this.menuTx = new ActorMenuTransactions(facade);
         this.events = Objects.requireNonNull(events, "events");
         this.daySupplier = Objects.requireNonNull(daySupplier, "daySupplier");
@@ -691,6 +695,20 @@ public final class BindingActor implements Actor {
             }
             lastInteractClaimed = true;
             lastDropClaimed = false;
+            lastEntityClaimed = false;
+        } else if (interact != null && interact.intent() instanceof Intent.InteractEntity ie) {
+            // Entity use is one-shot: fire on the rising edge only. A
+            // held InteractEntity claim across ticks must not press
+            // repeatedly - same rising-edge gate as InteractBlock and
+            // DropSelected. Any stale dig crack is cleared because
+            // InteractEntity owns the channel this tick.
+            dig.release();
+            if (!lastEntityClaimed) {
+                this.entityInteract.use(ie.entityId());
+            }
+            lastEntityClaimed = true;
+            lastDropClaimed = false;
+            lastInteractClaimed = false;
         } else {
             // A dig no longer held must clear its crack broadcast the
             // same tick; vanilla's stop path does, and a stale crack
@@ -698,6 +716,7 @@ public final class BindingActor implements Actor {
             dig.release();
             lastDropClaimed = false;
             lastInteractClaimed = false;
+            lastEntityClaimed = false;
         }
     }
 
@@ -709,6 +728,7 @@ public final class BindingActor implements Actor {
         dig.release();
         lastDropClaimed = false;
         lastInteractClaimed = false;
+        lastEntityClaimed = false;
     }
 
     /**

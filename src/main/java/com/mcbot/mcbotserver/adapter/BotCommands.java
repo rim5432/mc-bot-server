@@ -82,6 +82,7 @@ public final class BotCommands {
                 .then(digBranch(live))
                 .then(mineBranch(live))
                 .then(attackBranch(live))
+                .then(tameBranch(live))
                 .then(cancelBranch(live))
                 .then(stopBranch(live))
                 .then(eventsBranch(live))
@@ -219,6 +220,31 @@ public final class BotCommands {
         args.put("targetId", StringArgumentType.getString(ctx, "targetId"));
         args.put("timeoutTicks", String.valueOf(timeoutTicks));
         return submitCommand(ctx, live, "attack", args, null);
+    }
+
+    /**
+     * /bot tame <targetId> [timeoutTicks] - the harness-directed
+     * taming: walk to the named animal and press its tame item
+     * against it until the scan reports it tamed. Rides CommandBus
+     * like attack; verdict attrs carry the targetId.
+     */
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> tameBranch(
+            Supplier<Channels> live) {
+        // word(): entity ids are UUID-shaped (letters, digits,
+        // hyphens) - no spaces, no colons to protect.
+        return Commands.literal("tame")
+                .then(Commands.argument("targetId", StringArgumentType.word())
+                        .executes(ctx -> runTame(ctx, live, 1200L))
+                        .then(Commands.argument("timeoutTicks", IntegerArgumentType.integer(1))
+                                .executes(ctx -> runTame(
+                                        ctx, live, (long) IntegerArgumentType.getInteger(ctx, "timeoutTicks")))));
+    }
+
+    private static int runTame(CommandContext<CommandSourceStack> ctx, Supplier<Channels> live, long timeoutTicks) {
+        Map<String, String> args = new LinkedHashMap<>();
+        args.put("targetId", StringArgumentType.getString(ctx, "targetId"));
+        args.put("timeoutTicks", String.valueOf(timeoutTicks));
+        return submitCommand(ctx, live, "tame", args, null);
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> cancelBranch(

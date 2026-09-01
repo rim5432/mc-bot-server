@@ -15,6 +15,7 @@ import com.mcbot.mcbotserver.core.command.CommandBus;
 import com.mcbot.mcbotserver.core.command.DigCommandHandler;
 import com.mcbot.mcbotserver.core.command.GotoCommandHandler;
 import com.mcbot.mcbotserver.core.command.MineCommandHandler;
+import com.mcbot.mcbotserver.core.command.TameCommandHandler;
 import com.mcbot.mcbotserver.core.command.VerbTaskHandler;
 import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.process.DefendProcess;
@@ -187,6 +188,7 @@ public final class BotAssembly {
         var weaponCatalog = new VanillaWeaponCatalog();
         Behavior combat = new CombatBehavior("combat", () -> eyePoseOf(body), weaponCatalog);
         Behavior fisher = new com.mcbot.mcbotserver.core.behavior.FishBehavior("fish");
+        Behavior tamer = new com.mcbot.mcbotserver.core.behavior.TameBehavior("tame");
 
         // One fresh reflex-owned defend per engage submission; the
         // assembly owns identity, budget and type sets.
@@ -225,7 +227,7 @@ public final class BotAssembly {
         BotController controller = new BotController(
                 reflex,
                 arbiter,
-                List.of(mover, combat, fisher),
+                List.of(mover, combat, fisher, tamer),
                 actor,
                 () -> poseOf(body),
                 body::getHealth,
@@ -266,7 +268,15 @@ public final class BotAssembly {
                 () -> poseOf(body),
                 weaponCatalog);
         attackHandler.attach(bus);
-        List<VerbTaskHandler<?>> taskHandlers = List.of(gotoHandler, digHandler, mineHandler, attackHandler);
+        TameCommandHandler tameHandler = new TameCommandHandler(
+                arbiter,
+                events,
+                () -> level.getDayTime() / 24000L,
+                () -> level.getDayTime() % 24000L,
+                () -> poseOf(body));
+        tameHandler.attach(bus);
+        List<VerbTaskHandler<?>> taskHandlers =
+                List.of(gotoHandler, digHandler, mineHandler, attackHandler, tameHandler);
         // The bus has ONE cancel-listener slot: route to every verb
         // handler's public cancel method (each self-guards by its
         // missions map, so no verb dispatch is needed).

@@ -1,6 +1,6 @@
 ---
 title: Harness Interaction Model - the canonical architecture of the bot's command surface
-last_verified: 2026-09-01
+last_verified: 2026-09-02
 covers:
   - doc/architecture/boundaries.md
   - tool/harness/mc.py
@@ -66,7 +66,7 @@ superseding decision 28's table-lives-in-the-issue clause):
 | `/tasks/` | job family: `goto` `mine`, `<id>` (cat), `<id>/cancel` | value encodes args; receipt is a taskId |
 | `/player/` | `health`, `inventory/free`, `bag` (per-slot inventory truth), `menu` (pending 0012 D1); writable: `sneak` (latch), `hotbar` (selection 0..8), `held/use` (held item against the POV ray) | reads synchronous; writes are synchronous; reply is the verdict |
 | `/blocks/<x,y,z>` | one cell; volume reads aggregate nearby | `<blockid>` places (sync receipt; optional `@face` suffix for orientation, default up), `air` digs (job receipt), `/use <face>` runs the block's interaction, `/sleep` bed-rests (device-completed rule the engine cannot see) |
-| `/entities/` | nearby entity list, distance-sorted (lines carry the id= column) | `/attack` = directed engagement (job receipt; the harness hands the target id) |
+| `/entities/` | nearby entity list, distance-sorted (lines carry the id= column) | `/attack` = directed engagement (job receipt; the harness hands the target id); `/tame` = directed taming (job receipt; presses the species' tame item until the tamed sighting; typed refusals `NOT_TAMEABLE` `ALREADY_TAMED` `NO_TAME_ITEM`) |
 | `/nearby/` | nearby entity digest (distance-sorted, self-flagged) | read-only; rides the `entities` wire verb |
 | `/recipes/<slug>` | recipe pages, materialized to disk (section 6) | read-only; `dump-recipes` refreshes |
 | `/stations/<type>@<x,y,z>/<role>` | workstation snapshots | last segment is always a ROLE, never a verb |

@@ -20,6 +20,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.phys.AABB;
 
 /**
@@ -138,7 +139,8 @@ public final class BindingWorldView implements WorldView {
                     key != null ? key.toString() : "unknown",
                     new CellPos(e.getBlockX(), e.getBlockY(), e.getBlockZ()),
                     e.getHealth(),
-                    e.getMaxHealth()));
+                    e.getMaxHealth(),
+                    e instanceof TamableAnimal tamable && tamable.isTame()));
         }
         return out;
     }

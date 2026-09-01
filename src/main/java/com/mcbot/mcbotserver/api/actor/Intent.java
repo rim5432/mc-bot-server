@@ -101,6 +101,38 @@ public sealed interface Intent {
     record DropSelected(boolean fullStack) implements Intent {}
 
     /**
+     * Right-click one entity, resolved on the INTERACT channel: the
+     * vanilla use-on-entity chain with the held item - taming feeds,
+     * saddles, and leads ride it. One-shot action - the adapter fires
+     * on the rising edge (same shape USE uses for melee swings and
+     * InteractBlock uses for block clicks); a held claim across ticks
+     * does not act repeatedly.
+     *
+     * <p>The id, not a crosshair, names the target: vanilla clients
+     * press what they look at, the device resolves the id against the
+     * server level and gates reach - the mechanical equivalent. An
+     * empty-hand press is legal here (it toggles sit on an owned pet),
+     * so callers that must not toggle sit guarantee the held item
+     * themselves.
+     *
+     * @param entityId the target entity's UUID string; never null or
+     *                 blank
+     */
+    record InteractEntity(String entityId) implements Intent {
+
+        /**
+         * Creates a validated interact-entity intent.
+         *
+         * @param entityId must not be null or blank
+         */
+        public InteractEntity {
+            if (entityId == null || entityId.isBlank()) {
+                throw new IllegalArgumentException("entityId must not be blank");
+            }
+        }
+    }
+
+    /**
      * Right-click a block, resolved on the INTERACT channel: the
      * vanilla non-sneak use chain at the clicked cell - block
      * interaction first (open a door, press a button), then the held

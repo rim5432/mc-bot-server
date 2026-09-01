@@ -233,7 +233,11 @@ class GametestInventoryCheck {
                             "goldenAppleEdibleAtFullHungerAndAppliesEffects",
                             "suspiciousStewWithMultipleEffectsAppliesAll",
                             "bowlFoodFullInventoryDropsContainer",
-                            "eatCompletedEventCarriesFullNutritionSnapshot")));
+                            "eatCompletedEventCarriesFullNutritionSnapshot")),
+            Map.entry(
+                    "BotTamingGameTests",
+                    Set.of("tamesWolfWithBones", "alreadyTamedWolfFailsFast", "tameRejectsNonTameableTarget")),
+            Map.entry("BotHuntYieldGameTests", Set.of("huntsCowAndCollectsBeefYield")));
     /** Pulls the method name out of each
      * {@code @GameTest(...)} declaration in a source file. */
     private static final Pattern GAME_TEST_METHOD =

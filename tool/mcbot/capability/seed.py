@@ -394,6 +394,53 @@ SEED_CAPABILITIES: list[Capability] = [
         implementation_status="gap",
         vanilla_ref="AbstractFish (line 34, createAttributes MAX_HEALTH 3.0, registerGoals AvoidEntityGoal flee 8.0, WaterBoundPathNavigation); AbstractFish.aiStep flop (line 122-133); Bucketable.bucketMobPickup (line 137) (decompiled 1.20.1)",
     ),
+    # --- 12. Taming (pet domestication loop) ---
+    Capability(
+        id="taming.chain",
+        name="Tame chain: approach + tame-item use-on-entity presses until tamed",
+        category="taming",
+        axis="interaction",
+        description="Right-click a named tameable animal with its species' tame item until the tamed flag flips. Wolf takes a bone (1/3 per press), cat raw cod/salmon (1/3), parrot any of six seed kinds (1/10); each press consumes the item and broadcasts hearts (success) or smoke (retry). The process chases with GoalNear(2), refuses on first sight with typed verdicts (NOT_TAMEABLE / ALREADY_TAMED / NO_TAME_ITEM), and completes directly on the tamed sighting; the behavior equips via SLOT and presses INTERACT (Intent.InteractEntity) every 12 ticks; the executor resolves the id, gates reach at 3.0, and rides Player.interactOn. Horses excluded: ride-bucking temper taming, no item press.",
+        implementation_status="gap",
+        vanilla_ref="TamableAnimal.tame (bit 4 + owner UUID); Wolf.mobInteract nextInt(3); Cat TEMPT_INGREDIENT; Parrot TAME_FOOD nextInt(10); Player.interactOn (decompiled 1.20.1)",
+    ),
+    # --- 13. Hunting yield: land-game, herd, harvest (RE doc section 9, 2026-09-02) ---
+    Capability(
+        id="acquisition.hunt_game",
+        name="Land-game hunt: kill prey, drop-table yield lands in inventory",
+        category="acquisition",
+        axis="offense",
+        description="The excursion yield scenario: directed kill of land prey (the combat stack reused) followed by the prey's drop-table items reaching the carrier inventory - the assertion anchor is the YIELD, not the kill. Loot is data-driven per pool: set_count uniform + looting_enchant (grow(round(level x uniform)), uncapped) + furnace_smelt when the prey burns; death XP 1-3. All prey but rabbit/goat are temptable with breeding food (lure beats chase); plains herds are 4-strong (sheep w12, pig w10, chicken w10, cow w8).",
+        implementation_status="gap",
+        vanilla_ref="client-extra.jar data/minecraft/loot_tables/entities/cow.json (leather 0-2 + beef 1-3); LootingEnchantFunction.run:45-61; Animal.getExperienceReward:131 1+nextInt(3); plains.json spawners.creature (decompiled 1.20.1)",
+    ),
+    Capability(
+        id="husbandry.shear_wool",
+        name="Shear living sheep: 1-3 wool per cycle, regrows on graze",
+        category="husbandry",
+        axis="harvest",
+        description="Zero-kill renewable harvest: use-on-entity with shears against a sheared-ready sheep (alive, not sheared, not baby) drops 1-3 wool of its current color; the sheep regrows once it eats a grass block, so one flock yields forever. Blocked on the entity-use interaction verb (mobInteract); harness path pending that verb.",
+        implementation_status="gap",
+        vanilla_ref="Sheep.shear:214-231 (1+nextInt(3)); Sheep.readyForShearing:236; EatBlockGoal regrow (Sheep.java:116,122) (decompiled 1.20.1)",
+    ),
+    Capability(
+        id="husbandry.breed_loop",
+        name="Breed loop: feed two adults, raise the calf, compound the herd",
+        category="husbandry",
+        axis="breed",
+        description="Food-bank strategy: feed breeding food to two same-species adults (love 600t each) births one baby; parents cool down 5 minutes (setAge 6000); the baby grows 20 minutes naturally and each feeding accelerates 10% of the REMAINING time (~9 feedings = instant adult); 1-7 XP per newborn. Input is farmed food (the farming domain feeds this loop), output is the hunt/slaughter yield surface.",
+        implementation_status="gap",
+        vanilla_ref="Animal.mobInteract:141-158; Animal.spawnChildFromBreeding:218-236 (setAge 6000); AgeableMob.getSpeedUpSecondsWhenFeeding:159-161; breed XP Animal.java:248 nextInt(7)+1 (decompiled 1.20.1)",
+    ),
+    Capability(
+        id="husbandry.passive_collect",
+        name="Passive collect: milk on demand, eggs on a 5-10 minute clock",
+        category="husbandry",
+        axis="harvest",
+        description="Kill-free periodic gains: bucket use-on-entity on a cow or goat yields MILK_BUCKET with NO cooldown (infinite-renewable); a hen drops an egg item every nextInt(6000)+6000 ticks (5-10 minutes), and a thrown egg hatches a chick at p=1/8 (1/32 for four). Blocked on the entity-use interaction verb (mobInteract); harness path pending that verb.",
+        implementation_status="gap",
+        vanilla_ref="Cow.mobInteract:81-89 (MILK_BUCKET, no cooldown); Goat.java:211; Chicken.java:48,95-99 eggTime; ThrownEgg.onHit:57-59 (decompiled 1.20.1)",
+    ),
 ]
 
 
@@ -424,6 +471,9 @@ HARNESS_PATHS: dict[str, list[str]] = {
     "combat.melee": ["/entities/<id>/attack"],
     "combat.line_of_sight": ["/entities/<id>/attack"],
     "combat.hostile_acquisition": ["/entities/<id>/attack"],
+    # hunting yield: the directed-kill leg of the land-game excursion
+    # rides the existing attack task; the drop pickup is vanilla
+    "acquisition.hunt_game": ["/entities/<id>/attack"],
     # interaction: held item against the POV ray
     "interaction.right_click_order": ["write /player/held/use"],
     "interaction.blockitem_place": ["write /player/held/use"],
@@ -446,6 +496,8 @@ HARNESS_PATHS: dict[str, list[str]] = {
     "farming.harvest_mature": ["/tasks/mine"],
     # water fish hunt reuses the attack task
     "acquisition.water_fish": ["/entities/<id>/attack"],
+    # taming: the directed tame task
+    "taming.chain": ["/entities/<id>/tame"],
 }
 
 
@@ -699,6 +751,23 @@ SOURCE_PATHS: dict[str, list[str]] = {
         "core/behavior/CombatBehavior.java",
         "adapter/MeleeResolver.java",
         "core/process/HungryProcess.java",
+    ],
+    # taming: item press chain to the vanilla tame flip
+    "taming.chain": [
+        "core/tame/TameFoodCatalog.java",
+        "core/behavior/TameBehavior.java",
+        "core/process/TameProcess.java",
+        "core/command/TameCommandHandler.java",
+        "api/process/Tame.java",
+        "api/actor/Intent.java",
+        "adapter/InteractEntityExecutor.java",
+    ],
+    # land-game hunt: the directed-kill stack plus the world scan the
+    # target id resolves against (yield pickup is vanilla, no file)
+    "acquisition.hunt_game": [
+        "core/process/AttackProcess.java",
+        "core/behavior/CombatBehavior.java",
+        "adapter/MeleeResolver.java",
     ],
 }
 

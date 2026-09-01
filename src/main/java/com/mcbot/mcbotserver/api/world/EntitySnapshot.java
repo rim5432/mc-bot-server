@@ -17,8 +17,10 @@ import com.mcbot.mcbotserver.api.types.CellPos;
  * @param pos       block cell the entity occupies; never null
  * @param health    current health, 0 or greater
  * @param maxHealth maximum health, positive
+ * @param tamed     whether the entity is a tamed companion; always
+ *                  false for non-tamable types
  */
-public record EntitySnapshot(String id, String type, CellPos pos, float health, float maxHealth) {
+public record EntitySnapshot(String id, String type, CellPos pos, float health, float maxHealth, boolean tamed) {
 
     /**
      * Creates a validated snapshot.
@@ -45,5 +47,19 @@ public record EntitySnapshot(String id, String type, CellPos pos, float health, 
         if (maxHealth <= 0f) {
             throw new IllegalArgumentException("maxHealth must be positive");
         }
+    }
+
+    /**
+     * Creates a snapshot with the tamed fact absent - the pre-taming
+     * call-site shape, kept so mock and test fixtures stay 5-arg.
+     *
+     * @param id        stable identity of the entity; never null
+     * @param type      entity type key; never null
+     * @param pos       block cell the entity occupies; never null
+     * @param health    current health, 0 or greater
+     * @param maxHealth maximum health, positive
+     */
+    public EntitySnapshot(String id, String type, CellPos pos, float health, float maxHealth) {
+        this(id, type, pos, health, maxHealth, false);
     }
 }

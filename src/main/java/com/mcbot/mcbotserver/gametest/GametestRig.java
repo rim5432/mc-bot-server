@@ -218,6 +218,28 @@ final class GametestRig {
     }
 
     /**
+     * Spawns one non-hostile mob at the local cell for interaction
+     * scenarios: the same centering and creation-check conventions
+     * as {@link #spawnHostile}, widened past the Monster bound so
+     * tameable animals ride the same pin.
+     *
+     * @param helper the gametest helper; never null
+     * @param type   the entity type to create; never null
+     * @param local  structure-local spawn cell; never null
+     * @param <T>    the spawned mob type
+     * @return the added entity; never null
+     */
+    static <T extends net.minecraft.world.entity.Mob> T spawnMob(
+            GameTestHelper helper, net.minecraft.world.entity.EntityType<T> type, BlockPos local) {
+        T mob = type.create(helper.getLevel());
+        check(mob != null, "mob creation failed: " + type);
+        var abs = helper.absolutePos(local);
+        mob.moveTo(abs.getX() + 0.5, abs.getY(), abs.getZ() + 0.5, 0f, 0f);
+        helper.getLevel().addFreshEntity(mob);
+        return mob;
+    }
+
+    /**
      * Registers and takes control of a goto mission with the default
      * tick budget.
      *

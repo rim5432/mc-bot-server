@@ -1,6 +1,6 @@
 ---
 title: Work Plan (effort-sized checklist)
-last_verified: 2026-09-01
+last_verified: 2026-09-02
 covers:
   - doc/architecture/boundaries.md
   - doc/decisions/0004-tick-pipeline-actor-channels.md
@@ -381,6 +381,18 @@ dies (2026-08-29):
          Item.mineBlock durability and vanilla mining exhaustion -
          engine-proven by the pooled batch's dig scenarios
          (52/52).                             [dep: none]
+- [x] S  Directed taming (landed 2026-09-02): `/entities/<id>/tame`
+         task over the `taming.chain` face - `Intent.InteractEntity`
+         on the INTERACT channel riding `Player.interactOn`, the
+         `Tame` order as Overrides' third additive component, typed
+         refusals (NOT_TAMEABLE / ALREADY_TAMED / NO_TAME_ITEM /
+         TARGET_DEAD), the species item map (TameFoodCatalog:
+         wolf bone, cat cod/salmon, parrot six seeds), and three
+         engine scenarios (tamesWolfWithBones, alreadyTamedWolfFailsFast,
+         tameRejectsNonTameableTarget). Horse/ride taming deferred -
+         the ride-bucking temper loop needs a mount+steer
+         capability (mechanics survey in player-behavior-RE.md
+         section 9).                          [dep: none]
 
 Combat envelope honesty (retired map "known limits", unchanged):
 melee standoff-kill; creeper trades hits (accepted risk); ranged

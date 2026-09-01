@@ -57,6 +57,9 @@ Wire mapping:
   write /entities/<id>/attack -> /bot attack <id> [timeoutTicks]
                               (directed engagement; ids come from
                               ls /entities lines, id= column)
+  write /entities/<id>/tame   -> /bot tame <id> [timeoutTicks]
+                              (directed taming; wolf/cat/parrot, the
+                              tame item must be in the bot's hotbar)
   write /blocks/<x,y,z> "oak_planks"       -> place x y z up   (sync)
   write /blocks/<x,y,z> "oak_stairs@north" -> place x y z north (sync)
   write /blocks/<x,y,z> "air"              -> /bot dig x y z  (job)
@@ -635,6 +638,18 @@ def cmd_write(path: str, value: str, tol: int | None = None,
         # a taskId - wait joins it like any job.
         timeout_val = timeout if timeout is not None else 1200
         resp = wire(f"/bot attack {entity_attack.group(1)} {timeout_val}")
+        emit_json(resp)
+        if resp.get("ok") and "task" in resp:
+            print(f"taskId: {resp['task']}", file=sys.stderr)
+        return 0 if resp.get("ok") else 1
+    entity_tame = re.fullmatch(r"/entities/([A-Za-z0-9._:-]+)/tame", path)
+    if entity_tame:
+        # The harness-directed taming: walk to the named animal and
+        # press its tame item against it until the scan reports it
+        # tamed. Same receipt shape as attack - ids come from
+        # `ls /entities`, wait joins the taskId like any job.
+        timeout_val = timeout if timeout is not None else 1200
+        resp = wire(f"/bot tame {entity_tame.group(1)} {timeout_val}")
         emit_json(resp)
         if resp.get("ok") and "task" in resp:
             print(f"taskId: {resp['task']}", file=sys.stderr)
