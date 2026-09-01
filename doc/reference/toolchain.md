@@ -22,12 +22,12 @@ Facts about this repo's build toolchain. This document **covers**
 | Forge | see `forge_version` |
 | Gradle wrapper | see `gradle/wrapper/gradle-wrapper.properties` |
 | Java toolchain (compile) | 17 (`build.gradle`) |
-| Checkstyle | 12.3.1 (`build.gradle`) — last version shipping Java-17 bytecode; all of 13.x+ are Java-21 (probed class-major straight from maven jars, 2026-08-27) |
+| Checkstyle | 14.0.0 (`build.gradle`) — analyzer JVM runs on an auto-detected Java 21 toolchain launcher (2026-09-01, P3); 13.x+ ship Java-21 bytecode, which is why the version was pinned to 12.3.1 while the analyzer shared the Java 17 daemon |
 | PMD / CPD | 7.26.0 (`build.gradle`) — PMD 7 needs Gradle >= 8.6; Gradle 8.8 supports it via explicit `pmd.toolVersion` (default stays 6.55.0) |
 | Spotless / formatter | plugin 8.10.0 + palantir-java-format 2.97.0 (both Java-11 bytecode) — formatter output IS the ecosystem standard: Sun-style 4-space indent, K&R braces, 120 columns |
 | Error Prone | plugin 5.1.0 + core 2.42.0 — 2.42.0 is the last core that runs on a JDK 17 toolchain; verified working on the moddev compile chain unmodified, flags must go through `options.errorprone.check(...)` (raw `-Xep:` compilerArgs are rejected by plain javac when disabled) |
 | SpotBugs | plugin 6.5.11 + tool 4.10.4 — scoped to api/core packages via `onlyAnalyze`, which removes the MC auxclasspath problem entirely |
-| JaCoCo | Gradle builtin; `jacocoTestReport` emits xml+html, manual-run lens |
+| JaCoCo | Gradle builtin; `jacocoTestCoverageVerification` rides `test` as a finalizer since 2026-09-01 (0.84 BUNDLE floor = 95% of the 88.63% measured baseline, 0.49 PACKAGE collapse guard; engine-covered classes filtered at class-directory level - rule-level excludes do NOT apply to the BUNDLE element). `jacocoTestReport` emits xml+html |
 | PIT mutation | plugin `info.solidsoft.pitest` 1.15.0 + junit5 engine 1.2.1 — manual `gradle pitest`; full-tree baseline ≈ 2min at this repo size. Scoped rounds pass `-PpitClasses`/`-PpitTests` (comma-joined patterns) so adapter classes' MC references stay off the minion classpath |
 
 Do not hardcode versions into new docs; link here instead.
@@ -42,9 +42,12 @@ Do not hardcode versions into new docs; link here instead.
 - The custom `cpdCheck` JavaExec task invokes
   `net.sourceforge.pmd.cli.PmdCli cpd`; since PMD 7, CPD is a
   subcommand of the unified CLI launcher.
-- Gradle's Checkstyle task exposes no forked-JVM knob (`jvmArgs`
-  unavailable), so violation messages render in the daemon JVM locale;
-  known cosmetic issue.
+- Gradle's Checkstyle task still exposes no `jvmArgs` knob, but the
+  analyzer JVM itself is toolchain-selectable: `javaLauncher` on the
+  Checkstyle tasks points at Java 21 (checkstyle 14 requirement). A
+  missing detectable JDK 21 fails the build with "no matching
+  toolchain" - dev machines need Temurin 21 installed, and CI relies
+  on ubuntu-latest's preinstalled `/usr/lib/jvm` Temurin 21.
 - Lint invocation goes through the locked gradle passthrough with the
   opt-in `-Plint` flag; postures and deferral rationale live in
   [Build & Run Guide](../guide/build-and-run.md#static-analysis--plint).

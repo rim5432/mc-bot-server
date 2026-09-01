@@ -41,6 +41,8 @@ class LintPostureGateTest {
      * (failing since the 2026-09-01 first-triage flip; its triaged
      * suppressions live in config/spotbugs/exclude.xml, each with an
      * inline justification). No task softens with ignoreFailures.
+     * The checkstyle analyzer JVM runs on Java 21 (checkstyle 14 needs
+     * it; the mod toolchain stays 17).
      */
     private static final List<Posture> PINNED_POSTURES = List.of(
             new Posture(
@@ -48,6 +50,9 @@ class LintPostureGateTest {
                     List.of(
                             "dependsOn 'checkstyleMain', 'checkstyleTest', 'spotlessCheck'",
                             "finalizedBy 'jacocoTestCoverageVerification'")),
+            new Posture(
+                    "tasks.withType(Checkstyle).configureEach {",
+                    List.of("languageVersion = JavaLanguageVersion.of(21)")),
             new Posture("tasks.withType(Pmd).configureEach {", List.of("enabled = project.hasProperty('lint')")),
             new Posture(
                     "tasks.withType(com.github.spotbugs.snom.SpotBugsTask).configureEach {",

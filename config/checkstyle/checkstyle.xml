@@ -62,8 +62,11 @@
              public/protected types and members need Javadoc; non-void
              needs @return; every object param needs @param. Overridden
              methods are exempt by design. src/test/** is suppressed in
-             suppressions.xml (test classes carry pragmatic coverage). -->
-        <module name="JavadocStyle"/>
+             suppressions.xml (test classes carry pragmatic coverage).
+             JavadocStyle was dropped with the checkstyle 14 upgrade
+             (2026-09-01, P3): upstream removed the module, and the
+             first-sentence rule it partially enforced is review-owned
+             per AGENTS.md section 1.2 anyway. -->
         <module name="MissingJavadocType">
             <property name="scope" value="public"/>
         </module>

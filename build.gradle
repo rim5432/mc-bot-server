@@ -166,9 +166,19 @@ tasks.withType(JavaCompile).configureEach {
 // since the 2026-09-01 first-triage flip) and the Error Prone pass
 // run behind -Plint; postures in doc/guide/build-and-run.md.
 checkstyle {
-    // All of 13.x and 14.x ship Java-21 bytecode (probed 2026-08-27);
-    // the dev toolchain locks Java 17, so pin the last 17-runnable line
-    toolVersion = '12.3.1'
+    // 14.x line, P3 of the 2026-09-01 lint-posture round: the analyzer
+    // JVM runs on Java 21 via the launcher below, so the mod's Java 17
+    // toolchain no longer pins the checkstyle version
+    toolVersion = '14.0.0'
+}
+tasks.withType(Checkstyle).configureEach {
+    // checkstyle 13+/14+ ship Java-21 bytecode; the mod toolchain locks
+    // Java 17, so ONLY the analyzer JVM upgrades: auto-detected Temurin
+    // 21 on dev machines, preinstalled Temurin 21 on ubuntu-latest
+    // runners (/usr/lib/jvm). Compilation itself stays on Java 17.
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
 }
 pmd {
     // PMD 7 needs Gradle >= 8.6; the built-in plugin defaults to 6.55.0

@@ -3,6 +3,11 @@
 # game instance and stay a local step (python tool/mcbot_tool.py build
 # runGameTest).
 #
+# Checkstyle 14 runs its analyzer on a Java 21 toolchain launcher while
+# compilation stays on Java 17; ubuntu-latest images ship Temurin 21 in
+# /usr/lib/jvm, which Gradle's toolchain auto-detection picks up - no
+# explicit setup-java step needed for it.
+#
 # A parallel static-analysis job runs the full qualityCheck verdict
 # (-Plint): PMD, CPD, SpotBugs, and the Error Prone + NullAway compile
 # pass - findings surface on the mirror instead of waiting for the next

@@ -56,7 +56,7 @@ Postures after the 2026-08-27 promotion:
 
 | Suite | Posture | Notes |
 |---|---|---|
-| Checkstyle | **hard gate, default `test` flow** | naming, imports, Javadoc, modifier order, EmptyBlock; 2026-08-27 added TodoComment, IllegalCatch (narrowed), IllegalThrows, MissingDeprecated, JavadocVariable (public constants), RegexpSinglelineJava (bans printStackTrace() and System.exit()) |
+| Checkstyle | **hard gate, default `test` flow** | 14.0.0 since 2026-09-01 (P3 of the lint-posture round) on a Java 21 analyzer launcher - the mod toolchain stays 17, only the analyzer JVM upgraded; naming, imports, Javadoc, modifier order, EmptyBlock; 2026-08-27 added TodoComment, IllegalCatch (narrowed), IllegalThrows, MissingDeprecated, JavadocVariable (public constants), RegexpSinglelineJava (bans printStackTrace() and System.exit()) |
 | Spotless check | **hard gate, default `test` flow** | `palantirJavaFormat` output == ecosystem standard (4-space / 120 cols / K&R); `spotlessApply` runs ungated any time |
 | PMD main + test | **RED WALL, `-Plint` fails on violation** | zero findings held since the 2026-08-27 paydown (17 -> 0 via per-channel/per-kind/stage extractions); only project-documented `@SuppressWarnings("PMD.TooManyMethods")` exemptions remain on MineProcess and BotController
 | CPD | **RED WALL, `-Plint` fails at >=140 tokens** | main-side duplication cleared 2026-08-27 (CommandResponse, submitCommand, CommandHandlerGuards, BindingInventory.toView sharing, GametestRig.fillPool); the threshold sits above the largest surviving test-side copy (131), so only new main-scale duplication fires - sub-threshold dups stay periodic manual review |
