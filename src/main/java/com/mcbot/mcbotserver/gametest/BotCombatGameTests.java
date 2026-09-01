@@ -868,6 +868,10 @@ public final class BotCombatGameTests {
         // inside GoalRange min (8), so the predicate fails from tick one.
         Zombie zombie = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(8, GametestRig.WALK_Y, 8));
         zombie.setNoAi(true);
+        // A stray entity inside the structure is a nearer hostile for
+        // the threat sensor and a body for the kiting walk - pooled-run
+        // cross-contamination class (ledger 46).
+        GametestRig.sweepForeignEntities(helper, rig.body(), zombie);
         final float[] healthBefore = {zombie.getHealth()};
 
         helper.startSequence()
@@ -983,6 +987,11 @@ public final class BotCombatGameTests {
         // not six: outside the engage reflex's trigger (see Javadoc).
         Zombie fullDraw = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(4, GametestRig.WALK_Y, 9));
         fullDraw.setNoAi(true);
+        // The full-draw miss with health untouched is the pooled-run
+        // contamination class (a leaked entity absorbing the shot) -
+        // sweep the structure so the only thing on the firing column
+        // is the intended target.
+        GametestRig.sweepForeignEntities(helper, rig.body(), fullDraw);
         // The hand pump owns ROT as well as USE: without an aim claim
         // the arrow flies wherever the idle look channel points, not
         // at the target (the 7-cell clean-miss class). Same bearing

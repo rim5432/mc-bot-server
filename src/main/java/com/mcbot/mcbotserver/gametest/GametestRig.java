@@ -392,4 +392,35 @@ final class GametestRig {
             }
         }
     }
+
+    /**
+     * Discards every entity inside this structure's 16x8x16 footprint
+     * except the kept ones. Pooled runs share one level, and leaked
+     * or stray entities walking through a neighbouring structure have
+     * absorbed aimed shots and tripped proximity triggers (the bowtap
+     * clean-miss class, the rangedBot stray-threat class - ledger 46
+     * cross-contamination family). GameTestHelper.getBounds is
+     * private in 1.20.1, so the footprint is hand-built from the
+     * template origin exactly like ProductionWiringGameTests.
+     *
+     * @param helper owning scenario; never null
+     * @param keep  entities that survive the sweep (the rig's own
+     *              body and scenario targets); never null
+     */
+    static void sweepForeignEntities(
+            net.minecraft.gametest.framework.GameTestHelper helper, net.minecraft.world.entity.Entity... keep) {
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        net.minecraft.world.phys.AABB structureBox = new net.minecraft.world.phys.AABB(
+                origin.getX(), origin.getY(), origin.getZ(), origin.getX() + 16, origin.getY() + 8, origin.getZ() + 16);
+        java.util.Set<Integer> keepIds = new java.util.HashSet<>();
+        for (net.minecraft.world.entity.Entity e : keep) {
+            keepIds.add(e.getId());
+        }
+        for (net.minecraft.world.entity.Entity e :
+                helper.getLevel().getEntitiesOfClass(net.minecraft.world.entity.Entity.class, structureBox)) {
+            if (!keepIds.contains(e.getId())) {
+                e.discard();
+            }
+        }
+    }
 }
