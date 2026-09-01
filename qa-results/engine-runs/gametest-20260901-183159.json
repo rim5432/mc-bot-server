@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "task": "runGameTest",
+  "log": "D:\\mc-bot-server\\tool\\.runtime\\build-runGameTest-20260901-183101.log",
+  "git_rev": "f3a0e3b",
+  "finished_at": "2026-09-01T18:31:59",
+  "scenarios_total": 101,
+  "failed_count": 5,
+  "failed": [
+    "healingpotionrestoreshealthandleavesglassbottle",
+    "rangedbotbacksawaywhentargetclosesinsidemin",
+    "escapeslavatoshore",
+    "bowtapshotdealsweakdamage",
+    "sneakcrawlfitsthroughgap"
+  ],
+  "optional_failed_count": 1,
+  "failed_optional": [
+    "climbsladdertoplatform"
+  ],
+  "green": false
+}
