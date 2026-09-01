@@ -8,6 +8,7 @@ import com.mcbot.mcbotserver.api.world.BlockTraitsRegistry;
 import com.mcbot.mcbotserver.api.world.BobberSnapshot;
 import com.mcbot.mcbotserver.api.world.CollisionShape;
 import com.mcbot.mcbotserver.api.world.EntitySnapshot;
+import com.mcbot.mcbotserver.api.world.ProjectileSnapshot;
 import com.mcbot.mcbotserver.api.world.ViewMode;
 import com.mcbot.mcbotserver.api.world.WorldView;
 import java.util.ArrayList;
@@ -161,6 +162,34 @@ public final class BindingWorldView implements WorldView {
             out.add(new BobberSnapshot(
                     new com.mcbot.mcbotserver.api.types.Vec3(hook.getX(), hook.getY(), hook.getZ()),
                     hook.getHookedIn() != null));
+        }
+        return out;
+    }
+
+    @Override
+    public List<ProjectileSnapshot> getProjectiles(CellPos center, double radius, ViewMode mode) {
+        AABB box = new AABB(
+                center.x() + 0.5 - radius,
+                center.y() + 0.5 - radius,
+                center.z() + 0.5 - radius,
+                center.x() + 0.5 + radius,
+                center.y() + 0.5 + radius,
+                center.z() + 0.5 + radius);
+        List<ProjectileSnapshot> out = new ArrayList<>();
+        for (net.minecraft.world.entity.projectile.Projectile p :
+                level.getEntitiesOfClass(net.minecraft.world.entity.projectile.Projectile.class, box)) {
+            if (p instanceof net.minecraft.world.entity.projectile.FishingHook) {
+                // Bobbers ride their own query; bite watching owns them.
+                continue;
+            }
+            double dist = p.blockPosition().distSqr(toMc(center));
+            if (dist > radius * radius) {
+                continue;
+            }
+            var motion = p.getDeltaMovement();
+            out.add(new ProjectileSnapshot(
+                    new com.mcbot.mcbotserver.api.types.Vec3(p.getX(), p.getY(), p.getZ()),
+                    new com.mcbot.mcbotserver.api.types.Vec3(motion.x, motion.y, motion.z)));
         }
         return out;
     }

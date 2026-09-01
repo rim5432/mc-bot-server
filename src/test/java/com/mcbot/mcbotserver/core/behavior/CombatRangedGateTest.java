@@ -144,21 +144,24 @@ class CombatRangedGateTest {
         // Target 6.5 away: the draw runs on the ranged path.
         for (int tick = 0; tick < 12; tick++) {
             combat.tick(world, orderAt(6), actor);
+            UseClaimTestSupport.applySlotFeedback(world, actor);
         }
         // Target now 2.7 away - inside the melee band - but the draw
         // is charged past the commit threshold and finishes.
         position[0] = new Vec3(4, 64, 0);
-        for (int tick = 0; tick < 10; tick++) {
+        for (int tick = 0; tick < 12; tick++) {
             combat.tick(world, orderAt(6), actor);
+            UseClaimTestSupport.applySlotFeedback(world, actor);
         }
 
         List<Boolean> presses = pressSequence(actor);
-        assertEquals(22, presses.size(), "20 charge ticks, one release, one melee swing");
+        assertEquals(23, presses.size(), "20 charge, release, sword-switch gap, swing pair: " + presses);
         for (int i = 0; i < CombatBehavior.BOW_CHARGE_TICKS; i++) {
             assertTrue(presses.get(i), "the draw holds through the range flip at tick " + i);
         }
         assertFalse(presses.get(20), "the committed shot releases");
         assertTrue(presses.get(21), "the melee path takes over right after the shot");
+        assertFalse(presses.get(22), "the melee swing unlatches");
         assertEquals(0, selectedSlotOf(actor), "the sword is drawn only after the shot lands");
     }
 
@@ -180,10 +183,13 @@ class CombatRangedGateTest {
         }
         position[0] = new Vec3(4, 64, 0);
         combat.tick(world, orderAt(6), actor);
+        UseClaimTestSupport.applySlotFeedback(world, actor);
+        combat.tick(world, orderAt(6), actor);
 
         List<Boolean> presses = pressSequence(actor);
-        assertEquals(6, presses.size(), "4 charge ticks, the abort, the first swing");
+        assertEquals(6, presses.size(), "4 charge ticks, the abort, the first swing: " + presses);
         assertFalse(presses.get(4), "a barely-started draw is aborted, not finished");
+        assertTrue(presses.get(5), "the swing fires once the sword lands");
         assertEquals(0, selectedSlotOf(actor), "the melee band draws the sword");
     }
 

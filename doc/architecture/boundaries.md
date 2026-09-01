@@ -405,6 +405,7 @@ ordering-critical numbers sit behind test gates, not behind prose.
 | 49 | Ranged/survival batch 2: rear-shield direction gate, bow tap band, shears select; rescue covered by existing pins, shield warmup N/A in 1.20.1; 75 green | 2026-08-30 |
 | 50 | Boundary-D honesty round, receipt-closed: resetAt epoch allocator (EventEpochStore SavedData) + BotChunkTicket forceload; C2b/C2-post red->green live | 2026-08-31 |
 | 51 | Combat range routing stateful + weapon-aware: committed draws finish through band flips, bow answers point-blank when unarmed of better melee, bow-only opens at standoff (amends 37) | 2026-09-01 |
+| 52 | Reactive shield: WorldView.getProjectiles + ProjectileThreats geometry; combat order + hit-course flight + carried shield preempts both attack paths; melee hold-item gate closes the bow/shield-held press race | 2026-09-01 |
 
 ## Deferred, with reopen conditions
 

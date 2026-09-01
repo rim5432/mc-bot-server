@@ -71,7 +71,8 @@ class GametestInventoryCheck {
                             "raisedShieldBlocksFrontalMelee",
                             "bowChargedShotDamagesDistantTarget",
                             "rearArrowBypassesTheRaisedShield",
-                            "bowTapShotDealsWeakDamage")),
+                            "bowTapShotDealsWeakDamage",
+                            "blocksIncomingArrowsMidCombat")),
             Map.entry(
                     "BotHazardReflexGameTests",
                     Set.of(

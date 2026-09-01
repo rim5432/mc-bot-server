@@ -11,6 +11,7 @@ import static com.mcbot.mcbotserver.gametest.GametestRig.spawnHostile;
 import com.mcbot.mcbotserver.McBotServer;
 import com.mcbot.mcbotserver.adapter.BotAssembly;
 import com.mcbot.mcbotserver.adapter.VanillaWeaponCatalog;
+import com.mcbot.mcbotserver.adapter.entity.BotBodyEntity;
 import com.mcbot.mcbotserver.adapter.inventory.BindingInventory;
 import com.mcbot.mcbotserver.adapter.sensing.LevelThreatSensor;
 import com.mcbot.mcbotserver.api.actor.Channel;
@@ -18,7 +19,12 @@ import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
+import com.mcbot.mcbotserver.api.goal.GoalNear;
+import com.mcbot.mcbotserver.api.process.Attack;
+import com.mcbot.mcbotserver.api.process.Directive;
+import com.mcbot.mcbotserver.api.process.Overrides;
 import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.core.behavior.CombatBehavior;
 import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.process.DefendProcess;
 import java.util.ArrayList;
@@ -31,6 +37,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.Skeleton;
 import net.minecraft.world.entity.monster.Zombie;
+import net.minecraft.world.entity.projectile.Arrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
@@ -970,5 +977,143 @@ public final class BotCombatGameTests {
                     rig.body().discard();
                 })
                 .thenSucceed();
+    }
+
+    /**
+     * Scenario: the reactive shield answers an incoming projectile
+     * through the production chain - the projectile scan (arrows are
+     * invisible to the living-entity scan), the closest-approach
+     * geometry, and the behavior-tier block path raising the body
+     * shield before impact. The damage control (sword only, no
+     * shield) proves the arrow delivers; the shielded phase proves
+     * the identical geometry deals nothing while the guard is up, and
+     * that the guard lowers after the flight clears.
+     *
+     * <p>The combat order's goal sits at the bot's own feet on
+     * purpose: the attack tier runs without locomotion so the arrow
+     * geometry stays fixed. The behavior instance ticks beside the
+     * rig - the seated assembly holds no directive, so nothing else
+     * claims USE or SLOT. The arrow flies at 0.65 blocks per tick
+     * with drag-corrected gravity compensation: the ~17-tick flight
+     * locks the threat around tick 6, leaving the vanilla 5-tick arm
+     * delay (isBlocking needs five held ticks) four spare ticks over
+     * the 2-tick reaction budget.
+     *
+     * <p>Discriminative facts: (1) unshielded, the arrow drops
+     * health; (2) with the shield carried, isBlocking() turns true
+     * before impact and the identical arrow moves nothing; (3) after
+     * the flight clears and the linger expires, the guard releases.
+     */
+    // feature: combat.shield.projectile_reaction
+    // capability: combat.shield
+    @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
+    public static void blocksIncomingArrowsMidCombat(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(5, GametestRig.WALK_Y, 5));
+        rig.body().getInventory().container().setItem(0, new ItemStack(Items.IRON_SWORD));
+        // The goal cell is the body's own (absolute) cell: a combat
+        // order with the goal already reached runs the attack tier
+        // without locomotion, keeping the arrow geometry fixed.
+        BlockPos feet = rig.body().blockPosition();
+        Directive order = new Directive(
+                new GoalNear(new CellPos(feet.getX(), feet.getY(), feet.getZ()), 1),
+                new Overrides(new Attack("gametest:shield")));
+        CombatBehavior combat =
+                new CombatBehavior("shield-reaction", () -> eyeOf(rig.body()), new VanillaWeaponCatalog());
+        final float[] controlBefore = {20.0f};
+        final float[] shieldedBefore = {20.0f};
+
+        helper.startSequence()
+                // Phase 1 (damage control): sword only, no shield in
+                // the hotbar - the arrow must land and deal damage.
+                .thenExecuteAfter(0, () -> controlBefore[0] = rig.body().getHealth())
+                .thenExecuteAfter(
+                        0,
+                        () -> spawnArrowToward(
+                                helper,
+                                new BlockPos(5, GametestRig.WALK_Y + 1, 14),
+                                rig.body().getEyePosition()))
+                .thenExecuteFor(20, () -> {
+                    combat.tick(rig.view(), order, rig.actor());
+                    GametestRig.driveTick(rig);
+                })
+                .thenExecuteAfter(
+                        0,
+                        () -> check(
+                                rig.body().getHealth() < controlBefore[0],
+                                "the control arrow must deal damage without a shield, before=" + controlBefore[0]
+                                        + " after=" + rig.body().getHealth()))
+                // Phase 2: the shield enters the hotbar and the
+                // identical geometry must be answered by a raised
+                // guard before impact.
+                .thenExecuteAfter(
+                        0, () -> rig.body().getInventory().container().setItem(1, new ItemStack(Items.SHIELD)))
+                .thenExecuteAfter(0, () -> {
+                    shieldedBefore[0] = rig.body().getHealth();
+                    spawnArrowToward(
+                            helper,
+                            new BlockPos(5, GametestRig.WALK_Y + 1, 14),
+                            rig.body().getEyePosition());
+                })
+                .thenWaitUntil(() -> {
+                    combat.tick(rig.view(), order, rig.actor());
+                    GametestRig.driveTick(rig);
+                    check(rig.body().isBlocking(), "the guard must raise against the incoming arrow");
+                })
+                .thenExecuteFor(30, () -> {
+                    combat.tick(rig.view(), order, rig.actor());
+                    GametestRig.driveTick(rig);
+                })
+                .thenExecuteAfter(
+                        0,
+                        () -> check(
+                                rig.body().getHealth() >= shieldedBefore[0],
+                                "the blocked arrow must deal no damage, before=" + shieldedBefore[0] + " after="
+                                        + rig.body().getHealth()))
+                .thenWaitUntil(() -> {
+                    combat.tick(rig.view(), order, rig.actor());
+                    GametestRig.driveTick(rig);
+                    check(!rig.body().isBlocking(), "the guard must release after the flight clears");
+                })
+                .thenExecuteAfter(0, () -> rig.body().discard())
+                .thenSucceed();
+    }
+
+    /**
+     * The body's eye pose as the combat aim source - the same origin
+     * the production assembly wires (arrows launch from eye height).
+     *
+     * @param body the acting body; never null
+     * @return the eye position in api coordinates; never null
+     */
+    private static com.mcbot.mcbotserver.api.types.Vec3 eyeOf(BotBodyEntity body) {
+        net.minecraft.world.phys.Vec3 eye = body.getEyePosition();
+        return new com.mcbot.mcbotserver.api.types.Vec3(eye.x, eye.y, eye.z);
+    }
+
+    /**
+     * A manually aimed arrow at 0.65 blocks per tick with drag-
+     * corrected gravity compensation: the aim point rises by the
+     * free-fall drop over the estimated flight (times a small
+     * correction factor - drag lengthens the flight, deepening the
+     * drop), so the slow arrow still arrives at the target height.
+     *
+     * @param helper the test host, for the level
+     * @param from   the launch cell (structure-local; converted here)
+     * @param target the intended impact point (world coordinates)
+     * @return the spawned arrow; never null
+     */
+    private static Arrow spawnArrowToward(GameTestHelper helper, BlockPos from, net.minecraft.world.phys.Vec3 target) {
+        var abs = helper.absolutePos(from);
+        Arrow arrow = new Arrow(helper.getLevel(), abs.getX() + 0.5, abs.getY(), abs.getZ() + 0.5);
+        net.minecraft.world.phys.Vec3 straight = target.subtract(arrow.position());
+        double ticks = straight.length() / 0.65;
+        double lift = 1.05 * 0.5 * 0.05 * ticks * ticks;
+        net.minecraft.world.phys.Vec3 launch = target.add(0.0, lift, 0.0)
+                .subtract(arrow.position())
+                .normalize()
+                .scale(0.65);
+        arrow.setDeltaMovement(launch);
+        helper.getLevel().addFreshEntity(arrow);
+        return arrow;
     }
 }

@@ -720,3 +720,43 @@ Amendment chains recorded so far (both sides annotated):
     corrupt (the bowtap 14.096 flake family). Fixed at the scenario
     layer - target re-spaced to seven cells, a no-reflex-verdict pin
     added - hand-pumped scenarios own their channels exclusively.
+    52. 2026-09-01 Reactive shield: the combat tier answers incoming
+    projectiles. This closes the integration gap the 09-01 capability
+    review exposed - the raise/release mechanism shipped with issue
+    0003's body-blocking work, but no combat decision ever reached it
+    (raisedShieldBlocksFrontalMelee rigged the USE claim by hand).
+    Boundary A grows one query, bobber-precedent shaped:
+    WorldView.getProjectiles (default empty) answers
+    ProjectileSnapshot{pos, velocity} over the Projectile family in
+    the adapter, bobbers excluded (they own their query). The
+    decision is combat-tier geometry, not a reflex: a live combat
+    order plus a hit-course flight plus a carried shield preempts
+    BOTH attack paths - even a committed draw releases (the commit
+    guard bounds wasted charge; it does not outrank survival). ROT
+    tracks the flight itself (isDamageSourceBlocked gates on the
+    source bearing, and the projectile IS the source); the shield
+    claims SLOT one tick before the USE press because the actor
+    applies USE before SLOT - a same-tick press would read the
+    weapon; the hold releases when the flight clears plus a 10-tick
+    linger that deliberately does NOT bridge a skeleton's ~40-tick
+    cadence (a longer hold is refusal to fight, not defense). The
+    threat geometry (ProjectileThreats) is straight-line closest
+    approach: speed floor 0.2 b/t, a 1.2-block guard band, a 25-tick
+    arrival horizon; receding flights self-filter, so the bot's own
+    arrows never trigger it. Two budget facts are stated, not papered
+    over. (1) The vanilla arm delay - isBlocking requires five held
+    ticks - makes the reaction cost 2 channel ticks + 5 arm ticks, so
+    a full-draw arrow deep inside the band can still land first;
+    anticipating a shooter's draw is deferred until a second consumer
+    needs it. (2) A carrier with nothing but a shield never presses a
+    swing: the melee hold-item gate refuses to press a USE edge on a
+    still-held shield (it would re-raise the guard), which also
+    closes the pre-existing race where a bow-held swing tick drew the
+    bow instead of swinging - the ranged/melee transition tests now
+    feed SLOT claims back into their mocks (BindingActor.applySlot
+    semantics) to pin it. Offline: ProjectileThreatsTest geometry and
+    the CombatShieldReactionGateTest raise/linger/release/resume
+    pairs. Engine: blocksIncomingArrowsMidCombat - damage control
+    (unshielded arrow drops health), blocked (identical geometry
+    deals nothing with the guard armed), release (guard lowers after
+    the flight) - through the production scan/decision/body chain.

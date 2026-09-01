@@ -84,4 +84,27 @@ final class UseClaimTestSupport {
                 List.copyOf(Collections.nCopies(InventoryView.ARMOR_SIZE, ItemView.EMPTY)),
                 ItemView.EMPTY);
     }
+
+    /**
+     * Feeds the actor's latest SLOT claim back into the mock's
+     * selected slot. BindingActor.applySlot writes the body's held
+     * slot at flush time, and the combat behavior's hold-item gate
+     * reads that write - a multi-tick transition test that never
+     * applies the feedback freezes the held item where it started.
+     *
+     * @param world the mock whose selection follows the claims; never null
+     * @param actor the recorded submissions; never null
+     */
+    static void applySlotFeedback(com.mcbot.mcbotserver.core.world.MockWorldView world, RecordingActor actor) {
+        int slot = -1;
+        for (Claim c : actor.submitted) {
+            if (c.channel() == Channel.SLOT && c.intent() instanceof Intent.SelectSlot s) {
+                slot = s.slot();
+            }
+        }
+        if (slot >= 0) {
+            InventoryView inv = world.getInventory();
+            world.setInventory(new InventoryView(inv.main(), slot, inv.armor(), inv.offhand()));
+        }
+    }
 }

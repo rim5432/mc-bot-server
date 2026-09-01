@@ -8,6 +8,7 @@ import com.mcbot.mcbotserver.api.world.BlockTraitsRegistry;
 import com.mcbot.mcbotserver.api.world.BobberSnapshot;
 import com.mcbot.mcbotserver.api.world.CollisionShape;
 import com.mcbot.mcbotserver.api.world.EntitySnapshot;
+import com.mcbot.mcbotserver.api.world.ProjectileSnapshot;
 import com.mcbot.mcbotserver.api.world.ViewMode;
 import com.mcbot.mcbotserver.api.world.WorldView;
 import java.util.ArrayList;
@@ -33,6 +34,7 @@ public final class MockWorldView implements WorldView {
     private final Map<CellPos, BlockSnapshot> blocks = new HashMap<>();
     private final List<EntitySnapshot> entities = new ArrayList<>();
     private final List<BobberSnapshot> bobbers = new java.util.ArrayList<>();
+    private final List<ProjectileSnapshot> projectiles = new java.util.ArrayList<>();
     private final Set<CellPos> unloaded = new HashSet<>();
     // Per-cell shape overrides: tests that care about partial blocks
     // (slabs, fences, stairs) call putShape() to inject the box.
@@ -112,6 +114,31 @@ public final class MockWorldView implements WorldView {
     @Override
     public java.util.List<BobberSnapshot> getBobbers(CellPos center, double radius, ViewMode mode) {
         return java.util.List.copyOf(bobbers);
+    }
+
+    /**
+     * Add a projectile flight to the visible set. Appends - a volley
+     * is a legitimate scene; {@link #clearProjectiles()} resets.
+     *
+     * @param snapshot the flight; must not be null
+     * @return this mock, for fluent test setup
+     */
+    public MockWorldView addProjectile(ProjectileSnapshot snapshot) {
+        if (snapshot == null) {
+            throw new IllegalArgumentException("snapshot must not be null");
+        }
+        projectiles.add(snapshot);
+        return this;
+    }
+
+    /** Clears the visible flights - the arrow has passed or embedded. */
+    public void clearProjectiles() {
+        projectiles.clear();
+    }
+
+    @Override
+    public java.util.List<ProjectileSnapshot> getProjectiles(CellPos center, double radius, ViewMode mode) {
+        return java.util.List.copyOf(projectiles);
     }
 
     /**

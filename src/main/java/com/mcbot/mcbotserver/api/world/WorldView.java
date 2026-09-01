@@ -100,6 +100,24 @@ public interface WorldView {
     }
 
     /**
+     * Projectiles within a spherical range of a cell center — arrows,
+     * fireballs, snowballs, everything in flight. Projectiles are
+     * invisible to {@link #getEntities} (living entities only), so the
+     * flight family carries its own query beside the bobber's; the
+     * bobber itself stays with {@link #getBobbers} (bite watching owns
+     * it). Carries position and per-tick velocity, nothing else — the
+     * consumer's geometry decides what "incoming" means.
+     *
+     * @param center search origin; must not be null
+     * @param radius search radius in blocks; positive
+     * @param mode   consistency requested, per decision 17b
+     * @return matching snapshots, unordered; never null, possibly empty
+     */
+    default List<ProjectileSnapshot> getProjectiles(CellPos center, double radius, ViewMode mode) {
+        return List.of();
+    }
+
+    /**
      * Whether the chunk containing the cell is loaded — the first-class
      * "do I know this?" query (decision 17a).
      *

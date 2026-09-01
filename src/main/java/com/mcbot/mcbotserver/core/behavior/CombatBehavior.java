@@ -13,7 +13,9 @@ import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.ExecutionReport;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.types.Vec3;
+import com.mcbot.mcbotserver.api.world.ProjectileSnapshot;
 import com.mcbot.mcbotserver.api.world.WorldView;
+import com.mcbot.mcbotserver.core.combat.ProjectileThreats;
 import com.mcbot.mcbotserver.core.combat.RangedLoadouts;
 import java.util.Objects;
 
@@ -39,6 +41,18 @@ import java.util.Objects;
  * answers at every distance while nothing in the hotbar outranks it
  * in melee: a bow-only carrier keeps firing point-blank instead of
  * clubbing for fist-tier damage.
+ *
+ * <p>Reactive shield: while a combat order is live and a projectile
+ * is on a hit course with the body, the fight pauses and the shield
+ * answers - facing the flight, holding USE as a raised guard. The
+ * vanilla arm delay is the binding budget (isBlocking needs five
+ * held ticks on top of the two reaction ticks the channel ordering
+ * costs), so a full-draw arrow deep inside the band can still land
+ * first; anticipating a shooter's draw is deliberately NOT modelled
+ * here. A carrier with nothing but a shield never presses a swing:
+ * the hold-item gate keeps the USE edge from re-raising what the
+ * block path just lowered, so blocking is that carrier's whole
+ * fight.
  *
  * <p>Implementation note: runs on the server tick thread only.
  */
@@ -88,6 +102,15 @@ public final class CombatBehavior implements Behavior {
     public static final double BOW_RANGE = 15.0;
 
     /**
+     * Ticks the block holds after the last incoming sighting. Bridges
+     * one arrow's pass-and-embed and immediate follow-ups without
+     * turtling - the gap to a skeleton's next shot (about 40 ticks)
+     * is deliberately NOT bridged: a shield held that long stops
+     * being defense and becomes refusal to fight.
+     */
+    public static final int BLOCK_LINGER_TICKS = 10;
+
+    /**
      * Arrow-drop approximation at full draw, blocks of drop per
      * block² of range (v = 3 b/t, g = 0.05 b/t² gives 0.5·g/v²). The
      * aim point rises by drop·range² - a constant-velocity parabola
@@ -116,6 +139,11 @@ public final class CombatBehavior implements Behavior {
     private float lastYaw;
     private boolean drawing;
     private int chargeTicks;
+    private boolean blocking;
+    // Starts EXPIRED, mirroring the reach memory: no block lingers
+    // before a first sighting opens one.
+    private int ticksSinceThreat = BLOCK_LINGER_TICKS + 1;
+    private Vec3 blockAim;
 
     /**
      * Creates a combat behavior over one body position source. No
@@ -171,8 +199,21 @@ public final class CombatBehavior implements Behavior {
         if (directive == null || directive.overrides().combat() == null) {
             // A stale draw must not outlive its directive.
             abortDraw(actor);
+            releaseBlock(actor);
             return ExecutionReport.running();
         }
+        ProjectileSnapshot threat = ProjectileThreats.incomingThreat(world, positionSource.get());
+        if (threat != null) {
+            ticksSinceThreat = 0;
+        } else {
+            ticksSinceThreat++;
+        }
+        int shieldSlot = RangedLoadouts.hotbarShieldSlot(world);
+        boolean holdBlock = threat != null || (blocking && ticksSinceThreat <= BLOCK_LINGER_TICKS);
+        if (holdBlock && shieldSlot >= 0) {
+            return tickBlock(world, actor, threat, shieldSlot);
+        }
+        releaseBlock(actor);
         AimSolve aim = solveAim(world, directive);
         actor.submit(new Claim(Channel.ROT, 20, name, new Intent.Look(aim.yaw(), aim.pitch())));
         if (aim.ranging() || committedToShot(aim)) {
@@ -196,14 +237,12 @@ public final class CombatBehavior implements Behavior {
     @Feature(
             id = "combat.bow_draw.commit_threshold",
             face = "combat.bow_draw",
-            description =
-                    "Draw-commit threshold: a draw charged past 10 ticks (half full draw) is finished, not" +
-                    " aborted, when the range verdict flips to melee. Prevents a target oscillating across" +
-                    " ATTACK_REACH from restarting the draw every approach tick and never releasing.",
+            description = "Draw-commit threshold: a draw charged past 10 ticks (half full draw) is finished, not"
+                    + " aborted, when the range verdict flips to melee. Prevents a target oscillating across"
+                    + " ATTACK_REACH from restarting the draw every approach tick and never releasing.",
             vanillaRef = "No direct vanilla counterpart — player controls draw/release manually",
-            deviation =
-                    "Bot-specific stateful range routing: the commit guard bounds the paid-in charge at one full" +
-                    " draw and keeps the remaining wait under half a draw.")
+            deviation = "Bot-specific stateful range routing: the commit guard bounds the paid-in charge at one full"
+                    + " draw and keeps the remaining wait under half a draw.")
     private boolean committedToShot(AimSolve aim) {
         return drawing && chargeTicks >= BOW_COMMIT_TICKS && aim.bowSlot() >= 0;
     }
@@ -231,15 +270,13 @@ public final class CombatBehavior implements Behavior {
     @Feature(
             id = "combat.bow_draw.arrow_drop_compensation",
             face = "combat.bow_draw",
-            description =
-                    "Arrow drop compensation: aim point lifted by 0.0028 * range² blocks (constant-velocity" +
-                    " parabola fit: v=3 b/t, g=0.05 b/t² gives 0.5·g/v²). Honest to within a block across the" +
-                    " 15-block bow band. Aim degeneracy guard holds last yaw when horizontal distance < 0.5" +
-                    "(standing on target makes atan2 flip 180° per tick).",
+            description = "Arrow drop compensation: aim point lifted by 0.0028 * range² blocks (constant-velocity"
+                    + " parabola fit: v=3 b/t, g=0.05 b/t² gives 0.5·g/v²). Honest to within a block across the"
+                    + " 15-block bow band. Aim degeneracy guard holds last yaw when horizontal distance < 0.5"
+                    + "(standing on target makes atan2 flip 180° per tick).",
             vanillaRef = "Arrow projectile physics (decompiled 1.20.1)",
-            deviation =
-                    "Bot-specific: the bot must pre-compensate drop because it cannot steer the arrow in flight;" +
-                    "players aim by feel and correction.")
+            deviation = "Bot-specific: the bot must pre-compensate drop because it cannot steer the arrow in flight;"
+                    + "players aim by feel and correction.")
     private AimSolve solveAim(WorldView world, Directive directive) {
         Vec3 position = positionSource.get();
         CellPos aimCell = Goals.cellOf(directive.goal());
@@ -283,15 +320,13 @@ public final class CombatBehavior implements Behavior {
     @Feature(
             id = "combat.bow_draw.draw_and_release",
             face = "combat.bow_draw",
-            description =
-                    "Bow draw/release pacing: USE(true) held for 20 ticks (full charge), then one USE(false) tick" +
-                    " triggers BowItem.releaseUsing. The bow owns the SLOT channel while ranging so holdBestWeapon" +
-                    " cannot switch it off (bows carry no ATTACK_DAMAGE modifier). A melee press in progress is" +
-                    " closed first (one USE edge per tick).",
+            description = "Bow draw/release pacing: USE(true) held for 20 ticks (full charge), then one USE(false) tick"
+                    + " triggers BowItem.releaseUsing. The bow owns the SLOT channel while ranging so holdBestWeapon"
+                    + " cannot switch it off (bows carry no ATTACK_DAMAGE modifier). A melee press in progress is"
+                    + " closed first (one USE edge per tick).",
             vanillaRef = "BowItem.releaseUsing + Player.use (decompiled 1.20.1)",
-            deviation =
-                    "Facade is not player-ticked, so the adapter pumps tickUseLoop every held tick; the falling" +
-                    " edge or USE claim loss releases the bow to prevent an orphaned forever-charge.")
+            deviation = "Facade is not player-ticked, so the adapter pumps tickUseLoop every held tick; the falling"
+                    + " edge or USE claim loss releases the bow to prevent an orphaned forever-charge.")
     private ExecutionReport tickRanged(WorldView world, Actor actor, int bowSlot) {
         // The bow owns SLOT while ranging: the melee ranking would
         // switch off a bow every tick (bows carry no attack-damage
@@ -332,22 +367,29 @@ public final class CombatBehavior implements Behavior {
     @Feature(
             id = "combat.melee.swing_pacing",
             face = "combat.melee",
-            description =
-                    "Melee swing pacing: USE(true) on cooldown expiry + in-reach, USE(false) the next tick —" +
-                    " exactly one rising edge per attack window. Reach memory (AIM_HOLD_TICKS=3) lets the window" +
-                    " survive brief excursions past the gate instead of starving on edge jitter. Fixed 10-tick" +
-                    " behavior-layer pace; the resolver's actual cooldown may be longer (sword 12.5) and gates real" +
-                    " damage.",
+            description = "Melee swing pacing: USE(true) on cooldown expiry + in-reach, USE(false) the next tick —"
+                    + " exactly one rising edge per attack window. Reach memory (AIM_HOLD_TICKS=3) lets the window"
+                    + " survive brief excursions past the gate instead of starving on edge jitter. Fixed 10-tick"
+                    + " behavior-layer pace; the resolver's actual cooldown may be longer (sword 12.5) and gates real"
+                    + " damage.",
             vanillaRef = "Player attack cooldown (decompiled 1.20.1)",
-            deviation =
-                    "Behavior-layer pace (10 ticks) is decoupled from the resolver's item-derived cooldown — a" +
-                    " fast pulse gets one landed hit per cooldown window, vanilla's effective output, not" +
-                    " machine-gun damage.")
+            deviation = "Behavior-layer pace (10 ticks) is decoupled from the resolver's item-derived cooldown — a"
+                    + " fast pulse gets one landed hit per cooldown window, vanilla's effective output, not"
+                    + " machine-gun damage.")
     private ExecutionReport tickMelee(WorldView world, Actor actor, AimSolve aim) {
         abortDraw(actor);
 
         holdBestWeapon(world, actor);
 
+        // A hold-item still in hand must not receive the swing press:
+        // the actor applies USE before SLOT within one tick, so that
+        // edge would raise the bow or shield instead of swinging. The
+        // weapon lands next tick and the swing follows; a carrier with
+        // nothing but a shield never swings at all.
+        String heldId = world.getInventory().getSelected().itemId();
+        if (RangedLoadouts.isHoldItem(heldId)) {
+            return ExecutionReport.running();
+        }
         boolean released = !pressLatched;
         ticksSinceSwing++;
         double reach = aim.distance();
@@ -384,6 +426,81 @@ public final class CombatBehavior implements Behavior {
     }
 
     /**
+     * The block path: face the flight, take the shield, hold USE as a
+     * raised guard until the threat clears and the linger expires.
+     * Preempts both attack paths - even a committed draw releases:
+     * the commit guard bounds wasted charge, it does not outrank
+     * survival. Facing matters as much as holding - isDamageSourceBlocked
+     * gates on the source sitting in the look hemisphere and the
+     * projectile IS the source - so ROT tracks the flight, not the
+     * combat target; during linger ticks the last seen flight bearing
+     * is held. The shield must claim SLOT one tick before the press:
+     * the actor applies USE before SLOT, so a same-tick press would
+     * read the still-held weapon instead of the shield.
+     */
+    @Feature(
+            id = "combat.shield.projectile_reaction",
+            face = "combat.shield",
+            description = "Reactive shield: while a combat order is live and a projectile is on a hit course with the"
+                    + " body, the fight pauses - ROT tracks the flight (the frontal block gate reads the source"
+                    + " bearing), SLOT takes the shield one tick before the USE press (channel ordering), and the"
+                    + " hold releases after the threat clears plus a 10-tick linger. Even a committed draw"
+                    + " releases: survival outranks the charge bound.",
+            vanillaRef = "Player shield raise against incoming projectiles (decompiled 1.20.1)",
+            deviation = "Bot-specific: vanilla players react by eye; the bot's budget is 2 reaction ticks + 5 vanilla"
+                    + " arm ticks (isBlocking requires 5 held ticks), so full-draw arrows deep inside the band can"
+                    + " still land first - draw anticipation is deferred, not modelled. Scoped to live combat"
+                    + " orders; raising a shield outside combat is reflex-tier work.")
+    private ExecutionReport tickBlock(WorldView world, Actor actor, ProjectileSnapshot threat, int shieldSlot) {
+        blocking = true;
+        if (threat != null) {
+            blockAim = threat.pos();
+        }
+        Vec3 position = positionSource.get();
+        double dx = blockAim.x() - position.x();
+        double dy = blockAim.y() - position.y();
+        double dz = blockAim.z() - position.z();
+        double horizontal = Math.hypot(dx, dz);
+        float yaw = lastYaw;
+        if (horizontal >= AIM_MIN_HORIZONTAL) {
+            yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+            lastYaw = yaw;
+        }
+        float pitch = (float) -Math.toDegrees(Math.atan2(dy, Math.max(horizontal, 0.001)));
+        actor.submit(new Claim(Channel.ROT, 20, name, new Intent.Look(yaw, pitch)));
+        if (pressLatched || drawing) {
+            // Close any in-flight swing or draw first - one USE edge
+            // per tick, and neither survives into the block.
+            actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(false)));
+            pressLatched = false;
+            drawing = false;
+            chargeTicks = 0;
+            return ExecutionReport.running();
+        }
+        if (world.getInventory().selectedSlot() != shieldSlot) {
+            actor.submit(new Claim(Channel.SLOT, 20, name, new Intent.SelectSlot(shieldSlot)));
+            return ExecutionReport.running();
+        }
+        actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(true)));
+        return ExecutionReport.running();
+    }
+
+    /**
+     * Lower the guard, if one is up. Mirrors {@link #abortDraw}: a
+     * block must not outlive its threat window any more than a draw
+     * outlives its directive.
+     *
+     * @param actor claim surface; never null
+     */
+    private void releaseBlock(Actor actor) {
+        if (blocking) {
+            actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(false)));
+            blocking = false;
+            blockAim = null;
+        }
+    }
+
+    /**
      * The hotbar bow slot when a ranged loadout exists - delegated to
      * the shared combat-tier loadout reader (DefendProcess's refuse
      * gate reads the same source of truth). Distance gating is the
@@ -407,15 +524,13 @@ public final class CombatBehavior implements Behavior {
     @Feature(
             id = "combat.melee.weapon_ranking",
             face = "combat.melee",
-            description =
-                    "Weapon ranking by per-hit damage only: mob melee has no attack-speed scaling (the strength" +
-                    " ticker is Player-only), so per-hit damage is the whole ranking — an axe outranks a same-tier" +
-                    " sword. Hoes net +0 and are filtered by the catalog. One SLOT claim whenever the best slot" +
-                    " differs from current selection.",
+            description = "Weapon ranking by per-hit damage only: mob melee has no attack-speed scaling (the strength"
+                    + " ticker is Player-only), so per-hit damage is the whole ranking — an axe outranks a same-tier"
+                    + " sword. Hoes net +0 and are filtered by the catalog. One SLOT claim whenever the best slot"
+                    + " differs from current selection.",
             vanillaRef = "Player attack strength scaling (decompiled 1.20.1)",
-            deviation =
-                    "Bot has no Player attack-strength bar, so DPS ranking (damage * speed) is replaced by pure" +
-                    " per-hit damage ranking. This is the root reason axes beat swords for the bot.")
+            deviation = "Bot has no Player attack-strength bar, so DPS ranking (damage * speed) is replaced by pure"
+                    + " per-hit damage ranking. This is the root reason axes beat swords for the bot.")
     private void holdBestWeapon(WorldView world, Actor actor) {
         InventoryView inventory = world.getInventory();
         int best = -1;

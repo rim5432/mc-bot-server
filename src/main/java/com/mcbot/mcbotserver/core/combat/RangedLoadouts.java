@@ -25,10 +25,25 @@ public final class RangedLoadouts {
 
     private static final String BOW_ID = "minecraft:bow";
 
+    private static final String SHIELD_ID = "minecraft:shield";
+
     private static final Set<String> ARROW_IDS =
             Set.of("minecraft:arrow", "minecraft:tipped_arrow", "minecraft:spectral_arrow");
 
     private RangedLoadouts() {}
+
+    /**
+     * Whether the item id's USE press starts a hold instead of a
+     * swing. The two items the combat tier itself can leave in the
+     * held slot mid-transition (bow via the draw path, shield via the
+     * block path) - the melee press must wait for the weapon to land.
+     *
+     * @param itemId registry id; may be null (answers false)
+     * @return true when a USE press on this item raises or draws
+     */
+    public static boolean isHoldItem(String itemId) {
+        return BOW_ID.equals(itemId) || SHIELD_ID.equals(itemId);
+    }
 
     /**
      * The hotbar bow slot when a ranged loadout exists: a bow carried
@@ -41,9 +56,9 @@ public final class RangedLoadouts {
             id = "combat.bow_slot.loadout_detection",
             face = "combat.bow_slot",
             description =
-                    "Bow loadout detection: bow in hotbar + arrows anywhere in inventory (normal/tipped/spectral)." +
-                    "Returns the bow's hotbar slot, or -1 when the loadout is missing. Shared by behavior tier" +
-                    "(draw pacing) and process tier (refuse-when-unarmed gate).",
+                    "Bow loadout detection: bow in hotbar + arrows anywhere in inventory (normal/tipped/spectral)."
+                            + "Returns the bow's hotbar slot, or -1 when the loadout is missing. Shared by"
+                            + " behavior tier (draw pacing) and process tier (refuse-when-unarmed gate).",
             vanillaRef = "BowItem + ArrowItem registry (decompiled 1.20.1)")
     public static int hotbarBowSlot(WorldView world) {
         InventoryView inventory = world.getInventory();
@@ -87,15 +102,14 @@ public final class RangedLoadouts {
             id = "combat.bow_slot.weapon_aware_routing",
             face = "combat.bow_slot",
             description =
-                    "Weapon-aware routing: whether any non-bow hotbar item deals strictly more per-hit damage than" +
-                    " the bow. The bow carries no ATTACK_DAMAGE modifier, so 'nothing beats it' means the bot is" +
-                    " reduced to clubbing. Drives both point-blank bow fire (behavior tier) and standoff-rim" +
-                    " engagement (process tier).",
+                    "Weapon-aware routing: whether any non-bow hotbar item deals strictly more per-hit damage than"
+                            + " the bow. The bow carries no ATTACK_DAMAGE modifier, so 'nothing beats it' means the"
+                            + " bot is reduced to clubbing. Drives both point-blank bow fire (behavior tier) and"
+                            + " standoff-rim engagement (process tier).",
             vanillaRef = "Item attribute modifiers (decompiled 1.20.1)",
-            deviation =
-                    "Bot-specific: the bow has no melee damage modifier, so any weapon ranking by ATTACK_DAMAGE" +
-                    " would switch off the bow every tick. This predicate is the single source of truth for when" +
-                    " the bow should keep firing vs. when melee is better.")
+            deviation = "Bot-specific: the bow has no melee damage modifier, so any weapon ranking by ATTACK_DAMAGE"
+                    + " would switch off the bow every tick. This predicate is the single source of truth for when"
+                    + " the bow should keep firing vs. when melee is better.")
     public static boolean meleeWeaponBeatsBow(WorldView world, WeaponCatalog weapons) {
         InventoryView inventory = world.getInventory();
         float bowDamage = weapons.perHitDamage(BOW_ID);
@@ -109,5 +123,31 @@ public final class RangedLoadouts {
             }
         }
         return false;
+    }
+
+    /**
+     * The hotbar shield slot when a shield is carried. Unlike the bow
+     * loadout there is no ammunition requirement - a shield blocks
+     * with nothing but itself, so presence alone is the loadout.
+     *
+     * @param world read surface for the inventory; never null
+     * @return the shield's hotbar slot, or -1 when none is carried
+     */
+    @Feature(
+            id = "combat.shield.loadout_detection",
+            face = "combat.shield",
+            description = "Shield loadout detection: a shield anywhere in the hotbar. No ammunition requirement -"
+                    + " a shield blocks with nothing but itself, so presence alone is the loadout. Read by the"
+                    + " combat behavior's reactive block.",
+            vanillaRef = "ShieldItem (decompiled 1.20.1)")
+    public static int hotbarShieldSlot(WorldView world) {
+        InventoryView inventory = world.getInventory();
+        for (int slot = 0; slot < InventoryView.HOTBAR_SIZE; slot++) {
+            var item = inventory.main().get(slot);
+            if (!item.isEmpty() && SHIELD_ID.equals(item.itemId())) {
+                return slot;
+            }
+        }
+        return -1;
     }
 }
