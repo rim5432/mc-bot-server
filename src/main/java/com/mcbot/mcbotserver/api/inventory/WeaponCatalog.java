@@ -9,7 +9,7 @@ package com.mcbot.mcbotserver.api.inventory;
  * the weapon metric (an axe outranks a same-tier sword).
  *
  * <p>Registry-level only: enchantment-aware ranking needs stack-level
- * disclosure {@code ItemView} does not carry yet; the damage path
+ * disclosure {@link ItemView} does not carry yet; the damage path
  * itself reads the live stack and stays enchant-aware adapter-side.
  */
 public interface WeaponCatalog {

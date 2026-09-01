@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.api.process;
 
+import com.mcbot.mcbotserver.api.goal.Goal;
 import javax.annotation.Nullable;
 
 /**
@@ -7,7 +8,7 @@ import javax.annotation.Nullable;
  * B that keeps processes side-effect-free.
  *
  * <p>Contract: see ADR-0004 D3. SUCCESS is declared only after the
- * directive's {@code Goal} predicate passed; STUCK is declared by the
+ * directive's {@link Goal} predicate passed; STUCK is declared by the
  * behavior that owns motion history; processes consume reports and
  * never read world state themselves.
  */

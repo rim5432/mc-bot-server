@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.api.menu;
 
+import com.mcbot.mcbotserver.api.actor.Actor;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import javax.annotation.Nullable;
 
@@ -10,10 +11,10 @@ import javax.annotation.Nullable;
  * between contestants, both wrong for a transaction (issue 0007
  * §6.2).
  *
- * <p>Implemented by the actor binding alongside {@code Actor}, so
+ * <p>Implemented by the actor binding alongside {@link Actor}, so
  * boundary A's single-mutation-surface rule survives (a second menu
  * controller outside the actor would need review sanction).
- * {@code Actor} itself stays claim-only — claim-only actors (the
+ * {@link Actor} itself stays claim-only — claim-only actors (the
  * core arbiter, test recordings) are legitimate implementations and
  * must not carry dead menu methods.
  *

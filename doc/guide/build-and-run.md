@@ -34,7 +34,8 @@ Two postures, split at the 2026-08-27 promotion (user ruling:
 hygiene outweighs ~10s of build time):
 
 1. **Hard gates ride the default `test` flow.** `checkstyleMain`,
-   `checkstyleTest` and `spotlessCheck` run on every
+   `checkstyleTest`, `spotlessCheck` and `javadocApi` (doclint on the
+   api layer) run on every
    `python tool/mcbot_tool.py test` and fail the build on
    violation - no opt-in, no memory required. Block-verified by
    probe (an injected unused import fails `test` in 19s). The JaCoCo
@@ -58,6 +59,7 @@ Postures after the 2026-08-27 promotion:
 |---|---|---|
 | Checkstyle | **hard gate, default `test` flow** | 14.0.0 since 2026-09-01 (P3 of the lint-posture round) on a Java 21 analyzer launcher - the mod toolchain stays 17, only the analyzer JVM upgraded; naming, imports, Javadoc, modifier order, EmptyBlock; 2026-08-27 added TodoComment, IllegalCatch (narrowed), IllegalThrows, MissingDeprecated, JavadocVariable (public constants), RegexpSinglelineJava (bans printStackTrace() and System.exit()); 2026-09-01 added SimplifyBooleanReturn, FallThrough, IllegalType (bans Date/Vector/Hashtable/Stack); 2026-09-01 also added the three 14-line promotions - UseEnhancedSwitch (colon-label switches must be arrow), IllegalBlockTag (@author graffiti ban, AGENTS 1.4), MissingOverrideOnRecordAccessor (JEP 395) |
 | Spotless check | **hard gate, default `test` flow** | `palantirJavaFormat` output == ecosystem standard (4-space / 120 cols / K&R); `spotlessApply` runs ungated any time |
+| Javadoc doclint (`javadocApi`) | **hard gate, default `test` flow** | `-Xdoclint:all,-missing -Xwerror` scoped to `api/**` only: that layer has zero MC imports, so `{@link}` references resolve inside the layer and broken links (rename/refactor fallout) fail the build; `-missing` stays off because checkstyle `JavadocMethod` owns presence and coverage at a finer grain (H-R10). Adapter javadoc quotes MC classes as `{@code}` by convention - unverifiable by doclint there by design |
 | PMD main + test | **RED WALL, `-Plint` fails on violation** | zero findings held since the 2026-08-27 paydown (17 -> 0 via per-channel/per-kind/stage extractions); 2026-09-01 added UseCollectionIsEmpty (5 test-site fixes) and cleared 3 post-paydown regressions (BotFishingGameTests unused var, MenuPlanner GodClass+CC suppressions with justification). Documented suppressions: TooManyMethods on HungryProcess/MineProcess/BotController, GodClass+CyclomaticComplexity on MenuPlanner |
 | CPD | **RED WALL, `-Plint` fails at >=140 tokens** | main-side duplication cleared 2026-08-27 (CommandResponse, submitCommand, CommandHandlerGuards, BindingInventory.toView sharing, GametestRig.fillPool); the threshold sits above the largest surviving test-side copy (131), so only new main-scale duplication fires - sub-threshold dups stay periodic manual review |
 | SpotBugs (api+core scope only) | **RED WALL, `-Plint` fails on finding** | flipped from dashboard 2026-09-01 by the first triage round (22 findings: 3 fixed at root - DCN explicit arg null-checks on Mine/Dig, test stream close; 19 suppressed with inline justification in `config/spotbugs/exclude.xml` - ThreatBlackboard PA x9 per the ADR-0003 scratch-struct ruling, InMemoryEventQueue AT x4 per the single-thread policy with both wire paths marshalling to the tick thread, DI EI2 x2, MissionShell CT, test-fixture EI, assertThrows RV x2); `onlyAnalyze` limits to engine-free packages, which need no MC auxclasspath - a NEW finding fails lint and lands in the filter with a reason or gets fixed |
@@ -103,7 +105,7 @@ cycle exceptions left; a new one is a design regression.
 The public mirror at `github.com/rim5432/mc-bot-server` runs the
 offline gate on every push and PR (`.github/workflows/ci.yml`):
 `compileJava` + the default `test` flow, meaning offline JUnit plus
-the checkstyle/spotlessCheck hard gates. A second, parallel job runs
+the checkstyle/spotlessCheck/javadocApi hard gates. A second, parallel job runs
 the full static-analysis verdict (`qualityCheck -Plint`): PMD, CPD,
 SpotBugs, and the Error Prone + NullAway compile pass ride every push
 too, so `-Plint` findings surface on the mirror instead of waiting

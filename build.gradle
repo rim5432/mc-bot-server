@@ -108,7 +108,7 @@ tasks.named('test', Test).configure {
     useJUnitPlatform()
     // hard style gates ride every test run - user ruling 2026-08-27:
     // hygiene outweighs ~10s of build time; see doc/guide/build-and-run.md
-    dependsOn 'checkstyleMain', 'checkstyleTest', 'spotlessCheck'
+    dependsOn 'checkstyleMain', 'checkstyleTest', 'spotlessCheck', 'javadocApi'
     // coverage floor rides as a FINALIZER, not dependsOn: the JaCoCo
     // verification task itself depends on test, so a dependsOn edge here
     // would close a cycle. Finalizers still fail the build on violation.
@@ -165,6 +165,24 @@ tasks.withType(JavaCompile).configureEach {
 // (PMD since its 2026-08-27 paydown, CPD at >=140 tokens, SpotBugs
 // since the 2026-09-01 first-triage flip) and the Error Prone pass
 // run behind -Plint; postures in doc/guide/build-and-run.md.
+tasks.register('javadocApi', Javadoc) {
+    group = 'verification'
+    description = 'Doclint (reference + syntax) for the api contract layer.'
+    // The api Javadoc is the harness-facing contract (see the api deps
+    // comment below), so broken {@link} references and malformed doc
+    // HTML fail the build. Scoped to api/ because that layer has zero
+    // MC imports - {@link} references resolve inside the layer - while
+    // adapter javadoc quotes MC classes as {@code} by convention.
+    // -missing stays off: checkstyle JavadocMethod owns presence and
+    // coverage at a finer grain (code-health H-R10).
+    source = sourceSets.main.allJava.matching { include 'com/mcbot/mcbotserver/api/**' }
+    classpath = sourceSets.main.compileClasspath
+    options.encoding = 'UTF-8'
+    options.addStringOption('Xdoclint:all,-missing', '-quiet')
+    options.addStringOption('Xwerror')
+    // Generated HTML is not consumed; the task exists to run doclint.
+    destinationDir = layout.buildDirectory.dir('docs/api-lint').get().asFile
+}
 checkstyle {
     // 14.x line, P3 of the 2026-09-01 lint-posture round: the analyzer
     // JVM runs on Java 21 via the launcher below, so the mod's Java 17

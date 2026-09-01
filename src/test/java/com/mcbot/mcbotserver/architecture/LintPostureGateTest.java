@@ -32,7 +32,8 @@ class LintPostureGateTest {
     private record Posture(String blockMarker, List<String> requiredLines) {}
 
     /**
-     * The pinned wiring. Hard gates: checkstyle and spotlessCheck hang
+     * The pinned wiring. Hard gates: checkstyle, spotlessCheck, and the
+     * api-scoped javadoc doclint (javadocApi) hang
      * off the test task, and the JaCoCo coverage floor rides it as a
      * finalizer (user ruling 2026-09-01; a finalizer because the
      * verification task itself depends on test - a dependsOn edge would
@@ -64,8 +65,9 @@ class LintPostureGateTest {
             new Posture(
                     "tasks.named('test', Test).configure {",
                     List.of(
-                            "dependsOn 'checkstyleMain', 'checkstyleTest', 'spotlessCheck'",
+                            "dependsOn 'checkstyleMain', 'checkstyleTest', 'spotlessCheck', 'javadocApi'",
                             "finalizedBy 'jacocoTestCoverageVerification'")),
+            new Posture("tasks.register('javadocApi', Javadoc) {", List.of("Xdoclint:all,-missing", "Xwerror")),
             new Posture(
                     "tasks.withType(Checkstyle).configureEach {",
                     List.of("languageVersion = JavaLanguageVersion.of(21)")),
