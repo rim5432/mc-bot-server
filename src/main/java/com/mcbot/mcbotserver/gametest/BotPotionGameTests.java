@@ -412,8 +412,9 @@ public final class BotPotionGameTests {
     public static void harnessUseClaimThrowsSplashPotion(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(7, WALK_Y, 7));
         var body = rig.body();
-        body.getInventory().container().setItem(
-                0, PotionUtils.setPotion(new ItemStack(Items.SPLASH_POTION), Potions.POISON));
+        body.getInventory()
+                .container()
+                .setItem(0, PotionUtils.setPotion(new ItemStack(Items.SPLASH_POTION), Potions.POISON));
 
         helper.startSequence()
                 .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
@@ -438,16 +439,21 @@ public final class BotPotionGameTests {
                                     + thrown.attrs().get("potionId"));
                     check(
                             "0".equals(thrown.attrs().get("slot")),
-                            "POTION_THROWN slot must be 0, got " + thrown.attrs().get("slot"));
+                            "POTION_THROWN slot must be 0, got "
+                                    + thrown.attrs().get("slot"));
                     check(
                             "splash".equals(thrown.attrs().get("throwType")),
-                            "POTION_THROWN throwType must be splash, got " + thrown.attrs().get("throwType"));
+                            "POTION_THROWN throwType must be splash, got "
+                                    + thrown.attrs().get("throwType"));
                     check(
-                            thrown.attrs().get("effects") != null && thrown.attrs().get("effects").contains("poison"),
-                            "POTION_THROWN effects must contain poison, got " + thrown.attrs().get("effects"));
+                            thrown.attrs().get("effects") != null
+                                    && thrown.attrs().get("effects").contains("poison"),
+                            "POTION_THROWN effects must contain poison, got "
+                                    + thrown.attrs().get("effects"));
                     check(
                             "harness".equals(thrown.attrs().get("source")),
-                            "POTION_THROWN source must be harness, got " + thrown.attrs().get("source"));
+                            "POTION_THROWN source must be harness, got "
+                                    + thrown.attrs().get("source"));
                     // Side effect: slot 0 is empty (thrown potions leave
                     // no container — unlike drinkable potions which leave
                     // a glass bottle).
@@ -457,7 +463,8 @@ public final class BotPotionGameTests {
                     // level. The projectile carries the splash potion stack
                     // and will apply poison on impact.
                     var thrownPotions = helper.getLevel()
-                            .getEntitiesOfClass(net.minecraft.world.entity.projectile.ThrownPotion.class,
+                            .getEntitiesOfClass(
+                                    net.minecraft.world.entity.projectile.ThrownPotion.class,
                                     body.getBoundingBox().inflate(8.0));
                     check(!thrownPotions.isEmpty(), "a ThrownPotion entity must exist after throw");
                     body.discard();
@@ -488,8 +495,7 @@ public final class BotPotionGameTests {
         helper.startSequence()
                 .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
                     // Reflex-owned claim: owner prefix triggers intent detection.
-                    rig.actor().submit(new Claim(
-                            Channel.USE, 50, "reflex:DRINK_ON_LOW_HEALTH", new Intent.Use(true)));
+                    rig.actor().submit(new Claim(Channel.USE, 50, "reflex:DRINK_ON_LOW_HEALTH", new Intent.Use(true)));
                     GametestRig.assertEventSeen(rig.events(), EventKind.DRINK_FAILED);
                 }))
                 .thenExecuteAfter(0, () -> {
@@ -500,13 +506,15 @@ public final class BotPotionGameTests {
                             .orElseThrow();
                     check(
                             "SLOT_EMPTY".equals(failed.attrs().get("reason")),
-                            "DRINK_FAILED reason must be SLOT_EMPTY, got " + failed.attrs().get("reason"));
+                            "DRINK_FAILED reason must be SLOT_EMPTY, got "
+                                    + failed.attrs().get("reason"));
                     check(
                             "0".equals(failed.attrs().get("slot")),
                             "DRINK_FAILED slot must be 0, got " + failed.attrs().get("slot"));
                     check(
                             "reflex".equals(failed.attrs().get("source")),
-                            "DRINK_FAILED source must be reflex, got " + failed.attrs().get("source"));
+                            "DRINK_FAILED source must be reflex, got "
+                                    + failed.attrs().get("source"));
                     body.discard();
                 })
                 .thenSucceed();
@@ -530,8 +538,7 @@ public final class BotPotionGameTests {
 
         helper.startSequence()
                 .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
-                    rig.actor().submit(new Claim(
-                            Channel.USE, 50, "reflex:DRINK_ON_LOW_HEALTH", new Intent.Use(true)));
+                    rig.actor().submit(new Claim(Channel.USE, 50, "reflex:DRINK_ON_LOW_HEALTH", new Intent.Use(true)));
                     GametestRig.assertEventSeen(rig.events(), EventKind.DRINK_FAILED);
                 }))
                 .thenExecuteAfter(0, () -> {
@@ -542,16 +549,19 @@ public final class BotPotionGameTests {
                             .orElseThrow();
                     check(
                             "NO_POTION".equals(failed.attrs().get("reason")),
-                            "DRINK_FAILED reason must be NO_POTION, got " + failed.attrs().get("reason"));
+                            "DRINK_FAILED reason must be NO_POTION, got "
+                                    + failed.attrs().get("reason"));
                     check(
                             "minecraft:stick".equals(failed.attrs().get("itemId")),
-                            "DRINK_FAILED itemId must be minecraft:stick, got " + failed.attrs().get("itemId"));
+                            "DRINK_FAILED itemId must be minecraft:stick, got "
+                                    + failed.attrs().get("itemId"));
                     check(
                             "0".equals(failed.attrs().get("slot")),
                             "DRINK_FAILED slot must be 0, got " + failed.attrs().get("slot"));
                     check(
                             "reflex".equals(failed.attrs().get("source")),
-                            "DRINK_FAILED source must be reflex, got " + failed.attrs().get("source"));
+                            "DRINK_FAILED source must be reflex, got "
+                                    + failed.attrs().get("source"));
                     body.discard();
                 })
                 .thenSucceed();
@@ -579,8 +589,9 @@ public final class BotPotionGameTests {
         }
         // Count-2 healing potion in slot 0: after drinking, count 1 remains
         // and the glass bottle must go somewhere — but inventory is full.
-        body.getInventory().container().setItem(
-                0, PotionUtils.setPotion(new ItemStack(Items.POTION, 2), Potions.HEALING));
+        body.getInventory()
+                .container()
+                .setItem(0, PotionUtils.setPotion(new ItemStack(Items.POTION, 2), Potions.HEALING));
 
         helper.startSequence()
                 .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
@@ -633,8 +644,9 @@ public final class BotPotionGameTests {
             body.getInventory().container().setItem(i, new ItemStack(Items.COBBLESTONE));
         }
         // Count-2 healing potion in slot 0.
-        body.getInventory().container().setItem(
-                0, PotionUtils.setPotion(new ItemStack(Items.POTION, 2), Potions.HEALING));
+        body.getInventory()
+                .container()
+                .setItem(0, PotionUtils.setPotion(new ItemStack(Items.POTION, 2), Potions.HEALING));
 
         helper.startSequence()
                 .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
@@ -658,7 +670,9 @@ public final class BotPotionGameTests {
                     // Slot 1: the glass bottle merged in (count 1 → 2).
                     ItemStack slot1 = body.getInventory().container().getItem(1);
                     check(slot1.is(Items.GLASS_BOTTLE), "slot 1 must hold glass bottles; got " + slot1);
-                    check(slot1.getCount() == 2, "slot 1 glass bottle count must be 2 (merged); got " + slot1.getCount());
+                    check(
+                            slot1.getCount() == 2,
+                            "slot 1 glass bottle count must be 2 (merged); got " + slot1.getCount());
                     body.discard();
                 })
                 .thenSucceed();

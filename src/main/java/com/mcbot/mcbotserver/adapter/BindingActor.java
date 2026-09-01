@@ -71,6 +71,8 @@ public final class BindingActor implements Actor {
     private final InteractBlockExecutor interact;
     /** One-shot use-on-entity chain (taming feeds, leads, saddles). */
     private final InteractEntityExecutor entityInteract;
+    /** One-shot directed melee strike on a named entity (hunt, defend). */
+    private final StrikeEntityExecutor strike;
 
     /**
      * The one-shot place executor for the synchronous /bot place verb
@@ -169,6 +171,9 @@ public final class BindingActor implements Actor {
 
     private boolean lastUsePressing;
     private boolean lastDropClaimed;
+    /** Last Strike claim seen on USE - claim identity is the rising edge. */
+    private Claim lastStrikeClaim;
+
     private boolean lastInteractClaimed;
     private boolean lastEntityClaimed;
 
@@ -201,6 +206,7 @@ public final class BindingActor implements Actor {
         this.facade = new BotPlayerFacade(body);
         this.interact = new InteractBlockExecutor(body, facade);
         this.entityInteract = new InteractEntityExecutor(body, facade);
+        this.strike = new StrikeEntityExecutor(body, facade, melee);
         this.menuTx = new ActorMenuTransactions(facade);
         this.events = Objects.requireNonNull(events, "events");
         this.daySupplier = Objects.requireNonNull(daySupplier, "daySupplier");
@@ -279,7 +285,17 @@ public final class BindingActor implements Actor {
     }
 
     private void applyUse(Claim use) {
-        if (use != null && use.intent() instanceof Intent.Use u) {
+        if (use != null && use.intent() instanceof Intent.Strike s) {
+            // Directed strike is one-shot per NEW claim: the behavior
+            // submits a fresh claim per swing window, so claim-identity
+            // (not a boolean latch) is the rising edge - consecutive
+            // Strike claims must each fire once.
+            if (use != lastStrikeClaim) {
+                this.strike.strike(s.entityId());
+                lastStrikeClaim = use;
+            }
+            lastUsePressing = false;
+        } else if (use != null && use.intent() instanceof Intent.Use u) {
             if (u.pressing() && !lastUsePressing) {
                 onUsePressEdge(use.holder());
             }
@@ -292,12 +308,14 @@ public final class BindingActor implements Actor {
                 releaseUseHolds();
             }
             lastUsePressing = u.pressing();
+            lastStrikeClaim = null;
         } else {
             // The USE claim vanished mid-draw (reflex preemption) -
             // release now; an orphaned charge would keep the loop
             // running with nobody watching it.
             releaseUseHolds();
             lastUsePressing = false;
+            lastStrikeClaim = null;
         }
     }
 
@@ -729,6 +747,7 @@ public final class BindingActor implements Actor {
         lastDropClaimed = false;
         lastInteractClaimed = false;
         lastEntityClaimed = false;
+        lastStrikeClaim = null;
     }
 
     /**

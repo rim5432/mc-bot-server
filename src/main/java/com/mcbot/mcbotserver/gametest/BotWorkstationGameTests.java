@@ -161,8 +161,10 @@ public final class BotWorkstationGameTests {
         // Take the output (slot 3). ResultSlot.onTake consumes all three inputs.
         view = tx.menuClick(3, 0, MenuClick.PICKUP);
         check(view.carried() != null && !view.carried().isEmpty(), "the upgraded result must be takeable");
-        check(view.carried().itemId().equals("minecraft:netherite_chestplate"),
-                "the carried result must be a netherite chestplate, got " + view.carried().itemId());
+        check(
+                view.carried().itemId().equals("minecraft:netherite_chestplate"),
+                "the carried result must be a netherite chestplate, got "
+                        + view.carried().itemId());
         check(view.slot(0).isEmpty(), "the take must consume the template");
         check(view.slot(1).isEmpty(), "the take must consume the diamond chestplate");
         check(view.slot(2).isEmpty(), "the take must consume the netherite ingot");
@@ -223,8 +225,10 @@ public final class BotWorkstationGameTests {
 
         view = tx.menuClick(3, 0, MenuClick.PICKUP);
         check(view.carried() != null && !view.carried().isEmpty(), "the patterned banner must be takeable");
-        check(view.carried().itemId().equals("minecraft:white_banner"),
-                "the carried result must be a white banner, got " + view.carried().itemId());
+        check(
+                view.carried().itemId().equals("minecraft:white_banner"),
+                "the carried result must be a white banner, got "
+                        + view.carried().itemId());
         tx.menuClick(hotbar0, 0, MenuClick.PICKUP);
         tx.closeMenu();
 

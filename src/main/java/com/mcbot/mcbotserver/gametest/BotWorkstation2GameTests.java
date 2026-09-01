@@ -99,8 +99,11 @@ public final class BotWorkstation2GameTests {
         check(be instanceof LecternBlockEntity, "lectern block entity must exist");
         LecternBlockEntity lecternBe = (LecternBlockEntity) be;
         lecternBe.setBook(new ItemStack(Items.WRITABLE_BOOK));
-        helper.getLevel().setBlock(lecternAbs,
-                helper.getLevel().getBlockState(lecternAbs).setValue(LecternBlock.HAS_BOOK, true), 3);
+        helper.getLevel()
+                .setBlock(
+                        lecternAbs,
+                        helper.getLevel().getBlockState(lecternAbs).setValue(LecternBlock.HAS_BOOK, true),
+                        3);
 
         var tx = rig.actor().menuTransactions();
         var view = tx.openMenu(cellOf(lecternAbs));
@@ -227,8 +230,7 @@ public final class BotWorkstation2GameTests {
         view = tx.openMenu(cellOf(chestAbs));
         int found = -1;
         for (int i = 0; i < 27; i++) {
-            if (!view.slot(i).isEmpty()
-                    && view.slot(i).item().itemId().equals("minecraft:gold_ingot")) {
+            if (!view.slot(i).isEmpty() && view.slot(i).item().itemId().equals("minecraft:gold_ingot")) {
                 found = i;
                 break;
             }
@@ -278,8 +280,7 @@ public final class BotWorkstation2GameTests {
         view = tx.openMenu(cellOf(enderAbs));
         int found = -1;
         for (int i = 0; i < 27; i++) {
-            if (!view.slot(i).isEmpty()
-                    && view.slot(i).item().itemId().equals("minecraft:emerald")) {
+            if (!view.slot(i).isEmpty() && view.slot(i).item().itemId().equals("minecraft:emerald")) {
                 found = i;
                 break;
             }

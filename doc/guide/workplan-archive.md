@@ -1,6 +1,6 @@
 ---
 title: Work Plan Archive (shipped items)
-last_verified: 2026-09-01
+last_verified: 2026-09-02
 covers:
   - doc/architecture/boundaries.md
   - doc/decisions/0004-tick-pipeline-actor-channels.md

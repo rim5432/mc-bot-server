@@ -99,6 +99,16 @@ public final class TameProcess extends MissionShell {
     /** Failure reason: the target died before the tame could land. */
     public static final String REASON_TARGET_DEAD = "TARGET_DEAD";
 
+    /**
+     * Failure reason: the target is in an aggressive state that blocks
+     * item taming. In 1.20.1 only the wolf carries an anger mechanic
+     * that gates {@code Wolf.mobInteract} (bone press falls through
+     * when {@code isAngry()}); the snapshot carries the bit so the
+     * process refuses now instead of budget-staring at presses that
+     * never consume.
+     */
+    public static final String REASON_TARGET_ANGRY = "TARGET_ANGRY";
+
     private final String targetId;
     private final Supplier<CellPos> positionSource;
 
@@ -199,6 +209,15 @@ public final class TameProcess extends MissionShell {
         if (firstSighting) {
             if (!TameFoodCatalog.isTameable(target.type())) {
                 fail(REASON_NOT_TAMEABLE);
+                return lastDirective;
+            }
+            if (target.angry()) {
+                // An angry wolf's mobInteract falls through the bone
+                // branch (Wolf.java:377 guards on !isAngry()), so every
+                // press is a silent no-op - refuse now instead of
+                // budget-staring. Only the wolf carries an anger gate in
+                // 1.20.1; the snapshot bit is false for every other type.
+                fail(REASON_TARGET_ANGRY);
                 return lastDirective;
             }
             if (TameFoodCatalog.hotbarTameItemSlot(world.getInventory(), target.type()) < 0) {

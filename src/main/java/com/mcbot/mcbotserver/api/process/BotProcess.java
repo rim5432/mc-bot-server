@@ -41,9 +41,16 @@ public interface BotProcess {
      *
      * @param world read-only perception; never null
      * @return the directive for behaviors to execute; must not be null
-     *         while active. A terminal mission returns null - the
-     *         post-failure hold must never hand the mover a stale or
-     *         far-away goal (the 7f02283 terminal-hold pin)
+     *         while active. A terminal mission returns null when its
+     *         last-emitted goal could misdirect the mover (the 7f02283
+     *         terminal-hold pin - HungryProcess's far-origin goal wedged
+     *         the pathing capture box). Missions whose stale goal points
+     *         at a near-neighbor cell (AttackProcess, DefendProcess,
+     *         TameProcess - the bot was already chasing that position)
+     *         may return lastDirective for the one-tick retirement-lap
+     *         corpse the arbiter keeps so the transition emitter sees
+     *         previous != now; the next tick's head sweep retires them
+     *         and nulls the directive.
      */
     @Nullable
     com.mcbot.mcbotserver.api.process.Directive onTick(WorldView world);

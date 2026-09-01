@@ -21,6 +21,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.TamableAnimal;
+import net.minecraft.world.entity.animal.Wolf;
 import net.minecraft.world.phys.AABB;
 
 /**
@@ -140,7 +141,8 @@ public final class BindingWorldView implements WorldView {
                     new CellPos(e.getBlockX(), e.getBlockY(), e.getBlockZ()),
                     e.getHealth(),
                     e.getMaxHealth(),
-                    e instanceof TamableAnimal tamable && tamable.isTame()));
+                    e instanceof TamableAnimal tamable && tamable.isTame(),
+                    e instanceof Wolf wolf && wolf.isAngry()));
         }
         return out;
     }

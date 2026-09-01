@@ -19,8 +19,12 @@ import com.mcbot.mcbotserver.api.types.CellPos;
  * @param maxHealth maximum health, positive
  * @param tamed     whether the entity is a tamed companion; always
  *                  false for non-tamable types
+ * @param angry     whether the entity is in an aggressive state that
+ *                  blocks item taming (wolf only in 1.20.1); always
+ *                  false for types without an anger mechanic
  */
-public record EntitySnapshot(String id, String type, CellPos pos, float health, float maxHealth, boolean tamed) {
+public record EntitySnapshot(
+        String id, String type, CellPos pos, float health, float maxHealth, boolean tamed, boolean angry) {
 
     /**
      * Creates a validated snapshot.
@@ -50,8 +54,9 @@ public record EntitySnapshot(String id, String type, CellPos pos, float health, 
     }
 
     /**
-     * Creates a snapshot with the tamed fact absent - the pre-taming
-     * call-site shape, kept so mock and test fixtures stay 5-arg.
+     * Creates a snapshot with both tamed and angry facts absent - the
+     * pre-taming call-site shape, kept so mock and test fixtures stay
+     * 5-arg.
      *
      * @param id        stable identity of the entity; never null
      * @param type      entity type key; never null
@@ -61,5 +66,20 @@ public record EntitySnapshot(String id, String type, CellPos pos, float health, 
      */
     public EntitySnapshot(String id, String type, CellPos pos, float health, float maxHealth) {
         this(id, type, pos, health, maxHealth, false);
+    }
+
+    /**
+     * Creates a snapshot with the tamed fact present and angry absent -
+     * the taming-arc call-site shape before the angry bit was added.
+     *
+     * @param id        stable identity of the entity; never null
+     * @param type      entity type key; never null
+     * @param pos       block cell the entity occupies; never null
+     * @param health    current health, 0 or greater
+     * @param maxHealth maximum health, positive
+     * @param tamed     whether the entity is a tamed companion
+     */
+    public EntitySnapshot(String id, String type, CellPos pos, float health, float maxHealth, boolean tamed) {
+        this(id, type, pos, health, maxHealth, tamed, false);
     }
 }

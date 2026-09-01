@@ -133,6 +133,40 @@ public sealed interface Intent {
     }
 
     /**
+     * Strike one named entity, resolved on the USE channel: a one-shot
+     * directed melee attack whose victim is the ADDRESSED entity, not
+     * the nearest hostile in the aim cone. The hurt-side sibling of
+     * {@link InteractEntity} - the vanilla client hurts what the
+     * crosshair names via {@code Player.attack} (attribute damage,
+     * enchant bonus, knockback, Fire Aspect, crit), the device
+     * resolves the claim's id against the server level and gates the
+     * shared melee reach plus the weapon's item-derived cooldown, so
+     * a fast claim pulse never leaks machine-gun hits. Passive prey
+     * (the hunt face) and the defend target ride the same addressed
+     * hit.
+     *
+     * <p>One-shot action - each new claim is one strike attempt; the
+     * executor no-ops silently on a missing, dead, or out-of-reach
+     * target and the behavior tier's cadence simply presses again.
+     *
+     * @param entityId the target entity's UUID string; never null or
+     *                 blank
+     */
+    record Strike(String entityId) implements Intent {
+
+        /**
+         * Creates a validated strike intent.
+         *
+         * @param entityId must not be null or blank
+         */
+        public Strike {
+            if (entityId == null || entityId.isBlank()) {
+                throw new IllegalArgumentException("entityId must not be blank");
+            }
+        }
+    }
+
+    /**
      * Right-click a block, resolved on the INTERACT channel: the
      * vanilla non-sneak use chain at the clicked cell - block
      * interaction first (open a door, press a button), then the held

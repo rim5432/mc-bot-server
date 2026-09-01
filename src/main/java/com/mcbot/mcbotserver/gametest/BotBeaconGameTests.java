@@ -65,14 +65,14 @@ public final class BotBeaconGameTests {
         // column above the beacon up to the world surface so the beam can
         // form and the pyramid detection runs.
         BlockPos beaconAbs = helper.absolutePos(beaconPos);
-        int surfaceY = helper.getLevel().getHeight(
-                net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE,
-                beaconAbs.getX(), beaconAbs.getZ());
+        int surfaceY = helper.getLevel()
+                .getHeight(
+                        net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE,
+                        beaconAbs.getX(),
+                        beaconAbs.getZ());
         for (int y = beaconAbs.getY() + 1; y <= surfaceY; y++) {
-            helper.getLevel().setBlock(
-                    new BlockPos(beaconAbs.getX(), y, beaconAbs.getZ()),
-                    Blocks.AIR.defaultBlockState(),
-                    3);
+            helper.getLevel()
+                    .setBlock(new BlockPos(beaconAbs.getX(), y, beaconAbs.getZ()), Blocks.AIR.defaultBlockState(), 3);
         }
 
         // Give bot an iron ingot for the payment slot.
@@ -108,7 +108,8 @@ public final class BotBeaconGameTests {
         BlockPos beaconAbsFinal = beaconAbs;
         helper.runAfterDelay(100, () -> {
             var beaconBe = helper.getLevel().getBlockEntity(beaconAbsFinal);
-            check(beaconBe instanceof net.minecraft.world.level.block.entity.BeaconBlockEntity,
+            check(
+                    beaconBe instanceof net.minecraft.world.level.block.entity.BeaconBlockEntity,
                     "beacon block entity must exist");
             net.minecraft.world.level.block.entity.BeaconBlockEntity beacon =
                     (net.minecraft.world.level.block.entity.BeaconBlockEntity) beaconBe;
@@ -124,8 +125,7 @@ public final class BotBeaconGameTests {
                 primaryField.setAccessible(true);
                 Object primary = primaryField.get(beacon);
                 check(primary != null, "primary effect must be set after setBeaconEffects");
-                check(primary.equals(MobEffects.MOVEMENT_SPEED),
-                        "primary effect must be Speed, got " + primary);
+                check(primary.equals(MobEffects.MOVEMENT_SPEED), "primary effect must be Speed, got " + primary);
             } catch (ReflectiveOperationException e) {
                 helper.fail("beacon field reflection failed: " + e.getMessage());
             }
@@ -224,7 +224,8 @@ public final class BotBeaconGameTests {
 
         tx.closeMenu();
         helper.runAfterDelay(20, () -> {
-            check(!rig.body().hasEffect(MobEffects.MOVEMENT_SPEED),
+            check(
+                    !rig.body().hasEffect(MobEffects.MOVEMENT_SPEED),
                     "bot must NOT have Speed effect when beacon has no payment");
             rig.body().discard();
             helper.succeed();

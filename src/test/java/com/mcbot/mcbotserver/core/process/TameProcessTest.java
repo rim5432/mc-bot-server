@@ -51,6 +51,10 @@ class TameProcessTest {
         return new EntitySnapshot(id, WOLF, new CellPos(x, 64, 0), 10f, 10f, tamed);
     }
 
+    private EntitySnapshot angryWolf(String id, int x) {
+        return new EntitySnapshot(id, WOLF, new CellPos(x, 64, 0), 10f, 10f, false, true);
+    }
+
     private MockWorldView worldWithBone() {
         MockWorldView world = new MockWorldView();
         world.setInventory(inventoryWith(BONE));
@@ -132,6 +136,24 @@ class TameProcessTest {
 
         assertFalse(m.missionSucceeded());
         assertEquals(TameProcess.REASON_ALREADY_TAMED, m.failureReasonOrNull());
+    }
+
+    /**
+     * An angry wolf's mobInteract falls through the bone branch
+     * (Wolf.java:377 guards on !isAngry()), so every press is a silent
+     * no-op - the process refuses with a typed reason instead of
+     * budget-staring.
+     */
+    @Test
+    void angryWolfFailsFast() {
+        MockWorldView world = worldWithBone();
+        TameProcess m = mission();
+        world.addEntity(angryWolf("wolf-1", 6));
+
+        m.onTick(world);
+
+        assertFalse(m.missionSucceeded());
+        assertEquals(TameProcess.REASON_TARGET_ANGRY, m.failureReasonOrNull());
     }
 
     /**

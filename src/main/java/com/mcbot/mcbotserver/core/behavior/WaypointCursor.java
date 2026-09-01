@@ -12,8 +12,11 @@ import java.util.List;
  * <p>Contract: see boundaries.md decision 8 (movement five-tuple) and
  * issue 0001 §2 settled facts - waypoint reach is XZ-only
  * ({@code Math.hypot(dx, dz)} against {@link PathingBehavior#WAYPOINT_REACH});
- * Y is intentionally ignored for touch detection, the goal predicate
- * remains the 3D cell-equality authority for arrival.
+ * Y is intentionally ignored for same-Y touch detection, the goal predicate
+ * remains the 3D cell-equality authority for arrival. A vertical guard in
+ * {@link #advance} (issue 0017) refuses to consume waypoints more than one
+ * block above the floor on XZ reach alone — those are merged climb or
+ * staircase segments owned by {@link #advanceClimb}.
  *
  * <p>Implementation note: single-threaded, tick-thread-local like all
  * follower state.
@@ -128,12 +131,31 @@ final class WaypointCursor {
      * {@link PathingBehavior#WAYPOINT_REACH}; Y is ignored for touch
      * purposes (see class contract).
      *
+     * <p>Vertical guard (issue 0017): a waypoint more than one block
+     * above the body's floor is a vertical segment — a merged ladder
+     * climb or a uniform staircase — and must NOT be consumed on
+     * horizontal reach alone. {@code PlanSmoother.collapseRuns}
+     * collapses a 5-cell climb into one waypoint at the top; without
+     * this guard the bot standing one cell west of the ladder (within
+     * 0.8 m XZ of the top waypoint, 5 m below it) consumes the entire
+     * climb leg in one tick, skips to the platform waypoint, and
+     * oscillates under the ceiling until the mission budget dies.
+     * JumpUp legs (y+1) stay consumable: the body is mid-jump and
+     * reaches that Y within a tick.
+     *
      * @param position the body's current fine position; never null
      */
     void advance(Vec3 position) {
+        CellPos floor = PathingBehavior.floorOf(position);
         while (waypointIndex < waypoints.size()) {
             CellPos wp = waypoints.get(waypointIndex);
-            boolean sameCell = PathingBehavior.floorOf(position).equals(wp);
+            if (wp.y() > floor.y() + 1) {
+                // Vertical segment: stop consuming and let the body
+                // gain Y. advanceClimb owns exact-Y consumption once
+                // the body enters the climbable column.
+                break;
+            }
+            boolean sameCell = floor.equals(wp);
             double horizontal = Math.hypot(position.x() - (wp.x() + 0.5), position.z() - (wp.z() + 0.5));
             if (sameCell || horizontal <= PathingBehavior.WAYPOINT_REACH) {
                 waypointIndex++;

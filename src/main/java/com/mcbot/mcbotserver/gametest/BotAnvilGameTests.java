@@ -258,7 +258,8 @@ public final class BotAnvilGameTests {
             int xpAfter = rig.body().getExperienceLevel();
             check(
                     xpAfter > xpBefore,
-                    "grindstone must return experience (level increased); xpBefore=" + xpBefore + " xpAfter=" + xpAfter);
+                    "grindstone must return experience (level increased); xpBefore=" + xpBefore + " xpAfter="
+                            + xpAfter);
             rig.body().discard();
             helper.succeed();
         });

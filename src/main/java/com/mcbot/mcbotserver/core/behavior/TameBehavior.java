@@ -47,6 +47,18 @@ public final class TameBehavior implements Behavior {
      * not an engine fact: fast enough that a 1/10 parrot lands inside
      * a default mission budget, slow enough that each attempt is a
      * distinct deliberate press.
+     *
+     * <p><b>Invariant:</b> this value must stay greater than 1. On the
+     * tick the process detects the tamed flip and succeeds, it returns
+     * its last directive (which still carries the tame order) for the
+     * arbiter's one-tick retirement-lap corpse. The behavior receives
+     * that stale directive on the same tick. A cooldown of N set by
+     * the previous press means cooldownTicks = N-1 on the detection
+     * tick, so no second press fires. If N were 1, cooldownTicks would
+     * be 0 on the detection tick and the behavior would press again
+     * with a now-empty hand (or a bone on a full-health tamed wolf),
+     * triggering the sit toggle and standing the freshly-tamed animal
+     * back up. Lowering this constant breaks the sit-toggle guard.
      */
     public static final int PRESS_INTERVAL_TICKS = 12;
 

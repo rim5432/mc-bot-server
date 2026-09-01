@@ -577,8 +577,7 @@ public final class BotHungerGameTests {
 
         helper.startSequence()
                 .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
-                    rig.actor()
-                            .submit(new Claim(Channel.USE, 85, "reflex:EAT_WHEN_HUNGRY", new Intent.Use(true)));
+                    rig.actor().submit(new Claim(Channel.USE, 85, "reflex:EAT_WHEN_HUNGRY", new Intent.Use(true)));
                     GametestRig.assertEventSeen(rig.events(), EventKind.EAT_FAILED);
                 }))
                 .thenExecuteAfter(0, () -> {
@@ -589,11 +588,15 @@ public final class BotHungerGameTests {
                             .orElseThrow();
                     check(
                             "SLOT_EMPTY".equals(failed.attrs().get("reason")),
-                            "EAT_FAILED reason must be SLOT_EMPTY, got " + failed.attrs().get("reason"));
+                            "EAT_FAILED reason must be SLOT_EMPTY, got "
+                                    + failed.attrs().get("reason"));
                     check(
                             "reflex".equals(failed.attrs().get("source")),
-                            "EAT_FAILED source must be reflex, got " + failed.attrs().get("source"));
-                    check("0".equals(failed.attrs().get("slot")), "EAT_FAILED slot must be 0, got " + failed.attrs().get("slot"));
+                            "EAT_FAILED source must be reflex, got "
+                                    + failed.attrs().get("source"));
+                    check(
+                            "0".equals(failed.attrs().get("slot")),
+                            "EAT_FAILED slot must be 0, got " + failed.attrs().get("slot"));
                     body.discard();
                 })
                 .thenSucceed();
@@ -619,8 +622,7 @@ public final class BotHungerGameTests {
 
         helper.startSequence()
                 .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
-                    rig.actor()
-                            .submit(new Claim(Channel.USE, 85, "reflex:EAT_WHEN_HUNGRY", new Intent.Use(true)));
+                    rig.actor().submit(new Claim(Channel.USE, 85, "reflex:EAT_WHEN_HUNGRY", new Intent.Use(true)));
                     GametestRig.assertEventSeen(rig.events(), EventKind.EAT_FAILED);
                 }))
                 .thenExecuteAfter(0, () -> {
@@ -631,13 +633,16 @@ public final class BotHungerGameTests {
                             .orElseThrow();
                     check(
                             "NOT_EDIBLE".equals(failed.attrs().get("reason")),
-                            "EAT_FAILED reason must be NOT_EDIBLE, got " + failed.attrs().get("reason"));
+                            "EAT_FAILED reason must be NOT_EDIBLE, got "
+                                    + failed.attrs().get("reason"));
                     check(
                             "minecraft:stick".equals(failed.attrs().get("itemId")),
-                            "EAT_FAILED itemId must be minecraft:stick, got " + failed.attrs().get("itemId"));
+                            "EAT_FAILED itemId must be minecraft:stick, got "
+                                    + failed.attrs().get("itemId"));
                     check(
                             "reflex".equals(failed.attrs().get("source")),
-                            "EAT_FAILED source must be reflex, got " + failed.attrs().get("source"));
+                            "EAT_FAILED source must be reflex, got "
+                                    + failed.attrs().get("source"));
                     body.discard();
                 })
                 .thenSucceed();

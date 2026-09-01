@@ -222,7 +222,7 @@ public final class CombatBehavior implements Behavior {
         if (aim.ranging() || committedToShot(aim)) {
             return tickRanged(world, actor, aim.bowSlot());
         }
-        return tickMelee(world, actor, aim);
+        return tickMelee(world, actor, aim, directive.overrides().combat().targetId());
     }
 
     /**
@@ -370,16 +370,16 @@ public final class CombatBehavior implements Behavior {
     @Feature(
             id = "combat.melee.swing_pacing",
             face = "combat.melee",
-            description = "Melee swing pacing: USE(true) on cooldown expiry + in-reach, USE(false) the next tick —"
-                    + " exactly one rising edge per attack window. Reach memory (AIM_HOLD_TICKS=3) lets the window"
-                    + " survive brief excursions past the gate instead of starving on edge jitter. Fixed 10-tick"
-                    + " behavior-layer pace; the resolver's actual cooldown may be longer (sword 12.5) and gates real"
-                    + " damage.",
+            description = "Melee strike pacing: one directed Strike(entityId) claim per attack window on cooldown"
+                    + " expiry + in-reach - the victim is the combat order's id, not the resolver's nearest-hostile"
+                    + " cone (ledger 62). Reach memory (AIM_HOLD_TICKS=3) lets the window survive brief excursions"
+                    + " past the gate instead of starving on edge jitter. Fixed 10-tick behavior-layer pace; the"
+                    + " executor's full-charge gate and the weapon's own cooldown (sword 12.5) gate real damage.",
             vanillaRef = "Player attack cooldown (decompiled 1.20.1)",
-            deviation = "Behavior-layer pace (10 ticks) is decoupled from the resolver's item-derived cooldown — a"
+            deviation = "Behavior-layer pace (10 ticks) is decoupled from the weapon's item-derived cooldown - a"
                     + " fast pulse gets one landed hit per cooldown window, vanilla's effective output, not"
-                    + " machine-gun damage.")
-    private ExecutionReport tickMelee(WorldView world, Actor actor, AimSolve aim) {
+                    + " machine-gun damage. The victim is addressed by id, not crosshair-selected.")
+    private ExecutionReport tickMelee(WorldView world, Actor actor, AimSolve aim, String targetId) {
         abortDraw(actor);
 
         holdBestWeapon(world, actor);
@@ -393,7 +393,6 @@ public final class CombatBehavior implements Behavior {
         if (RangedLoadouts.isHoldItem(heldId)) {
             return ExecutionReport.running();
         }
-        boolean released = !pressLatched;
         ticksSinceSwing++;
         double reach = aim.distance();
         if (reach <= ATTACK_REACH) {
@@ -402,13 +401,15 @@ public final class CombatBehavior implements Behavior {
             ticksSinceInReach++;
         }
         boolean inReachMemory = reach <= ATTACK_REACH || ticksSinceInReach <= AIM_HOLD_TICKS;
-        if (released && ticksSinceSwing >= ATTACK_COOLDOWN_TICKS && inReachMemory) {
-            actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(true)));
-            pressLatched = true;
+        if (ticksSinceSwing >= ATTACK_COOLDOWN_TICKS && inReachMemory) {
+            // Directed strike: the combat order names the victim by
+            // id, so the swing lands on the ADDRESSED entity instead
+            // of the resolver's nearest-hostile pick - passive prey
+            // (the hunt face) and the defend target take the same
+            // addressed hit. One-shot intent: no USE release dance,
+            // the executor's full-charge gate absorbs a fast pulse.
+            actor.submit(new Claim(Channel.USE, 20, name, new Intent.Strike(targetId)));
             ticksSinceSwing = 0;
-        } else if (pressLatched) {
-            actor.submit(new Claim(Channel.USE, 20, name, new Intent.Use(false)));
-            pressLatched = false;
         }
         return ExecutionReport.running();
     }

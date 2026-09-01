@@ -236,7 +236,11 @@ class GametestInventoryCheck {
                             "eatCompletedEventCarriesFullNutritionSnapshot")),
             Map.entry(
                     "BotTamingGameTests",
-                    Set.of("tamesWolfWithBones", "alreadyTamedWolfFailsFast", "tameRejectsNonTameableTarget")),
+                    Set.of(
+                            "tamesWolfWithBones",
+                            "tamesCatWithCod",
+                            "alreadyTamedWolfFailsFast",
+                            "tameRejectsNonTameableTarget")),
             Map.entry("BotHuntYieldGameTests", Set.of("huntsCowAndCollectsBeefYield")));
     /** Pulls the method name out of each
      * {@code @GameTest(...)} declaration in a source file. */

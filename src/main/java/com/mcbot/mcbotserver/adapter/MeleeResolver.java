@@ -98,7 +98,7 @@ final class MeleeResolver {
             deviation = "Bot only deals damage at full charge; partial-charge damage is a Player-only affordance the"
                     + " harness has no use for. Unready swings do not reset the cooldown to avoid a zero-damage"
                     + " lockout from fast pulse.")
-    private double getAttackCooldownTicks() {
+    double getAttackCooldownTicks() {
         double speed = body.getAttributeValue(Attributes.ATTACK_SPEED);
         return 1.0 / speed * 20.0;
     }
@@ -248,7 +248,7 @@ final class MeleeResolver {
             vanillaRef = "Mob.doHurtTarget + LivingEntity.die XP award (decompiled 1.20.1)",
             deviation = "doHurtTarget cannot carry a damage multiplier (computes f internally), so the crit-aware"
                     + " chain is inlined here — same deviation class as DigExecutor's manual break sequence.")
-    private void performMeleeAttack(LivingEntity target) {
+    void performMeleeAttack(LivingEntity target) {
         float damage = (float) body.getAttributeValue(Attributes.ATTACK_DAMAGE);
         float knockback = (float) body.getAttributeValue(Attributes.ATTACK_KNOCKBACK);
         damage += EnchantmentHelper.getDamageBonus(body.getMainHandItem(), target.getMobType());

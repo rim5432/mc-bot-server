@@ -9,7 +9,6 @@ covers:
 status: open (filed 2026-08-27; the executable arm of boundaries.md decision 33 and the harness-interaction.md canonical doc; heir of the archived issue 0012 menu-surface implementation queue)
 related:
   - doc/architecture/issues/0011-harness-surface-convergence.md
-  - doc/architecture/issues/archive/0012-work-block-usability-and-harness-menu-surface.md
   - doc/architecture/issues/0013-world-interaction-layer.md
   - doc/architecture/issues/0014-mineprocess-composite-mining-task.md
 ---
@@ -73,7 +72,7 @@ evidence attached, and the ledger summary follows.
   event, pipeline stops). Device-side; owned by 0014 section 6.
 - `ls /tasks` as a real listing needs a list-tasks wire verb;
   today the CLI derives only the current task from status.
-- FUSE mount as a second frontend: owned by archived 0012 section 6.
+- FUSE mount as a second frontend: deferred; inherited from issue 0012 (archived 2026-08-27).
 
 ## 6. Verification criteria
 
@@ -89,7 +88,7 @@ The 0012 design is resolved - D4 promoted into the canonical model,
 its wire table standing as the integration contract, rulings 1-17
 executed or overturned on record - but the implementation queue
 never ran past goto migration. These inherit here; shapes per the
-archived D1 table and its rulings:
+D1 table inherited from issue 0012 (archived 2026-08-27):
 
 - [x] L  D1 menu wire verbs - open / open-inventory / snapshot /
          close / deposit / take / craft / scan / recipes -
@@ -154,7 +153,7 @@ archived D1 table and its rulings:
          flip: C2b (respawn, within one boot) and C2-post (clean
          restart) both green on the fix.                [dep: none]
 
-Reopen triggers that live only inside the archived 0012 body
-(brewing / enchant cast overrides, L2 JSON role table, cast mixin,
-multi-client arbitration, full-chain acquire): their archive path is
-the standing pointer - they reopen from there when fired.
+Reopen triggers inherited from issue 0012 (archived 2026-08-27;
+details in git history): brewing / enchant cast overrides, L2 JSON
+role table, cast mixin, multi-client arbitration, full-chain acquire.
+They reopen from this list when fired.

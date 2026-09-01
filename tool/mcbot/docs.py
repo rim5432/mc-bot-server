@@ -18,7 +18,7 @@ from mcbot.paths import PROJECT_ROOT
 
 DOC_DIR = PROJECT_ROOT / "doc"
 DOC_INDEX = DOC_DIR / "README.md"
-DOC_CATEGORIES = ["architecture", "guide", "reference", "decisions", "archive"]
+DOC_CATEGORIES = ["architecture", "guide", "reference", "decisions"]
 DEFAULT_STALE_DAYS = 90
 
 _PLACEHOLDER_RE = re.compile(r"\b(TODO|TBD|FIXME|XXX)\b")
@@ -115,8 +115,6 @@ def check_doc(path: Path, stale_days: int = DEFAULT_STALE_DAYS) -> list:
     if err:
         return [("ERR", "DOC_FRONTMATTER", f"{rel}: {err}")]
 
-    in_archive = "archive" in path.relative_to(DOC_DIR).parts
-
     title = str(meta.get("title", "")).strip("'\"") if isinstance(meta.get("title"), str) else ""
     if not title:
         issues.append(("ERR", "DOC_FRONTMATTER", f"{rel}: front-matter 'title' missing"))
@@ -128,17 +126,6 @@ def check_doc(path: Path, stale_days: int = DEFAULT_STALE_DAYS) -> list:
                        f"{rel}: front-matter 'last_verified' missing or not YYYY-MM-DD"))
     else:
         verified = _dt.date.fromisoformat(lv_raw)
-
-    if in_archive:
-        sup = str(meta.get("superseded_by", "")).strip("'\"")
-        if not sup:
-            issues.append(("ERR", "ARCHIVE_NO_SUCCESSOR",
-                           f"{rel}: archived doc requires 'superseded_by:' front-matter"))
-        elif not (DOC_DIR / sup.replace("\\", "/")).exists():
-            issues.append(("ERR", "ARCHIVE_BAD_LINK",
-                           f"{rel}: superseded_by target not found: {sup}"))
-        # archived docs are exempt from age/drift checks by design
-        return issues
 
     if "decisions" in rel_doc.split("/") and not re.match(r"\d{4}-", path.name):
         issues.append(("WARN", "ADR_NAMING", f"{rel}: ADR filename should start with NNNN-"))

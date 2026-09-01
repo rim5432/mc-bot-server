@@ -27,16 +27,18 @@ class WaypointCursorClimbGateTest {
     private static final CellPos RUNG_2 = new CellPos(0, 66, 0);
 
     @Test
-    void xzReachWouldExhaustButClimbAdvanceWaits() {
-        // The regression this method exists to close: a body standing
-        // at the ladder base, waypoint directly overhead. advance()
-        // consumes it instantly (XZ distance ~0); advanceClimb() must
-        // hold the cursor until the floor cell reaches the rung.
+    void xzReachConsumesJumpUpButStopsAtVerticalSegment() {
+        // The 0017 fix: advance() must NOT consume a waypoint more than
+        // one block above the floor. A y+1 JumpUp rung is still
+        // consumed (the body is mid-jump and reaches that Y); a y+2
+        // (or higher) vertical segment is held for advanceClimb.
         WaypointCursor cursor = new WaypointCursor();
         cursor.set(List.of(BASE, RUNG_1, RUNG_2));
         cursor.advance(new Vec3(0.5, 64.0, 0.5));
-        assertTrue(cursor.exhausted(), "XZ-only reach must consume the overhead rungs - the old bug");
-        assertEquals(RUNG_2, cursor.steerTarget());
+        // BASE (same cell) + RUNG_1 (y+1, horizontal 0) consumed;
+        // RUNG_2 (y+2) held by the vertical guard.
+        assertEquals(2, cursor.index(), "y+1 consumed, y+2 held");
+        assertEquals(RUNG_2, cursor.current(), "the vertical guard stops at the first high waypoint");
 
         WaypointCursor climb = new WaypointCursor();
         climb.set(List.of(BASE, RUNG_1, RUNG_2));
@@ -55,5 +57,47 @@ class WaypointCursorClimbGateTest {
         assertEquals(RUNG_2, cursor.current(), "one floor cell consumes exactly one rung");
         cursor.advanceClimb(RUNG_2);
         assertTrue(cursor.exhausted(), "reaching the top rung exhausts the vertical chain");
+    }
+
+    /**
+     * Issue 0017 regression: the smoothed ladder plan collapses the
+     * 5-cell climb into a single waypoint at the top. A bot standing
+     * one cell west of the ladder base is within 0.8 m XZ of that top
+     * waypoint but 5 m below it; advance() must NOT consume the climb
+     * leg on horizontal reach alone, or the bot skips the entire
+     * ascent and oscillates under the platform until TIMEOUT.
+     */
+    @Test
+    void smoothedLadderTopWaypointNotConsumedOneCellWest() {
+        CellPos start = new CellPos(4, 1, 8);
+        CellPos ladderBase = new CellPos(9, 1, 8);
+        CellPos ladderTop = new CellPos(9, 6, 8);
+        CellPos platformGoal = new CellPos(6, 6, 8);
+        WaypointCursor cursor = new WaypointCursor();
+        cursor.set(List.of(start, ladderBase, ladderTop, platformGoal));
+
+        // Bot at x=8.8 (floor cell 8, one west of the ladder), within
+        // WAYPOINT_REACH of the ladderBase waypoint's XZ centre (9.5).
+        // 8.8 (not 8.7) avoids the IEEE-754 0.8 boundary.
+        Vec3 oneCellWest = new Vec3(8.8, 1.0, 8.5);
+        cursor.advance(oneCellWest);
+
+        // ladderBase consumed (same Y, horizontal <= 0.8); ladderTop
+        // must be held by the vertical guard (y=6 > floor.y+1=2).
+        assertEquals(
+                ladderTop,
+                cursor.current(),
+                "the merged climb top must not be consumed from one cell west of the ladder");
+        assertEquals(2, cursor.index(), "cursor stops at the climb top, not the platform waypoint");
+
+        // Once the body steps into the ladder column, isVerticalClimb
+        // (in PathingBehavior) routes to advanceClimb, which holds the
+        // top until the body actually reaches y=6.
+        cursor.advanceClimb(new CellPos(9, 1, 8));
+        assertEquals(ladderTop, cursor.current(), "advanceClimb holds the top through the lower rungs");
+        cursor.advanceClimb(new CellPos(9, 5, 8));
+        assertEquals(ladderTop, cursor.current(), "advanceClimb still holds one rung below the top");
+        cursor.advanceClimb(new CellPos(9, 6, 8));
+        assertEquals(platformGoal, cursor.current(), "reaching the top rung consumes the climb leg");
     }
 }

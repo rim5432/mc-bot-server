@@ -93,7 +93,7 @@ class CombatRangedGateTest {
         assertTrue(
                 actor.submitted.stream().noneMatch(c -> c.channel() == Channel.SLOT),
                 "melee range must not re-arm the hotbar");
-        assertFalse(useClaims(actor).isEmpty(), "melee pacing still swings");
+        assertFalse(strikeClaims(actor).isEmpty(), "melee pacing still swings");
     }
 
     @Test

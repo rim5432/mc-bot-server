@@ -9,8 +9,6 @@ status: open (Stage 3 review agenda; unlocked by the pre-Stage-3 survival gate)
 related:
   - doc/decisions/0002-capability-model-task-arbiter.md
   - doc/decisions/0004-tick-pipeline-actor-channels.md
-  - doc/architecture/issues/archive/0004-movement-primitive-vocabulary.md
-  - doc/architecture/issues/archive/0005-player-feel-motion-layer.md
 ---
 
 # Issue 0007: Player parity - inventory, menus, crafting, interaction

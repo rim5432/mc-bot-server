@@ -125,8 +125,7 @@ public final class MenuOpener {
             if (enderInventory != null && blockEntity instanceof EnderChestBlockEntity enderBe) {
                 enderInventory.setActiveChest(enderBe);
                 facade.syncPosition();
-                var enderMenu = ChestMenu.threeRows(
-                        NEXT_ID.getAndIncrement(), facade.getInventory(), enderInventory);
+                var enderMenu = ChestMenu.threeRows(NEXT_ID.getAndIncrement(), facade.getInventory(), enderInventory);
                 facade.containerMenu = enderMenu;
                 return Optional.of(new BindingMenu(enderMenu, facade, "ender_chest", toCellPos(pos)));
             }

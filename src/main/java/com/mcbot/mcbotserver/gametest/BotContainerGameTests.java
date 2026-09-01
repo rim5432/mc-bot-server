@@ -69,8 +69,7 @@ public final class BotContainerGameTests {
         check(view != null, "barrel must reopen");
         int foundSlot = -1;
         for (int i = 0; i < 27; i++) {
-            if (!view.slot(i).isEmpty()
-                    && view.slot(i).item().itemId().equals("minecraft:iron_ingot")) {
+            if (!view.slot(i).isEmpty() && view.slot(i).item().itemId().equals("minecraft:iron_ingot")) {
                 foundSlot = i;
                 break;
             }
@@ -121,8 +120,7 @@ public final class BotContainerGameTests {
         view = tx.openMenu(cellOf(shulkerAbs));
         int found = -1;
         for (int i = 0; i < 27; i++) {
-            if (!view.slot(i).isEmpty()
-                    && view.slot(i).item().itemId().equals("minecraft:diamond")) {
+            if (!view.slot(i).isEmpty() && view.slot(i).item().itemId().equals("minecraft:diamond")) {
                 found = i;
                 break;
             }
@@ -170,8 +168,7 @@ public final class BotContainerGameTests {
         view = tx.openMenu(cellOf(hopperAbs));
         int found = -1;
         for (int i = 0; i < 5; i++) {
-            if (!view.slot(i).isEmpty()
-                    && view.slot(i).item().itemId().equals("minecraft:wheat")) {
+            if (!view.slot(i).isEmpty() && view.slot(i).item().itemId().equals("minecraft:wheat")) {
                 found = i;
                 break;
             }
@@ -219,8 +216,7 @@ public final class BotContainerGameTests {
         view = tx.openMenu(cellOf(dispenserAbs));
         int found = -1;
         for (int i = 0; i < 9; i++) {
-            if (!view.slot(i).isEmpty()
-                    && view.slot(i).item().itemId().equals("minecraft:arrow")) {
+            if (!view.slot(i).isEmpty() && view.slot(i).item().itemId().equals("minecraft:arrow")) {
                 found = i;
                 break;
             }

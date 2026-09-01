@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "task": "runGameTest",
+  "log": "D:\\mc-bot-server\\tool\\.runtime\\build-runGameTest-20260901-215744.log",
+  "git_rev": "2ddd8fe",
+  "finished_at": "2026-09-01T21:58:30",
+  "scenarios_total": 130,
+  "failed_count": 3,
+  "failed": [
+    "harnessuseclaimthrowssplashpotion",
+    "walkaccumulatesexhaustionatdeviatedrate",
+    "beaconsetsprimaryeffectandconsumespayment"
+  ],
+  "optional_failed_count": 1,
+  "failed_optional": [
+    "climbsladdertoplatform"
+  ],
+  "green": false
+}

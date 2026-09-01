@@ -93,7 +93,9 @@ class WireVocabularyGateTest {
                             "source")),
             Map.entry("EAT_FAILED", Set.of("reason", "slot", "itemId", "source")),
             Map.entry("DRINK_STARTED", Set.of("potionId", "slot", "health", "source")),
-            Map.entry("DRINK_COMPLETED", Set.of("potionId", "slot", "effects", "containerType", "containerDropped", "source")),
+            Map.entry(
+                    "DRINK_COMPLETED",
+                    Set.of("potionId", "slot", "effects", "containerType", "containerDropped", "source")),
             Map.entry("DRINK_FAILED", Set.of("reason", "slot", "itemId", "source")),
             Map.entry("POTION_THROWN", Set.of("potionId", "slot", "throwType", "effects", "source")));
 
