@@ -137,6 +137,7 @@ class GametestInventoryCheck {
                             "drinkReflexEmptySlotEmitsSlotEmpty",
                             "drinkReflexNonPotionEmitsNoPotion",
                             "drinkCountTwoFullInventoryDropsContainer",
+                            "drinkCountTwoMergesBottleIntoExistingStack",
                             "brewingStandBrewsWaterBottleWithNetherWart",
                             "brewingStandFuelSlotRejectsNonBlazePowder",
                             "brewingStandSlotRolesAreCorrect",

@@ -731,26 +731,81 @@ public final class BotBodyEntity extends PathfinderMob {
     }
 
     /**
-     * Add a single-item stack to the first empty main-inventory slot, or
-     * drop it at the carrier's position if the inventory is full. The
-     * vanilla Player path uses {@code Inventory.add} with stacking; the
-     * bot's SimpleContainer has no {@code addItem}, so this finds an empty
-     * slot directly — sufficient for container items which are always count
-     * 1 and rarely contend for space.
+     * Route a recovered container (glass bottle / bucket / bowl) to
+     * inventory, mirroring vanilla {@code Inventory.placeItemBackInInventory}
+     * (decompiled 1.20.1 Inventory.java lines 304-325):
      *
-     * @param stack the single-item stack to route; never null
-     * @return true if the stack was added to an empty inventory slot,
-     *         false if it was dropped at the body's location (inventory full)
+     * <ol>
+     *   <li><b>Merge</b> into an existing same-item stack, in vanilla
+     *       {@code getSlotWithRemainingSpace} order: selected hotbar
+     *       slot, then offhand (slot 40), then main inventory 0..35.
+     *       Condition mirrors {@code hasRemainingSpaceForItem}:
+     *       non-empty, same item+tags, stackable, below max stack size.</li>
+     *   <li><b>Empty slot</b> in main inventory 0..35 only — vanilla
+     *       {@code getFreeSlot} scans only {@code this.items}; armor
+     *       slots 36..39 are NEVER destinations for item pickup.</li>
+     *   <li><b>Drop</b> at the body's location if neither phase finds
+     *       a slot (vanilla {@code player.drop}).</li>
+     * </ol>
+     *
+     * <p>The previous implementation scanned all 41 slots for empties
+     * and never merged: a count-2 potion drunk with a glass bottle
+     * already in inventory would drop the second bottle and report
+     * containerDropped=true, while vanilla merges it into the existing
+     * stack. This rewrite closes that fidelity gap.
+     *
+     * @param stack the single-item container stack to route; never null
+     * @return true if merged or placed in inventory, false if dropped
      */
     private boolean addOrDrop(ItemStack stack) {
-        for (int i = 0; i < BindingInventory.CONTAINER_SIZE; i++) {
-            if (inventory.container().getItem(i).isEmpty()) {
-                inventory.container().setItem(i, stack);
+        var container = inventory.container();
+        // Phase 1: merge into existing same-item stack.
+        int mergeSlot = -1;
+        if (canMergeInto(container.getItem(selectedSlot), stack)) {
+            mergeSlot = selectedSlot;
+        } else if (canMergeInto(container.getItem(BindingInventory.OFFHAND_SLOT), stack)) {
+            mergeSlot = BindingInventory.OFFHAND_SLOT;
+        } else {
+            for (int i = 0; i < BindingInventory.ARMOR_START; i++) {
+                if (canMergeInto(container.getItem(i), stack)) {
+                    mergeSlot = i;
+                    break;
+                }
+            }
+        }
+        if (mergeSlot >= 0) {
+            ItemStack existing = container.getItem(mergeSlot);
+            existing.grow(1);
+            container.setItem(mergeSlot, existing);
+            return true;
+        }
+        // Phase 2: empty slot in main inventory only (armor never receives).
+        for (int i = 0; i < BindingInventory.ARMOR_START; i++) {
+            if (container.getItem(i).isEmpty()) {
+                container.setItem(i, stack);
                 return true;
             }
         }
+        // Phase 3: drop at body location.
         spawnAtLocation(stack);
         return false;
+    }
+
+    /**
+     * Whether the existing slot can accept the incoming stack via
+     * merging. Mirrors vanilla {@code Inventory.hasRemainingSpaceForItem}
+     * (decompiled 1.20.1 lines 57-63): non-empty, same item+tags,
+     * stackable, and below the item's max stack size.
+     *
+     * @param existing the slot's current stack; never null
+     * @param incoming the stack to merge; never null
+     * @return true if the incoming stack can merge into the existing slot
+     */
+    private static boolean canMergeInto(ItemStack existing, ItemStack incoming) {
+        return !existing.isEmpty()
+                && ItemStack.isSameItemSameTags(existing, incoming)
+                && existing.isStackable()
+                && existing.getCount() < existing.getMaxStackSize();
     }
 
     /**

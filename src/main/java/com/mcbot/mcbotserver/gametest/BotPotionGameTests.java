@@ -610,6 +610,60 @@ public final class BotPotionGameTests {
                 .thenSucceed();
     }
 
+    /**
+     * Scenario: count-2 potion with a glass bottle already in slot 1 and
+     * all other slots full of cobblestone — the recovered bottle must
+     * MERGE into the existing stack (slot 1 count 1→2), not be dropped.
+     * This pins the vanilla {@code placeItemBackInInventory} merge path
+     * (getSlotWithRemainingSpace: selected → offhand → main 0..35).
+     * Before the addOrDrop rewrite, the bottle was dropped on the ground
+     * and containerDropped was reported true — a vanilla fidelity gap.
+     */
+    // capability: consumable.potion
+    @GameTest(template = "empty16x8x16", timeoutTicks = 60)
+    public static void drinkCountTwoMergesBottleIntoExistingStack(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, WALK_Y, 7));
+        var body = rig.body();
+        body.setHealth(10.0f);
+        // Slot 1: one glass bottle — the merge target.
+        body.getInventory().container().setItem(1, new ItemStack(Items.GLASS_BOTTLE));
+        // Fill slots 2 through 40 (main remainder + armor + offhand) with
+        // cobblestone so there are no empty slots and no other merge targets.
+        for (int i = 2; i < com.mcbot.mcbotserver.adapter.inventory.BindingInventory.CONTAINER_SIZE; i++) {
+            body.getInventory().container().setItem(i, new ItemStack(Items.COBBLESTONE));
+        }
+        // Count-2 healing potion in slot 0.
+        body.getInventory().container().setItem(
+                0, PotionUtils.setPotion(new ItemStack(Items.POTION, 2), Potions.HEALING));
+
+        helper.startSequence()
+                .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
+                    rig.actor().submit(new Claim(Channel.USE, 50, "test:drink", new Intent.Use(true)));
+                    GametestRig.assertEventSeen(rig.events(), EventKind.DRINK_COMPLETED);
+                }))
+                .thenExecuteAfter(0, () -> {
+                    var events = GametestRig.eventsOf(rig.events());
+                    BotEvent completed = events.stream()
+                            .filter(e -> EventKind.DRINK_COMPLETED.equals(e.kind()))
+                            .findFirst()
+                            .orElseThrow();
+                    check(
+                            "false".equals(completed.attrs().get("containerDropped")),
+                            "DRINK_COMPLETED containerDropped must be false (merged into existing stack), got "
+                                    + completed.attrs().get("containerDropped"));
+                    // Slot 0 keeps the shrunk potion (count 1).
+                    ItemStack slot0 = body.getInventory().container().getItem(0);
+                    check(slot0.is(Items.POTION), "slot 0 must keep the remaining potion; got " + slot0);
+                    check(slot0.getCount() == 1, "slot 0 potion count must be 1; got " + slot0.getCount());
+                    // Slot 1: the glass bottle merged in (count 1 → 2).
+                    ItemStack slot1 = body.getInventory().container().getItem(1);
+                    check(slot1.is(Items.GLASS_BOTTLE), "slot 1 must hold glass bottles; got " + slot1);
+                    check(slot1.getCount() == 2, "slot 1 glass bottle count must be 2 (merged); got " + slot1.getCount());
+                    body.discard();
+                })
+                .thenSucceed();
+    }
+
     // -----------------------------------------------------------------------
     // Brewing stand menu interactions (capability: inventory.menu_clicks)
     // -----------------------------------------------------------------------
