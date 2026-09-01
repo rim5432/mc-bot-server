@@ -760,3 +760,36 @@ Amendment chains recorded so far (both sides annotated):
     (unshielded arrow drops health), blocked (identical geometry
     deals nothing with the guard armed), release (guard lowers after
     the flight) - through the production scan/decision/body chain.
+    53. 2026-09-01 Cut-vs-drained verdict weight in the async
+    planner (the pullscraftsandbanksbyrecipeid 13:10 flake, root-caused
+    from the receipt shape: bot never moved, mission already dead, in
+    the one loaded run where bowtap and the ladder timeout also fired).
+    AStarPathFinder's empty-result return served THREE different
+    endings with one shape: a naturally drained open set (real
+    unreachability), a wall-clock/node-budget cut whose partial
+    collapsed under MIN_PARTIAL_CONFIDENCE, and - one hop up in
+    PlanLifecycle - an exceptional worker future. All three collapsed
+    into NO_ROUTE, and PathingBehavior turned that into an instant
+    mission-level NO_PATH the same tick. The killer detail: the
+    wall-clock deadline is armed at compute entry and checked every 64
+    expansions, so a worker thread the scheduler starves past the 200ms
+    budget BEFORE its first check returns a zero-progress cut - a
+    starved thread read as a drained search space, killing 7-block
+    walks that one retry would complete. Ruling: PathResult carries
+    drainedOpenSet (true only when the open set emptied naturally);
+    failed() keeps verdict weight, a new cut() factory carries none,
+    and the exceptional-future catch lands on cut(0).
+    PlanLifecycle maps empty results through that flag - NO_ROUTE for
+    drains, a new CUT outcome for cuts - and CUT gets STALE's
+    treatment (primeLadder, re-ask; the cooldown gates the retry, the
+    progress fuse bounds patience at 20 stalls, and sustained
+    starvation now dies an honest STUCK/TIMEOUT instead of a false
+    NO_PATH). The sync test-only mode is deliberately unchanged: no
+    wall clock runs offline and its budget-cut semantics are pinned by
+    the existing gates. Pinned by AStarWallClockGateTest's flag pair
+    (starved-start cut carries no weight, drained pocket keeps it) and
+    PlanCutRetryGateTest (node-budget-8 cut re-asks, exceptional
+    future re-asks, pocket drain stays NO_ROUTE, all through the real
+    worker). The scenario's wait message now prints failure= for the
+    next occurrence. Engine rerun for this round: deliberately not run
+    (session closeout); the offline gates are the receipt.

@@ -724,7 +724,8 @@ public final class BotCraftingGameTests {
                                 "waiting for arrival back at the chest, at="
                                         + positionOf(rig.body()) + " goal=" + chestStand
                                         + " active=" + mission[0].isActive()
-                                        + " ok=" + mission[0].missionSucceeded())))
+                                        + " ok=" + mission[0].missionSucceeded()
+                                        + " failure=" + mission[0].failureReasonOrNull())))
                 .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     check(mission[0].missionSucceeded(), "the walk back must succeed");

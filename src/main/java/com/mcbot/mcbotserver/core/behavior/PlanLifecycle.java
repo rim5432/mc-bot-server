@@ -57,6 +57,14 @@ final class PlanLifecycle {
         /** Result answered a question we no longer ask; discarded. */
         STALE,
 
+        /**
+         * The search stopped early (budget cut or cancellation) with
+         * nothing usable - NOT a verdict about the world. The follower
+         * re-asks rather than concluding unreachability: a starved
+         * worker thread must not read as a drained search space.
+         */
+        CUT,
+
         /** Fresh result, definitive no route. */
         NO_ROUTE,
 
@@ -196,7 +204,7 @@ final class PlanLifecycle {
         try {
             result = pendingPlan.join();
         } catch (RuntimeException cancelled) {
-            result = AStarPathFinder.PathResult.failed(0);
+            result = AStarPathFinder.PathResult.cut(0);
         }
         pendingPlan = null;
 
@@ -218,7 +226,10 @@ final class PlanLifecycle {
             return new Adoption(Outcome.STALE, null);
         }
         if (!result.reachedGoal() && result.waypoints().isEmpty()) {
-            return new Adoption(Outcome.NO_ROUTE, null);
+            // Verdict weight lives in the result: only a drained open
+            // set concludes "no route"; a cut or cancelled search with
+            // nothing usable is a re-ask, never unreachability.
+            return new Adoption(result.drainedOpenSet() ? Outcome.NO_ROUTE : Outcome.CUT, null);
         }
         return new Adoption(Outcome.ADOPTED, result.waypoints());
     }

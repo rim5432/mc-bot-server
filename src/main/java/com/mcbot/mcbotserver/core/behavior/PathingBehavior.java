@@ -482,6 +482,14 @@ public final class PathingBehavior implements Behavior {
                 // asking would be a lie.
                 gate.primeLadder();
             }
+            case CUT -> {
+                // The search stopped early (starved worker, stingy
+                // budget) with nothing usable - not a verdict about
+                // the world. Same treatment as STALE: re-ask. A
+                // transient scheduler blip must not kill a walk that a
+                // one-tick retry would complete.
+                gate.primeLadder();
+            }
             case NOT_READY -> {}
         }
     }

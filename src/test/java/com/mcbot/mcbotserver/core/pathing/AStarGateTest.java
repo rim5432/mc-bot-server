@@ -138,13 +138,13 @@ class AStarGateTest {
     @Test
     void pathResultConfidenceIsValidated() {
         try {
-            new AStarPathFinder.PathResult(java.util.List.of(), 0, true, 1.5);
+            new AStarPathFinder.PathResult(java.util.List.of(), 0, true, 1.5, false);
             org.junit.jupiter.api.Assertions.fail("confidence > 1.0 must be rejected");
         } catch (IllegalArgumentException expected) {
             assertTrue(expected.getMessage().contains("confidence"));
         }
         try {
-            new AStarPathFinder.PathResult(java.util.List.of(), 0, true, Double.NaN);
+            new AStarPathFinder.PathResult(java.util.List.of(), 0, true, Double.NaN, false);
             org.junit.jupiter.api.Assertions.fail("NaN confidence must be rejected");
         } catch (IllegalArgumentException expected) {
             assertTrue(expected.getMessage().contains("confidence"));

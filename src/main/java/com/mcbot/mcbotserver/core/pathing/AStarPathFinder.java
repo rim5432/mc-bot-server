@@ -48,19 +48,30 @@ public final class AStarPathFinder {
      * Search outcome: full success (goal reached), best partial (budget
      * exhausted with a usable prefix toward the goal), or total failure.
      */
-    public record PathResult(List<CellPos> waypoints, int expandedNodes, boolean reachedGoal, double confidence) {
+    public record PathResult(
+            List<CellPos> waypoints,
+            int expandedNodes,
+            boolean reachedGoal,
+            double confidence,
+            boolean drainedOpenSet) {
 
         /**
          * Creates a validated result.
          *
-         * @param waypoints     start-first cell chain; empty only when
-         *                      no progress was possible; never null
-         * @param expandedNodes nodes popped from the open set
-         * @param reachedGoal   whether the last waypoint satisfies the
-         *                      goal predicate
-         * @param confidence    progress ratio in [0,1] - 1.0 for a
-         *                      reached goal, 0.0 for failure; partial
-         *                      outcomes sit in (0,1) by construction
+         * @param waypoints      start-first cell chain; empty only when
+         *                       no progress was possible; never null
+         * @param expandedNodes  nodes popped from the open set
+         * @param reachedGoal    whether the last waypoint satisfies the
+         *                       goal predicate
+         * @param confidence     progress ratio in [0,1] - 1.0 for a
+         *                       reached goal, 0.0 for failure; partial
+         *                       outcomes sit in (0,1) by construction
+         * @param drainedOpenSet true only when the open set emptied
+         *                       naturally - a verdict about the WORLD
+         *                       (no route exists right now). False on a
+         *                       budget cut or a cancelled search: those
+         *                       say the search stopped early, never that
+         *                       there is no path
          */
         public PathResult {
             waypoints = List.copyOf(waypoints);
@@ -70,13 +81,26 @@ public final class AStarPathFinder {
         }
 
         /**
-         * Failure result carrying the expansion count.
+         * Failure by drained open set carrying the expansion count.
+         * This is the only factory that claims unreachability.
          *
-         * @param expanded nodes expanded before giving up
-         * @return an empty, unreached result
+         * @param expanded nodes expanded before the open set emptied
+         * @return an empty, unreached result with world-verdict weight
          */
         public static PathResult failed(int expanded) {
-            return new PathResult(List.of(), expanded, false, 0.0);
+            return new PathResult(List.of(), expanded, false, 0.0, true);
+        }
+
+        /**
+         * Failure by budget cut or cancellation: the search stopped
+         * early, so the empty result carries NO verdict about the
+         * world - the caller re-asks rather than concluding.
+         *
+         * @param expanded nodes expanded before the cut
+         * @return an empty, unreached result without verdict weight
+         */
+        public static PathResult cut(int expanded) {
+            return new PathResult(List.of(), expanded, false, 0.0, false);
         }
     }
 
@@ -243,7 +267,7 @@ public final class AStarPathFinder {
             }
 
             if (goal.isInGoal(current.pos())) {
-                return new PathResult(reconstruct(cameFrom, current.pos()), expanded, true, 1.0);
+                return new PathResult(reconstruct(cameFrom, current.pos()), expanded, true, 1.0, false);
             }
 
             relaxNeighbors(
@@ -318,10 +342,13 @@ public final class AStarPathFinder {
             double startH = heuristic.estimate(start);
             double confidence = (startH > 0.0) ? Math.max(0.0, Math.min(1.0, 1.0 - bestH / startH)) : 0.0;
             if (confidence >= MIN_PARTIAL_CONFIDENCE) {
-                return new PathResult(reconstruct(cameFrom, bestPartial), expanded, false, confidence);
+                return new PathResult(reconstruct(cameFrom, bestPartial), expanded, false, confidence, false);
             }
         }
-        return PathResult.failed(expanded);
+        // The loop ended without reaching the goal: a budget cut says
+        // "stopped early" (no verdict about the world), a drained open
+        // set says "no route exists right now" (the one honest NO_PATH).
+        return searchCut ? PathResult.cut(expanded) : PathResult.failed(expanded);
     }
 
     private static List<CellPos> reconstruct(Map<CellPos, CellPos> links, CellPos end) {
