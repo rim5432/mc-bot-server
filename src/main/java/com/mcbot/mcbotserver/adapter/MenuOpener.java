@@ -18,6 +18,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.CraftingTableBlock;
+import net.minecraft.world.level.block.SmithingTableBlock;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
@@ -106,6 +107,23 @@ public final class MenuOpener {
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();
 
+        // SmithingTableBlock extends CraftingTableBlock, so it must be
+        // checked first — otherwise the instanceof below routes it to
+        // openCraftingTable and the snapshot type comes out "crafting_table"
+        // instead of "smithing_table". The smithing table carries its own
+        // MenuProvider that returns a proper SmithingMenu.
+        if (block instanceof SmithingTableBlock) {
+            MenuProvider smithingProvider = state.getMenuProvider(level, pos);
+            if (smithingProvider != null) {
+                facade.syncPosition();
+                var smithingMenu = smithingProvider.createMenu(NEXT_ID.getAndIncrement(), facade.getInventory(), facade);
+                if (smithingMenu != null) {
+                    facade.containerMenu = smithingMenu;
+                    return Optional.of(new BindingMenu(smithingMenu, facade, "smithing_table", toCellPos(pos)));
+                }
+            }
+            return Optional.empty();
+        }
         if (block instanceof CraftingTableBlock) {
             return Optional.of(openCraftingTable(pos));
         }
