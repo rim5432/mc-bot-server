@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "exported_at": "2026-09-01T19:35:49",
+  "exported_at": "2026-09-01T23:19:52",
   "statuses": [
     {
       "id": "combat.bow_draw",
@@ -37,6 +37,12 @@
       "status": "shipped",
       "verified_at": "2026-08-29",
       "deviation": ""
+    },
+    {
+      "id": "consumable.potion",
+      "status": "shipped",
+      "verified_at": "2026-09-01",
+      "deviation": "Bot consumes in one rising-edge pass (no 32-tick nibble animation); PotionItem.finishUsingItem lines 60-75 are Player-only (no shrink, no glass bottle return, no inventory add) so the adapter implements consumeDrink to mirror vanilla container recovery. Splash/lingering detected via ThrowablePotionItem instanceof check BEFORE PotionItem (ThrowablePotionItem extends PotionItem) to route to throw instead of drink."
     },
     {
       "id": "dig.enchantment_loot",
@@ -221,6 +227,51 @@
   ],
   "links": [
     {
+      "case_id": "GT-BotAnvilGameTests-anvilCombinesEnchantmentsFromBook",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotAnvilGameTests-anvilPriorWorkPenaltyIncreases",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotAnvilGameTests-anvilRepairsItemWithMaterial",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotAnvilGameTests-grindstoneRemovesEnchantmentsAndReturnsXP",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotAnvilGameTests-grindstoneRepairsItemByCombining",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotBeaconGameTests-beaconPaymentSlotRejectsNonPaymentItem",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotBeaconGameTests-beaconSetEffectsWithoutPaymentIsNoOp",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotBeaconGameTests-beaconSetsPrimaryEffectAndConsumesPayment",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotCombatGameTests-arrowsRunOutMidFightReroutesToMelee",
+      "capability_id": "combat.melee",
+      "link_source": "auto_keyword"
+    },
+    {
       "case_id": "GT-BotCombatGameTests-blocksIncomingArrowsMidCombat",
       "capability_id": "combat.shield",
       "link_source": "feature_annotated"
@@ -299,6 +350,31 @@
       "case_id": "GT-BotCombatGameTests-underwaterSwingsNeverCrit",
       "capability_id": "combat.melee",
       "link_source": "feature_annotated"
+    },
+    {
+      "case_id": "GT-BotContainerGameTests-barrelStoresAndRetrievesItems",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotContainerGameTests-dispenserMenuOpensAndShowsNineSlots",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotContainerGameTests-dropperMenuOpensAndShowsNineSlots",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotContainerGameTests-hopperMenuOpensAndShowsFiveSlots",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotContainerGameTests-shulkerBoxStoresAndRetrievesItems",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
     },
     {
       "case_id": "GT-BotCraftingGameTests-catalogsShapedRecipes",
@@ -414,6 +490,31 @@
       "case_id": "GT-BotFishingGameTests-rodCastsAndReelsTheBobber",
       "capability_id": "interaction.bucket_rod",
       "link_source": "auto"
+    },
+    {
+      "case_id": "GT-BotFurnaceGameTests-blastFurnaceSmeltsIronOre",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotFurnaceGameTests-furnaceFuelSlotRejectsNonFuel",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotFurnaceGameTests-furnaceSlotRolesAreCorrect",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotFurnaceGameTests-furnaceSmeltsIronOreWithCoal",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotFurnaceGameTests-smokerCooksRawBeef",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
     },
     {
       "case_id": "GT-BotHazardReflexGameTests-climbsOutOfPowderSnow",
@@ -556,8 +657,18 @@
       "link_source": "auto"
     },
     {
+      "case_id": "GT-BotInteractionGameTests-useItemOnDeviationsConfirmed",
+      "capability_id": "interaction.use_item_deviations",
+      "link_source": "annotated"
+    },
+    {
       "case_id": "GT-BotInventoryGameTests-anvilRenamesAndChargesLevels",
       "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotInventoryGameTests-classifiesArmorPiecesByRegistryId",
+      "capability_id": "inventory.armor_classification",
       "link_source": "annotated"
     },
     {
@@ -659,6 +770,136 @@
       "case_id": "GT-BotLocomotionGameTests-sneakingInWaterSlidesDown",
       "capability_id": "motion.sneak",
       "link_source": "auto"
+    },
+    {
+      "case_id": "GT-BotPotionGameTests-brewingStandBrewsWaterBottleWithNetherWart",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotPotionGameTests-brewingStandFuelSlotRejectsNonBlazePowder",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotPotionGameTests-brewingStandSlotRolesAreCorrect",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotPotionGameTests-brewingStandThreeBottlesBrewSimultaneously",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotPotionGameTests-drinkCountTwoFullInventoryDropsContainer",
+      "capability_id": "consumable.potion",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotPotionGameTests-drinkReflexEmptySlotEmitsSlotEmpty",
+      "capability_id": "consumable.potion",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotPotionGameTests-drinkReflexNonPotionEmitsNoPotion",
+      "capability_id": "consumable.potion",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotPotionGameTests-drinkReflexOnLowHealthEmitsStartedAndCompleted",
+      "capability_id": "consumable.potion",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotPotionGameTests-harnessUseClaimEmitsDrinkStartedAndCompleted",
+      "capability_id": "consumable.potion",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotPotionGameTests-harnessUseClaimThrowsSplashPotion",
+      "capability_id": "consumable.potion",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotPotionGameTests-healingPotionRestoresHealthAndLeavesGlassBottle",
+      "capability_id": "consumable.potion",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotPotionGameTests-milkBucketClearsEffectsAndLeavesBucket",
+      "capability_id": "consumable.potion",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotPotionGameTests-potionStackCountTwoKeepsRemainderAndAddsBottle",
+      "capability_id": "consumable.potion",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotWorkstation2GameTests-campfireHasNoMenu",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotWorkstation2GameTests-cartographyTableOpensWithThreeSlots",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotWorkstation2GameTests-enchantingTableOpensWithTwoInputSlots",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotWorkstation2GameTests-enderChestBlockedByRedstoneConductorDoesNotOpen",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotWorkstation2GameTests-enderChestOpensAndStoresItems",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotWorkstation2GameTests-lecternWithBookOpensWithOneSlot",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotWorkstation2GameTests-lecternWithoutBookDoesNotOpen",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotWorkstation2GameTests-trappedChestOpensAndStoresItems",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotWorkstationGameTests-loomAppliesBannerPattern",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotWorkstationGameTests-smithingTableUpgradesDiamondToNetherite",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotWorkstationGameTests-stonecutterCutsStoneIntoStairs",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotWorkstationGameTests-stonecutterInputRejectsNonStone",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotWorkstationGameTests-workstationSlotRolesAreCorrect",
+      "capability_id": "inventory.menu_clicks",
+      "link_source": "annotated"
     }
   ]
 }

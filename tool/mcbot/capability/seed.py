@@ -46,6 +46,16 @@ SEED_CAPABILITIES: list[Capability] = [
         implementation_status="shipped",
         vanilla_ref="Item.finishUsingItem; FoodData.eat (decompiled 1.20.1)",
     ),
+    # --- consumable: potions, milk, splash/lingering ---
+    Capability(
+        id="consumable.potion",
+        name="Potion drinking, milk, splash/lingering throw + DRINK lifecycle",
+        category="consumable",
+        description="Drink potions and milk via finishUsingItem (PotionItem/MilkBucketItem), throw splash/lingering via ThrowableItem path. DRINK_STARTED/DRINK_COMPLETED/DRINK_FAILED/POTION_THROWN events on boundary-D. consumeDrink shared helper handles shrink + container recovery (glass bottle / bucket) with containerDropped attr when inventory is full. DrinkOnLowHealthRule reflex auto-drinks healing potion below 12 HP. Failed reasons: SLOT_EMPTY / NO_POTION / NOT_EDIBLE with itemId. Instant health I heals 4 HP ((4 << amplifier) * healthFactor).",
+        implementation_status="shipped",
+        vanilla_ref="PotionItem.finishUsingItem; MilkBucketItem.finishUsingItem; ThrowablePotionItem; ItemUtils.createFilledResult (decompiled 1.20.1)",
+        deviation="Bot consumes in one rising-edge pass (no 32-tick nibble animation); PotionItem.finishUsingItem lines 60-75 are Player-only (no shrink, no glass bottle return, no inventory add) so the adapter implements consumeDrink to mirror vanilla container recovery. Splash/lingering detected via ThrowablePotionItem instanceof check BEFORE PotionItem (ThrowablePotionItem extends PotionItem) to route to throw instead of drink.",
+    ),
     # --- 2. Vitals ---
     Capability(
         id="vitals.lava",
@@ -357,6 +367,8 @@ HARNESS_PATHS: dict[str, list[str]] = {
     "interaction.use_item_deviations": ["write /player/held/use"],
     # hunger: eating is held-item use; fooddata/exhaustion are internal
     "hunger.eat_chain": ["write /player/held/use"],
+    # consumable: potion drinking and throw are held-item use
+    "consumable.potion": ["write /player/held/use"],
     # perception: fishing rod use exercises the projectile/bobber sense
     "perception.projectiles": ["write /player/held/use"],
     # inventory: bag/free reads + station menu crafting
@@ -443,6 +455,19 @@ SOURCE_PATHS: dict[str, list[str]] = {
         "core/process/HungryProcess.java",
         "adapter/entity/BotBodyEntity.java",
         "adapter/VanillaFoodCatalog.java",
+    ],
+    # consumable
+    "consumable.potion": [
+        "adapter/entity/BotBodyEntity.java",
+        "adapter/BindingActor.java",
+        "api/event/EventKind.java",
+        "core/reflex/DrinkOnLowHealthRule.java",
+        "core/tick/ReflexClaimInjector.java",
+        "core/tick/BotController.java",
+        "adapter/BotAssembly.java",
+        "adapter/sensing/LevelThreatSensor.java",
+        "api/reflex/ReflexAction.java",
+        "api/reflex/ThreatBlackboard.java",
     ],
     # interaction
     "interaction.right_click_order": [
