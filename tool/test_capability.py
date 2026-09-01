@@ -30,7 +30,22 @@ from mcbot.capability.report import (
 from mcbot.capability.repository import CapabilityRepository
 from mcbot.capability.seed import seed_database
 from mcbot.capability.state_export import export_state, restore_state
-from mcbot.engine import parse_run_log
+from mcbot.capability.validation import (
+    TestArtifact,
+    load_artifacts_from_db,
+    validate_all,
+    validate_artifact,
+    validate_capability_fk,
+    validate_db,
+    validate_impl_fields,
+    validate_kind,
+    validate_link_source,
+    validate_no_face_consistency,
+    validate_notes_json,
+    validate_required_fields,
+    validate_spec_fields,
+)
+from mcbot.engine import parse_run_log, write_engine_receipt
 
 
 def _write_log(lines: list[str]) -> Path:
@@ -894,6 +909,304 @@ class CliImportSmokeTest(unittest.TestCase):
     def test_cli_module_parses_and_imports(self):
         from mcbot import cli
         self.assertTrue(callable(cli.main))
+
+
+class ValidationTest(unittest.TestCase):
+    """Every validator in capability/validation.py. Pure functions —
+    the highest-ROI untested surface in the tool tree before this round."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.db = self.root / "test.db"
+        seed_database(self.db)
+        self.repo = CapabilityRepository(self.db)
+        self.known_face = "combat.melee"
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    @staticmethod
+    def _artifact(**kw):
+        base = dict(id="TC-001", kind="spec", title="test case")
+        base.update(kw)
+        return TestArtifact(**base)
+
+    # -- validate_kind --
+
+    def test_kind_accepts_all_vocabulary(self):
+        for k in ("spec", "impl", "wire"):
+            self.assertIsNone(validate_kind(self._artifact(kind=k)))
+
+    def test_kind_rejects_unknown(self):
+        err = validate_kind(self._artifact(kind="bogus"))
+        self.assertIsNotNone(err)
+        self.assertIn("unknown kind", err)
+
+    # -- validate_required_fields --
+
+    def test_required_fields_id_and_kind(self):
+        errs = validate_required_fields(self._artifact(id=""))
+        self.assertIn("missing required field: id", errs)
+        errs = validate_required_fields(self._artifact(kind=""))
+        self.assertIn("missing required field: kind", errs)
+
+    def test_required_fields_title_for_spec_and_impl(self):
+        errs = validate_required_fields(self._artifact(kind="spec", title=""))
+        self.assertIn("missing required field: title", errs)
+        errs = validate_required_fields(self._artifact(kind="impl", title=""))
+        self.assertIn("missing required field: title", errs)
+
+    def test_required_fields_title_not_required_for_wire(self):
+        errs = validate_required_fields(self._artifact(kind="wire", title=""))
+        self.assertNotIn("missing required field: title", errs)
+
+    # -- validate_capability_fk --
+
+    def test_fk_none_is_unlinked_ok(self):
+        self.assertIsNone(validate_capability_fk(
+            self._artifact(capability_id=None), self.repo))
+
+    def test_fk_wire_skips_check(self):
+        self.assertIsNone(validate_capability_fk(
+            self._artifact(kind="wire", capability_id="does.not.exist"), self.repo))
+
+    def test_fk_known_face_ok(self):
+        self.assertIsNone(validate_capability_fk(
+            self._artifact(capability_id=self.known_face), self.repo))
+
+    def test_fk_unknown_face_errors(self):
+        err = validate_capability_fk(
+            self._artifact(capability_id="no.such.face"), self.repo)
+        self.assertIsNotNone(err)
+        self.assertIn("unknown capability_id", err)
+
+    # -- validate_link_source --
+
+    def test_link_source_none_ok(self):
+        self.assertIsNone(validate_link_source(self._artifact(link_source=None)))
+
+    def test_link_source_accepts_vocabulary(self):
+        for ls in ("csv", "manual", "auto", "auto_keyword", "auto_class",
+                    "annotated", "annotated_none", "feature_annotated", "no_face"):
+            self.assertIsNone(validate_link_source(self._artifact(link_source=ls)))
+
+    def test_link_source_rejects_unknown(self):
+        err = validate_link_source(self._artifact(link_source="guess"))
+        self.assertIsNotNone(err)
+        self.assertIn("unknown link_source", err)
+
+    # -- validate_no_face_consistency --
+
+    def test_no_face_with_capability_id_is_contradiction(self):
+        err = validate_no_face_consistency(
+            self._artifact(link_source="no_face", capability_id=self.known_face))
+        self.assertIsNotNone(err)
+        self.assertIn("contradictory", err)
+
+    def test_no_face_without_capability_id_ok(self):
+        self.assertIsNone(validate_no_face_consistency(
+            self._artifact(link_source="no_face", capability_id=None)))
+
+    # -- validate_spec_fields --
+
+    def test_spec_fields_accept_valid(self):
+        errs = validate_spec_fields(self._artifact(
+            extra={"priority": "P0", "test_type": "gametest"}, status="passed"))
+        self.assertEqual(errs, [])
+
+    def test_spec_fields_reject_bad_priority(self):
+        errs = validate_spec_fields(self._artifact(extra={"priority": "P9"}))
+        self.assertTrue(any("invalid priority" in e for e in errs))
+
+    def test_spec_fields_reject_bad_test_type(self):
+        errs = validate_spec_fields(self._artifact(extra={"test_type": "fuzz"}))
+        self.assertTrue(any("invalid test_type" in e for e in errs))
+
+    def test_spec_fields_reject_bad_status(self):
+        errs = validate_spec_fields(self._artifact(status="error"))
+        self.assertTrue(any("invalid status" in e for e in errs))
+
+    # -- validate_impl_fields --
+
+    def test_impl_fields_require_method_name(self):
+        errs = validate_impl_fields(self._artifact(kind="impl", extra={}))
+        self.assertTrue(any("missing method_name" in e for e in errs))
+
+    def test_impl_fields_reject_manual_status(self):
+        errs = validate_impl_fields(self._artifact(
+            kind="impl", extra={"method_name": "testX"}, status="passed"))
+        self.assertTrue(any("should not carry manual status" in e for e in errs))
+
+    def test_impl_fields_not_executed_status_ok(self):
+        errs = validate_impl_fields(self._artifact(
+            kind="impl", extra={"method_name": "testX"}, status="not_executed"))
+        self.assertEqual(errs, [])
+
+    # -- validate_notes_json --
+
+    def test_notes_valid_json_ok(self):
+        self.assertIsNone(validate_notes_json(self._artifact(notes='{"a": 1}')))
+
+    def test_notes_empty_ok(self):
+        self.assertIsNone(validate_notes_json(self._artifact(notes="")))
+
+    def test_notes_invalid_json_errors(self):
+        err = validate_notes_json(self._artifact(notes="{not json"))
+        self.assertIsNotNone(err)
+        self.assertIn("not valid JSON", err)
+
+    # -- validate_artifact (composite) --
+
+    def test_validate_artifact_clean_spec(self):
+        errs = validate_artifact(self._artifact(
+            capability_id=self.known_face, link_source="csv",
+            extra={"priority": "P1", "test_type": "gametest"}, status="passed"),
+            self.repo)
+        self.assertEqual(errs, [])
+
+    def test_validate_artifact_bad_kind_short_circuits(self):
+        errs = validate_artifact(self._artifact(kind="nope", title=""), self.repo)
+        self.assertEqual(len(errs), 1)
+        self.assertIn("unknown kind", errs[0])
+
+    def test_validate_artifact_collects_multiple_errors(self):
+        errs = validate_artifact(self._artifact(
+            title="", capability_id="no.such", link_source="bad",
+            notes="{broken"), self.repo)
+        self.assertTrue(len(errs) >= 3)
+
+    # -- validate_all (batch) --
+
+    def test_validate_all_returns_only_dirty(self):
+        clean = self._artifact(id="TC-001", capability_id=self.known_face)
+        dirty = self._artifact(id="TC-002", capability_id="no.such.face")
+        results = validate_all([clean, dirty], self.repo)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0][0].id, "TC-002")
+
+    def test_validate_all_empty_when_all_clean(self):
+        results = validate_all([
+            self._artifact(id="TC-001", capability_id=self.known_face),
+            self._artifact(id="TC-002", kind="impl", title="t",
+                            extra={"method_name": "m"}, capability_id=self.known_face),
+        ], self.repo)
+        self.assertEqual(results, [])
+
+    # -- load_artifacts_from_db --
+
+    def _insert_case(self, case_id, kind, title, cap_id, link_source,
+                     status="passed", priority="P1", test_type="gametest"):
+        import datetime as _dt
+        now = _dt.datetime.now().isoformat(timespec="seconds")
+        with get_connection(self.db) as conn:
+            conn.execute(
+                "INSERT INTO qa_test_cases (id, kind, title, capability_id, "
+                "link_source, status, priority, test_type, notes, module, "
+                "created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (case_id, kind, title, cap_id, link_source,
+                 status, priority, test_type, "{}", "combat", now, now))
+
+    def test_load_artifacts_from_db_maps_rows(self):
+        self._insert_case("TC-LOAD", "spec", "loaded case",
+                          self.known_face, "csv")
+        artifacts = load_artifacts_from_db(self.db)
+        self.assertEqual(len(artifacts), 1)
+        a = artifacts[0]
+        self.assertEqual(a.id, "TC-LOAD")
+        self.assertEqual(a.kind, "spec")
+        self.assertEqual(a.capability_id, self.known_face)
+        self.assertEqual(a.extra["priority"], "P1")
+        self.assertEqual(a.extra["test_type"], "gametest")
+
+    def test_load_artifacts_from_db_parses_impl_method_name(self):
+        self._insert_case("GT-BotCombatGameTests-testCritHit", "impl",
+                          "testCritHit", self.known_face, "annotated",
+                          status="not_executed", priority="", test_type="")
+        artifacts = load_artifacts_from_db(self.db)
+        self.assertEqual(artifacts[0].extra["method_name"], "testCritHit")
+
+    # -- validate_db (convenience) --
+
+    def test_validate_db_runs_on_live_db(self):
+        # valid FK (DB enforces it) but invalid link_source — the kind
+        # of dirty row that slipped in before vocabulary expanded
+        self._insert_case("TC-DIRTY", "spec", "dirty",
+                          self.known_face, "guess")
+        results = validate_db(self.db)
+        self.assertTrue(any(r[0].id == "TC-DIRTY" for r in results))
+
+
+class EngineReceiptTest(unittest.TestCase):
+    """write_engine_receipt — parses a runGameTest log into the JSON
+    receipt that feeds the entire evidence axis. Zero tests before this
+    round; a bug here corrupts every downstream status/staleness/queue."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        import mcbot.engine as _engine
+        self._orig_run_dir = _engine.ENGINE_RUN_DIR
+        _engine.ENGINE_RUN_DIR = self.root / "engine-runs"
+
+    def tearDown(self):
+        import mcbot.engine as _engine
+        _engine.ENGINE_RUN_DIR = self._orig_run_dir
+        self._tmp.cleanup()
+
+    def _write_log(self, lines):
+        log = self.root / "run.log"
+        log.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return log
+
+    def test_green_run_writes_receipt(self):
+        log = self._write_log([
+            "[10:00:00] [thread/INFO] [logger]: 5 GAME TESTS COMPLETE",
+            "[10:00:00] [thread/INFO] [logger]: 0 required tests failed",
+            "[10:00:00] [thread/INFO] [logger]: 0 optional tests failed",
+        ])
+        path = write_engine_receipt(log)
+        self.assertIsNotNone(path)
+        self.assertTrue(path.exists())
+        data = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(data["schema"], 1)
+        self.assertEqual(data["task"], "runGameTest")
+        self.assertEqual(data["scenarios_total"], 5)
+        self.assertEqual(data["failed_count"], 0)
+        self.assertEqual(data["failed"], [])
+        self.assertTrue(data["green"])
+        self.assertIn("git_rev", data)
+        self.assertIn("finished_at", data)
+
+    def test_failed_run_captures_names(self):
+        log = self._write_log([
+            "[10:00:00] [thread/INFO] [logger]: 3 GAME TESTS COMPLETE",
+            "[10:00:00] [thread/INFO] [logger]: 1 required tests failed",
+            "[10:00:00] [thread/INFO] [logger]: - test_crit_hit",
+            "[10:00:00] [thread/INFO] [logger]: 0 optional tests failed",
+        ])
+        path = write_engine_receipt(log)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(data["failed_count"], 1)
+        self.assertEqual(data["failed"], ["test_crit_hit"])
+        self.assertFalse(data["green"])
+
+    def test_no_verdict_returns_none(self):
+        log = self._write_log([
+            "[10:00:00] [thread/INFO] [logger]: Loading game...",
+            "[10:00:01] [thread/INFO] [logger]: Crash during startup",
+        ])
+        self.assertIsNone(write_engine_receipt(log))
+
+    def test_receipt_filename_is_timestamped(self):
+        log = self._write_log([
+            "[10:00:00] [thread/INFO] [logger]: 1 GAME TESTS COMPLETE",
+            "[10:00:00] [thread/INFO] [logger]: 0 required tests failed",
+            "[10:00:00] [thread/INFO] [logger]: 0 optional tests failed",
+        ])
+        path = write_engine_receipt(log)
+        self.assertRegex(path.name, r"^gametest-\d{8}-\d{6}\.json$")
 
 
 if __name__ == "__main__":
