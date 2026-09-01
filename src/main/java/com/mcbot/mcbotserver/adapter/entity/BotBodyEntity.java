@@ -1,7 +1,11 @@
 package com.mcbot.mcbotserver.adapter.entity;
 
+import com.mcbot.mcbotserver.adapter.BindingActor;
 import com.mcbot.mcbotserver.adapter.BotPlayerFacade;
 import com.mcbot.mcbotserver.adapter.inventory.BindingInventory;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.PathfinderMob;
@@ -21,56 +25,28 @@ import net.minecraft.world.item.SplashPotionItem;
 import net.minecraft.world.item.SuspiciousStewItem;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
-import net.minecraft.sounds.SoundEvent;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 
 /**
  * The physical body: a vanilla-pathfinding-capable mob whose locomotion
  * is driven exclusively by per-tick input writes from the binding.
- *
- * <p>Carrier ratification (Stage 1 review; issue 0007 Path A): a
- * custom PathfinderMob carrier instead of a ServerPlayer subclass.
- * Rationale: engine-owned physics plus the accumulated calibration
- * surface (direct jumpFromGround / jumpInFluid calls, no-op control
- * swaps, drive constants) make a carrier rewrite prohibitively
- * expensive; player parity arrives on the interaction axis via
- * BotPlayerFacade (typed Player parameters, issue 0007 Phase 2)
- * rather than by making the body a real ServerPlayer. The threat axis
- * of the same ruling is already shipped (presence pass below); the
- * interaction axis is in active development (inventory sense first,
- * issue 0007 Phase 1).
- * Vanilla {@code travel()} remains the only thing that moves this body
+ * Vanilla {@code travel()} is the only thing that moves this body
  * — boundary A holds because every write below is an intent echo of an
  * Actor claim, never self-computed physics.
  *
- * <p>Why the default AI controls cannot coexist with input driving
- * (empirically confirmed via body-probe, do not re-derive from
- * memory): Mob.aiStep() runs goalSelector.tick(), navigation.tick(),
- * customServerAiStep() (our write point), THEN moveControl.tick(),
- * lookControl.tick(), jumpControl.tick(). Each default control sits
- * in a slot AFTER the binding's write and silently clobbers shared
- * state: MoveControl.WAIT does setZza(0); LookControl.resetXRotOnTick
- * forces setXRot(0) (wipes non-zero pitch); JumpControl does
- * setJumping(false). The constructor therefore swaps all three for
- * no-ops; the binding is the sole writer of locomotion, look, and
- * jump state. Stage 2 landmine: if A* or follow goals ever need
- * vanilla pathing again, all three swaps must be revisited as a
- * whole (drive through the controls instead of around them), not
- * patched by re-enabling one beside the binding.
+ * <p>Player parity is split (issue 0007 Path A): entity-scan
+ * player-ness — hostile targeting, closed by the carrier-side
+ * presence pass below — versus menu/interaction player-ness, which
+ * lives in {@link BotPlayerFacade} (typed Player parameters, never
+ * entity scans).
+ *
+ * <p>The three vanilla AI controls (move/look/jump) are swapped for
+ * no-ops in the constructor — they tick after the binding's write
+ * point and clobber shared state. The probe evidence, the pitch-aim
+ * landmine, and the Stage 2 revisit condition live in the constructor
+ * comment; the swap must be revisited as a whole, never re-enabled
+ * one control at a time.
  *
  * <p>Implementation note: constructed and ticked by the server only.
- *
- * <p>World treatment (user ruling 2026-08-25): the world treats the
- * bot as a player wherever the engine asks "is this a player".
- * Hostile targeting is one such place - vanilla sight-aggro goals
- * match {@code Player.class} entity scans, which structurally cannot
- * see a PathfinderMob. The presence pass below closes that gap from
- * the carrier side: monsters with line of sight and no other target
- * acquire this body exactly as they would acquire a player, at their
- * own follow range. Menu/interaction player-ness is the OTHER axis
- * and stays with the {@code BotPlayerFacade} plan (issue 0007 Path
- * A) - the facade answers typed parameters, never entity scans.
  */
 // contract: see boundaries.md section A (Actor is intents-only) and
 // decision 2 as amended by the entity-binding spike follow-up
@@ -92,11 +68,15 @@ public final class BotBodyEntity extends PathfinderMob {
 
     /**
      * Position at the previous customServerAiStep call. Used for
-     * movement-exhaustion distance measurement because customServerAiStep
-     * runs BEFORE LivingEntity.travel() in the aiStep() chain (decompiled
-     * 1.20.1 LivingEntity.aiStep line 2609 serverAiStep, line 2662
-     * travel), so getX()-xo is zero at this point — the engine has not
-     * yet moved the body this tick. Tracked manually instead.
+     * movement-exhaustion distance measurement because
+     * customServerAiStep runs BEFORE LivingEntity.travel() in the
+     * aiStep() chain (decompiled 1.20.1 LivingEntity.aiStep line 2609
+     * serverAiStep, line 2662 travel), so the engine has not moved the
+     * body yet this tick and getX()-xo is always zero here. The delta
+     * against the previous call measures the previous tick's travel —
+     * exactly what vanilla Player.checkMovementStatistics consumes (it
+     * too runs on the previous tick's displacement). Tracked manually
+     * for that reason.
      */
     private double lastTickX;
 
@@ -106,7 +86,7 @@ public final class BotBodyEntity extends PathfinderMob {
     /**
      * Set by {@code consumeDrink} when the recovered container (glass
      * bottle / bucket) could not fit in inventory and was dropped at the
-     * body's location instead. Read by {@code BindingActor} after a
+     * body's location instead. Read by {@link BindingActor} after a
      * drink to attach the {@code containerDropped} attr to
      * DRINK_COMPLETED. Single-threaded tick pipeline makes this safe
      * without synchronization.
@@ -175,7 +155,7 @@ public final class BotBodyEntity extends PathfinderMob {
     /**
      * The body's hunger state (Phase 4 eat slice, issue 0010): a
      * vanilla {@link net.minecraft.world.food.FoodData} owned and
-     * ticked by the carrier - Path A facade, user ruling 2026-08-27.
+     * ticked by the carrier - Path A facade (issue 0007).
      * FoodData has zero Player-field dependencies except its
      * {@code tick(Player)} signature; {@link HungerTicker#tick} carries
      * the same math with {@code this} in the player's seat
@@ -278,7 +258,10 @@ public final class BotBodyEntity extends PathfinderMob {
         // Neutralize all three vanilla controls: the binding is the sole
         // writer of locomotion, look, and jump state. Each control runs
         // in Mob.aiStep() AFTER customServerAiStep() and would silently
-        // clobber the binding's writes:
+        // clobber the binding's writes (empirically confirmed via
+        // body-probe, do not re-derive from memory — Mob.aiStep() runs
+        // goalSelector.tick(), navigation.tick(), customServerAiStep()
+        // (our write point), THEN the three control ticks):
         //   - MoveControl.tick() WAIT branch: setZza(0) every tick
         //   - LookControl.tick(): resetXRotOnTick() forces setXRot(0),
         //     wiping any non-zero pitch the binding set (pitch-aim landmine)
@@ -288,6 +271,10 @@ public final class BotBodyEntity extends PathfinderMob {
         // the binding owning every input channel, they are concurrent writers
         // on shared state, not helpers. Anonymous no-ops match the existing
         // MoveControl pattern.
+        // Stage 2 landmine: if A* or follow goals ever need vanilla pathing
+        // again, all three swaps must be revisited as a whole (drive through
+        // the controls instead of around them), not patched by re-enabling
+        // one beside the binding.
         this.moveControl = new MoveControl(this) {
             @Override
             public void tick() {
@@ -437,20 +424,11 @@ public final class BotBodyEntity extends PathfinderMob {
         setZza(driveForward);
         // Movement exhaustion: nothing on a mob accumulates it
         // naturally, so the carrier feeds it from actual horizontal
-        // distance. Sprint is vanilla-parity at 0.1/block
-        // (Player.checkMovementStatistics); walk is a recorded
-        // deviation at 0.01/block — vanilla walk is 0/block, but a
-        // zero-walk carrier would never exhaust on foot, so the bot
-        // uses the vanilla swim rate as its walking floor. See
-        // player-behavior-RE.md section 1 for the full deviation note.
-        //
-        // Position is tracked manually (lastTickX/Z) rather than via
-        // getX()-xo: customServerAiStep runs BEFORE LivingEntity.travel()
-        // in the aiStep() chain, so xo still equals the current position
-        // at this point and getX()-xo is always zero. The delta against
-        // the previous call measures the previous tick's travel, which is
-        // exactly what vanilla Player.checkMovementStatistics does (it
-        // also runs on the previous tick's displacement).
+        // distance. The rates and the walk-rate deviation rationale
+        // live on the SPRINT/WALK_EXHAUSTION_PER_BLOCK constants; why
+        // the delta is measured manually against lastTickX/Z (xo still
+        // equals the current position at this point in the aiStep
+        // chain) lives on the lastTickX field.
         if (hasLastTickPos) {
             float movedHorizontally = (float) Math.hypot(getX() - lastTickX, getZ() - lastTickZ);
             foodData.addExhaustion(
@@ -495,7 +473,7 @@ public final class BotBodyEntity extends PathfinderMob {
      * for count{@code >}1 but only adds the glass bottle to {@code Player}
      * inventories (the bot is a Mob, so the bottle is lost). This method
      * implements the vanilla Player resolution: count 1 replaces the slot
-     * with the container; count{@code >}1 keeps the shrunk stack in the slot
+     * with the container; count {@code > 1} keeps the shrunk stack in the slot
      * and routes the container to inventory (or drops it if full).
      *
      * <p>Always-edible bypass (golden apples, enchanted golden apples):
@@ -550,28 +528,21 @@ public final class BotBodyEntity extends PathfinderMob {
     /**
      * Drink the held potion (consumable-face Phase 1): the vanilla
      * mob-safe chain — {@code finishUsingItem} applies the potion
-     * effects ({@code PotionUtils.getMobEffects} -> {@code addEffect}
-     * / {@code applyInstantenousEffect}) and fires the DRINK game
-     * event, but does NOT shrink the stack or return a glass bottle
-     * for non-Player callers ({@code PotionItem.finishUsingItem}
-     * lines 60-75 are Player-only). This method implements the
-     * vanilla Player resolution: count 1 replaces the slot with a
-     * glass bottle; count{@code >}1 keeps the shrunk stack in the
-     * slot and routes the glass bottle to inventory (or drops it if
-     * full).
+     * effects and fires the DRINK game event, but does NOT shrink the
+     * stack or recover a glass bottle for non-Player callers
+     * ({@code PotionItem.finishUsingItem} lines 60-75 are
+     * Player-only). The vanilla Player resolution — manual shrink plus
+     * glass-bottle recovery — is shared with milk in
+     * {@link #consumeDrink(Item)}.
      *
      * <p>No hunger gate: potions are drinkable at any time, matching
-     * vanilla {@code PotionItem.use} (calls {@code
-     * startUsingInstantly} with no {@code canEat} check). The only
-     * food category sharing this property is always-edible
-     * ({@code FoodProperties.canAlwaysEat}); normal food is gated by
-     * {@code needsFood()}.
-     *
-     * <p>Effects are applied by {@code finishUsingItem} itself; the
-     * caller ({@code BindingActor.onUsePressEdge}) captures the
-     * effect list BEFORE calling this method for the DRINK_COMPLETED
-     * event, exactly as {@code eatHeldItem}'s caller captures
-     * nutrition before consumption.
+     * vanilla {@code PotionItem.use} (calls {@code startUsingInstantly}
+     * with no {@code canEat} check). The only food category sharing
+     * this property is always-edible ({@code FoodProperties
+     * .canAlwaysEat}); normal food is gated by {@code needsFood()}.
+     * The caller ({@code BindingActor.onUsePressEdge}) captures the
+     * effect list BEFORE this method so DRINK_COMPLETED can report
+     * what was applied.
      *
      * @return true when a potion was consumed
      */
@@ -592,18 +563,17 @@ public final class BotBodyEntity extends PathfinderMob {
      * Drink the held milk bucket (consumable-face Phase 2): the vanilla
      * mob-safe chain — {@code finishUsingItem} calls {@code
      * curePotionEffects} to clear all curable effects and fires the
-     * DRINK game event, but does NOT shrink the stack or return a bucket
-     * for non-Player callers ({@code MilkBucketItem.finishUsingItem}
-     * line 34-36 are Player-only). This method implements the vanilla
-     * Player resolution: count 1 replaces the slot with a bucket;
-     * count{@code >}1 keeps the shrunk stack in the slot and routes the
-     * bucket to inventory (or drops it if full).
+     * DRINK game event, but does NOT shrink the stack or return a
+     * bucket for non-Player callers ({@code MilkBucketItem
+     * .finishUsingItem} lines 34-36 are Player-only). The vanilla
+     * Player resolution — manual shrink plus bucket recovery — is
+     * shared with potions in {@link #consumeDrink(Item)}.
      *
-     * <p>Effect-clearing semantics: {@code curePotionEffects} removes all
-     * curable {@code MobEffectInstance}s (the default for most effects;
-     * effects marked non-curable in their constructor survive). The caller
-     * captures the active effect list BEFORE calling this method so the
-     * DRINK_COMPLETED event can report what was cleared.
+     * <p>Effect-clearing semantics: {@code curePotionEffects} removes
+     * all curable {@code MobEffectInstance}s (the default for most
+     * effects; effects marked non-curable in their constructor
+     * survive). The caller captures the active effect list BEFORE this
+     * method so DRINK_COMPLETED can report what was cleared.
      *
      * @return true when a milk bucket was consumed
      */
@@ -620,16 +590,20 @@ public final class BotBodyEntity extends PathfinderMob {
     }
 
     /**
-     * Shared drink-consumption tail: manually shrink the held stack (Mob
-     * callers skip the Player-only shrink in PotionItem/MilkBucketItem
-     * finishUsingItem) and recover the container. Count 1 replaces the
-     * slot with the container; count{@code >}1 keeps the shrunk stack in
-     * the slot and routes the container to inventory via addOrDrop.
+     * Shared drink-consumption tail: manually shrink the held stack
+     * (Mob callers skip the Player-only shrink in
+     * PotionItem/MilkBucketItem finishUsingItem) and recover the
+     * container — the single home for the container-recovery rules.
+     * Count 1 replaces the slot with the container; count
+     * {@code > 1} keeps the shrunk stack in the slot and routes the
+     * container to inventory via addOrDrop, which merges into an
+     * existing same-item stack or takes an empty main-inventory slot
+     * and drops it at the body's location when it fits nowhere (see
+     * {@link #wasLastContainerDropped()}).
      *
-     * <p>Extracted so potion and milk drink paths share identical container
-     * resolution — the only difference is the container item (glass bottle
-     * vs bucket) and the effect side effect (add vs cure), both handled
-     * by the caller before this method runs.
+     * <p>The only difference between the drink kinds is the container
+     * item (glass bottle vs bucket) and the effect side effect (add
+     * vs cure), both handled by the caller before this method runs.
      *
      * @param container the container item left behind (GLASS_BOTTLE /
      *                  BUCKET); never null
@@ -651,8 +625,8 @@ public final class BotBodyEntity extends PathfinderMob {
 
     /**
      * Whether the most recent {@code consumeDrink} call dropped the
-     * recovered container (glass bottle / bucket) because inventory was
-     * full. Read by {@code BindingActor} to attach the
+     * recovered container (glass bottle / bucket) because inventory
+     * was full. Read by {@link BindingActor} to attach the
      * {@code containerDropped} attr to DRINK_COMPLETED.
      *
      * @return true if the container was dropped, false if it was added
@@ -674,7 +648,7 @@ public final class BotBodyEntity extends PathfinderMob {
      *
      * <p>Container recovery: thrown potions leave no container (unlike
      * drinkable potions which leave a glass bottle) — the stack simply
-     * shrinks by 1. Count 1 empties the slot; count{@code >}1 keeps the
+     * shrinks by 1. Count 1 empties the slot; count {@code > 1} keeps the
      * shrunk stack.
      *
      * <p>Sound: splash uses {@code SPLASH_POTION_THROW}, lingering uses
@@ -700,8 +674,15 @@ public final class BotBodyEntity extends PathfinderMob {
         potion.shootFromRotation(this, getXRot(), getYRot(), -20.0F, 0.5F, 1.0F);
         level().addFreshEntity(potion);
         SoundEvent sound = isLingering ? SoundEvents.LINGERING_POTION_THROW : SoundEvents.SPLASH_POTION_THROW;
-        level().playSound(null, getX(), getY(), getZ(), sound, SoundSource.PLAYERS, 0.5F,
-                0.4F / (level().getRandom().nextFloat() * 0.4F + 0.8F));
+        level().playSound(
+                        null,
+                        getX(),
+                        getY(),
+                        getZ(),
+                        sound,
+                        SoundSource.PLAYERS,
+                        0.5F,
+                        0.4F / (level().getRandom().nextFloat() * 0.4F + 0.8F));
         // Shrink: count 1 empties the slot; count > 1 keeps the shrunk stack.
         held.shrink(1);
         if (held.isEmpty()) {
@@ -1033,6 +1014,12 @@ public final class BotBodyEntity extends PathfinderMob {
         }
     }
 
+    /**
+     * Never despawn: the body is a registered, externally-driven bot,
+     * not ambient wildlife — its lifetime is owned by the session that
+     * created it, not by chunk distance. Pairs with
+     * {@code setPersistenceRequired()} in the constructor.
+     */
     @Override
     public boolean removeWhenFarAway(double distance) {
         return false;
