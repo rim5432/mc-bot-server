@@ -1,6 +1,7 @@
 package com.mcbot.mcbotserver.api.process;
 
 import com.mcbot.mcbotserver.api.world.WorldView;
+import javax.annotation.Nullable;
 
 /**
  * The task-channel unit: a side-effect-free planner that turns world
@@ -40,8 +41,11 @@ public interface BotProcess {
      *
      * @param world read-only perception; never null
      * @return the directive for behaviors to execute; must not be null
-     *         while active — returning null is an implementation bug
+     *         while active. A terminal mission returns null - the
+     *         post-failure hold must never hand the mover a stale or
+     *         far-away goal (the 7f02283 terminal-hold pin)
      */
+    @Nullable
     com.mcbot.mcbotserver.api.process.Directive onTick(WorldView world);
 
     /**

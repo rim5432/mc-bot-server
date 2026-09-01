@@ -143,7 +143,12 @@ public final class HungryProcess extends MissionShell implements DigMission {
     @Override
     public Directive onTick(WorldView world) {
         if (!live()) {
-            return lastDirective;
+            // Terminal hold stays null - a ctor- or last-emission-
+            // backed directive here re-arms the mover every
+            // post-failure tick toward wherever the mission last
+            // looked (7f02283; 20b200d's NullAway initializer
+            // regressed the pin).
+            return null;
         }
         if (foodNowCarried(world)) {
             succeed();
