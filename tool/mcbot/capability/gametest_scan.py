@@ -32,6 +32,7 @@ from mcbot.capability.qa_import import (
 )
 from mcbot.capability.models import QATestCase
 from mcbot.capability.repository import CapabilityRepository
+from mcbot.capability.feature_repository import FeatureRepository
 
 GAMETEST_SRC = Path(
     "src/main/java/com/mcbot/mcbotserver/gametest"
@@ -90,6 +91,17 @@ _CAPABILITY_COMMENT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Explicit feature declaration in a comment above a @GameTest method:
+#   // feature: combat.melee.crit_hit
+# This is the highest-resolution link: it pins the test to a single
+# atomic feature within a face. When present, the capability_id is
+# derived from the feature's parent face (looked up in the features
+# table), so the test is linked at both granularities simultaneously.
+_FEATURE_COMMENT_RE = re.compile(
+    r"//\s*feature\s*:\s*([a-z_]+\.[a-z_]+\.[a-z_]+)",
+    re.IGNORECASE,
+)
+
 
 def _extract_capability_comment(content: str, method_start: int) -> Optional[str]:
     """Walk backward from the method start to find a // capability: <id>
@@ -101,6 +113,22 @@ def _extract_capability_comment(content: str, method_start: int) -> Optional[str
         if m:
             return m.group(1).lower()
         # Stop walking if we hit a blank line or code (not a comment)
+        stripped = line.strip()
+        if stripped and not stripped.startswith("//") and not stripped.startswith("@"):
+            break
+    return None
+
+
+def _extract_feature_comment(content: str, method_start: int) -> Optional[str]:
+    """Walk backward from the method start to find a // feature: <id>
+    comment in the immediately preceding lines. Feature links are the
+    highest-resolution anchor; when present, the capability link is
+    derived from the feature's parent face."""
+    lines_before = content[:method_start].splitlines()
+    for line in reversed(lines_before[-6:]):
+        m = _FEATURE_COMMENT_RE.search(line)
+        if m:
+            return m.group(1).lower()
         stripped = line.strip()
         if stripped and not stripped.startswith("//") and not stripped.startswith("@"):
             break
@@ -161,6 +189,7 @@ def scan_gametests(
     """
     init_db(db_path)
     repo = CapabilityRepository(db_path)
+    feature_repo = FeatureRepository(db_path)
     root = src_root or GAMETEST_SRC
 
     if not root.exists():
@@ -213,49 +242,87 @@ def scan_gametests(
             # manual triage sticks, fresh guesses are marked by confidence)
             existing = _get_case(db_path, case_id)
             link_fields: dict = {}
-            if existing and existing.capability_id:
-                link_fields["capability_id"] = existing.capability_id
-                link_fields["link_source"] = existing.link_source or "auto"
-                ls = link_fields["link_source"]
-            else:
-                # Priority 1: explicit // capability: <id> comment above the method
-                annotated = _extract_capability_comment(content, method_match.start())
-                if annotated:
-                    if annotated == "none":
-                        # Intentionally unlinked (test infra, non-behavior mechanics)
-                        link_fields["capability_id"] = None
-                        link_fields["link_source"] = "annotated_none"
-                        ls = "annotated_none"
-                    elif repo.get(annotated):
-                        link_fields["capability_id"] = annotated
-                        link_fields["link_source"] = "annotated"
-                        ls = "annotated"
-                        auto_linked += 1
-                    else:
-                        # Annotation references a non-existent face - collect for strict mode
-                        invalid_annotations.append({
-                            "case_id": case_id, "class": class_name,
-                            "method": method_name, "file": java_file.name,
-                            "declared": annotated,
-                        })
-                        link_fields["capability_id"] = None
-                        link_fields["link_source"] = None
-                        ls = "unlinked"
-                        unlinked += 1
+
+            # Priority 0: explicit // feature: <id> comment — the
+            # highest-resolution anchor. When present, the capability
+            # link is derived from the feature's parent face, so the
+            # test is linked at both granularities simultaneously.
+            feature_annotated = _extract_feature_comment(content, method_match.start())
+            if feature_annotated:
+                feature_row = feature_repo.get(feature_annotated)
+                if feature_row:
+                    link_fields["feature_id"] = feature_annotated
+                    link_fields["capability_id"] = feature_row.face
+                    link_fields["link_source"] = "feature_annotated"
+                    ls = "feature_annotated"
+                    auto_linked += 1
                 else:
-                    # Priority 2: keyword match, then class fallback
-                    cap_id, link_src = _method_to_capability(method_name, class_name, repo)
-                    link_fields["capability_id"] = cap_id
-                    link_fields["link_source"] = link_src
-                    ls = link_src or "unlinked"
-                    if cap_id:
-                        auto_linked += 1
+                    # Feature declared in comment but not yet scanned
+                    # into the features table — collect for strict mode
+                    # and fall through to capability-level linking.
+                    invalid_annotations.append({
+                        "case_id": case_id, "class": class_name,
+                        "method": method_name, "file": java_file.name,
+                        "declared_feature": feature_annotated,
+                        "reason": "feature not found in features table (run feature scan first)",
+                    })
+                    feature_annotated = None  # fall through
+
+            if not feature_annotated:
+                if existing and existing.capability_id and not existing.feature_id:
+                    link_fields["capability_id"] = existing.capability_id
+                    link_fields["link_source"] = existing.link_source or "auto"
+                    link_fields["feature_id"] = None
+                    ls = link_fields["link_source"]
+                elif existing and existing.feature_id:
+                    # Preserve existing feature link (manual triage sticks)
+                    link_fields["feature_id"] = existing.feature_id
+                    link_fields["capability_id"] = existing.capability_id
+                    link_fields["link_source"] = existing.link_source or "auto"
+                    ls = link_fields["link_source"]
+                else:
+                    # Priority 1: explicit // capability: <id> comment above the method
+                    annotated = _extract_capability_comment(content, method_match.start())
+                    if annotated:
+                        if annotated == "none":
+                            # Intentionally unlinked (test infra, non-behavior mechanics)
+                            link_fields["capability_id"] = None
+                            link_fields["feature_id"] = None
+                            link_fields["link_source"] = "annotated_none"
+                            ls = "annotated_none"
+                        elif repo.get(annotated):
+                            link_fields["capability_id"] = annotated
+                            link_fields["feature_id"] = None
+                            link_fields["link_source"] = "annotated"
+                            ls = "annotated"
+                            auto_linked += 1
+                        else:
+                            # Annotation references a non-existent face - collect for strict mode
+                            invalid_annotations.append({
+                                "case_id": case_id, "class": class_name,
+                                "method": method_name, "file": java_file.name,
+                                "declared": annotated,
+                            })
+                            link_fields["capability_id"] = None
+                            link_fields["feature_id"] = None
+                            link_fields["link_source"] = None
+                            ls = "unlinked"
+                            unlinked += 1
                     else:
-                        unlinked += 1
-                        unlinked_methods.append({
-                            "case_id": case_id, "class": class_name,
-                            "method": method_name, "file": java_file.name,
-                        })
+                        # Priority 2: keyword match, then class fallback
+                        cap_id, link_src = _method_to_capability(method_name, class_name, repo)
+                        link_fields["capability_id"] = cap_id
+                        link_fields["feature_id"] = None
+                        link_fields["link_source"] = link_src
+                        ls = link_src or "unlinked"
+                        if cap_id:
+                            auto_linked += 1
+                        else:
+                            unlinked += 1
+                            unlinked_methods.append({
+                                "case_id": case_id, "class": class_name,
+                                "method": method_name, "file": java_file.name,
+                            })
             link_source_counts[ls] = link_source_counts.get(ls, 0) + 1
 
             now = _dt.datetime.now().isoformat(timespec="seconds")

@@ -52,6 +52,7 @@ class QATestCase:
     """
     id: str
     capability_id: Optional[str] = None
+    feature_id: Optional[str] = None
     title: str = ""
     requirement: str = ""
     priority: str = ""  # P0, P1, P2
@@ -70,6 +71,31 @@ class QATestCase:
     block_reason: str = ""
     last_run_at: Optional[str] = None
     last_receipt_id: Optional[int] = None
+    created_at: str = ""
+    updated_at: str = ""
+
+
+@dataclass
+class Feature:
+    """A single behavioral feature, the atomic unit of a capability face.
+
+    Features are declared in Java source via the ``@Feature`` annotation
+    and discovered by the offline scanner — they are never hand-seeded.
+    The ``face`` field links back to the parent capability; the scanner
+    rejects annotations whose face is not in the seed table.
+
+    ``status`` is derived, never stored: it is computed from the linked
+    test cases at query time (shipped if any passed, regression if any
+    failed, gap if none executed, deferred only by explicit marker).
+    """
+    id: str
+    face: str
+    description: str = ""
+    vanilla_ref: str = ""
+    deviation: str = ""
+    source_file: str = ""
+    source_method: str = ""
+    source_line: int = 0
     created_at: str = ""
     updated_at: str = ""
 

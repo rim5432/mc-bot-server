@@ -843,5 +843,14 @@ class RefInventoryTest(unittest.TestCase):
         self.assertEqual(cov["mapped"], 0)
 
 
+class CliImportSmokeTest(unittest.TestCase):
+    """The capability tests never import mcbot.cli, so a syntax error in
+    the CLI shipped green once already (f-string backslash). Import it."""
+
+    def test_cli_module_parses_and_imports(self):
+        from mcbot import cli
+        self.assertTrue(callable(cli.main))
+
+
 if __name__ == "__main__":
     unittest.main()

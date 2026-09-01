@@ -33,6 +33,7 @@ VALID_LINK_SOURCES = {
     "auto_class",     # impl: class->category fallback (single face in cat)
     "annotated",      # impl: explicit // capability: <id> comment above method
     "annotated_none", # impl: explicit // capability: none (intentionally unlinked)
+    "feature_annotated", # impl: explicit // feature: <id> comment (capability derived from feature's parent face)
     "no_face",        # spec: non-behavior case (code audit, test hygiene)
 }
 VALID_STATUSES = {"not_executed", "passed", "failed", "blocked"}

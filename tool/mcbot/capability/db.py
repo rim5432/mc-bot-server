@@ -227,6 +227,40 @@ _MIGRATIONS: list[tuple[int, str, list[str]]] = [
             "CREATE INDEX idx_ref_actions_face ON reference_actions(mapped_face)",
         ],
     ),
+    (
+        7,
+        "features: annotation-declared atomic behavior units + feature_id on test cases",
+        [
+            # Features are the atomic unit of a capability face. They
+            # are declared in Java source via @Feature and discovered by
+            # the offline scanner — never hand-seeded. source_file /
+            # source_method / source_line pin the annotation location so
+            # drift detection can flag moved or removed annotations.
+            """
+            CREATE TABLE features (
+                id TEXT PRIMARY KEY,
+                face_id TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                vanilla_ref TEXT DEFAULT '',
+                deviation TEXT DEFAULT '',
+                source_file TEXT DEFAULT '',
+                source_method TEXT DEFAULT '',
+                source_line INTEGER DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (face_id) REFERENCES capabilities(id) ON DELETE CASCADE
+            )
+            """,
+            "CREATE INDEX idx_features_face ON features(face_id)",
+            # A test case may link to a specific feature in addition to
+            # its face-level capability_id. The feature link is the
+            # higher-resolution anchor; capability_id remains for
+            # face-level aggregation. NULL means the test covers the
+            # face broadly without pinning a single feature.
+            "ALTER TABLE qa_test_cases ADD COLUMN feature_id TEXT",
+            "CREATE INDEX idx_qa_cases_feature ON qa_test_cases(feature_id)",
+        ],
+    ),
 ]
 
 
@@ -271,6 +305,7 @@ def db_status(db_path: Optional[Path] = None) -> dict:
         for table in [
             "capabilities", "qa_test_cases", "test_receipts",
             "test_case_runs", "capability_status_transitions",
+            "features", "reference_actions",
         ]:
             try:
                 row = conn.execute(f"SELECT COUNT(*) as c FROM {table}").fetchone()

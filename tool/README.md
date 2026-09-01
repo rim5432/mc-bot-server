@@ -102,6 +102,8 @@ declared-shipped faces carry green evidence.
 | `capability diff [--since YYYY-MM-DD]` | what changed: status transitions, run green/red split + scenario growth, RED details with per-scenario failures, new faces |
 | `capability domain <category>` | per-face evidence: status, SPECS/IMPLS counts, NO-SPEC / NO-IMPL / DEVIATION flags, failure history, domain green streak |
 | `capability restore` | apply the committed overlay after a rebuild |
+| `capability audit` | the single priority-sorted action queue: P0 shipped-without-evidence/red, P1 coverage gaps (unmapped items, pathless, gap/deferred faces), P2 hygiene (source drift, promote candidates, missing specs) — every row carries a copy-pasteable action |
+| `capability scan-features` / `features [face]` / `feature <id>` | `@Feature` annotation inventory: SOURCE-retained Java annotations declare a face's atomic design points (id/face/description/vanillaRef/deviation), scanned into the `features` table; `// feature: <id>` comments link gametests at feature granularity (highest-priority link source) |
 
 Rebuild recipe after losing `.runtime`:
 `capability init` → `qa-import` each CSV → `scan-gametest` →

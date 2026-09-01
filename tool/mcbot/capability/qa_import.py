@@ -49,7 +49,9 @@ def _now_iso() -> str:
 # ---------------------------------------------------------------------------
 def _row_to_case(row) -> QATestCase:
     return QATestCase(
-        id=row["id"], capability_id=row["capability_id"], title=row["title"],
+        id=row["id"], capability_id=row["capability_id"],
+        feature_id=row["feature_id"] if "feature_id" in row.keys() else None,
+        title=row["title"],
         requirement=row["requirement"] or "", priority=row["priority"] or "",
         module=row["module"] or "", test_type=row["test_type"] or "",
         description=row["description"] or "", preconditions=row["preconditions"] or "",
@@ -76,19 +78,19 @@ def _insert_case(db_path: Optional[Path], case: QATestCase) -> None:
         conn.execute(
             """
             INSERT INTO qa_test_cases (
-                id, capability_id, title, requirement, priority, module,
-                test_type, description, preconditions, steps, expected_result,
-                related_risk, test_data, notes, kind, link_source, status,
-                block_reason, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                id, capability_id, feature_id, title, requirement, priority,
+                module, test_type, description, preconditions, steps,
+                expected_result, related_risk, test_data, notes, kind,
+                link_source, status, block_reason, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                case.id, case.capability_id, case.title, case.requirement,
-                case.priority, case.module, case.test_type, case.description,
-                case.preconditions, case.steps, case.expected_result,
-                case.related_risk, case.test_data, case.notes, case.kind,
-                case.link_source, case.status, case.block_reason,
-                case.created_at, case.updated_at,
+                case.id, case.capability_id, case.feature_id, case.title,
+                case.requirement, case.priority, case.module, case.test_type,
+                case.description, case.preconditions, case.steps,
+                case.expected_result, case.related_risk, case.test_data,
+                case.notes, case.kind, case.link_source, case.status,
+                case.block_reason, case.created_at, case.updated_at,
             ),
         )
         conn.commit()

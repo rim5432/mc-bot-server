@@ -53,15 +53,23 @@ from mcbot.lock import (
 from mcbot.capability import db as cap_db
 from mcbot.capability import queries as cap_queries
 from mcbot.capability.backfill import backfill_receipts
+from mcbot.capability.feature_scan import scan_features
+from mcbot.capability.feature_repository import FeatureRepository
 from mcbot.capability.gametest_scan import scan_gametests
 from mcbot.capability.report import (
+    action_queue,
     diff_since,
     domain_report,
     evidence_for_faces,
     evidence_rollup,
+    face_features,
+    feature_status,
+    features_overview,
     harness_axis,
-    staleness_for_faces,
+    is_internal_face,
+    source_drift,
     spec_impl_gap,
+    staleness_for_faces,
     status_suggestions,
 )
 from mcbot.capability.validation import validate_db
@@ -422,6 +430,10 @@ def cmd_capability(args) -> int:
         "link": cmd_cap_link,
         "unlinked": cmd_cap_unlinked,
         "validate": cmd_cap_validate,
+        "audit": cmd_cap_audit,
+        "features": cmd_cap_features,
+        "feature": cmd_cap_feature,
+        "scan-features": cmd_cap_scan_features,
     }
     fn = dispatch.get(args.action)
     if fn is None:
@@ -549,7 +561,79 @@ def cmd_cap_status(args) -> int:
             print(f"    code change: {st['last_code_change']}")
         if st["last_green_at"]:
             print(f"    last green : {st['last_green_at']}")
+
+    # --- record integrity panel: six axes, one glance ---
+    drift = source_drift().get(cap.id, {})
+    ev = ev or {"state": "untested", "red_runs": 0}
+    print()
+    print("  RECORD INTEGRITY")
+    # source paths
+    if cap.source_paths:
+        missing = drift.get("missing", [])
+        if missing:
+            print(f"    source_paths  : \u2717 MISSING: {', '.join(missing)}")
+        else:
+            print(f"    source_paths  : \u2713 ({len(cap.source_paths)} paths, all exist)")
+    else:
+        print(f"    source_paths  : \u2717 UNMAPPED — catalog implementation files in seed.py")
+    # harness paths
+    if cap.harness_paths:
+        print(f"    harness_paths : \u2713 ({len(cap.harness_paths)} paths)")
+    elif is_internal_face(cap.id):
+        print(f"    harness_paths : \u2713 (internal reflex/sense — pathless by design)")
+    else:
+        print(f"    harness_paths : \u2717 PATHLESS — add boundary-D path in seed.py HARNESS_PATHS")
+    # test anchors
+    if ev["state"] == "untested":
+        print(f"    test anchors  : \u2717 NO-IMPL — no automated test evidence")
+    elif ev["state"] == "red":
+        print(f"    test anchors  : \u2717 RED in newest run ({ev.get('red_runs', 0)} red run(s) total)")
+    else:
+        print(f"    test anchors  : \u2713 {ev['state'].upper()}")
+    # vanilla ref / deviation
+    vanilla_mark = "\u2713" if cap.vanilla_ref else "\u2717 none"
+    deviation_mark = "\u2713 recorded" if cap.deviation else "\u2713 none"
+    print(f"    vanilla_ref   : {vanilla_mark}")
+    print(f"    deviation     : {deviation_mark}")
+    # code drift
+    if drift.get("state") == "drift":
+        print(f"    code drift    : \u2717 code changed {drift.get('days_drift', 0):.1f}d after record update")
+    elif drift.get("state") == "missing":
+        print(f"    code drift    : \u2717 source path missing (see above)")
+    elif drift.get("state") == "fresh":
+        print(f"    code drift    : \u2713 fresh")
+    # NEXT action — pick the single highest-priority thing to do
+    next_action = _next_action_for(cap, ev, drift)
+    print()
+    print(f"  NEXT: {next_action}")
     return 0
+
+
+def _next_action_for(cap, ev: dict, drift: dict) -> str:
+    """Pick the single highest-priority next action for a face.
+
+    Order mirrors the audit P0/P1/P2 bands: missing paths first, then
+    evidence problems, then coverage gaps, then drift. Returns a
+    copy-pasteable command or edit instruction.
+    """
+    if drift.get("state") == "missing":
+        return ("update seed.py SOURCE_PATHS for this face (file moved/renamed), "
+                "then `capability init`")
+    if cap.implementation_status == "shipped" and ev.get("state") == "untested":
+        return "add a @GameTest method, then `capability scan-gametest`"
+    if cap.implementation_status == "shipped" and ev.get("state") == "red":
+        return "investigate newest runGameTest failure, then re-run `build runGameTest`"
+    if not cap.harness_paths and not is_internal_face(cap.id) and cap.implementation_status != "deferred":
+        return "add harness_paths in seed.py HARNESS_PATHS, then `capability init`"
+    if cap.implementation_status in ("gap", "deferred"):
+        return (f"implement + test, then `capability set {cap.id} --status partial --verify`")
+    if drift.get("state") == "drift":
+        return "re-verify the record matches current code, then `capability set --verify`"
+    if cap.implementation_status in ("partial", "gap") and ev.get("state") == "green":
+        return f"evidence is green — review and `capability set {cap.id} --status shipped --verify`"
+    if not cap.vanilla_ref:
+        return "add vanilla_ref citing the decompiled source (see player-behavior-RE.md)"
+    return "record is clean — no action needed"
 
 
 def cmd_cap_set(args) -> int:
@@ -1009,6 +1093,143 @@ def cmd_cap_validate(args) -> int:
     return 1 if errors else 0
 
 
+def cmd_cap_audit(args) -> int:
+    """Priority-sorted action queue: everything that needs a human, in order.
+
+    The single command that answers 'what do I do next' without reading
+    four other commands. P0 = shipped-without-evidence or shipped-red.
+    P1 = coverage gaps (unmapped items / pathless faces / gap-deferred).
+    P2 = hygiene (source drift / promote candidates / missing specs).
+    Every row carries a copy-pasteable action string.
+    """
+    q = action_queue()
+    items = q["items"]
+    if not items:
+        print("[mcbot] audit clean — no action items")
+        return 0
+    print(f"=== ACTION QUEUE ({len(items)} items) ===")
+    print()
+    print(f"{'PRI':<4} {'TARGET':<30} {'GAP':<24} ACTION")
+    print("-" * 115)
+    for item in items:
+        print(f"{item['priority']:<4} {item['target']:<30} {item['gap']:<24} {item['action']}")
+        if item.get("detail"):
+            print(f"     {'':30} {'':24}   {item['detail']}")
+    print()
+    s = q["summary"]
+    print(f"summary: P0={s.get('P0', 0)}  P1={s.get('P1', 0)}  P2={s.get('P2', 0)}")
+    print(q["legend"])
+    return 0
+
+
+def cmd_cap_scan_features(args) -> int:
+    """Scan Java source for @Feature annotations and upsert the features table."""
+    result = scan_features(strict=args.strict)
+    if "error" in result:
+        print(f"[mcbot] {result['error']}", file=sys.stderr)
+        return 1
+    print(f"[mcbot] feature scan complete")
+    print(f"  scanned files  : {result['scanned_files']}")
+    print(f"  annotations    : {result['total_annotations']}")
+    print(f"  inserted       : {result['inserted']}")
+    print(f"  updated        : {result['updated']}")
+    print(f"  pruned         : {result['pruned']}")
+    print(f"  total features : {result['total_features']}")
+    if args.strict and result.get("strict_failures", 0) > 0:
+        print(f"\n[mcbot] STRICT FAILURES: {result['strict_failures']}")
+        for inv in result.get("invalid_annotations", []):
+            print(f"  {inv['file']}:{inv['line']} — {inv['reason']}"
+                  f" (feature={inv.get('feature_id', '?')}, face={inv.get('declared_face', '?')})")
+        return 1
+    return 0
+
+
+def cmd_cap_features(args) -> int:
+    """List annotation-declared features, optionally filtered by face."""
+    if args.face:
+        data = face_features(args.face)
+        if data["feature_count"] == 0:
+            print(f"[mcbot] face '{args.face}' has no @Feature annotations")
+            print(f"  declared status: {data['face_status']}")
+            print(f"  hint: add @Feature(id=..., face='{args.face}', ...) to the implementing methods")
+            return 0
+        print(f"=== FEATURES: {args.face} ({data['face_name']}) ===")
+        print(f"  declared status : {data['face_status']}")
+        print(f"  derived status  : {data['derived_status']}")
+        print(f"  feature count   : {data['feature_count']}")
+        sc = data["status_counts"]
+        print(f"  shipped={sc.get('shipped', 0)}  partial={sc.get('partial', 0)}  "
+              f"gap={sc.get('gap', 0)}  regression={sc.get('regression', 0)}")
+        print()
+        print(f"{'STATUS':<12} {'FEATURE ID':<40} {'TESTS':>6}  SOURCE")
+        print("-" * 100)
+        for f in data["features"]:
+            tc = f["test_counts"]
+            test_str = f"{tc.get('passed', 0)}p/{tc.get('failed', 0)}f/{tc.get('not_executed', 0)}u"
+            src = f"{f['source_method']} ({f['source_file'].split('/')[-1]}:{f['source_line']})"
+            print(f"{f['status']:<12} {f['id']:<40} {test_str:>6}  {src}")
+        return 0
+
+    # All faces overview
+    ov = features_overview()
+    print(f"=== FEATURES OVERVIEW ===")
+    print(f"  total features : {ov['total_features']}")
+    print(f"  faces covered  : {ov['faces_with_features']}/{ov['total_faces']}")
+    sc = ov["status_counts"]
+    print(f"  shipped={sc.get('shipped', 0)}  partial={sc.get('partial', 0)}  "
+          f"gap={sc.get('gap', 0)}  regression={sc.get('regression', 0)}")
+    print()
+    print(f"{'FACE':<30} {'DECL':<10} {'DERIVED':<12} {'FEATS':>6}")
+    print("-" * 62)
+    for fb in ov["face_breakdown"]:
+        print(f"{fb['face_id']:<30} {fb['face_status']:<10} {fb['derived_status']:<12} {fb['feature_count']:>6}")
+    if ov["faces_without_features"]:
+        print()
+        print(f"faces without @Feature annotations ({len(ov['faces_without_features'])}):")
+        for fid in ov["faces_without_features"]:
+            print(f"  {fid}")
+    return 0
+
+
+def cmd_cap_feature(args) -> int:
+    """Show one feature in detail: description, source, derived status, tests."""
+    feat_repo = FeatureRepository()
+    feat = feat_repo.get(args.feature_id)
+    if not feat:
+        print(f"[mcbot] feature not found: {args.feature_id}", file=sys.stderr)
+        print(f"  hint: run `capability scan-features` to discover @Feature annotations", file=sys.stderr)
+        return 1
+
+    st = feature_status(args.feature_id)
+    print(f"=== FEATURE: {feat.id} ===")
+    print(f"  face          : {feat.face}")
+    print(f"  description   : {feat.description}")
+    if feat.vanilla_ref:
+        print(f"  vanilla ref   : {feat.vanilla_ref}")
+    if feat.deviation:
+        print(f"  deviation     : {feat.deviation}")
+    print(f"  source        : {feat.source_file}:{feat.source_line}")
+    if feat.source_method:
+        print(f"  method        : {feat.source_method}")
+    print()
+    print(f"  derived status: {st['status']}")
+    tc = st["counts"]
+    print(f"  tests         : {st['total_tests']} total "
+          f"({tc.get('passed', 0)} passed, {tc.get('failed', 0)} failed, "
+          f"{tc.get('blocked', 0)} blocked, {tc.get('not_executed', 0)} unexecuted)")
+    if st["cases"]:
+        print()
+        print(f"  {'CASE ID':<45} {'STATUS':<14} {'LINK':<18} TITLE")
+        print(f"  {'-'*45} {'-'*14} {'-'*18} {'-'*30}")
+        for c in st["cases"]:
+            print(f"  {c['id']:<45} {c.get('status', '?'):<14} "
+                  f"{c.get('link_source', '?') or '?':<18} {c.get('title', '')[:30]}")
+    else:
+        print()
+        print("  no linked tests — add `// feature: <id>` above the @GameTest method")
+    return 0
+
+
 # ---------------------------------------------------------------------------
 # doc commands
 # ---------------------------------------------------------------------------
@@ -1339,6 +1560,22 @@ def main() -> int:
     p_cap_sub.add_parser(
         "validate",
         help="unified validation: schema/vocabulary/FK checks on all test artifacts + spec-vs-impl gap analysis (exit 1 on errors)")
+    p_cap_sub.add_parser(
+        "audit",
+        help="priority-sorted action queue: everything needing a human (P0 shipped-without-evidence, P1 coverage gaps, P2 hygiene)")
+    p_cap_features = p_cap_sub.add_parser(
+        "features",
+        help="list annotation-declared features (atomic units within faces), filter by face")
+    p_cap_features.add_argument("face", nargs="?", help="filter by face id, e.g. combat.melee")
+    p_cap_feature = p_cap_sub.add_parser(
+        "feature",
+        help="show one feature: description, source location, derived status, linked tests")
+    p_cap_feature.add_argument("feature_id", help="feature id, e.g. combat.melee.crit_hit")
+    p_cap_scan_feat = p_cap_sub.add_parser(
+        "scan-features",
+        help="scan Java source for @Feature annotations and upsert the features table")
+    p_cap_scan_feat.add_argument("--strict", action="store_true",
+                                 help="fail on annotations whose face is not in the seed table (CI gate)")
     p_cap.set_defaults(func=cmd_capability)
 
     # doc management (rot control; read-only except touch/new/index)

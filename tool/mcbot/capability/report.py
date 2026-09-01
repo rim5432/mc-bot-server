@@ -15,12 +15,15 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
+import subprocess
 from pathlib import Path
 from typing import Optional
 
 from mcbot.capability.db import get_connection, init_db
 from mcbot.capability.queries import overview
 from mcbot.capability.ref_inventory import inventory_coverage
+from mcbot.capability.repository import CapabilityRepository
+from mcbot.capability.feature_repository import FeatureRepository
 
 TRANSITIONS_BORN = "2026-08-31"
 
@@ -629,3 +632,521 @@ def spec_impl_gap(db_path: Optional[Path] = None) -> dict:
             result["neither"].append(entry)
     result["summary"] = {k: len(v) for k, v in result.items() if k != "summary"}
     return result
+
+
+# ---------------------------------------------------------------------------
+# Source-path drift detection
+# ---------------------------------------------------------------------------
+
+# Reflex/sense faces that are pathless by design: the harness never invokes
+# them directly, they fire from the tick pipeline. Listing them as coverage
+# gaps would be noise. The set is explicit rather than prefix-based so a
+# future perception face that DOES carry a path (e.g. a scan verb) is not
+# silently excluded.
+_INTERNAL_FACE_IDS = frozenset({
+    "hunger.fooddata",
+    "hunger.movement_exhaustion",
+    "perception.death_flag",
+    "perception.sleepers",
+    "vitals.air_supply",
+    "vitals.fire",
+    "vitals.lava",
+    "vitals.mlg_water",
+    "vitals.powder_snow",
+    "vitals.suffocation",
+    "vitals.swimming",
+})
+
+
+def is_internal_face(face_id: str) -> bool:
+    """True when this face is an internal reflex/sense with no boundary-D path by design."""
+    return face_id in _INTERNAL_FACE_IDS
+
+
+def _git_last_commit_ts(repo_root: Path, rel_path: str) -> Optional[int]:
+    """Return the unix timestamp of the last commit touching rel_path, or None.
+
+    rel_path is relative to the java source root; we resolve it against
+    src/main/java/com/mcbot/mcbotserver/ before calling git.
+    """
+    full = repo_root / "src/main/java/com/mcbot/mcbotserver" / rel_path
+    if not full.exists():
+        return None
+    try:
+        out = subprocess.run(
+            ["git", "log", "-1", "--format=%ct", "--", str(full)],
+            cwd=repo_root, capture_output=True, text=True, timeout=10,
+        )
+        ts = out.stdout.strip()
+        return int(ts) if ts else None
+    except (subprocess.TimeoutExpired, ValueError):
+        return None
+
+
+def source_drift(
+    db_path: Optional[Path] = None,
+    *,
+    repo_root: Optional[Path] = None,
+) -> dict[str, dict]:
+    """Per-face source-path integrity: missing files and code-vs-record drift.
+
+    Two checks per face:
+    1. MISSING — a catalogued source_path no longer exists on disk (the
+       implementation moved or was renamed and the seed was not updated).
+    2. DRIFT — a source_path's last git commit is newer than the face's
+       updated_at, meaning code changed after the catalog record was last
+       touched. The record may describe an outdated implementation.
+
+    Faces with empty source_paths are UNMAPPED (not an error — the seed
+    may not have catalogued them yet, or the face is pure-decision-layer
+    with no single adapter file).
+
+    Returns {face_id: {state, missing, last_code_change, record_updated,
+    days_drift}} where state in {fresh, drift, missing, unmapped}.
+    """
+    if repo_root is None:
+        repo_root = Path(__file__).resolve().parents[3]
+    init_db(db_path)
+    with get_connection(db_path) as conn:
+        rows = conn.execute(
+            "SELECT id, source_paths, updated_at FROM capabilities ORDER BY id"
+        ).fetchall()
+    result: dict[str, dict] = {}
+    for r in rows:
+        face = r["id"]
+        paths = json.loads(r["source_paths"] or "[]")
+        if not paths:
+            result[face] = {
+                "state": "unmapped", "missing": [],
+                "last_code_change": None, "record_updated": r["updated_at"],
+                "days_drift": None,
+            }
+            continue
+        missing: list[str] = []
+        last_code_ts: Optional[int] = None
+        for p in paths:
+            full = repo_root / "src/main/java/com/mcbot/mcbotserver" / p
+            if not full.exists():
+                missing.append(p)
+                continue
+            ts = _git_last_commit_ts(repo_root, p)
+            if ts:
+                last_code_ts = max(last_code_ts or 0, ts)
+        if missing:
+            result[face] = {
+                "state": "missing", "missing": missing,
+                "last_code_change": None, "record_updated": r["updated_at"],
+                "days_drift": None,
+            }
+            continue
+        last_code_dt = (
+            _dt.datetime.fromtimestamp(last_code_ts, _dt.timezone.utc)
+            if last_code_ts else None
+        )
+        record_dt = None
+        if r["updated_at"]:
+            try:
+                record_dt = _dt.datetime.fromisoformat(
+                    r["updated_at"].replace("Z", "+00:00")
+                )
+                if record_dt.tzinfo is None:
+                    record_dt = record_dt.replace(tzinfo=_dt.timezone.utc)
+            except ValueError:
+                record_dt = None
+        if last_code_dt and record_dt:
+            days_drift = (last_code_dt - record_dt).total_seconds() / 86400
+            state = "drift" if days_drift > 0 else "fresh"
+        else:
+            days_drift = None
+            state = "fresh" if last_code_dt else "unmapped"
+        result[face] = {
+            "state": state, "missing": [],
+            "last_code_change": last_code_dt.isoformat() if last_code_dt else None,
+            "record_updated": r["updated_at"],
+            "days_drift": round(days_drift, 1) if days_drift is not None else None,
+        }
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Action queue — the single "what needs a human, in what order" read-model
+# ---------------------------------------------------------------------------
+
+def _suggest_face_for_item(methods: list[str]) -> str:
+    """Heuristic face suggestion for an unmapped inventory item.
+
+    Based on which player-action methods the class overrides. This is a
+    suggestion rendered in the audit output, not a ruling — the human
+    edits face-map.json. Kept conservative: ambiguous cases say "new face"
+    rather than guessing wrong.
+    """
+    m = set(methods)
+    if "releaseUsing" in m:
+        return "combat.bow_draw (charge/release) or new face"
+    if "finishUsingItem" in m:
+        return "hunger.eat_chain (consumable) or new face"
+    if "useOn" in m and "use" not in m:
+        return "interaction.blockitem_place or right_click_order"
+    if "use" in m and "useOn" not in m:
+        return "interaction.right_click_order or new face"
+    return "needs manual classification"
+
+
+def action_queue(
+    db_path: Optional[Path] = None,
+    *,
+    repo_root: Optional[Path] = None,
+) -> dict:
+    """Aggregated, priority-sorted action queue.
+
+    Priority bands:
+      P0 — shipped but no automated evidence, or shipped but RED in the
+           newest run. False-positive / regression risk: the declared
+           status disagrees with what the tests say.
+      P1 — coverage gaps: unmapped inventory items (with heuristic face
+           suggestion), pathless non-internal faces, and gap/deferred
+           faces that have no clear entry point.
+      P2 — hygiene: source-path drift, partial/gap faces that now carry
+           green evidence and could be promoted, shipped faces with no
+           declared spec.
+
+    Every item carries an ``action`` string — a concrete command or edit
+    target — so the reader can copy-paste rather than interpret. The CLI
+    renders this as one table; a future HTTP API can return it as JSON.
+
+    Returns {items, summary, legend}.
+    """
+    init_db(db_path)
+    repo = CapabilityRepository(db_path)
+    all_faces = {c.id: c for c in repo.list()}
+    evidence = evidence_for_faces(db_path)
+    suggestions = status_suggestions(db_path)
+    drift = source_drift(db_path, repo_root=repo_root)
+    harness = harness_axis(db_path)
+    inv = inventory_coverage(db_path)
+
+    items: list[dict] = []
+
+    # --- P0: shipped without evidence, or shipped but red ---
+    for face_id, cap in all_faces.items():
+        if cap.implementation_status != "shipped":
+            continue
+        ev = evidence.get(face_id, {"state": "untested"})
+        if ev["state"] == "untested":
+            items.append({
+                "priority": "P0",
+                "target": face_id,
+                "target_kind": "face",
+                "gap": "shipped+NO-IMPL",
+                "action": "add @GameTest method, then `capability scan-gametest`",
+                "detail": f"declared shipped {cap.verified_at or '?'}, 0 impl cases linked",
+            })
+        elif ev["state"] == "red":
+            items.append({
+                "priority": "P0",
+                "target": face_id,
+                "target_kind": "face",
+                "gap": "shipped+RED",
+                "action": "investigate newest runGameTest failure, then re-run",
+                "detail": f"last red {ev.get('last_red_at') or '?'}, {ev.get('red_runs', 0)} red run(s) total",
+            })
+
+    # --- P1: unmapped inventory items ---
+    if inv and inv.get("unmapped", 0) > 0:
+        unmapped = [e for e in inv["entries"] if not e["mapped_face"]]
+        # Show at most 12 individually; the rest roll up into a count
+        for e in unmapped[:12]:
+            methods = json.loads(e["methods"] or "[]")
+            items.append({
+                "priority": "P1",
+                "target": e["class_name"],
+                "target_kind": "item",
+                "gap": "unmapped-in-face-map",
+                "action": f"edit face-map.json -> {_suggest_face_for_item(methods)}",
+                "detail": f"methods={'+'.join(methods)}  ({e['file']})",
+            })
+        if len(unmapped) > 12:
+            items.append({
+                "priority": "P1",
+                "target": f"... and {len(unmapped) - 12} more items",
+                "target_kind": "item",
+                "gap": "unmapped-in-face-map",
+                "action": "run `capability ref-coverage` for the full list",
+                "detail": "",
+            })
+
+    # --- P1: pathless non-internal faces ---
+    for category, faces in harness.get("pathless_by_category", {}).items():
+        for face_id in faces:
+            if is_internal_face(face_id):
+                continue
+            cap = all_faces.get(face_id)
+            if cap and cap.implementation_status == "deferred":
+                continue  # deferred faces are explicitly out of scope
+            items.append({
+                "priority": "P1",
+                "target": face_id,
+                "target_kind": "face",
+                "gap": "PATHLESS",
+                "action": "add harness_paths in seed.py HARNESS_PATHS, then `capability init`",
+                "detail": f"category={category}, status={cap.implementation_status if cap else '?'}",
+            })
+
+    # --- P1: gap/deferred faces (explicit backlog) ---
+    for cap in repo.list():
+        if cap.implementation_status in ("gap", "deferred"):
+            items.append({
+                "priority": "P1",
+                "target": cap.id,
+                "target_kind": "face",
+                "gap": cap.implementation_status.upper(),
+                "action": ("implement + test, then `capability set "
+                           f"{cap.id} --status partial --verify`"),
+                "detail": cap.deviation[:80] if cap.deviation else "",
+            })
+
+    # --- P2: source-path drift ---
+    for face_id, d in drift.items():
+        if d["state"] == "missing":
+            items.append({
+                "priority": "P2",
+                "target": face_id,
+                "target_kind": "face",
+                "gap": "source-path-MISSING",
+                "action": "update seed.py SOURCE_PATHS (file moved/renamed), then `capability init`",
+                "detail": f"missing: {', '.join(d['missing'])}",
+            })
+        elif d["state"] == "drift":
+            items.append({
+                "priority": "P2",
+                "target": face_id,
+                "target_kind": "face",
+                "gap": "source-DRIFT",
+                "action": "re-verify the face record matches current code, then `capability set --verify`",
+                "detail": f"code changed {d['days_drift']}d after record update",
+            })
+
+    # --- P2: evidence-driven status suggestions (promote / add-spec) ---
+    for s in suggestions:
+        if s["suggestion"] == "consider_promote":
+            items.append({
+                "priority": "P2",
+                "target": s["face"],
+                "target_kind": "face",
+                "gap": f"{s['status']}+GREEN",
+                "action": f"review and `capability set {s['face']} --status shipped --verify`",
+                "detail": s["reason"],
+            })
+        elif s["suggestion"] == "add_spec":
+            items.append({
+                "priority": "P2",
+                "target": s["face"],
+                "target_kind": "face",
+                "gap": "shipped+NO-SPEC",
+                "action": "add a TC-* row in the QA CSV, then `capability qa-import`",
+                "detail": s["reason"],
+            })
+
+    # Sort: P0 before P1 before P2, then rollup rows (target starts with "...")
+    # last within a band, then by target name.
+    band_order = {"P0": 0, "P1": 1, "P2": 2}
+    items.sort(key=lambda x: (
+        band_order.get(x["priority"], 9),
+        x["target"].startswith("..."),
+        x["target"],
+    ))
+
+    summary: dict[str, int] = {}
+    for it in items:
+        summary[it["priority"]] = summary.get(it["priority"], 0) + 1
+
+    legend = (
+        "Legend: P0=shipped-without-evidence-or-red | P1=coverage-gap "
+        "(unmapped items / pathless faces / gap-deferred) | "
+        "P2=hygiene (drift / promote-candidate / missing-spec)"
+    )
+    return {"items": items, "summary": summary, "legend": legend}
+
+
+# ---------------------------------------------------------------------------
+# Feature-level status derivation (annotation-declared atomic units)
+# ---------------------------------------------------------------------------
+
+def feature_status(feature_id: str, *, db_path: Optional[Path] = None) -> dict:
+    """Derive a feature's status from its linked test cases.
+
+    Status is never stored on the feature row — it is computed at query
+    time from the qa_test_cases rows that link to this feature_id. The
+    derivation rules:
+
+    - **shipped**: at least one test passed, zero failed
+    - **partial**: tests exist but some failed/blocked, or a mix of
+      passed and not-executed
+    - **gap**: no linked tests, or all tests not_executed
+    - **regression**: at least one test failed (a stricter signal than
+      partial; surfaced separately so audit can flag it)
+
+    Returns a dict with status, test counts, and the individual case
+    ids so the caller can render evidence links.
+    """
+    init_db(db_path)
+    with get_connection(db_path) as conn:
+        rows = conn.execute(
+            """
+            SELECT id, status, link_source, title
+            FROM qa_test_cases
+            WHERE feature_id = ?
+            ORDER BY id
+            """,
+            (feature_id,),
+        ).fetchall()
+
+    cases = [dict(r) for r in rows]
+    counts = {"passed": 0, "failed": 0, "blocked": 0, "not_executed": 0}
+    for c in cases:
+        s = c.get("status", "not_executed")
+        if s in counts:
+            counts[s] += 1
+        else:
+            counts["not_executed"] += 1
+
+    if counts["failed"] > 0:
+        status = "regression"
+    elif counts["passed"] > 0 and counts["failed"] == 0:
+        status = "shipped" if counts["not_executed"] == 0 else "partial"
+    elif counts["blocked"] > 0:
+        status = "partial"
+    else:
+        status = "gap"
+
+    return {
+        "feature_id": feature_id,
+        "status": status,
+        "counts": counts,
+        "total_tests": len(cases),
+        "cases": cases,
+    }
+
+
+def face_features(face_id: str, *, db_path: Optional[Path] = None) -> dict:
+    """All features under a face, each with derived status.
+
+    Returns the face metadata plus a list of feature dicts (id,
+    description, source location, derived status, test counts). The
+    face-level derived_status is the rollup:
+    - all features shipped → shipped
+    - any regression → regression
+    - mix of shipped and gap → partial
+    - all gap → gap
+    - no features → None (face has no annotation-declared features)
+    """
+    init_db(db_path)
+    feat_repo = FeatureRepository(db_path)
+    cap_repo = CapabilityRepository(db_path)
+
+    face = cap_repo.get(face_id)
+    features = feat_repo.list(face=face_id)
+
+    feature_dicts = []
+    status_counts = {"shipped": 0, "partial": 0, "gap": 0, "regression": 0}
+    for f in features:
+        st = feature_status(f.id, db_path=db_path)
+        status_counts[st["status"]] = status_counts.get(st["status"], 0) + 1
+        feature_dicts.append({
+            "id": f.id,
+            "description": f.description,
+            "vanilla_ref": f.vanilla_ref,
+            "deviation": f.deviation,
+            "source_file": f.source_file,
+            "source_method": f.source_method,
+            "source_line": f.source_line,
+            "status": st["status"],
+            "test_counts": st["counts"],
+            "total_tests": st["total_tests"],
+        })
+
+    if not features:
+        derived_status = None
+    elif status_counts.get("regression", 0) > 0:
+        derived_status = "regression"
+    elif status_counts.get("gap", 0) == len(features):
+        derived_status = "gap"
+    elif status_counts.get("shipped", 0) == len(features):
+        derived_status = "shipped"
+    else:
+        derived_status = "partial"
+
+    return {
+        "face_id": face_id,
+        "face_name": face.name if face else face_id,
+        "face_status": face.implementation_status if face else None,
+        "derived_status": derived_status,
+        "feature_count": len(features),
+        "status_counts": status_counts,
+        "features": feature_dicts,
+    }
+
+
+def features_overview(*, db_path: Optional[Path] = None) -> dict:
+    """All features across all faces, grouped by face, with derived status.
+
+    Returns a summary dict: total features, status distribution, and a
+    per-face breakdown. Faces with zero features are listed separately
+    so the audit can flag "declared face, no annotation coverage".
+    """
+    init_db(db_path)
+    feat_repo = FeatureRepository(db_path)
+    cap_repo = CapabilityRepository(db_path)
+
+    all_faces = cap_repo.list()
+    all_features = feat_repo.list()
+
+    # Group features by face
+    by_face: dict[str, list] = {}
+    for f in all_features:
+        by_face.setdefault(f.face, []).append(f)
+
+    face_breakdown = []
+    status_counts = {"shipped": 0, "partial": 0, "gap": 0, "regression": 0}
+    faces_with_features = set()
+
+    for face in all_faces:
+        feats = by_face.get(face.id, [])
+        if feats:
+            faces_with_features.add(face.id)
+        feat_statuses = []
+        for f in feats:
+            st = feature_status(f.id, db_path=db_path)
+            feat_statuses.append(st["status"])
+            status_counts[st["status"]] = status_counts.get(st["status"], 0) + 1
+
+        if not feats:
+            derived = "no-features"
+        elif "regression" in feat_statuses:
+            derived = "regression"
+        elif all(s == "gap" for s in feat_statuses):
+            derived = "gap"
+        elif all(s == "shipped" for s in feat_statuses):
+            derived = "shipped"
+        else:
+            derived = "partial"
+
+        face_breakdown.append({
+            "face_id": face.id,
+            "face_status": face.implementation_status,
+            "feature_count": len(feats),
+            "derived_status": derived,
+        })
+
+    faces_without_features = [
+        f.id for f in all_faces if f.id not in faces_with_features
+    ]
+
+    return {
+        "total_features": len(all_features),
+        "total_faces": len(all_faces),
+        "faces_with_features": len(faces_with_features),
+        "faces_without_features": faces_without_features,
+        "status_counts": status_counts,
+        "face_breakdown": face_breakdown,
+    }
