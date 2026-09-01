@@ -1,6 +1,6 @@
 ---
 title: Architecture Overview
-last_verified: 2026-09-01
+last_verified: 2026-09-02
 covers:
   - src/main/java/com/mcbot/mcbotserver/McBotServer.java
   - src/main/templates/META-INF/mods.toml
