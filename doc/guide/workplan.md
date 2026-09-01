@@ -393,6 +393,14 @@ dies (2026-08-29):
          the ride-bucking temper loop needs a mount+steer
          capability (mechanics survey in player-behavior-RE.md
          section 9).                          [dep: none]
+- [ ] S  Husbandry verb family: shear / feed / milk harness paths
+         over `Intent.InteractEntity` for the seeded
+         husbandry.shear_wool / breed_loop / passive_collect faces
+         - shear and milk need no kill, breed loops compound farmed
+         food into meat. The landed tame path is species-specific;
+         these need the general item-on-entity flows (mechanics in
+         player-behavior-RE.md section 9; status in workplan.yaml
+         gap-husbandry-verbs).                [dep: none]
 
 Combat envelope honesty (retired map "known limits", unchanged):
 melee standoff-kill; creeper trades hits (accepted risk); ranged

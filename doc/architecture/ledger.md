@@ -1129,4 +1129,9 @@ Amendment chains recorded so far (both sides annotated):
     decisions 24/26 and player-behavior-RE.md section 8) landed
     swept inside the concurrent docs round's 7bd7804 reformat and
     8d858f6 toolchain-merge commits; this entry and the boundaries
-    index row are the verdict of record.
+    index row are the verdict of record. Engine evidence:
+    huntsCowAndCollectsBeefYield and holdsFireWhenSightBlocked
+    green at gametest-20260902-033227 (144 scenarios; the first
+    run gametest-20260902-031909 caught both defects above);
+    grindstone-XP and walk-exhaustion reds are pre-existing
+    rotation (red since the 09-01 batches, unrelated domains).

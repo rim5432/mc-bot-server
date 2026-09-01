@@ -245,3 +245,11 @@ open_items:
     size: M
     deps: []
     note: "bot stays blind to the choice"
+
+  - id: gap-husbandry-verbs
+    title: "Husbandry verb family: shear / feed / milk harness paths over InteractEntity"
+    stage: "capability-gaps"
+    status: open
+    size: S
+    deps: []
+    note: "seeded faces husbandry.shear_wool / breed_loop / passive_collect (2026-09-02); the landed tame path is species-specific; mechanics in player-behavior-RE.md section 9"

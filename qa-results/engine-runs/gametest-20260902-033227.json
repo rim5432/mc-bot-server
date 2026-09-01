@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task": "runGameTest",
+  "log": "D:\\mc-bot-server\\tool\\.runtime\\build-runGameTest-20260902-033131.log",
+  "git_rev": "14efdb2",
+  "finished_at": "2026-09-02T03:32:27",
+  "scenarios_total": 144,
+  "failed_count": 2,
+  "failed": [
+    "grindstoneremovesenchantmentsandreturnsxp",
+    "walkaccumulatesexhaustionatdeviatedrate"
+  ],
+  "optional_failed_count": 1,
+  "failed_optional": [
+    "climbsladdertoplatform"
+  ],
+  "green": false
+}
