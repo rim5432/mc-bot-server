@@ -113,8 +113,8 @@ public final class EventKind {
 
     /**
      * An eat attempt reached the adapter but consumed nothing. Carries
-     * attrs {@code reason} (NOT_HUNGRY / NO_FOOD / NOT_EDIBLE /
-     * SLOT_EMPTY), {@code slot}, {@code itemId}. Not urgent.
+     * attrs {@code reason} (NOT_HUNGRY / NOT_EDIBLE / SLOT_EMPTY),
+     * {@code slot}, {@code itemId}, {@code source}. Not urgent.
      */
     public static final String EAT_FAILED = "EAT_FAILED";
 
@@ -138,8 +138,13 @@ public final class EventKind {
      * chain (consumable-face extension of EAT_COMPLETED). Carries
      * attrs {@code potionId}, {@code slot}, {@code effects}
      * (comma-separated "id:amplifier:duration"; instantaneous
-     * effects have duration 0), {@code containerType}
-     * ("glass_bottle" or "none"), {@code source}. Not urgent — the
+     * effects have duration 1 — vanilla Potions.HEALING registers
+     * MobEffectInstance(HEAL, 1, 0)), {@code containerType}
+     * ("glass_bottle" for potions, "bucket" for milk),
+     * {@code containerDropped} ("true" if the recovered container
+     * was dropped because inventory was full, "false" otherwise —
+     * count=1 drinks always place the container in the selected
+     * slot, so this is "false"), {@code source}. Not urgent — the
      * harness learns the result at its next event drain.
      */
     public static final String DRINK_COMPLETED = "DRINK_COMPLETED";

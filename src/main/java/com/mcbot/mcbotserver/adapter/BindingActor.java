@@ -499,8 +499,9 @@ public final class BindingActor implements Actor {
      * Serialize a potion's effect list into the DRINK_COMPLETED wire
      * format: comma-separated "id:amplifier:duration" triples.
      * Instantaneous effects (instant health, instant damage) carry
-     * duration 0 — the harness distinguishes them by effect id. An
-     * empty list yields "" (not null), so the attr is always present.
+     * duration 1 — vanilla Potions.HEALING registers
+     * MobEffectInstance(HEAL, 1, 0), not 0. An empty list yields ""
+     * (not null), so the attr is always present.
      *
      * @param effects the potion's effect instances; never null
      * @return the serialized string, possibly empty
