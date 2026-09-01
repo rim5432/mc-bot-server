@@ -170,6 +170,11 @@ public final class BotCombatGameTests {
                             !GametestRig.eventSeen(rig.events(), EventKind.TASK_PAUSED),
                             "a standoff-range skeleton must not trip the engage " + "reflex (no TASK_PAUSED expected)");
                     rig.body().discard();
+                    // The skeleton survives the standoff assertion - it
+                    // must not survive the scenario: a leaked hostile
+                    // wanders the wall-less structures and jams later
+                    // geometry (the sneakcrawl gap family).
+                    skeleton.discard();
                 })
                 .thenSucceed();
     }
@@ -836,6 +841,62 @@ public final class BotCombatGameTests {
                 .thenExecuteAfter(0, () -> {
                     check(rig.body().isAlive(), "the standoff must be safe");
                     rig.body().discard();
+                    // NoAi does not exempt the zombie from the leak
+                    // discipline: it still absorbs later scenarios'
+                    // arrows and scans from its spot.
+                    zombie.discard();
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Scenario: the ranged stance follows the live loadout, not the
+     * engage-time snapshot. A bow carrier holds the standoff while
+     * ammunition lasts; once the arrows are gone the same fight
+     * re-routes to the swing rim - the mission keeps its target and
+     * only the goal flips (GoalRange standoff to GoalNear charge).
+     * The zombie is NoAi and invulnerable: this scenario pins the
+     * STANCE transition, not damage delivery, so the target cannot
+     * die or fight back mid-flight and the geometry stays
+     * deterministic.
+     */
+    // feature: combat.hostile_acquisition.mid_fight_loadout_reroute
+    @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
+    public static void arrowsRunOutMidFightReroutesToMelee(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
+        var container = rig.body().getInventory().container();
+        container.setItem(0, new ItemStack(Items.BOW));
+        container.setItem(1, new ItemStack(Items.ARROW, 64));
+        Zombie zombie = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(8, GametestRig.WALK_Y, 8));
+        zombie.setNoAi(true);
+        zombie.setInvulnerable(true);
+
+        helper.startSequence()
+                .thenExecuteAfter(0, () -> submitDefend(rig))
+                .thenWaitUntil(driveUntil(rig, () -> {
+                    // Wall-less structures admit strays mid-run (the
+                    // sneakcrawl jam family): sweep so the stance
+                    // transition, not contamination luck, is what
+                    // this scenario measures.
+                    GametestRig.sweepForeignEntities(helper, rig.body(), zombie);
+                    check(
+                            Math.abs(rig.body().getBlockX() - zombie.getBlockX()) >= 8,
+                            "the standoff must open before the reroute; dist="
+                                    + Math.abs(rig.body().getBlockX() - zombie.getBlockX()));
+                }))
+                .thenExecuteAfter(0, () -> container.setItem(1, ItemStack.EMPTY))
+                .thenWaitUntil(driveUntil(rig, () -> {
+                    GametestRig.sweepForeignEntities(helper, rig.body(), zombie);
+                    check(
+                            Math.abs(rig.body().getBlockX() - zombie.getBlockX()) <= 4,
+                            "arrows gone must charge the swing rim; dist="
+                                    + Math.abs(rig.body().getBlockX() - zombie.getBlockX()));
+                }))
+                .thenExecuteFor(GametestRig.SETTLE_TICKS, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    check(rig.body().isAlive(), "the rerouted fight must stay survivable");
+                    rig.body().discard();
+                    zombie.discard();
                 })
                 .thenSucceed();
     }
@@ -906,6 +967,9 @@ public final class BotCombatGameTests {
                             "after backing away the separation must be at least the band min; dist=" + finalDist
                                     + " bodyX=" + rig.body().getBlockX() + " targetX=" + zombie.getBlockX());
                     rig.body().discard();
+                    // The kite only requires a health drop - the zombie
+                    // walks away alive unless the tail retires it.
+                    zombie.discard();
                 })
                 .thenSucceed();
     }
@@ -1050,6 +1114,9 @@ public final class BotCombatGameTests {
                             "the hand pump must own the USE channel: a reflex-engage mission here means"
                                     + " the target spawned inside the trigger radius");
                     rig.body().discard();
+                    // The weak-tap assertion leaves the zombie standing;
+                    // retire it with the body.
+                    fullDraw.discard();
                 })
                 .thenSucceed();
     }

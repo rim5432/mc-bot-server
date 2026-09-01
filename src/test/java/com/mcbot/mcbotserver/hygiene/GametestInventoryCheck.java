@@ -53,7 +53,11 @@ class GametestInventoryCheck {
                             "climbsLadderToPlatform")),
             Map.entry(
                     "BotInteractionGameTests",
-                    Set.of("doorOpensThroughUseChain", "stairsFaceTheirPlacer", "sleepVerbSkipsToMorningOnlyFromABed")),
+                    Set.of(
+                            "doorOpensThroughUseChain",
+                            "stairsFaceTheirPlacer",
+                            "sleepVerbSkipsToMorningOnlyFromABed",
+                            "useItemOnDeviationsConfirmed")),
             Map.entry(
                     "BotCombatGameTests",
                     Set.of(
@@ -73,7 +77,8 @@ class GametestInventoryCheck {
                             "rearArrowBypassesTheRaisedShield",
                             "bowTapShotDealsWeakDamage",
                             "blocksIncomingArrowsMidCombat",
-                            "rangedBotBacksAwayWhenTargetClosesInsideMin")),
+                            "rangedBotBacksAwayWhenTargetClosesInsideMin",
+                            "arrowsRunOutMidFightReroutesToMelee")),
             Map.entry(
                     "BotHazardReflexGameTests",
                     Set.of(
@@ -103,7 +108,8 @@ class GametestInventoryCheck {
                             "enchantsThroughMenuButton",
                             "xpSurvivesMenuCycles",
                             "xpNeededPerLevelMatchesVanilla",
-                            "villagerTradeMenuOpens")),
+                            "villagerTradeMenuOpens",
+                            "classifiesArmorPiecesByRegistryId")),
             Map.entry(
                     "BotCraftingGameTests",
                     Set.of(
@@ -124,7 +130,35 @@ class GametestInventoryCheck {
                     Set.of(
                             "healingPotionRestoresHealthAndLeavesGlassBottle",
                             "potionStackCountTwoKeepsRemainderAndAddsBottle",
-                            "milkBucketClearsEffectsAndLeavesBucket")),
+                            "milkBucketClearsEffectsAndLeavesBucket",
+                            "brewingStandBrewsWaterBottleWithNetherWart",
+                            "brewingStandFuelSlotRejectsNonBlazePowder",
+                            "brewingStandSlotRolesAreCorrect",
+                            "brewingStandThreeBottlesBrewSimultaneously")),
+            Map.entry(
+                    "BotAnvilGameTests",
+                    Set.of(
+                            "anvilCombinesEnchantmentsFromBook",
+                            "anvilPriorWorkPenaltyIncreases",
+                            "anvilRepairsItemWithMaterial",
+                            "grindstoneRemovesEnchantmentsAndReturnsXP",
+                            "grindstoneRepairsItemByCombining")),
+            Map.entry(
+                    "BotFurnaceGameTests",
+                    Set.of(
+                            "blastFurnaceSmeltsIronOre",
+                            "furnaceFuelSlotRejectsNonFuel",
+                            "furnaceSlotRolesAreCorrect",
+                            "furnaceSmeltsIronOreWithCoal",
+                            "smokerCooksRawBeef")),
+            Map.entry(
+                    "BotWorkstationGameTests",
+                    Set.of(
+                            "loomAppliesBannerPattern",
+                            "smithingTableUpgradesDiamondToNetherite",
+                            "stonecutterCutsStoneIntoStairs",
+                            "stonecutterInputRejectsNonStone",
+                            "workstationSlotRolesAreCorrect")),
             Map.entry("CrashRecoveryGameTests", Set.of("latchesAndRecoversAfterCrash")),
             Map.entry("ProductionWiringGameTests", Set.of("walksViaCommandAndServerTick")),
             Map.entry(

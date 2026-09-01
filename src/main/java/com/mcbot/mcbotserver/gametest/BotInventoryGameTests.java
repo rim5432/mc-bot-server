@@ -784,7 +784,59 @@ public final class BotInventoryGameTests {
                     var menu = opener.openEntity(villager.getId());
                     check(menu.isPresent(), "openEntity must bind the villager trade menu");
                     rig.body().discard();
+                    // The opened menu keeps the villager referenced; it
+                    // must not linger as a pooled-run stray either.
+                    villager.discard();
                 })
                 .thenSucceed();
+    }
+
+    /**
+     * Scenario: VanillaArmorCatalog classifies every vanilla armor item
+     * into the correct own-inventory flat slot (5..8, head..feet) with
+     * its defense value as the protection rank, and returns null for
+     * non-armor items. The catalog is the wear planner data source; a
+     * wrong slot or defense value silently mis-orders wear candidates.
+     *
+     * <p>Why a gametest and not an offline unit: the catalog walks
+     * ForgeRegistries.ITEMS, which only freezes at server start. An
+     * offline test would see an empty registry and classify nothing.
+     */
+    // capability: inventory.armor_classification
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void classifiesArmorPiecesByRegistryId(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+        var catalog = new com.mcbot.mcbotserver.adapter.VanillaArmorCatalog();
+
+        var ironHelmet = catalog.classify("minecraft:iron_helmet");
+        check(ironHelmet != null, "iron_helmet must classify as armor");
+        checkEquals(5, ironHelmet.armorSlot(), "iron_helmet must map to HEAD flat slot 5");
+        checkEquals(2, ironHelmet.protection(), "iron_helmet protection must be 2");
+
+        var turtleShell = catalog.classify("minecraft:turtle_helmet");
+        check(turtleShell != null, "turtle_helmet must classify as armor");
+        checkEquals(5, turtleShell.armorSlot(), "turtle_helmet must map to HEAD flat slot 5");
+        checkEquals(2, turtleShell.protection(), "turtle_helmet protection must be 2");
+
+        var diamondChest = catalog.classify("minecraft:diamond_chestplate");
+        check(diamondChest != null, "diamond_chestplate must classify as armor");
+        checkEquals(6, diamondChest.armorSlot(), "diamond_chestplate must map to CHEST flat slot 6");
+        checkEquals(8, diamondChest.protection(), "diamond_chestplate protection must be 8");
+
+        var ironLeggings = catalog.classify("minecraft:iron_leggings");
+        check(ironLeggings != null, "iron_leggings must classify as armor");
+        checkEquals(7, ironLeggings.armorSlot(), "iron_leggings must map to LEGS flat slot 7");
+        checkEquals(5, ironLeggings.protection(), "iron_leggings protection must be 5");
+
+        var diamondBoots = catalog.classify("minecraft:diamond_boots");
+        check(diamondBoots != null, "diamond_boots must classify as armor");
+        checkEquals(8, diamondBoots.armorSlot(), "diamond_boots must map to FEET flat slot 8");
+        checkEquals(3, diamondBoots.protection(), "diamond_boots protection must be 3");
+
+        check(catalog.classify("minecraft:diamond_sword") == null, "diamond_sword must not classify as armor");
+        check(catalog.classify("minecraft:oak_planks") == null, "oak_planks must not classify as armor");
+
+        rig.body().discard();
+        helper.succeed();
     }
 }

@@ -356,6 +356,13 @@ public final class BotLocomotionGameTests {
                 .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
                     // Re-armed every tick: claims expire at flush.
                     rig.actor().submit(new Claim(Channel.MOVE, 50, "test:sneak", new Intent.Move(1, 0, false, true)));
+                    // The shared template is wall-less and structures
+                    // sit 5 blocks apart, so a hostile leaked from
+                    // another scenario can walk in MID-crawl and jam
+                    // the 1-wide gap head-on - the X=7 freeze family.
+                    // Sweeping every tick makes this scenario measure
+                    // the crawl contract, not contamination luck.
+                    GametestRig.sweepForeignEntities(helper, rig.body());
                     check(
                             rig.body().getBlockX() >= 9,
                             "waiting for the body to cross the crawl gap (X="
