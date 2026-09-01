@@ -44,8 +44,17 @@ class EnglishOnlyScan {
      */
     private static final Set<String> ALLOWED_DATA_FILES = Set.of();
 
-    /** Fails listing every violation when any covered file carries
-     * a CJK codepoint. */
+    /**
+     * Known canary violations — set-equality assertion, not zero. A
+     * missing canary means the scan went blind (walk root moved, file
+     * filter changed, codepoint detector broken); an extra violation
+     * means CJK leaked into a covered file. The canary lives in
+     * hygiene/CanaryEnglish.java as a Javadoc-line codepoint (U+6C49).
+     */
+    private static final List<String> EXPECTED_CANARY_VIOLATIONS =
+            List.of("src/test/java/com/mcbot/mcbotserver/hygiene/CanaryEnglish.java:10: U+6C49 '\u6C49'");
+
+    /** Fails when the violation set drifts from the canary set. */
     @Test
     void coveredTreesCarryZeroCjkCodepoints() throws IOException {
         Path root = RepoRoot.find();
@@ -55,11 +64,11 @@ class EnglishOnlyScan {
             scanJavaTree(root.resolve(tree), root, violations);
         }
         assertEquals(
-                List.of(),
+                EXPECTED_CANARY_VIOLATIONS,
                 violations,
-                "CJK codepoints leaked into mandate-covered sources"
-                        + " (AGENTS.md 0.3, code-health.md H-R3):\n"
-                        + String.join("\n", violations)
+                "CJK gate drift (missing canary = blind, extra = leak):\n"
+                        + "expected: " + EXPECTED_CANARY_VIOLATIONS + "\n"
+                        + "actual:   " + violations
                         + "\nTranslate the offending prose to English; citations"
                         + " from non-English sources are English translations,"
                         + " never reproduced originals. A genuine data literal"

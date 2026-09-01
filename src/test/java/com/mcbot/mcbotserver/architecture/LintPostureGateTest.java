@@ -43,6 +43,13 @@ class LintPostureGateTest {
      * inline justification). No task softens with ignoreFailures.
      * The checkstyle analyzer JVM runs on Java 21 (checkstyle 14 needs
      * it; the mod toolchain stays 17).
+     *
+     * <p>SpotBugs toolVersion is pinned because the NP capability set is
+     * version-sensitive: 4.10.4 is verified (2026-09-01 injection probe)
+     * SILENT on both computeIfAbsent-then-get and assignment-then-deref
+     * of Map.get() return values. A version bump must re-run the NP probe
+     * before this pin moves — the gate's documented null-surface blind
+     * spots depend on this fact.
      */
     private static final List<Posture> PINNED_POSTURES = List.of(
             new Posture(
@@ -57,7 +64,9 @@ class LintPostureGateTest {
             new Posture(
                     "tasks.withType(com.github.spotbugs.snom.SpotBugsTask).configureEach {",
                     List.of("enabled = project.hasProperty('lint')")),
-            new Posture("spotbugs {", List.of("excludeFilter = file('config/spotbugs/exclude.xml')")),
+            new Posture(
+                    "spotbugs {",
+                    List.of("toolVersion = '4.10.4'", "excludeFilter = file('config/spotbugs/exclude.xml')")),
             new Posture("options.errorprone {", List.of("enabled = project.hasProperty('lint')")),
             new Posture("tasks.register('cpdCheck', JavaExec) {", List.of("enabled = project.hasProperty('lint')")),
             new Posture("tasks.register('qualityCheck') {", List.of("'pmdMain'", "'spotbugsTest'", "'spotlessCheck'")));

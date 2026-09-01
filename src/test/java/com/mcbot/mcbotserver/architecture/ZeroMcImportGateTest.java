@@ -37,8 +37,19 @@ class ZeroMcImportGateTest {
     };
 
     /**
+     * Known canary violations — the gate assertion is set-equality, not
+     * zero: a missing canary means the scan went blind (scope shrank, walk
+     * root moved, comment-detection dropped); an extra violation means a
+     * real MC import appeared. The canary lives in
+     * core/CanaryNotes.java as a commented import (commented-out code is
+     * banned by AGENTS.md 1.4; catching it here is the gate's job).
+     */
+    private static final List<String> EXPECTED_CANARY_VIOLATIONS =
+            List.of("CanaryNotes.java:27: // canary(zeromc): import net.minecraft.world.level.Level;");
+
+    /**
      * Fail with a per-file violation report when any api/ or core/
-     * source file contains a forbidden import line.
+     * source file contains a forbidden import line (real or commented-out).
      */
     @Test
     void apiAndCoreTreesHaveZeroMcImports() throws IOException {
@@ -50,7 +61,11 @@ class ZeroMcImportGateTest {
             scanTree(pkgDir, violations);
         }
         assertEquals(
-                List.of(), violations, "MC imports leaked into the pure-Java trees:\n" + String.join("\n", violations));
+                EXPECTED_CANARY_VIOLATIONS,
+                violations,
+                "MC import gate drift (zero means blind, extra means leak):\n"
+                        + "expected canary set: " + EXPECTED_CANARY_VIOLATIONS + "\n"
+                        + "actual: " + violations);
     }
 
     private void scanTree(Path root, List<String> violations) throws IOException {
@@ -69,9 +84,13 @@ class ZeroMcImportGateTest {
         }
         for (int i = 0; i < lines.size(); i++) {
             String trimmed = lines.get(i).trim();
+            boolean isComment = trimmed.startsWith("//");
             for (String forbidden : FORBIDDEN_PREFIXES) {
-                if (trimmed.startsWith(forbidden)) {
+                boolean realImport = trimmed.startsWith(forbidden);
+                boolean commentedImport = isComment && trimmed.contains(forbidden);
+                if (realImport || commentedImport) {
                     violations.add(file.getFileName() + ":" + (i + 1) + ": " + trimmed);
+                    break;
                 }
             }
         }

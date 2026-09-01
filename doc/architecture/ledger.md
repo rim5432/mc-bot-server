@@ -971,3 +971,37 @@ Amendment chains recorded so far (both sides annotated):
     pickup close, bow pickup open, skeleton refusal, churn guard)
     and in-engine by arrowsRunOutMidFightReroutesToMelee (NoAi
     invulnerable target, stance-only assertions).
+    59. 2026-09-01 Static-analysis meta-layer: canary bidirectional
+    pinning + exemption registry triage + SpotBugs NP capability probe.
+    Three rulings. (a) Injection probe verified SpotBugs 4.10.4 NP is
+    silent on assignment-then-deref of Map.get() return value
+    (var x = map.get(k); x.method()) — same disease as the
+    computeIfAbsent-then-get silence recorded in decision 55. Core/
+    assignment-form null surface is therefore unguarded; NullAway-core
+    expansion is deferred to the next round with trigger conditions
+    (core/ volume doubles, or a null incident occurs). LintPostureGateTest
+    pins the SpotBugs toolVersion string so any version bump forces a
+    re-run of the NP probe before the pin moves. (b) Three text-scan
+    gates (ZeroMcImport, GetDerefGateTest, EnglishOnlyScan) refactored
+    from zero-violation assertion to canary set-equality: a synthetic
+    violation in core/CanaryNotes.java (commented MC import, simple-arg
+    get-deref) and test/hygiene/CanaryEnglish.java (CJK codepoint)
+    proves each gate is live; a missing canary means the scan went blind
+    (regex changed, scope shrank, walk root moved), an extra violation
+    means a real defect. ZeroMcImport additionally catches commented-out
+    imports (commented code is banned, AGENTS.md 1.4). The nested-arg
+    get-deref form (get(f(k)).x()) is pinned as a must-not-match canary
+    — the regex [^)]* stops at the first close paren; changing the regex
+    to catch it forces boundary re-registration. BoundaryContractMarkerTest
+    already had ANCHORS positive control plus ADR/issue target
+    resolvability (decision 55 follow-up), so no canary refactor needed.
+    (c) Exemption registry (config/spotbugs/exclude.xml, 8 Match blocks)
+    triaged: every block now carries a STATUS element — either
+    "permanent" (architectural decision the bug pattern cannot model:
+    ThreatBlackboard mutable scratchpad ADR-0003, CommandBus/VerbTaskHandler
+    DI, MissionShell constructor fail-fast, two test-fixture blocks) or
+    "trigger" (InMemoryEventQueue AT_NONATOMIC x3: reverify when any wire
+    dispatch path calls EventQueue from off-thread; premise is all
+    dispatch marshals to tick thread, verified against decompiled tree
+    2026-09-01). The three-element discipline (justification + target +
+    status/trigger) is now declared in the exclude.xml header.

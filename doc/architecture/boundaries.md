@@ -412,6 +412,16 @@ ordering-critical numbers sit behind test gates, not behind prose.
 | 56 | Steering frame decoupling + band-aware progress: MOVE decomposition against a BodyYawSource (strafe/backpedal kiting when the combat aim owns ROT), Goals.distanceOf feeds fuse criterion 2 + NO_PATH witnesses; amends 54's environmental misattribution | 2026-09-01 |
 | 57 | Pooled-run hostile leaks: wall-less shared template + 5-block structure spacing + tickPresence recruitment funnel leaked hostiles through later scenarios' 1-wide geometry (the sneakcrawl jam); leak-site tail discards + per-tick foreign sweep where the passable geometry is one cell wide; failed-scenario leaks linger until a later sweep (no pass/fail listener in 1.20.1) | 2026-09-01 |
 | 58 | DefendProcess mid-fight stance re-route: the ranged-vs-melee decision is re-derived every engaged tick from the live loadout through the same predicate family as engage; ranged-typed target with a vanished loadout refuses rather than unarmed-chases; target identity stays locked | 2026-09-01 |
+| 59 | Static-analysis meta-layer: canary bidirectional pinning for three text-scan gates (ZeroMcImport commented-import + getderef simple-arg + EnglishOnly CJK; nested-arg get-deref pinned as must-not-match blind spot); SpotBugs 4.10.4 NP verified silent on assignment-then-deref (injection probe), NullAway-core deferred with triggers; exemption registry triaged to three-element discipline (justification + target + permanent/trigger status), InMemoryEventQueue AT_NONATOMIC trigger tied to off-thread dispatch path changes | 2026-09-01 |
+
+**CI enforcement (outside-repo-unverifiable):** the static-analysis job
+(`.github/workflows/ci.yml`, runs `qualityCheck -Plint` on every push and
+pull_request) is asserted to be a required branch-protection check. Branch
+protection lives in GitHub Settings, not in any git object, so this
+assertion cannot be proven from repository content. Verification is a
+one-time human check of the Settings/Branches page. Recorded here so a
+future agent does not infer "CI runs it" from ci.yml alone and mistake
+presence for enforcement. Decision 55 registers the same fact.
 
 ## Deferred, with reopen conditions
 

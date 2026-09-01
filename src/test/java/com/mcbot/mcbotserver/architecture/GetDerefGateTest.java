@@ -28,16 +28,30 @@ import org.junit.jupiter.api.Test;
  *   <li>assignment-then-unchecked-use (CommandBus-type missed check:
  *       {@code var x = map.get(k); x.method()} without a null check) —
  *       the get and the deref are on different lines, the line scanner
- *       cannot connect them.</li>
+ *       cannot connect them. <strong>Verified 2026-09-01 via injection
+ *       probe: SpotBugs 4.10.4 NP is SILENT on this pattern</strong>
+ *       (same disease as computeIfAbsent-then-get). This is an unguarded
+ *       null surface in core/; closure requires NullAway expansion into
+ *       core/ (deferred, next-round main debt per the B1 probe verdict).</li>
+ *   <li>nested function arguments: {@code get(f(k)).x()} is not caught
+ *       because {@code [^)]*} stops at the first {@code )} inside the
+ *       argument list. Zero live sites in api/ + core/ as of 2026-09-01;
+ *       the canary set pins this boundary.</li>
  *   <li>whether a particular get is on a List (index-safe within bounds)
  *       vs a Map (key-absent returns null) — a source scan has no type
  *       info.</li>
  * </ul>
- * Closing either requires an Error Prone custom BugChecker (AST + type
- * resolution) or NullAway expansion into core/. Both are deferred upgrade
- * paths, not current gaps: the assignment-type missed check is covered by
- * SpotBugs NP checks on core/, and the List/Map distinction is a
+ * Closing the first two requires an Error Prone custom BugChecker (AST +
+ * type resolution, can see across statements and into nested args) or
+ * NullAway expansion into core/. The List/Map distinction is a
  * false-positive tax the text gate pays for zero dependencies.
+ *
+ * <p>Task path: runs in the default {@code test} task (no {@code -Plint}
+ * required), alongside EnglishOnlyScan and ZeroMcImport — the architecture
+ * gate set is part of every commit's compile+test flow, not the lint-only
+ * dashboard. This is the "feedback-distance inversion": EP/NullAway/SpotBugs
+ * ride -Plint (CI static-analysis job), but this text gate is in the default
+ * loop, closer to the developer.
  *
  * <p>Scope: api/ + core/ only, matching SpotBugs onlyAnalyze and the
  * JaCoCo offline-tested exclusions. adapter/, client/, gametest/, and
@@ -70,7 +84,20 @@ class GetDerefGateTest {
      */
     private static final Set<String> EXEMPT_FILES = Set.of();
 
-    /** Fails listing every violation when any api/ or core/ source carries a chained get-deref. */
+    /**
+     * Known canary violations — set-equality assertion, not zero. A
+     * missing canary means the scan went blind (regex changed, scope
+     * shrank, walk root moved); an extra violation means a real get-deref
+     * appeared. The must-match canary (simple-arg chain) lives in
+     * core/CanaryNotes.java:28; the must-not-match canary (nested-arg
+     * chain, line 29) must NOT appear here — it pins the regex blind
+     * spot documented in the class Javadoc.
+     */
+    private static final List<String> EXPECTED_CANARY_VIOLATIONS =
+            List.of("src/main/java/com/mcbot/mcbotserver/core/CanaryNotes.java:28: "
+                    + "// canary(getderef): state.get(ruleName).lastPriority");
+
+    /** Fails when the violation set drifts from the canary set. */
     @Test
     void offlineLayersHaveZeroChainedGetDerefs() throws IOException {
         Path root = RepoRoot.find();
@@ -80,10 +107,11 @@ class GetDerefGateTest {
             scanTree(moduleDir, root, violations);
         }
         assertEquals(
-                List.of(),
+                EXPECTED_CANARY_VIOLATIONS,
                 violations,
-                "chained get-deref patterns in offline-testable layers:\n"
-                        + String.join("\n", violations)
+                "get-deref gate drift (missing canary = blind, extra = leak):\n"
+                        + "expected: " + EXPECTED_CANARY_VIOLATIONS + "\n"
+                        + "actual:   " + violations
                         + "\nExtract the get result to a local variable, or guard with has()/containsKey()"
                         + " before dereferencing. If the site is genuinely safe (List.get with bounds"
                         + " check, keySet-origin key), register it in EXEMPT_FILES with a reason.");

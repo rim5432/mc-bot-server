@@ -1,17 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   SpotBugs suppression registry (red wall since the 2026-09-01 first-triage
-  flip). Every Match carries its justification inline: a finding suppressed
-  here is accepted with a reason, not invisible. A NEW SpotBugs finding
-  fails qualityCheck and must either be fixed at the root or land here with
-  its own reason.
+  flip). Every Match carries three elements: (1) justification inline,
+  (2) target class(es), (3) STATUS — either "permanent" (an architectural
+  decision the bug pattern cannot model) or "trigger: <condition>" (the
+  exemption's premise; a change that violates the premise forces
+  re-verification). A finding suppressed here is accepted with a reason,
+  not invisible. A NEW SpotBugs finding fails qualityCheck and must
+  either be fixed at the root or land here with all three elements.
 -->
 <FindBugsFilter>
 
   <!-- ADR-0003 rules ThreatBlackboard a mutable reflex scratch struct: the
        reflex seat writes these fields per tick, reflex rules read them;
        encapsulation would not change ownership, only add accessor noise on
-       a hot per-tick path. -->
+       a hot per-tick path. Single-threaded by policy (class Javadoc).
+       STATUS: permanent — ADR-0003 mutable-scratchpad decision; fields
+       carry no invariants and are independently set/read. -->
   <Match>
     <Bug pattern="PA_PUBLIC_PRIMITIVE_ATTRIBUTE"/>
     <Class name="com.mcbot.mcbotserver.api.reflex.ThreatBlackboard"/>
@@ -19,7 +24,10 @@
 
   <!-- Constructor/setter storing an injected collaborator is dependency
        injection, not representation exposure: the bus and queue are
-       container-owned, the holder never hands them back out. -->
+       container-owned, the holder never hands them back out. Both holders
+       are in core/; EventQueue (api/) is the correct dependency direction.
+       STATUS: permanent — DI pattern; composition root owns the shared
+       instances and intends them to be shared. -->
   <Match>
     <Bug pattern="EI_EXPOSE_REP2"/>
     <Or>
@@ -31,7 +39,10 @@
   <!-- No finalizer exists anywhere in the mission hierarchy, and finalize()
        is deprecated for removal - there is no attacker for the
        partially-initialized-instance shape. Identity validation stays in
-       the constructor on purpose: fail fast on a malformed mission triple. -->
+       the constructor on purpose: fail fast on a malformed mission triple.
+       STATUS: permanent — standard constructor validation; Java 17 has no
+       finalizer attack surface; abstract class hierarchy makes static
+       factory impractical (subclass constructors call super). -->
   <Match>
     <Bug pattern="CT_CONSTRUCTOR_THROW"/>
     <Class name="com.mcbot.mcbotserver.core.process.MissionShell"/>
@@ -43,7 +54,12 @@
        the tick thread), BotControlSocket via server.execute + latch -
        verified against the decompiled tree 2026-09-01. The flagged fields
        never cross a thread boundary; atomics would paper over the false
-       positive and imply a memory model this queue does not need. -->
+       positive and imply a memory model this queue does not need.
+       STATUS: trigger — reverify when any wire dispatch path (RCON handler,
+       BotControlSocket, netty pipeline) calls EventQueue.push/poll/reset
+       from a thread other than the server tick thread. Premise: all
+       dispatch marshals to tick thread. A commit touching dispatch code
+       that introduces off-thread queue access invalidates this exemption. -->
   <Match>
     <Bug pattern="AT_NONATOMIC_64BIT_PRIMITIVE"/>
     <Class name="com.mcbot.mcbotserver.core.event.InMemoryEventQueue"/>
@@ -59,14 +75,16 @@
 
   <!-- Test fixture blessed by RecordingActor's Javadoc: returning the
        remembered lastFlush map is the fixture's whole purpose - tick gates
-       assert on it without intercepting the controller call chain. -->
+       assert on it without intercepting the controller call chain.
+       STATUS: permanent — test-only fixture; no production code path. -->
   <Match>
     <Bug pattern="EI_EXPOSE_REP"/>
     <Class name="com.mcbot.mcbotserver.core.tick.PipelineActor"/>
   </Match>
 
   <!-- assertThrows lambdas: the discarded return value IS the exception
-       contract; SpotBugs cannot see through the JUnit lambda boundary. -->
+       contract; SpotBugs cannot see through the JUnit lambda boundary.
+       STATUS: permanent — test-only assertThrows pattern. -->
   <Match>
     <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT"/>
     <Class name="com.mcbot.mcbotserver.api.menu.CraftingViewTest"/>
