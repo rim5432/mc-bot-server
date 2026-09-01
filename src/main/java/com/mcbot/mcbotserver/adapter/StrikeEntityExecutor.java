@@ -19,10 +19,12 @@ import net.minecraft.world.entity.LivingEntity;
  * <p>Deliberate deviation from the vanilla client press: a player
  * hurts what the crosshair names, the device resolves the claim's
  * entity id against the server level - the same mechanical
- * equivalent the melee path replaced with a cone. Reach uses the
- * melee surface radius (the resolver's own envelope); the resolver's
- * item-derived cooldown, self-timed here, keeps a fast claim pulse
- * from leaking machine-gun hits.
+ * equivalent the melee path replaced with a cone. Gates mirror the
+ * cone path's discipline: the shared melee surface reach, the
+ * resolver's line-of-sight and lava checks (no swinging through
+ * cover a walled target owns - the holdsFireWhenSightBlocked pin),
+ * and the resolver's item-derived cooldown, self-timed here, which
+ * keeps a fast claim pulse from leaking machine-gun hits.
  *
  * <p>Contract: see boundaries.md decision 25 (all mutation behind the
  * claim surface); USE stays entity-melee per the 0007 review.
@@ -76,6 +78,17 @@ public final class StrikeEntityExecutor {
         }
         double surfDistSq = target.getBoundingBox().distanceToSqr(body.getEyePosition());
         if (surfDistSq > MeleeResolver.MELEE_REACH_SURFACE * MeleeResolver.MELEE_REACH_SURFACE) {
+            return false;
+        }
+        // The wall discipline the cone path carries: no swing through
+        // blocked sight or lava. Vanilla Player.attack gates on reach
+        // only, but the resolver's deviation (cone + LOS + lava) is
+        // what keeps a walled target undamageable - the addressed
+        // strike inherits it, or a directed order could hit through
+        // cover the reflex path must respect.
+        var eye = body.getEyePosition();
+        var targetCenter = target.position().add(0, target.getBbHeight() / 2, 0);
+        if (resolver.sightBlocked(eye, targetCenter) || resolver.lavaBetween(eye, targetCenter)) {
             return false;
         }
         // The body is a PathfinderMob with no vanilla charge ticker,

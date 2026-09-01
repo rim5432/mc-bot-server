@@ -1,4 +1,4 @@
-# AGENTS.md — mc-bot-server Specification
+﻿# AGENTS.md — mc-bot-server Specification
 
 > Mandatory specification for every AI agent and human collaborator
 > in this repository: a checklist of hard constraints, not a design
@@ -86,8 +86,8 @@ Edit policy by subtree:
   frozen, vocabulary may grow; its decision index resolves every
   `decision N` citation.
 - `ledger.md` - append-only verdicts. Entries extend only forward;
-  amendments annotate both entries; absorbing an issue means
-  archiving it in the same commit.
+  amendments annotate both entries; absorbing an issue means deleting
+  it in the same commit (no archive - the ledger entry is the record).
 - `harness-interaction.md` - canonical interaction model; clause
   changes land there first, the ledger summary follows; new task
   verb / path root / consumer kind reopens its audit.
@@ -96,15 +96,16 @@ Edit policy by subtree:
 - `workplan.md` - items reorder by dependency, never by date; do not
   start an item before its blockers are done.
 - `reference/*-notes.md` - read-only; updates require a new doc plus
-  archiving the old one.
+  deleting the old one (no archive).
 - `issues/NNNN-slug.md` - filenames use 4-digit zero-padded numbers,
   globally unique, never reused. Status vocabulary:
   `open` / `parked` / `resolved`. Bodies hold problem / ruling /
   contract / deferred-with-reopen only - progress narratives belong
-  to commits and the ledger. Resolution moves the file to
-  `issues/archive/` with `superseded_by:` pointing at the absorbing
-  record; an exceptional design outcome promotes to an ADR behind a
-  pointer stub. Each issue cross-references the boundary sections
+  to commits and the ledger. Resolution deletes the file after its
+  core invariants have been absorbed into boundaries.md / ledger.md /
+  code Javadoc; an exceptional design outcome promotes to an ADR
+  behind a pointer stub. No archive directory - resolved issues are
+  deleted, not moved. Each issue cross-references the boundary sections
   and source paths it owns in `covers:`.
 
 Workflow: edit covered code -> update the covering doc in the same

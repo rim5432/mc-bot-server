@@ -364,7 +364,7 @@ final class MeleeResolver {
                             + " target center. A hit before the target (minus 0.35 grazing slack) blocks the swing."
                             + " Lava is transparent to this clip — see lavaBetween for the complementary check.",
             vanillaRef = "Player.hasLineOfSight (decompiled 1.20.1)")
-    private boolean sightBlocked(Vec3 eye, Vec3 targetCenter) {
+    boolean sightBlocked(Vec3 eye, Vec3 targetCenter) {
         var clip = body.level()
                 .clip(new ClipContext(eye, targetCenter, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, body));
         if (clip.getType() == HitResult.Type.MISS) {
@@ -393,7 +393,7 @@ final class MeleeResolver {
                     + " special-case lava",
             deviation = "Bot-specific: melee across lava is impossible, so pretending otherwise turns the bot into a"
                     + " sandbag swinging at the far shore. Water stays transparent by v1 semantics.")
-    private boolean lavaBetween(Vec3 eye, Vec3 targetCenter) {
+    boolean lavaBetween(Vec3 eye, Vec3 targetCenter) {
         var delta = targetCenter.subtract(eye);
         int steps = (int) Math.ceil(delta.length() / 0.5);
         for (int i = 1; i < steps; i++) {
