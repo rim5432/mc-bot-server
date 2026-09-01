@@ -65,7 +65,6 @@ from mcbot.capability.report import (
     harness_axis,
     integrity_for_faces,
     is_internal_face,
-    spec_impl_gap,
     status_suggestions,
 )
 from mcbot.capability.validation import validate_db
@@ -559,13 +558,12 @@ def cmd_cap_status(args) -> int:
             print(f"    last green : {ig['last_green_at']}")
 
     # --- record integrity panel: six axes, one glance ---
-    drift = ig
     ev = ev or {"state": "untested", "red_runs": 0}
     print()
     print("  RECORD INTEGRITY")
     # source paths
     if cap.source_paths:
-        missing = drift.get("missing", [])
+        missing = ig.get("missing", [])
         if missing:
             print(f"    source_paths  : \u2717 MISSING: {', '.join(missing)}")
         else:
@@ -592,44 +590,20 @@ def cmd_cap_status(args) -> int:
     print(f"    vanilla_ref   : {vanilla_mark}")
     print(f"    deviation     : {deviation_mark}")
     # code drift
-    if drift.get("state") == "drift":
-        print(f"    code drift    : \u2717 code changed {drift.get('days_drift', 0):.1f}d after record update")
-    elif drift.get("state") == "missing":
+    if ig.get("state") == "drift":
+        print(f"    code drift    : \u2717 code changed {ig.get('days_drift', 0):.1f}d after record update")
+    elif ig.get("state") == "missing":
         print(f"    code drift    : \u2717 source path missing (see above)")
-    elif drift.get("state") == "fresh":
+    elif ig.get("state") == "fresh":
         print(f"    code drift    : \u2713 fresh")
-    # NEXT action — pick the single highest-priority thing to do
-    next_action = _next_action_for(cap, ev, drift)
+    # NEXT action — the audit queue is the single advice engine; the
+    # first queue row for this face is the highest-priority thing to do
+    mine = [it for it in action_queue()["items"]
+            if it["target"] == cap.id and it.get("target_kind") == "face"]
     print()
-    print(f"  NEXT: {next_action}")
+    print(f"  NEXT: {mine[0]['action']}" if mine
+          else "  NEXT: record is clean — no action needed")
     return 0
-
-
-def _next_action_for(cap, ev: dict, drift: dict) -> str:
-    """Pick the single highest-priority next action for a face.
-
-    Order mirrors the audit P0/P1/P2 bands: missing paths first, then
-    evidence problems, then coverage gaps, then drift. Returns a
-    copy-pasteable command or edit instruction.
-    """
-    if drift.get("state") == "missing":
-        return ("update seed.py SOURCE_PATHS for this face (file moved/renamed), "
-                "then `capability init`")
-    if cap.implementation_status == "shipped" and ev.get("state") == "untested":
-        return "add a @GameTest method, then `capability scan-gametest`"
-    if cap.implementation_status == "shipped" and ev.get("state") == "red":
-        return "investigate newest runGameTest failure, then re-run `build runGameTest`"
-    if not cap.harness_paths and not is_internal_face(cap.id) and cap.implementation_status != "deferred":
-        return "add harness_paths in seed.py HARNESS_PATHS, then `capability init`"
-    if cap.implementation_status in ("gap", "deferred"):
-        return (f"implement + test, then `capability set {cap.id} --status partial --verify`")
-    if drift.get("state") == "drift":
-        return "re-verify the record matches current code, then `capability set --verify`"
-    if cap.implementation_status in ("partial", "gap") and ev.get("state") == "green":
-        return f"evidence is green — review and `capability set {cap.id} --status shipped --verify`"
-    if not cap.vanilla_ref:
-        return "add vanilla_ref citing the decompiled source (see player-behavior-RE.md)"
-    return "record is clean — no action needed"
 
 
 def cmd_cap_set(args) -> int:
@@ -735,6 +709,27 @@ def cmd_cap_diff(args) -> int:
     return 0
 
 
+def _face_table_row(f: dict, integrity: dict) -> str:
+    """One domain-table row: status, evidence, staleness, counts, flags."""
+    flags = []
+    if f["no_spec"]:
+        flags.append("NO-SPEC")
+    if f["no_impl"]:
+        flags.append("NO-IMPL")
+    if f["has_deviation"]:
+        flags.append("DEVIATION")
+    ev = f["evidence"]["state"].upper()
+    if f["evidence"]["state"] == "green" and f["evidence"]["red_runs"]:
+        ev += f"(x{f['evidence']['red_runs']})"
+    st = integrity.get(f["id"], {})
+    stale_str = st.get("stale_state", "-").upper()
+    if st.get("stale_state") == "stale" and st.get("days_stale") is not None:
+        stale_str += f"({st['days_stale']:.0f}d)"
+    return (f"{f['id']:<28} {f['implementation_status'] + '*':<10} {ev:<9} {stale_str:<8} "
+            f"{f['verified_at'] or '-':<12} "
+            f"{f['spec_count']:>5} {f['impl_count']:>5}  {' '.join(flags)}")
+
+
 def cmd_cap_domain(args) -> int:
     rep = domain_report(args.category)
     if rep is None:
@@ -779,42 +774,10 @@ def cmd_cap_domain(args) -> int:
             label = ax if ax != "_unclassified" else "(unclassified)"
             print(f"  [{label}]")
             for f in faces:
-                flags = []
-                if f["no_spec"]:
-                    flags.append("NO-SPEC")
-                if f["no_impl"]:
-                    flags.append("NO-IMPL")
-                if f["has_deviation"]:
-                    flags.append("DEVIATION")
-                ev = f["evidence"]["state"].upper()
-                if f["evidence"]["state"] == "green" and f["evidence"]["red_runs"]:
-                    ev += f"(x{f['evidence']['red_runs']})"
-                st = integrity.get(f["id"], {})
-                stale_str = st.get("stale_state", "-").upper()
-                if st.get("stale_state") == "stale" and st.get("days_stale") is not None:
-                    stale_str += f"({st['days_stale']:.0f}d)"
-                print(f"{f['id']:<28} {f['implementation_status'] + '*':<10} {ev:<9} {stale_str:<8} "
-                      f"{f['verified_at'] or '-':<12} "
-                      f"{f['spec_count']:>5} {f['impl_count']:>5}  {' '.join(flags)}")
+                print(_face_table_row(f, integrity))
     else:
         for f in rep["faces"]:
-            flags = []
-            if f["no_spec"]:
-                flags.append("NO-SPEC")
-            if f["no_impl"]:
-                flags.append("NO-IMPL")
-            if f["has_deviation"]:
-                flags.append("DEVIATION")
-            ev = f["evidence"]["state"].upper()
-            if f["evidence"]["state"] == "green" and f["evidence"]["red_runs"]:
-                ev += f"(x{f['evidence']['red_runs']})"
-            st = integrity.get(f["id"], {})
-            stale_str = st.get("stale_state", "-").upper()
-            if st.get("stale_state") == "stale" and st.get("days_stale") is not None:
-                stale_str += f"({st['days_stale']:.0f}d)"
-            print(f"{f['id']:<28} {f['implementation_status'] + '*':<10} {ev:<9} {stale_str:<8} "
-                  f"{f['verified_at'] or '-':<12} "
-                  f"{f['spec_count']:>5} {f['impl_count']:>5}  {' '.join(flags)}")
+            print(_face_table_row(f, integrity))
     if rep["faces_no_spec"]:
         print(f"\n  no specs (no declared testing intent): {', '.join(rep['faces_no_spec'])}")
     if rep["faces_no_impl"]:
@@ -1047,17 +1010,14 @@ def cmd_cap_unlinked(args) -> int:
 
 def cmd_cap_validate(args) -> int:
     """Unified validation: schema/vocabulary/FK checks on all test
-    artifacts in the DB, plus spec-vs-impl coverage gap analysis.
+    artifacts in the DB.
 
-    Exit 0 if all valid; exit 1 if any errors (CI-gateable). This is
-    the single command that answers 'is our test data clean?' without
-    running the game - pure read-model over the DB.
+    Exit 0 if all valid; exit 1 if any errors (CI-gateable). Pure data
+    hygiene — coverage questions (spec-only, impl-only, untested) are
+    audit-queue material, not a second report here.
     """
     errors = validate_db()
-    gap = spec_impl_gap()
-    print(f"[mcbot] validation: {len(errors)} artifact(s) with errors, "
-          f"{gap['summary']['both']} covered, {gap['summary']['spec_only']} spec-only, "
-          f"{gap['summary']['impl_only']} impl-only, {gap['summary']['neither']} untested")
+    print(f"[mcbot] validation: {len(errors)} artifact(s) with errors")
     if errors:
         print()
         print(f"{'ARTIFACT':<50} {'KIND':<6} ERRORS")
@@ -1066,22 +1026,8 @@ def cmd_cap_validate(args) -> int:
             print(f"{artifact.id:<50} {artifact.kind:<6} {'; '.join(errs)}")
         if len(errors) > 30:
             print(f"... and {len(errors) - 30} more")
-    if gap["spec_only"]:
-        print()
-        print("spec-only (declared intent, no automated anchor) — add gametest or accept as manual:")
-        for e in gap["spec_only"]:
-            print(f"  {e['id']:<30} [{e['status']:<8}] spec={e['spec_count']} impl=0")
-    if gap["impl_only"]:
-        print()
-        print("impl-only (automated test, no declared intent) — add CSV spec or accept as exploratory:")
-        for e in gap["impl_only"]:
-            print(f"  {e['id']:<30} [{e['status']:<8}] spec=0 impl={e['impl_count']}")
-    if gap["neither"]:
-        print()
-        print("untested (no spec, no impl) — internal reflex/sense faces by design, rest are review candidates:")
-        for e in gap["neither"]:
-            print(f"  {e['id']:<30} [{e['status']:<8}]")
-    return 1 if errors else 0
+        return 1
+    return 0
 
 
 def cmd_cap_audit(args) -> int:
@@ -1550,7 +1496,7 @@ def main() -> int:
     p_cap_sub.add_parser("unlinked", help="list QA cases not linked to any capability")
     p_cap_sub.add_parser(
         "validate",
-        help="unified validation: schema/vocabulary/FK checks on all test artifacts + spec-vs-impl gap analysis (exit 1 on errors)")
+        help="unified validation: schema/vocabulary/FK checks on all test artifacts in the DB (exit 1 on errors)")
     p_cap_sub.add_parser(
         "audit",
         help="priority-sorted action queue: everything needing a human (P0 shipped-without-evidence, P1 coverage gaps, P2 hygiene)")
