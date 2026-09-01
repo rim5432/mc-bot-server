@@ -782,6 +782,13 @@ def cmd_cap_domain(args) -> int:
         print(f"\n  no specs (no declared testing intent): {', '.join(rep['faces_no_spec'])}")
     if rep["faces_no_impl"]:
         print(f"  no impls (no automated anchor): {', '.join(rep['faces_no_impl'])}")
+    overlaps = [(f["id"], f["shares_impl_with"]) for f in rep["faces"] if f["shares_impl_with"]]
+    if overlaps:
+        print("\n  impl overlap (shared non-plumbing source files across categories; "
+              "no dependency direction implied):")
+        for fid, entries in overlaps:
+            for e in entries:
+                print(f"    {fid} <-> {e['face']} [{e['category']}]: {', '.join(e['shared'])}")
     print("  * statuses are DECLARED (human rulings), not yet derived from receipts")
     failures_shown = 0
     for f in rep["faces"]:

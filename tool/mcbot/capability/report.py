@@ -320,6 +320,76 @@ def status_suggestions(db_path: Optional[Path] = None) -> list[dict]:
     return suggestions
 
 
+# Files that are shared substrate: nearly every face touches them, so
+# their co-occurrence carries no overlap signal. Kept explicit rather
+# than prefix-derived so a new plumbing file surfaces as (noise)
+# overlap in the domain report instead of hiding silently.
+_SHARED_PLUMBING = frozenset({
+    "adapter/BotPlayerFacade.java",
+    "adapter/entity/BotBodyEntity.java",
+    "core/tick/BotController.java",
+    "core/world/SnapshotWorldView.java",
+    "adapter/sensing/LevelThreatSensor.java",
+    "api/process/Overrides.java",
+    "api/event/EventKind.java",
+})
+
+_SOURCE_PATH_PREFIX = "src/main/java/com/mcbot/mcbotserver/"
+
+
+def _normalize_source_path(p: str) -> str:
+    return p.replace("\\", "/").strip().removeprefix(_SOURCE_PATH_PREFIX)
+
+
+def impl_overlap_map(db_path: Optional[Path] = None) -> dict[str, list[dict]]:
+    """Cross-category implementation overlap between faces.
+
+    Two faces overlap when their catalogued source_paths share a
+    non-plumbing file across different categories - the computable
+    form of the accepted domain-overlap relationship (e.g. hunting
+    reuses combat's kill stack; see the AGENTS capability vocabulary).
+    Read-model over the capabilities catalog: computed on read,
+    never stored. Sharing is symmetric and implies no dependency
+    direction; shared plumbing files are excluded.
+
+    Returns {face_id: [{"face", "category", "shared": [paths]}]}
+    with both sides of every cross-category pair populated.
+    """
+    init_db(db_path)
+    with get_connection(db_path) as conn:
+        rows = conn.execute(
+            "SELECT id, category, source_paths FROM capabilities ORDER BY id"
+        ).fetchall()
+    cat_of = {r["id"]: r["category"] for r in rows}
+    face_paths: dict[str, list[str]] = {}
+    by_path: dict[str, list[str]] = {}
+    for r in rows:
+        paths = [
+            p for p in (
+                _normalize_source_path(x)
+                for x in json.loads(r["source_paths"] or "[]")
+            )
+            if p and p not in _SHARED_PLUMBING
+        ]
+        face_paths[r["id"]] = paths
+        for p in paths:
+            by_path.setdefault(p, []).append(r["id"])
+    result: dict[str, list[dict]] = {}
+    for face, paths in face_paths.items():
+        overlaps: dict[str, set[str]] = {}
+        for p in paths:
+            for other in by_path.get(p, []):
+                if other == face or cat_of[other] == cat_of[face]:
+                    continue
+                overlaps.setdefault(other, set()).add(p)
+        if overlaps:
+            result[face] = [
+                {"face": other, "category": cat_of[other], "shared": sorted(shares)}
+                for other, shares in sorted(overlaps.items())
+            ]
+    return result
+
+
 def domain_report(category: str, *, db_path: Optional[Path] = None) -> Optional[dict]:
     """One capability domain: per-face evidence, coverage, deficiencies.
 
@@ -336,6 +406,7 @@ def domain_report(category: str, *, db_path: Optional[Path] = None) -> Optional[
     render them as such."""
     init_db(db_path)
     evidence = evidence_for_faces(db_path)
+    overlaps = impl_overlap_map(db_path)
     with get_connection(db_path) as conn:
         caps = [
             dict(r) for r in conn.execute(
@@ -386,6 +457,7 @@ def domain_report(category: str, *, db_path: Optional[Path] = None) -> Optional[
                     "state": "untested", "red_runs": 0,
                     "last_red_at": None, "last_green_at": None,
                     "pending_impls": 0}),
+                "shares_impl_with": overlaps.get(cap["id"], []),
             })
         # last receipt that failed a scenario belonging to this domain
         last_red = conn.execute(

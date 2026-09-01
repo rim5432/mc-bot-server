@@ -153,6 +153,7 @@ Core vocabulary (one concept, one word, everywhere):
 | honest convergence | The count of DECLARED-shipped faces that actually carry GREEN evidence. The status line prints this as N/M shipped w/ green evidence. This is the real progress number, not the shipped percentage. |
 | staleness | Code changed after the face last green engine run. A stale face may still be shipped but its evidence is outdated. |
 | drift | Code changed after the face record updated_at. The record may describe stale code. |
+| impl overlap | Cross-category sharing of a non-plumbing source file between two faces - the computable form of accepted domain overlap (e.g. hunting reuses combat's kill stack). Symmetric, no dependency direction implied; rendered by `capability domain`. |
 | action queue | The priority-sorted what-needs-a-human list (audit): P0 = shipped-without-evidence or shipped-RED; P1 = coverage gaps (unmapped items, pathless faces, gap/deferred); P2 = hygiene (drift, promote candidates, missing specs). |
 | ref inventory | The vanilla item-action inventory enumerated from the decompiled tree, mapped to faces via face-map.json. ref-coverage gives the mapped/unmapped denominator. |
 | harness axis | The face to boundary-D path mapping. Pathless non-internal faces are P1 audit candidates; internal reflex/sense faces (listed in report._INTERNAL_FACE_IDS) are pathless by design. |
