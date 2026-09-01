@@ -187,6 +187,19 @@
             <property name="message"
                       value="System.exit() is banned: the mod never owns JVM lifecycle"/>
         </module>
+        <!-- Process-record guard: decision narratives ("ruling <year>",
+             "Stage N review") belong in boundaries.md / the ledger /
+             issues, never in production javadoc - javadoc keeps
+             invariants and pointers (AGENTS.md 1.4). Evidence
+             provenance ("dossier <date>", "decompiled <version>") is
+             the sanctioned pointer style and stays allowed. src/test
+             keeps pragmatic provenance via suppressions.xml. -->
+        <module name="RegexpSinglelineJava">
+            <property name="id" value="ProcessRecordGuard"/>
+            <property name="format" value="ruling 20\d{2}|Stage \d review"/>
+            <property name="message"
+                      value="decision-process records belong in boundaries.md/ledger/issues; javadoc keeps invariants and pointers"/>
+        </module>
     </module>
 
     <module name="SuppressionFilter">

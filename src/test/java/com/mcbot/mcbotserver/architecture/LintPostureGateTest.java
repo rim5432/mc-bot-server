@@ -35,7 +35,7 @@ class LintPostureGateTest {
      * The pinned wiring. Hard gates: checkstyle, spotlessCheck, and the
      * api-scoped javadoc doclint (javadocApi) hang
      * off the test task, and the JaCoCo coverage floor rides it as a
-     * finalizer (user ruling 2026-09-01; a finalizer because the
+     * finalizer (pinned 2026-09-01; a finalizer because the
      * verification task itself depends on test - a dependsOn edge would
      * close a cycle). Red walls under -Plint: PMD (failing since
      * the 2026-08-27 paydown), CPD (>= 140 tokens), and SpotBugs
@@ -83,7 +83,8 @@ class LintPostureGateTest {
                     List.of(
                             "enabled = project.hasProperty('lint')",
                             "check('NullAway', net.ltgt.gradle.errorprone.CheckSeverity.ERROR)",
-                            "option('NullAway:AnnotatedPackages', 'com.mcbot.mcbotserver.api,com.mcbot.mcbotserver.core')")),
+                            "option('NullAway:AnnotatedPackages', "
+                                    + "'com.mcbot.mcbotserver.api,com.mcbot.mcbotserver.core')")),
             new Posture("tasks.register('cpdCheck', JavaExec) {", List.of("enabled = project.hasProperty('lint')")),
             new Posture("tasks.register('qualityCheck') {", List.of("'pmdMain'", "'spotbugsTest'", "'spotlessCheck'")),
             new Posture("id 'net.ltgt.errorprone' version", List.of("'5.1.0'")),

@@ -265,7 +265,7 @@ public final class BotCombatGameTests {
     /**
      * Scenario 4b: the intruder fights BACK. The zombie keeps its AI;
      * with the carrier-side presence pass it acquires the body on
-     * sight (world-treatment ruling 2026-08-25) and attacks on its
+     * sight and attacks on its
      * own, and any hit the body lands adds HurtByTargetGoal heat on
      * top - the fight is two-sided from the start. Weakened to 8
      * health on purpose: the pin is "engages, survives being fought,
@@ -371,7 +371,7 @@ public final class BotCombatGameTests {
      * clear line of sight and its AI on. Nothing the bot does can
      * start this engagement; the only path into the fight is the
      * zombie acquiring the body through the carrier-side presence
-     * pass (world-treatment ruling 2026-08-25: monsters see the body
+     * pass (monsters see the body
      * the way they would see a player, at their own follow range,
      * through their own line-of-sight ray).
      *

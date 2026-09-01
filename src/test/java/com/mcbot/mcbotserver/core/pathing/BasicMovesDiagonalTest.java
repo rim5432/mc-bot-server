@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
  * the head clip a 1-cell obstruction directly above a foot-clear
  * corner.
  *
- * <p>Contract: see Stage 1 review item C (Diagonal corner check).
+ * <p>Contract: diagonal corner check (head-level closure).
  * Pre-fix: only edgeA (foot) and edgeB (foot) were checked, plus
  * the destination's standability. Post-fix: edgeAhead and
  * edgeBhead close the head-level hole.

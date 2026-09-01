@@ -18,8 +18,9 @@ import java.util.List;
  * chest menus are otherwise indistinguishable). The {@code type} is a
  * plain string (not an enum) because menu
  * kinds grow as the facade covers more blocks (inventory, crafting_table,
- * chest, furnace, anvil, …); a frozen enum would require a Stage 3 review
- * for every new kind. The {@code slots} list is defensive-copied and
+ * chest, furnace, anvil, …); a frozen enum would turn every new menu
+ * kind into a wire-vocabulary change that reopens the
+ * harness-interaction audit. The {@code slots} list is defensive-copied and
  * immutable — the planner cannot mutate the snapshot.
  *
  * @param type          menu kind identifier (e.g. "inventory",
