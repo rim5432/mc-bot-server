@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "task": "runGameTest",
+  "log": "D:\\mc-bot-server\\tool\\.runtime\\build-runGameTest-20260901-194515.log",
+  "git_rev": "746c17f",
+  "finished_at": "2026-09-01T19:46:23",
+  "scenarios_total": 119,
+  "failed_count": 6,
+  "failed": [
+    "brewingstandfuelslotrejectsnonblazepowder",
+    "anvilpriorworkpenaltyincreases",
+    "anvilcombinesenchantmentsfrombook",
+    "grindstoneremovesenchantmentsandreturnsxp",
+    "furnacefuelslotrejectsnonfuel",
+    "walkaccumulatesexhaustionatdeviatedrate"
+  ],
+  "optional_failed_count": 1,
+  "failed_optional": [
+    "climbsladdertoplatform"
+  ],
+  "green": false
+}

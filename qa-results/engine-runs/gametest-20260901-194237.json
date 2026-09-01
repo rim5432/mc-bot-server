@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "task": "runGameTest",
+  "log": "D:\\mc-bot-server\\tool\\.runtime\\build-runGameTest-20260901-194124.log",
+  "git_rev": "746c17f",
+  "finished_at": "2026-09-01T19:42:37",
+  "scenarios_total": 108,
+  "failed_count": 3,
+  "failed": [
+    "brewingstandfuelslotrejectsnonblazepowder",
+    "classifiesarmorpiecesbyregistryid",
+    "walksviacommandandservertick"
+  ],
+  "optional_failed_count": 1,
+  "failed_optional": [
+    "climbsladdertoplatform"
+  ],
+  "green": false
+}

@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "exported_at": "2026-09-01T15:30:17",
+  "exported_at": "2026-09-01T19:35:49",
   "statuses": [
     {
       "id": "combat.bow_draw",
@@ -61,6 +61,12 @@
       "status": "shipped",
       "verified_at": "2026-08-29",
       "deviation": ""
+    },
+    {
+      "id": "hunger.eat_events",
+      "status": "shipped",
+      "verified_at": "2026-09-01",
+      "deviation": "Bot-specific: vanilla eating is a silent 32-tick animation; the bot discloses the full lifecycle for harness observability so the harness learns WHY the mission was preempted and WHAT was eaten without polling status."
     },
     {
       "id": "hunger.fooddata",
@@ -125,7 +131,7 @@
     {
       "id": "inventory.menu_clicks",
       "status": "shipped",
-      "verified_at": "2026-08-29",
+      "verified_at": "2026-09-01",
       "deviation": ""
     },
     {
@@ -257,6 +263,11 @@
     {
       "case_id": "GT-BotCombatGameTests-raisedShieldBlocksIncomingArrow",
       "capability_id": "combat.shield",
+      "link_source": "feature_annotated"
+    },
+    {
+      "case_id": "GT-BotCombatGameTests-rangedBotBacksAwayWhenTargetClosesInsideMin",
+      "capability_id": "combat.hostile_acquisition",
       "link_source": "feature_annotated"
     },
     {
@@ -440,8 +451,53 @@
       "link_source": "auto"
     },
     {
+      "case_id": "GT-BotHungerGameTests-bowlFoodCountOneLeavesBowlInSlot",
+      "capability_id": "hunger.eat_chain",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotHungerGameTests-bowlFoodCountTwoKeepsStewAndAddsBowlToInventory",
+      "capability_id": "hunger.eat_chain",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotHungerGameTests-bowlFoodFullInventoryDropsContainer",
+      "capability_id": "hunger.eat_chain",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotHungerGameTests-chorusFruitConsumesItemAndAppliesFood",
+      "capability_id": "hunger.eat_chain",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotHungerGameTests-eatCompletedEventCarriesFullNutritionSnapshot",
+      "capability_id": "hunger.eat_events",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotHungerGameTests-eatReflexEmitsStartedAndCompletedEvents",
+      "capability_id": "hunger.eat_events",
+      "link_source": "annotated"
+    },
+    {
       "case_id": "GT-BotHungerGameTests-exhaustionCascadeDrainsSaturationThenFood",
       "capability_id": "hunger.fooddata",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotHungerGameTests-goldenAppleEdibleAtFullHungerAndAppliesEffects",
+      "capability_id": "hunger.eat_chain",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotHungerGameTests-honeyBottleCountTwoKeepsBottleAndAddsGlassToInventory",
+      "capability_id": "hunger.eat_chain",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotHungerGameTests-honeyBottleRemovesPoisonEffect",
+      "capability_id": "hunger.eat_chain",
       "link_source": "annotated"
     },
     {
@@ -467,6 +523,16 @@
     {
       "case_id": "GT-BotHungerGameTests-starvationDealsDamageAtZeroFood",
       "capability_id": "hunger.fooddata",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotHungerGameTests-suspiciousStewAppliesStoredPotionEffect",
+      "capability_id": "hunger.eat_chain",
+      "link_source": "annotated"
+    },
+    {
+      "case_id": "GT-BotHungerGameTests-suspiciousStewWithMultipleEffectsAppliesAll",
+      "capability_id": "hunger.eat_chain",
       "link_source": "annotated"
     },
     {

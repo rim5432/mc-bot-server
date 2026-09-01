@@ -2,6 +2,7 @@ package com.mcbot.mcbotserver.gametest;
 
 import static com.mcbot.mcbotserver.gametest.GametestRig.WALK_Y;
 import static com.mcbot.mcbotserver.gametest.GametestRig.check;
+import static com.mcbot.mcbotserver.gametest.GametestRig.checkEquals;
 import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
 
 import com.mcbot.mcbotserver.McBotServer;
@@ -15,6 +16,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.alchemy.PotionUtils;
 import net.minecraft.world.item.alchemy.Potions;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
@@ -169,5 +171,224 @@ public final class BotPotionGameTests {
         check(slot0.getCount() == 1, "bucket count must be 1; got " + slot0.getCount());
         body.discard();
         helper.succeed();
+    }
+
+    // -----------------------------------------------------------------------
+    // Brewing stand menu interactions (capability: inventory.menu_clicks)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Scenario: the brewing stand full brew cycle end to end — water
+     * bottle in slot 0, nether wart in the ingredient slot, blaze powder
+     * in the fuel slot; the stand brews for 400 ticks and the water
+     * bottle becomes an awkward potion. Pins the menu slot routing
+     * (BOTTLE / INGREDIENT / FUEL roles) and the engine-side brewing
+     * tick through the real BlockEntity.
+     */
+    // capability: inventory.menu_clicks
+    @GameTest(template = "empty16x8x16", timeoutTicks = 1200)
+    public static void brewingStandBrewsWaterBottleWithNetherWart(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, WALK_Y, 7));
+        BlockPos standLocal = new BlockPos(7, WALK_Y, 8);
+        helper.setBlock(standLocal, Blocks.BREWING_STAND);
+        BlockPos standAbs = helper.absolutePos(standLocal);
+
+        rig.body()
+                .getInventory()
+                .container()
+                .setItem(0, PotionUtils.setPotion(new ItemStack(Items.POTION), Potions.WATER));
+        rig.body().getInventory().container().setItem(1, new ItemStack(Items.NETHER_WART));
+        rig.body().getInventory().container().setItem(2, new ItemStack(Items.BLAZE_POWDER));
+
+        var tx = rig.actor().menuTransactions();
+        var view = tx.openMenu(GametestRig.cellOf(standAbs));
+        check(view != null, "opening the brewing stand must succeed");
+        checkEquals("brewing_stand", view.type(), "menu type must be brewing_stand");
+
+        int hotbar0 = firstHotbarSlot(view);
+        view = tx.menuClick(hotbar0, 0, com.mcbot.mcbotserver.api.menu.MenuClick.QUICK_MOVE);
+        view = tx.menuClick(hotbar0 + 1, 0, com.mcbot.mcbotserver.api.menu.MenuClick.QUICK_MOVE);
+        view = tx.menuClick(hotbar0 + 2, 0, com.mcbot.mcbotserver.api.menu.MenuClick.QUICK_MOVE);
+
+        check(!view.slot(0).isEmpty(), "water bottle must land in bottle slot 0");
+        check(!view.slot(3).isEmpty(), "nether wart must land in ingredient slot 3");
+        check(!view.slot(4).isEmpty(), "blaze powder must land in fuel slot 4");
+        tx.closeMenu();
+
+        helper.startSequence()
+                .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
+                    var be = helper.getLevel().getBlockEntity(standAbs);
+                    check(
+                            be instanceof net.minecraft.world.level.block.entity.BrewingStandBlockEntity,
+                            "brewing stand block entity must exist");
+                    var result = ((net.minecraft.world.level.block.entity.BrewingStandBlockEntity) be).getItem(0);
+                    check(!result.isEmpty(), "bottle slot must not be empty");
+                    check(
+                            Potions.AWKWARD.equals(PotionUtils.getPotion(result)),
+                            "the result must be awkward potion, got " + PotionUtils.getPotion(result));
+                }))
+                .thenExecuteAfter(0, () -> {
+                    var tx2 = rig.actor().menuTransactions();
+                    var view2 = tx2.openMenu(GametestRig.cellOf(standAbs));
+                    check(view2 != null, "reopening must succeed");
+                    var result = view2.slot(0);
+                    check(!result.isEmpty(), "result slot must contain a potion");
+                    checkEquals("minecraft:potion", result.item().itemId(), "result item must be minecraft:potion");
+                    tx2.closeMenu();
+                    rig.body().discard();
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Scenario: the brewing stand fuel slot accepts blaze powder but
+     * rejects non-fuel items via QUICK_MOVE routing. A coal in the
+     * hotbar must stay in the hotbar after a QUICK_MOVE — the vanilla
+     * BrewingStandMenu slot logic refuses it in the fuel slot.
+     */
+    // capability: inventory.menu_clicks
+    @GameTest(template = "empty16x8x16", timeoutTicks = 200)
+    public static void brewingStandFuelSlotRejectsNonBlazePowder(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, WALK_Y, 7));
+        BlockPos standLocal = new BlockPos(7, WALK_Y, 8);
+        helper.setBlock(standLocal, Blocks.BREWING_STAND);
+        BlockPos standAbs = helper.absolutePos(standLocal);
+
+        rig.body().getInventory().container().setItem(0, new ItemStack(Items.DIRT));
+
+        var tx = rig.actor().menuTransactions();
+        var view = tx.openMenu(GametestRig.cellOf(standAbs));
+        check(view != null, "opening the brewing stand must succeed");
+
+        int hotbar0 = firstHotbarSlot(view);
+        view = tx.menuClick(hotbar0, 0, com.mcbot.mcbotserver.api.menu.MenuClick.QUICK_MOVE);
+
+        check(view.slot(4).isEmpty(), "fuel slot must not accept non-fuel items");
+        boolean dirtStillInInventory = false;
+        for (var slot : view.slots()) {
+            if ((slot.role() == com.mcbot.mcbotserver.api.menu.SlotRole.HOTBAR
+                            || slot.role() == com.mcbot.mcbotserver.api.menu.SlotRole.MAIN)
+                    && !slot.isEmpty()
+                    && "minecraft:dirt".equals(slot.item().itemId())) {
+                dirtStillInInventory = true;
+                break;
+            }
+        }
+        check(dirtStillInInventory, "non-fuel item must remain in the player inventory after rejected QUICK_MOVE");
+        tx.closeMenu();
+        rig.body().discard();
+        helper.succeed();
+    }
+
+    /**
+     * Scenario: three water bottles in all three bottle slots brew
+     * simultaneously — after 400 ticks all three become awkward potions
+     * and the nether wart is consumed. Pins the multi-bottle brew path.
+     */
+    // capability: inventory.menu_clicks
+    @GameTest(template = "empty16x8x16", timeoutTicks = 1200)
+    public static void brewingStandThreeBottlesBrewSimultaneously(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, WALK_Y, 7));
+        BlockPos standLocal = new BlockPos(7, WALK_Y, 8);
+        helper.setBlock(standLocal, Blocks.BREWING_STAND);
+        BlockPos standAbs = helper.absolutePos(standLocal);
+
+        for (int i = 0; i < 3; i++) {
+            rig.body()
+                    .getInventory()
+                    .container()
+                    .setItem(i, PotionUtils.setPotion(new ItemStack(Items.POTION), Potions.WATER));
+        }
+        rig.body().getInventory().container().setItem(3, new ItemStack(Items.NETHER_WART));
+        rig.body().getInventory().container().setItem(4, new ItemStack(Items.BLAZE_POWDER));
+
+        var tx = rig.actor().menuTransactions();
+        var view = tx.openMenu(GametestRig.cellOf(standAbs));
+        check(view != null, "opening the brewing stand must succeed");
+
+        int hotbar0 = firstHotbarSlot(view);
+        for (int i = 0; i < 5; i++) {
+            view = tx.menuClick(hotbar0 + i, 0, com.mcbot.mcbotserver.api.menu.MenuClick.QUICK_MOVE);
+        }
+
+        for (int s = 0; s < 3; s++) {
+            check(!view.slot(s).isEmpty(), "bottle slot " + s + " must contain a water bottle");
+        }
+        check(!view.slot(3).isEmpty(), "ingredient slot must contain nether wart");
+        check(!view.slot(4).isEmpty(), "fuel slot must contain blaze powder");
+        tx.closeMenu();
+
+        helper.startSequence()
+                .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
+                    var be = (net.minecraft.world.level.block.entity.BrewingStandBlockEntity)
+                            helper.getLevel().getBlockEntity(standAbs);
+                    check(be != null, "brewing stand must exist");
+                    for (int s = 0; s < 3; s++) {
+                        var result = be.getItem(s);
+                        check(!result.isEmpty(), "bottle slot " + s + " must not be empty");
+                        check(
+                                Potions.AWKWARD.equals(PotionUtils.getPotion(result)),
+                                "slot " + s + " must be awkward potion, got " + PotionUtils.getPotion(result));
+                    }
+                }))
+                .thenExecuteAfter(0, () -> {
+                    var be = (net.minecraft.world.level.block.entity.BrewingStandBlockEntity)
+                            helper.getLevel().getBlockEntity(standAbs);
+                    check(be.getItem(3).isEmpty(), "nether wart must be consumed after brewing");
+                    rig.body().discard();
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Scenario: the brewing stand slot roles are correct — slots 0-2
+     * are BOTTLE, slot 3 is INGREDIENT, slot 4 is FUEL, and the player
+     * region splits into MAIN and HOTBAR. Pins the MenuSlotLayouts
+     * brewingRole table against the live engine menu.
+     */
+    // capability: inventory.menu_clicks
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void brewingStandSlotRolesAreCorrect(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, WALK_Y, 7));
+        BlockPos standLocal = new BlockPos(7, WALK_Y, 8);
+        helper.setBlock(standLocal, Blocks.BREWING_STAND);
+        BlockPos standAbs = helper.absolutePos(standLocal);
+
+        var tx = rig.actor().menuTransactions();
+        var view = tx.openMenu(GametestRig.cellOf(standAbs));
+        check(view != null, "opening the brewing stand must succeed");
+
+        for (int s = 0; s < 3; s++) {
+            checkEquals(
+                    com.mcbot.mcbotserver.api.menu.SlotRole.BOTTLE,
+                    view.slot(s).role(),
+                    "slot " + s + " must be BOTTLE");
+        }
+        checkEquals(
+                com.mcbot.mcbotserver.api.menu.SlotRole.INGREDIENT, view.slot(3).role(), "slot 3 must be INGREDIENT");
+        checkEquals(com.mcbot.mcbotserver.api.menu.SlotRole.FUEL, view.slot(4).role(), "slot 4 must be FUEL");
+
+        boolean hasMain = false;
+        boolean hasHotbar = false;
+        for (var slot : view.slots()) {
+            if (slot.role() == com.mcbot.mcbotserver.api.menu.SlotRole.MAIN) hasMain = true;
+            if (slot.role() == com.mcbot.mcbotserver.api.menu.SlotRole.HOTBAR) hasHotbar = true;
+        }
+        check(hasMain, "menu must have MAIN slots");
+        check(hasHotbar, "menu must have HOTBAR slots");
+
+        tx.closeMenu();
+        rig.body().discard();
+        helper.succeed();
+    }
+
+    /** First HOTBAR-role slot index in a menu view. */
+    private static int firstHotbarSlot(com.mcbot.mcbotserver.api.menu.MenuView view) {
+        for (var slot : view.slots()) {
+            if (slot.role() == com.mcbot.mcbotserver.api.menu.SlotRole.HOTBAR) {
+                return slot.index();
+            }
+        }
+        throw new IllegalStateException("no HOTBAR slot in menu view");
     }
 }

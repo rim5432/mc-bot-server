@@ -180,4 +180,70 @@ public final class BotInteractionGameTests {
                 })
                 .thenSucceed();
     }
+
+    /**
+     * Scenario: the two documented deviations from
+     * ServerPlayerGameMode.useItemOn are confirmed in-engine:
+     * (1) a MenuProvider block (chest) is skipped by InteractBlock -
+     *     the container UI lives in the menu verbs, a second open path
+     *     would fight MenuOpener transaction state;
+     * (2) a non-container block accepts the item use-on chain (bone
+     *     meal on grass) through the BotPlayerFacade acting surface.
+     *
+     * <p>The Forge RightClickBlock hook is not fired by construction -
+     * the executor calls BlockState.use + ItemStack.useOn directly,
+     * bypassing the Forge event bus. This test pins the observable
+     * consequences; an event-bus assertion would couple the test to
+     * Forge internals.
+     */
+    // capability: interaction.use_item_deviations
+    @GameTest(template = "empty16x8x16", timeoutTicks = 100)
+    public static void useItemOnDeviationsConfirmed(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(7, GametestRig.WALK_Y, 7));
+
+        // Deviation 1: MenuProvider block (chest) is skipped by
+        // InteractBlock. The use() must not consume the click, and the
+        // facade must not gain a chest container menu.
+        BlockPos chestLocal = new BlockPos(7, GametestRig.WALK_Y, 8);
+        helper.setBlock(chestLocal, Blocks.CHEST);
+        CellPos chestCell = localToCell(helper, chestLocal);
+
+        var facade = new com.mcbot.mcbotserver.adapter.BotPlayerFacade(rig.body());
+        var beforeMenu = facade.containerMenu;
+        boolean chestUsed = rig.actor()
+                .interactExecutor()
+                .use(new Intent.InteractBlock(
+                        chestCell,
+                        Direction.WEST,
+                        new com.mcbot.mcbotserver.api.types.Vec3(
+                                chestCell.x() + 0.5, chestCell.y() + 0.5, chestCell.z() + 0.5)));
+        check(!chestUsed, "InteractBlock must skip a MenuProvider chest (deviation: container UI lives in menu verbs)");
+        check(
+                facade.containerMenu == beforeMenu,
+                "the facade container menu must not change when InteractBlock skips a MenuProvider block");
+
+        // Deviation 2: non-container block accepts item use-on. Bone
+        // meal on grass block fires the useOn chain through the facade.
+        BlockPos grassLocal = new BlockPos(9, GametestRig.WALK_Y, 7);
+        helper.setBlock(grassLocal, Blocks.GRASS_BLOCK);
+        rig.body().getInventory().container().setItem(0, new ItemStack(Items.BONE_MEAL, 4));
+        rig.body().selectedSlot = 0;
+        rig.body().getInventory().setSelectedSlot(0);
+        CellPos grassCell = localToCell(helper, grassLocal);
+
+        boolean grassUsed = rig.actor()
+                .interactExecutor()
+                .use(new Intent.InteractBlock(
+                        grassCell,
+                        Direction.UP,
+                        new com.mcbot.mcbotserver.api.types.Vec3(
+                                grassCell.x() + 0.5, grassCell.y() + 1.0, grassCell.z() + 0.5)));
+        check(grassUsed, "bone meal on grass must consume the click (non-container use-on chain works)");
+        check(
+                rig.body().getInventory().container().getItem(0).getCount() < 4,
+                "bone meal stack must shrink after a successful use-on");
+
+        rig.body().discard();
+        helper.succeed();
+    }
 }
