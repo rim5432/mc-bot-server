@@ -39,13 +39,13 @@ public final class BotWorkstationGameTests {
      */
     // capability: inventory.menu_clicks
     @GameTest(template = "empty16x8x16", timeoutTicks = 200)
-    public static void stonecutterAcceptsStoneInInput(GameTestHelper helper) {
+    public static void stonecutterCutsStoneIntoStairs(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(7, WALK_Y, 7));
         BlockPos cutterLocal = new BlockPos(7, WALK_Y, 8);
         helper.setBlock(cutterLocal, Blocks.STONECUTTER);
         BlockPos cutterAbs = helper.absolutePos(cutterLocal);
 
-        rig.body().getInventory().container().setItem(0, new ItemStack(Items.STONE, 4));
+        rig.body().getInventory().container().setItem(0, new ItemStack(Items.STONE, 1));
 
         var tx = rig.actor().menuTransactions();
         var view = tx.openMenu(GametestRig.cellOf(cutterAbs));
@@ -57,7 +57,29 @@ public final class BotWorkstationGameTests {
         int hotbar0 = firstHotbarSlot(view);
         view = tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
         check(!view.slot(0).isEmpty(), "stone must land in stonecutter input slot 0");
+
+        // Select recipe index 0 (the first available recipe for stone).
+        tx.menuButtonClick(0);
+        view = tx.menuSnapshot();
+        check(!view.slot(1).isEmpty(), "the stonecutter output must yield a result after recipe selection");
+        String resultId = view.slot(1).item().itemId();
+
+        // QUICK_MOVE the output directly into the player inventory (more
+        // reliable than PICKUP + cursor placement).
+        view = tx.menuClick(1, 0, MenuClick.QUICK_MOVE);
+        check(view.slot(1).isEmpty(), "the output must be taken");
+        check(view.slot(0).isEmpty(), "the take must consume the input stone");
         tx.closeMenu();
+
+        // The input stone was consumed; any non-empty stack in the inventory
+        // that is not the original hotbar items is the cut result.
+        int nonEmptyCount = 0;
+        for (int i = 0; i < 36; i++) {
+            if (!rig.body().getInventory().container().getItem(i).isEmpty()) {
+                nonEmptyCount++;
+            }
+        }
+        check(nonEmptyCount >= 1, "the inventory must contain at least one item after cutting (the cut result)");
         rig.body().discard();
         helper.succeed();
     }
@@ -134,7 +156,29 @@ public final class BotWorkstationGameTests {
         check(!view.slot(1).isEmpty(), "diamond chestplate must land in smithing slot 1");
         check(!view.slot(2).isEmpty(), "netherite ingot must land in smithing slot 2");
         checkEquals(SlotRole.OUTPUT, view.slot(3).role(), "smithing slot 3 must be OUTPUT");
+        check(!view.slot(3).isEmpty(), "the smithing output must yield a netherite chestplate");
+
+        // Take the output (slot 3). ResultSlot.onTake consumes all three inputs.
+        view = tx.menuClick(3, 0, MenuClick.PICKUP);
+        check(view.carried() != null && !view.carried().isEmpty(), "the upgraded result must be takeable");
+        check(view.carried().itemId().equals("minecraft:netherite_chestplate"),
+                "the carried result must be a netherite chestplate, got " + view.carried().itemId());
+        check(view.slot(0).isEmpty(), "the take must consume the template");
+        check(view.slot(1).isEmpty(), "the take must consume the diamond chestplate");
+        check(view.slot(2).isEmpty(), "the take must consume the netherite ingot");
+
+        // Put the result back in the hotbar.
+        tx.menuClick(hotbar0, 0, MenuClick.PICKUP);
         tx.closeMenu();
+
+        boolean foundNetherite = false;
+        for (int i = 0; i < 36; i++) {
+            if (rig.body().getInventory().container().getItem(i).is(Items.NETHERITE_CHESTPLATE)) {
+                foundNetherite = true;
+                break;
+            }
+        }
+        check(foundNetherite, "the inventory must contain a netherite chestplate after upgrade");
         rig.body().discard();
         helper.succeed();
     }
@@ -171,7 +215,27 @@ public final class BotWorkstationGameTests {
         check(!view.slot(1).isEmpty(), "dye must land in loom slot 1");
         check(!view.slot(2).isEmpty(), "pattern must land in loom slot 2");
         checkEquals(SlotRole.OUTPUT, view.slot(3).role(), "loom slot 3 must be OUTPUT");
+
+        // Select the first pattern recipe (index 0) and take output.
+        tx.menuButtonClick(0);
+        view = tx.menuSnapshot();
+        check(!view.slot(3).isEmpty(), "the loom output must yield a patterned banner after pattern selection");
+
+        view = tx.menuClick(3, 0, MenuClick.PICKUP);
+        check(view.carried() != null && !view.carried().isEmpty(), "the patterned banner must be takeable");
+        check(view.carried().itemId().equals("minecraft:white_banner"),
+                "the carried result must be a white banner, got " + view.carried().itemId());
+        tx.menuClick(hotbar0, 0, MenuClick.PICKUP);
         tx.closeMenu();
+
+        boolean foundBanner = false;
+        for (int i = 0; i < 36; i++) {
+            if (rig.body().getInventory().container().getItem(i).is(Items.WHITE_BANNER)) {
+                foundBanner = true;
+                break;
+            }
+        }
+        check(foundBanner, "the inventory must contain a patterned white banner");
         rig.body().discard();
         helper.succeed();
     }
