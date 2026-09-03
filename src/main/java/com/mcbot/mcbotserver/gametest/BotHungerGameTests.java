@@ -1,7 +1,7 @@
 package com.mcbot.mcbotserver.gametest;
 
+import static com.mcbot.mcbotserver.gametest.GametestAsserts.check;
 import static com.mcbot.mcbotserver.gametest.GametestRig.WALK_Y;
-import static com.mcbot.mcbotserver.gametest.GametestRig.check;
 import static com.mcbot.mcbotserver.gametest.GametestRig.driveOnly;
 import static com.mcbot.mcbotserver.gametest.GametestRig.driveUntil;
 import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
@@ -12,11 +12,8 @@ import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameRules;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
@@ -419,13 +416,6 @@ public final class BotHungerGameTests {
      *
      * @param slot0 the post-eat contents of slot 0; never null
      */
-    private static void assertSlotKeepsOneStew(ItemStack slot0) {
-        check(
-                slot0.is(Items.MUSHROOM_STEW),
-                "slot 0 must keep remaining stew, got " + BuiltInRegistries.ITEM.getKey(slot0.getItem()));
-        check(slot0.getCount() == 1, "stew count must be 1 (2-1), got " + slot0.getCount());
-    }
-
     /**
      * Drives the body forward with a fixed sprint flag for exactly N
      * ticks, recording the start position and exhaustion on the first

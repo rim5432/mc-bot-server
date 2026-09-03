@@ -1,7 +1,7 @@
 package com.mcbot.mcbotserver.gametest;
 
-import static com.mcbot.mcbotserver.gametest.GametestRig.check;
-import static com.mcbot.mcbotserver.gametest.GametestRig.checkEquals;
+import static com.mcbot.mcbotserver.gametest.GametestAsserts.check;
+import static com.mcbot.mcbotserver.gametest.GametestAsserts.checkEquals;
 import static com.mcbot.mcbotserver.gametest.GametestRig.localToCell;
 import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
 

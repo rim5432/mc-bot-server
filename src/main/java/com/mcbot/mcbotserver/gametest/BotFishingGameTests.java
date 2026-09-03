@@ -1,6 +1,6 @@
 package com.mcbot.mcbotserver.gametest;
 
-import static com.mcbot.mcbotserver.gametest.GametestRig.check;
+import static com.mcbot.mcbotserver.gametest.GametestAsserts.check;
 import static com.mcbot.mcbotserver.gametest.GametestRig.driveUntil;
 import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
 
@@ -69,7 +69,7 @@ public final class BotFishingGameTests {
 
         helper.startSequence()
                 .thenExecuteAfter(
-                        0, () -> GametestRig.check(rig.actor().useHeldItemAir(), "the cast verb must consume"))
+                        0, () -> GametestAsserts.check(rig.actor().useHeldItemAir(), "the cast verb must consume"))
                 .thenWaitUntil(driveUntil(
                         rig,
                         () -> check(
@@ -78,7 +78,7 @@ public final class BotFishingGameTests {
                                         + hooksInWorld(helper))))
                 .thenExecuteFor(20, GametestRig.driveOnly(rig))
                 .thenExecuteAfter(
-                        0, () -> GametestRig.check(rig.actor().useHeldItemAir(), "the reel verb must consume"))
+                        0, () -> GametestAsserts.check(rig.actor().useHeldItemAir(), "the reel verb must consume"))
                 .thenWaitUntil(driveUntil(
                         rig,
                         () -> check(

@@ -30,7 +30,10 @@
        same reason: BotAssembly builds ONE injector shared by the reflex
        paths and the dig-claim behavior, and its mutable slot suppliers are
        the wiring seam by design — a defensive copy would fork the claim
-       shapes the two paths must agree on.
+       shapes the two paths must agree on. VerbWiring (2026-09-03) is the
+       same pattern in record form: the wiring bundle carries the shared
+       queue to the task-verb handlers; its generated accessor IS the
+       sharing seam.
        STATUS: permanent — DI pattern; composition root owns the shared
        instances and intends them to be shared. -->
   <Match>
@@ -39,7 +42,12 @@
       <Class name="com.mcbot.mcbotserver.core.command.CommandBus"/>
       <Class name="com.mcbot.mcbotserver.core.command.VerbTaskHandler"/>
       <Class name="com.mcbot.mcbotserver.core.tick.DigClaimBehavior"/>
+      <Class name="com.mcbot.mcbotserver.core.command.VerbWiring"/>
     </Or>
+  </Match>
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP"/>
+    <Class name="com.mcbot.mcbotserver.core.command.VerbWiring"/>
   </Match>
 
   <!-- No finalizer exists anywhere in the mission hierarchy, and finalize()

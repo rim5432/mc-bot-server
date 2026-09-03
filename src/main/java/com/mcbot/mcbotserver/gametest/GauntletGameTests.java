@@ -1,7 +1,7 @@
 package com.mcbot.mcbotserver.gametest;
 
+import static com.mcbot.mcbotserver.gametest.GametestAsserts.check;
 import static com.mcbot.mcbotserver.gametest.GametestRig.SETTLE_TICKS;
-import static com.mcbot.mcbotserver.gametest.GametestRig.check;
 import static com.mcbot.mcbotserver.gametest.GametestRig.driveOnly;
 import static com.mcbot.mcbotserver.gametest.GametestRig.driveUntil;
 import static com.mcbot.mcbotserver.gametest.GametestRig.localToCell;
@@ -109,7 +109,7 @@ public final class GauntletGameTests {
                                     + "section regressed. reason="
                                     + mission.failureReasonOrNull()
                                     + " bodyAt=" + positionOf(rig.body()));
-                    GametestRig.assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
+                    GametestAsserts.assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
                     rig.body().discard();
                 })
                 .thenSucceed();
@@ -144,7 +144,7 @@ public final class GauntletGameTests {
                             "the gap is the only passage; routing must find it."
                                     + " reason=" + mission.failureReasonOrNull()
                                     + " bodyAt=" + positionOf(rig.body()));
-                    GametestRig.assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
+                    GametestAsserts.assertEventSeen(rig.events(), EventKind.TASK_COMPLETED);
                     rig.body().discard();
                 })
                 .thenSucceed();

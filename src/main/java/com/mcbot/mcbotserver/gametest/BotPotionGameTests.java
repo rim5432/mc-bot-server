@@ -1,8 +1,8 @@
 package com.mcbot.mcbotserver.gametest;
 
+import static com.mcbot.mcbotserver.gametest.GametestAsserts.check;
+import static com.mcbot.mcbotserver.gametest.GametestAsserts.checkEquals;
 import static com.mcbot.mcbotserver.gametest.GametestRig.WALK_Y;
-import static com.mcbot.mcbotserver.gametest.GametestRig.check;
-import static com.mcbot.mcbotserver.gametest.GametestRig.checkEquals;
 import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
 
 import com.mcbot.mcbotserver.McBotServer;
@@ -212,13 +212,13 @@ public final class BotPotionGameTests {
                     // first tick with pressing=true fires the rising edge
                     // in applyUse -> onUsePressEdge -> potion branch.
                     rig.actor().submit(new Claim(Channel.USE, 50, "test:drink", new Intent.Use(true)));
-                    GametestRig.assertEventSeen(rig.events(), EventKind.DRINK_COMPLETED);
+                    GametestAsserts.assertEventSeen(rig.events(), EventKind.DRINK_COMPLETED);
                 }))
                 .thenExecuteAfter(0, () -> {
-                    var events = GametestRig.eventsOf(rig.events());
+                    var events = GametestAsserts.eventsOf(rig.events());
                     // DRINK_STARTED: urgent, pre-consumption, carries
                     // potionId, slot, health at decision time, source.
-                    BotEvent started = GametestRig.eventOf(rig.events(), EventKind.DRINK_STARTED);
+                    BotEvent started = GametestAsserts.eventOf(rig.events(), EventKind.DRINK_STARTED);
                     check(started.urgent(), "DRINK_STARTED must be urgent (pre-consumption decision)");
                     check(
                             "minecraft:healing".equals(started.attrs().get("potionId")),
@@ -238,7 +238,7 @@ public final class BotPotionGameTests {
                                     + started.attrs().get("source"));
                     // DRINK_COMPLETED: non-urgent, carries potionId, slot,
                     // serialized effects, containerType, source.
-                    BotEvent completed = GametestRig.eventOf(rig.events(), EventKind.DRINK_COMPLETED);
+                    BotEvent completed = GametestAsserts.eventOf(rig.events(), EventKind.DRINK_COMPLETED);
                     check(!completed.urgent(), "DRINK_COMPLETED must be non-urgent");
                     check(
                             "minecraft:healing".equals(completed.attrs().get("potionId")),
@@ -311,12 +311,12 @@ public final class BotPotionGameTests {
 
         helper.startSequence()
                 .thenWaitUntil(GametestRig.driveUntil(
-                        rig, () -> GametestRig.assertEventSeen(rig.events(), EventKind.DRINK_COMPLETED)))
+                        rig, () -> GametestAsserts.assertEventSeen(rig.events(), EventKind.DRINK_COMPLETED)))
                 .thenExecuteAfter(0, () -> {
-                    var events = GametestRig.eventsOf(rig.events());
+                    var events = GametestAsserts.eventsOf(rig.events());
                     // DRINK_STARTED: urgent, pre-consumption, source=reflex
                     // (the claim owner is "reflex:DRINK_ON_LOW_HEALTH").
-                    BotEvent started = GametestRig.eventOf(rig.events(), EventKind.DRINK_STARTED);
+                    BotEvent started = GametestAsserts.eventOf(rig.events(), EventKind.DRINK_STARTED);
                     check(started.urgent(), "DRINK_STARTED must be urgent (reflex preempts mission)");
                     check(
                             "minecraft:healing".equals(started.attrs().get("potionId")),
@@ -336,7 +336,7 @@ public final class BotPotionGameTests {
                                     + started.attrs().get("source"));
                     // DRINK_COMPLETED: non-urgent, source=reflex, effects,
                     // containerType=glass_bottle.
-                    BotEvent completed = GametestRig.eventOf(rig.events(), EventKind.DRINK_COMPLETED);
+                    BotEvent completed = GametestAsserts.eventOf(rig.events(), EventKind.DRINK_COMPLETED);
                     check(!completed.urgent(), "DRINK_COMPLETED must be non-urgent");
                     check(
                             "minecraft:healing".equals(completed.attrs().get("potionId")),
@@ -410,12 +410,12 @@ public final class BotPotionGameTests {
                     // first tick with pressing=true fires the rising edge
                     // in applyUse -> onUsePressEdge -> splash branch.
                     rig.actor().submit(new Claim(Channel.USE, 50, "test:throw", new Intent.Use(true)));
-                    GametestRig.assertEventSeen(rig.events(), EventKind.POTION_THROWN);
+                    GametestAsserts.assertEventSeen(rig.events(), EventKind.POTION_THROWN);
                 }))
                 .thenExecuteAfter(0, () -> {
                     // POTION_THROWN: non-urgent (one-shot, no preemption),
                     // carries potionId, slot, throwType, effects, source.
-                    BotEvent thrown = GametestRig.eventOf(rig.events(), EventKind.POTION_THROWN);
+                    BotEvent thrown = GametestAsserts.eventOf(rig.events(), EventKind.POTION_THROWN);
                     check(!thrown.urgent(), "POTION_THROWN must be non-urgent (one-shot throw)");
                     check(
                             "minecraft:poison".equals(thrown.attrs().get("potionId")),
@@ -480,10 +480,10 @@ public final class BotPotionGameTests {
                 .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
                     // Reflex-owned claim: owner prefix triggers intent detection.
                     rig.actor().submit(new Claim(Channel.USE, 50, "reflex:DRINK_ON_LOW_HEALTH", new Intent.Use(true)));
-                    GametestRig.assertEventSeen(rig.events(), EventKind.DRINK_FAILED);
+                    GametestAsserts.assertEventSeen(rig.events(), EventKind.DRINK_FAILED);
                 }))
                 .thenExecuteAfter(0, () -> {
-                    BotEvent failed = GametestRig.eventOf(rig.events(), EventKind.DRINK_FAILED);
+                    BotEvent failed = GametestAsserts.eventOf(rig.events(), EventKind.DRINK_FAILED);
                     check(
                             "SLOT_EMPTY".equals(failed.attrs().get("reason")),
                             "DRINK_FAILED reason must be SLOT_EMPTY, got "
@@ -519,10 +519,10 @@ public final class BotPotionGameTests {
         helper.startSequence()
                 .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
                     rig.actor().submit(new Claim(Channel.USE, 50, "reflex:DRINK_ON_LOW_HEALTH", new Intent.Use(true)));
-                    GametestRig.assertEventSeen(rig.events(), EventKind.DRINK_FAILED);
+                    GametestAsserts.assertEventSeen(rig.events(), EventKind.DRINK_FAILED);
                 }))
                 .thenExecuteAfter(0, () -> {
-                    BotEvent failed = GametestRig.eventOf(rig.events(), EventKind.DRINK_FAILED);
+                    BotEvent failed = GametestAsserts.eventOf(rig.events(), EventKind.DRINK_FAILED);
                     check(
                             "NO_POTION".equals(failed.attrs().get("reason")),
                             "DRINK_FAILED reason must be NO_POTION, got "
@@ -584,14 +584,14 @@ public final class BotPotionGameTests {
         helper.startSequence()
                 .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
                     rig.actor().submit(new Claim(Channel.USE, 50, "test:drink", new Intent.Use(true)));
-                    GametestRig.assertEventSeen(rig.events(), EventKind.DRINK_COMPLETED);
+                    GametestAsserts.assertEventSeen(rig.events(), EventKind.DRINK_COMPLETED);
                 }))
                 .thenExecuteAfter(0, () -> {
-                    BotEvent completed = GametestRig.eventOf(rig.events(), EventKind.DRINK_COMPLETED);
-                    GametestRig.assertAttr(completed, "containerDropped", "true");
-                    GametestRig.assertAttr(completed, "containerType", "glass_bottle");
+                    BotEvent completed = GametestAsserts.eventOf(rig.events(), EventKind.DRINK_COMPLETED);
+                    GametestAsserts.assertAttr(completed, "containerDropped", "true");
+                    GametestAsserts.assertAttr(completed, "containerType", "glass_bottle");
                     // Slot 0 keeps the shrunk potion stack (count 1).
-                    GametestRig.assertSlot(body.getInventory().container(), 0, Items.POTION, 1);
+                    GametestAsserts.assertSlot(body.getInventory().container(), 0, Items.POTION, 1);
                     body.discard();
                 })
                 .thenSucceed();
@@ -621,15 +621,15 @@ public final class BotPotionGameTests {
         helper.startSequence()
                 .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
                     rig.actor().submit(new Claim(Channel.USE, 50, "test:drink", new Intent.Use(true)));
-                    GametestRig.assertEventSeen(rig.events(), EventKind.DRINK_COMPLETED);
+                    GametestAsserts.assertEventSeen(rig.events(), EventKind.DRINK_COMPLETED);
                 }))
                 .thenExecuteAfter(0, () -> {
-                    BotEvent completed = GametestRig.eventOf(rig.events(), EventKind.DRINK_COMPLETED);
-                    GametestRig.assertAttr(completed, "containerDropped", "false");
+                    BotEvent completed = GametestAsserts.eventOf(rig.events(), EventKind.DRINK_COMPLETED);
+                    GametestAsserts.assertAttr(completed, "containerDropped", "false");
                     // Slot 0 keeps the shrunk potion (count 1); slot 1's
                     // glass bottle merged in (count 1 → 2).
-                    GametestRig.assertSlot(body.getInventory().container(), 0, Items.POTION, 1);
-                    GametestRig.assertSlot(body.getInventory().container(), 1, Items.GLASS_BOTTLE, 2);
+                    GametestAsserts.assertSlot(body.getInventory().container(), 0, Items.POTION, 1);
+                    GametestAsserts.assertSlot(body.getInventory().container(), 1, Items.GLASS_BOTTLE, 2);
                     body.discard();
                 })
                 .thenSucceed();

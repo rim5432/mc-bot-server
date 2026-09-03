@@ -1,7 +1,7 @@
 package com.mcbot.mcbotserver.gametest;
 
+import static com.mcbot.mcbotserver.gametest.GametestAsserts.check;
 import static com.mcbot.mcbotserver.gametest.GametestRig.WALK_Y;
-import static com.mcbot.mcbotserver.gametest.GametestRig.check;
 import static com.mcbot.mcbotserver.gametest.GametestRig.driveUntil;
 import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
 
@@ -74,9 +74,9 @@ public final class BotEatingGameTests {
 
         helper.startSequence()
                 .thenWaitUntil(
-                        driveUntil(rig, () -> GametestRig.assertEventSeen(rig.events(), EventKind.EAT_COMPLETED)))
+                        driveUntil(rig, () -> GametestAsserts.assertEventSeen(rig.events(), EventKind.EAT_COMPLETED)))
                 .thenExecuteAfter(0, () -> {
-                    var events = GametestRig.eventsOf(rig.events());
+                    var events = GametestAsserts.eventsOf(rig.events());
                     // EAT_STARTED: pre-selection, urgent, carries foodLevel
                     // and slot at decision time.
                     BotEvent started = events.stream()
@@ -157,10 +157,10 @@ public final class BotEatingGameTests {
         helper.startSequence()
                 .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
                     rig.actor().submit(new Claim(Channel.USE, 85, "reflex:EAT_WHEN_HUNGRY", new Intent.Use(true)));
-                    GametestRig.assertEventSeen(rig.events(), EventKind.EAT_FAILED);
+                    GametestAsserts.assertEventSeen(rig.events(), EventKind.EAT_FAILED);
                 }))
                 .thenExecuteAfter(0, () -> {
-                    var events = GametestRig.eventsOf(rig.events());
+                    var events = GametestAsserts.eventsOf(rig.events());
                     BotEvent failed = events.stream()
                             .filter(e -> EventKind.EAT_FAILED.equals(e.kind()))
                             .findFirst()
@@ -202,10 +202,10 @@ public final class BotEatingGameTests {
         helper.startSequence()
                 .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
                     rig.actor().submit(new Claim(Channel.USE, 85, "reflex:EAT_WHEN_HUNGRY", new Intent.Use(true)));
-                    GametestRig.assertEventSeen(rig.events(), EventKind.EAT_FAILED);
+                    GametestAsserts.assertEventSeen(rig.events(), EventKind.EAT_FAILED);
                 }))
                 .thenExecuteAfter(0, () -> {
-                    var events = GametestRig.eventsOf(rig.events());
+                    var events = GametestAsserts.eventsOf(rig.events());
                     BotEvent failed = events.stream()
                             .filter(e -> EventKind.EAT_FAILED.equals(e.kind()))
                             .findFirst()
@@ -649,13 +649,13 @@ public final class BotEatingGameTests {
 
         helper.startSequence()
                 .thenWaitUntil(driveUntil(rig, () -> {
-                    long completed = GametestRig.eventsOf(rig.events()).stream()
+                    long completed = GametestAsserts.eventsOf(rig.events()).stream()
                             .filter(e -> EventKind.EAT_COMPLETED.equals(e.kind()))
                             .count();
                     check(completed >= 1, "waiting for EAT_COMPLETED (got " + completed + ")");
                 }))
                 .thenExecuteAfter(0, () -> {
-                    var completed = GametestRig.eventsOf(rig.events()).stream()
+                    var completed = GametestAsserts.eventsOf(rig.events()).stream()
                             .filter(e -> EventKind.EAT_COMPLETED.equals(e.kind()))
                             .findFirst()
                             .orElseThrow();

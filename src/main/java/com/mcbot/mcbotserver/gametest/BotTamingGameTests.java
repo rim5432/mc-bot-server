@@ -1,12 +1,12 @@
 package com.mcbot.mcbotserver.gametest;
 
+import static com.mcbot.mcbotserver.gametest.GametestAsserts.check;
+import static com.mcbot.mcbotserver.gametest.GametestAsserts.checkEquals;
+import static com.mcbot.mcbotserver.gametest.GametestAsserts.eventsOf;
 import static com.mcbot.mcbotserver.gametest.GametestRig.MISSION_BUDGET;
 import static com.mcbot.mcbotserver.gametest.GametestRig.SETTLE_TICKS;
-import static com.mcbot.mcbotserver.gametest.GametestRig.check;
-import static com.mcbot.mcbotserver.gametest.GametestRig.checkEquals;
 import static com.mcbot.mcbotserver.gametest.GametestRig.driveOnly;
 import static com.mcbot.mcbotserver.gametest.GametestRig.driveUntil;
-import static com.mcbot.mcbotserver.gametest.GametestRig.eventsOf;
 import static com.mcbot.mcbotserver.gametest.GametestRig.positionOf;
 import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
 import static com.mcbot.mcbotserver.gametest.GametestRig.spawnHostile;

@@ -1,8 +1,8 @@
 package com.mcbot.mcbotserver.gametest;
 
+import static com.mcbot.mcbotserver.gametest.GametestAsserts.check;
+import static com.mcbot.mcbotserver.gametest.GametestAsserts.checkEquals;
 import static com.mcbot.mcbotserver.gametest.GametestRig.SETTLE_TICKS;
-import static com.mcbot.mcbotserver.gametest.GametestRig.check;
-import static com.mcbot.mcbotserver.gametest.GametestRig.checkEquals;
 import static com.mcbot.mcbotserver.gametest.GametestRig.countItems;
 import static com.mcbot.mcbotserver.gametest.GametestRig.driveOnly;
 import static com.mcbot.mcbotserver.gametest.GametestRig.driveUntil;

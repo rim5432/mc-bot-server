@@ -1,8 +1,8 @@
 package com.mcbot.mcbotserver.gametest;
 
+import static com.mcbot.mcbotserver.gametest.GametestAsserts.check;
+import static com.mcbot.mcbotserver.gametest.GametestAsserts.checkEquals;
 import static com.mcbot.mcbotserver.gametest.GametestRig.SETTLE_TICKS;
-import static com.mcbot.mcbotserver.gametest.GametestRig.check;
-import static com.mcbot.mcbotserver.gametest.GametestRig.checkEquals;
 import static com.mcbot.mcbotserver.gametest.GametestRig.driveOnly;
 import static com.mcbot.mcbotserver.gametest.GametestRig.driveUntil;
 import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
@@ -151,7 +151,7 @@ public final class BotCombatGameTests {
                             DefendProcess.REASON_REFUSED,
                             mission.failureReasonOrNull(),
                             "the refusal reason must be structured");
-                    BotEvent failed = GametestRig.eventsOf(rig.events()).stream()
+                    BotEvent failed = GametestAsserts.eventsOf(rig.events()).stream()
                             .filter(e -> EventKind.TASK_FAILED.equals(e.kind()))
                             .findFirst()
                             .orElse(null);
@@ -167,7 +167,7 @@ public final class BotCombatGameTests {
                             "a structural refusal lands on the engage tick, not " + "after a chase; waited " + waited[0]
                                     + " ticks");
                     check(
-                            !GametestRig.eventSeen(rig.events(), EventKind.TASK_PAUSED),
+                            !GametestAsserts.eventSeen(rig.events(), EventKind.TASK_PAUSED),
                             "a standoff-range skeleton must not trip the engage " + "reflex (no TASK_PAUSED expected)");
                     rig.body().discard();
                     // The skeleton survives the standoff assertion - it
@@ -255,7 +255,7 @@ public final class BotCombatGameTests {
      *         retired yet
      */
     private static BotEvent reflexEngageVerdict(InMemoryEventQueue events) {
-        return GametestRig.eventsOf(events).stream()
+        return GametestAsserts.eventsOf(events).stream()
                 .filter(e -> EventKind.TASK_FAILED.equals(e.kind()) || EventKind.TASK_COMPLETED.equals(e.kind()))
                 .filter(e -> e.attrs().getOrDefault("task", "").startsWith("reflex-engage"))
                 .findFirst()
@@ -822,7 +822,6 @@ public final class BotCombatGameTests {
     public static void bowChargedShotDamagesDistantTarget(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(5, GametestRig.WALK_Y, 2));
         GametestRig.giveBowAndArrows(rig);
-        var container = rig.body().getInventory().container();
         // The production ranged engagement: no hand-pumped claims -
         // the defend mission and the ranged loadout own the draw
         // pacing, exactly what a harness /entities attack rides.
@@ -920,7 +919,6 @@ public final class BotCombatGameTests {
     public static void rangedBotBacksAwayWhenTargetClosesInsideMin(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
         GametestRig.giveBowAndArrows(rig);
-        var container = rig.body().getInventory().container();
 
         // Distance 5: x 3 -> 8, same z. Inside reflex trigger (6) and
         // inside GoalRange min (8), so the predicate fails from tick one.
@@ -1044,7 +1042,6 @@ public final class BotCombatGameTests {
     public static void bowTapShotDealsWeakDamage(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(4, GametestRig.WALK_Y, 2));
         GametestRig.giveBowAndArrows(rig);
-        var container = rig.body().getInventory().container();
         // ONE target straight south, both shots down the same column:
         // a second target at an angle sends stray tap arrows out of
         // the structure into neighbouring pooled scenarios (the lava

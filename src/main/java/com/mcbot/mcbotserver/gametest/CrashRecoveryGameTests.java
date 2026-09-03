@@ -1,8 +1,8 @@
 package com.mcbot.mcbotserver.gametest;
 
+import static com.mcbot.mcbotserver.gametest.GametestAsserts.check;
+import static com.mcbot.mcbotserver.gametest.GametestAsserts.checkEquals;
 import static com.mcbot.mcbotserver.gametest.GametestRig.SETTLE_TICKS;
-import static com.mcbot.mcbotserver.gametest.GametestRig.check;
-import static com.mcbot.mcbotserver.gametest.GametestRig.checkEquals;
 import static com.mcbot.mcbotserver.gametest.GametestRig.driveOnly;
 import static com.mcbot.mcbotserver.gametest.GametestRig.driveTick;
 import static com.mcbot.mcbotserver.gametest.GametestRig.driveUntil;
@@ -119,7 +119,7 @@ public final class CrashRecoveryGameTests {
                     check(!probe[0].isActive(), "the probe mission must retire after recovery");
                     check(probe[0].missionSucceeded(), "the recovered pipeline must complete the probe");
                     check(
-                            GametestRig.eventSeen(rig.events(), EventKind.TASK_COMPLETED),
+                            GametestAsserts.eventSeen(rig.events(), EventKind.TASK_COMPLETED),
                             "TASK_COMPLETED must reach the stream after reset");
                     rig.body().discard();
                 })
@@ -127,7 +127,7 @@ public final class CrashRecoveryGameTests {
     }
 
     private static int crashEvents(GametestRig.Rig rig) {
-        return (int) GametestRig.eventsOf(rig.events()).stream()
+        return (int) GametestAsserts.eventsOf(rig.events()).stream()
                 .filter(e -> EventKind.BOT_CRASHED.equals(e.kind()))
                 .count();
     }
