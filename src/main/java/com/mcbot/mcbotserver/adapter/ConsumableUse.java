@@ -141,7 +141,7 @@ final class ConsumableUse {
         // honey bottles leave a container; normal foods and chorus fruit
         // do not. Captured before eatHeldItem mutates the slot.
         String containerType = containerTypeFor(held.getItem());
-        boolean consumed = body.eatHeldItem();
+        boolean consumed = body.consumption().eatHeldItem();
         if (consumed) {
             int foodAfter = body.getFoodData().getFoodLevel();
             float satAfter = body.getFoodData().getSaturationLevel();
@@ -176,7 +176,7 @@ final class ConsumableUse {
                 BuiltInRegistries.POTION.getKey(PotionUtils.getPotion(held)).toString();
         String effects = serializeEffects(PotionUtils.getMobEffects(held));
         String throwType = held.getItem() instanceof LingeringPotionItem ? "lingering" : "splash";
-        if (body.throwHeldPotion()) {
+        if (body.consumption().throwHeldPotion()) {
             emitPotionThrown(potionId, slot, throwType, effects, source);
         }
         return true;
@@ -201,7 +201,7 @@ final class ConsumableUse {
         String effects = serializeEffects(PotionUtils.getMobEffects(held));
         float health = body.getHealth();
         emitDrinkStarted(potionId, slot, health, source);
-        if (body.drinkHeldItem()) {
+        if (body.consumption().drinkHeldItem()) {
             emitDrinkCompleted(potionId, slot, effects, "glass_bottle", source);
         } else {
             emitDrinkFailed("NOT_DRINKABLE", slot, itemId, source);
@@ -228,7 +228,7 @@ final class ConsumableUse {
         String clearedEffects = serializeEffects(List.copyOf(body.getActiveEffects()));
         float health = body.getHealth();
         emitDrinkStarted("minecraft:milk", slot, health, source);
-        if (body.drinkMilk()) {
+        if (body.consumption().drinkMilk()) {
             emitDrinkCompleted("minecraft:milk", slot, clearedEffects, "bucket", source);
         } else {
             emitDrinkFailed("NOT_DRINKABLE", slot, itemId, source);
@@ -310,7 +310,7 @@ final class ConsumableUse {
                     slot,
                     effects,
                     containerType,
-                    body.wasLastContainerDropped(),
+                    body.consumption().wasLastContainerDropped(),
                     source,
                     daySupplier.getAsLong(),
                     todSupplier.getAsLong()));

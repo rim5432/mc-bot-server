@@ -548,9 +548,9 @@ public final class BotCombatGameTests {
                 .thenWaitUntil(driveUntil(
                         rig,
                         () -> check(
-                                rig.body().getTotalExperience() >= 1 || orbCountNear(rig, deathSpot[0]) >= 1,
+                                rig.body().experience().getTotal() >= 1 || orbCountNear(rig, deathSpot[0]) >= 1,
                                 "a bot-killed zombie must seed XP: absorbed total="
-                                        + rig.body().getTotalExperience()
+                                        + rig.body().experience().getTotal()
                                         + ", orbs near death spot="
                                         + orbCountNear(rig, deathSpot[0]))))
                 .thenExecuteFor(GametestRig.SETTLE_TICKS, driveOnly(rig))

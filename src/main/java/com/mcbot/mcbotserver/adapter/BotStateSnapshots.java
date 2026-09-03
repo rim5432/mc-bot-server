@@ -66,7 +66,7 @@ public final class BotStateSnapshots {
                 Math.round(body.getHealth() / 2.0f),
                 freeSlots,
                 body.getFoodData().getFoodLevel(),
-                body.getExperienceLevel());
+                body.experience().getLevel());
     }
 
     private static CellPos poseOf(BotBodyEntity body) {

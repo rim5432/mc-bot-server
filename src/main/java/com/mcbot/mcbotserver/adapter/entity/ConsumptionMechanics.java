@@ -30,7 +30,7 @@ import net.minecraft.world.item.SuspiciousStewItem;
  * 1.20.1 line references); the container-recovery rules are the single
  * home for what a finished consumable leaves behind and where it goes.
  */
-final class ConsumptionMechanics {
+public final class ConsumptionMechanics {
 
     private final BotBodyEntity body;
 
@@ -78,7 +78,7 @@ final class ConsumptionMechanics {
      *
      * @return true when an item was consumed
      */
-    boolean eatHeldItem() {
+    public boolean eatHeldItem() {
         ItemStack held = body.getInventory().container().getItem(body.selectedSlot);
         FoodProperties props = held.getFoodProperties(body);
         if (props == null || (!body.getFoodData().needsFood() && !props.canAlwaysEat())) {
@@ -138,7 +138,7 @@ final class ConsumptionMechanics {
      *
      * @return true when a potion was consumed
      */
-    boolean drinkHeldItem() {
+    public boolean drinkHeldItem() {
         ItemStack held = body.getInventory().container().getItem(body.selectedSlot);
         if (!(held.getItem() instanceof PotionItem)) {
             return false;
@@ -169,7 +169,7 @@ final class ConsumptionMechanics {
      *
      * @return true when a milk bucket was consumed
      */
-    boolean drinkMilk() {
+    public boolean drinkMilk() {
         ItemStack held = body.getInventory().container().getItem(body.selectedSlot);
         if (!(held.getItem() instanceof MilkBucketItem)) {
             return false;
@@ -224,7 +224,7 @@ final class ConsumptionMechanics {
      * @return true if the container was dropped, false if it was added
      *         to inventory or placed in the selected slot (count-1 case)
      */
-    boolean wasLastContainerDropped() {
+    public boolean wasLastContainerDropped() {
         return lastContainerDropped;
     }
 
@@ -249,7 +249,7 @@ final class ConsumptionMechanics {
      *
      * @return true when a splash/lingering potion was thrown
      */
-    boolean throwHeldPotion() {
+    public boolean throwHeldPotion() {
         ItemStack held = body.getInventory().container().getItem(body.selectedSlot);
         boolean isSplash = held.getItem() instanceof SplashPotionItem;
         boolean isLingering = held.getItem() instanceof LingeringPotionItem;

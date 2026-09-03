@@ -86,7 +86,7 @@ public final class BotPotionGameTests {
         ItemStack potion = PotionUtils.setPotion(new ItemStack(Items.POTION), Potions.HEALING);
         body.getInventory().container().setItem(0, potion);
 
-        boolean consumed = body.drinkHeldItem();
+        boolean consumed = body.consumption().drinkHeldItem();
         check(consumed, "healing potion must be consumable via drinkHeldItem");
         // instant_health I heals 4 HP (2 hearts): the vanilla formula is
         // (4 << amplifier) * healthFactor, amplifier=0, healthFactor=1.0.
@@ -123,7 +123,7 @@ public final class BotPotionGameTests {
         ItemStack potion = PotionUtils.setPotion(new ItemStack(Items.POTION, 2), Potions.HEALING);
         body.getInventory().container().setItem(0, potion);
 
-        boolean consumed = body.drinkHeldItem();
+        boolean consumed = body.consumption().drinkHeldItem();
         check(consumed, "potion stack of 2 must be consumable via drinkHeldItem");
         // Slot 0 keeps the shrunk stack: count 1 remaining.
         ItemStack slot0 = body.getInventory().container().getItem(0);
@@ -166,7 +166,7 @@ public final class BotPotionGameTests {
         check(body.hasEffect(MobEffects.NIGHT_VISION), "night vision must be active before milk");
         body.getInventory().container().setItem(0, new ItemStack(Items.MILK_BUCKET));
 
-        boolean consumed = body.drinkMilk();
+        boolean consumed = body.consumption().drinkMilk();
         check(consumed, "milk bucket must be consumable via drinkMilk");
         // Milk cures all curable effects: night vision must be gone.
         check(!body.hasEffect(MobEffects.NIGHT_VISION), "milk must clear night vision effect");
@@ -398,7 +398,7 @@ public final class BotPotionGameTests {
      * Scenario: the harness submits a USE claim while a splash poison
      * potion is in slot 0 — the rising edge in applyUse fires
      * onUsePressEdge, the SplashPotionItem branch calls
-     * body.throwHeldPotion(), which spawns a ThrownPotion entity with
+     * body.consumption().throwHeldPotion(), which spawns a ThrownPotion entity with
      * the bot's rotation (vanilla -20deg pitch offset, 0.5 velocity)
      * and shrinks the stack. POTION_THROWN is emitted with potionId,
      * slot, throwType=splash, effects, source=harness. Pins the

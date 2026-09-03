@@ -947,7 +947,7 @@ public final class BotHungerGameTests {
 
         // Direct call (bypassing reflex) to verify the eatHeldItem gate.
         // Before the always-edible fix this returned false at full hunger.
-        boolean consumed = body.eatHeldItem();
+        boolean consumed = body.consumption().eatHeldItem();
         check(consumed, "golden apple must be consumable at full hunger (canAlwaysEat bypass)");
         // Golden apple signature effects: regeneration II (100 ticks) +
         // absorption I (2400 ticks). Both must apply even at full hunger.

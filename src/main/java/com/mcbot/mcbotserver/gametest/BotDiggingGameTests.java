@@ -181,22 +181,22 @@ public final class BotDiggingGameTests {
                 .thenWaitUntil(driveUntil(
                         rig,
                         () -> check(
-                                rig.body().getTotalExperience() >= 1 || orbsOnGround(helper, oreLocal),
+                                rig.body().experience().getTotal() >= 1 || orbsOnGround(helper, oreLocal),
                                 "the ore break must seed XP: absorbed total="
-                                        + rig.body().getTotalExperience() + ", or orbs at the break site")))
+                                        + rig.body().experience().getTotal() + ", or orbs at the break site")))
                 .thenExecuteAfter(0, () -> {
                     check(
                             mission.missionSucceeded(),
                             "the ore break must succeed, failure=" + mission.failureReasonOrNull());
-                    if (rig.body().getTotalExperience() >= 1) {
+                    if (rig.body().experience().getTotal() >= 1) {
                         check(
-                                rig.body().getExperienceLevel() >= 1
-                                        || rig.body().getExperienceProgress() > 0f,
+                                rig.body().experience().getLevel() >= 1
+                                        || rig.body().experience().getProgress() > 0f,
                                 "absorbed ore XP must move the level or the progress bar (a 7-XP roll"
                                         + " levels up and zeroes the bar), level="
-                                        + rig.body().getExperienceLevel()
+                                        + rig.body().experience().getLevel()
                                         + " progress="
-                                        + rig.body().getExperienceProgress());
+                                        + rig.body().experience().getProgress());
                     }
                     rig.body().discard();
                 })

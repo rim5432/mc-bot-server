@@ -439,59 +439,15 @@ public final class BotBodyEntity extends PathfinderMob {
     }
 
     /**
-     * Eat the held stack's top item - the vanilla mob-safe chain with
-     * Forge contexted-eat capture and container retention; full
-     * mechanics in {@link ConsumptionMechanics#eatHeldItem()}.
+     * The body's consumption mechanics (eat/drink/milk/throw plus the
+     * container-dropped read). Direct accessor since the 2026-09-03
+     * delegate removal - callers read {@link ConsumptionMechanics}
+     * instead of one-line forwards on the carrier.
      *
-     * @return true when an item was consumed
+     * @return the shared mechanics object; never null
      */
-    public boolean eatHeldItem() {
-        return consumption.eatHeldItem();
-    }
-
-    /**
-     * Drink the held potion - vanilla mob-safe chain with manual shrink
-     * and glass-bottle recovery; full mechanics in
-     * {@link ConsumptionMechanics#drinkHeldItem()}.
-     *
-     * @return true when a potion was consumed
-     */
-    public boolean drinkHeldItem() {
-        return consumption.drinkHeldItem();
-    }
-
-    /**
-     * Drink the held milk bucket - effect curing with manual shrink and
-     * bucket recovery; full mechanics in
-     * {@link ConsumptionMechanics#drinkMilk()}.
-     *
-     * @return true when a milk bucket was consumed
-     */
-    public boolean drinkMilk() {
-        return consumption.drinkMilk();
-    }
-
-    /**
-     * Whether the most recent drink dropped the recovered container
-     * because inventory was full; mechanics in
-     * {@link ConsumptionMechanics#wasLastContainerDropped()}.
-     *
-     * @return true if the container was dropped, false if it was added
-     *         to inventory or placed in the selected slot (count-1 case)
-     */
-    public boolean wasLastContainerDropped() {
-        return consumption.wasLastContainerDropped();
-    }
-
-    /**
-     * Throw the held splash or lingering potion - the vanilla
-     * ThrowableItem path; full mechanics in
-     * {@link ConsumptionMechanics#throwHeldPotion()}.
-     *
-     * @return true when a splash/lingering potion was thrown
-     */
-    public boolean throwHeldPotion() {
-        return consumption.throwHeldPotion();
+    public ConsumptionMechanics consumption() {
+        return consumption;
     }
 
     /**
@@ -583,65 +539,15 @@ public final class BotBodyEntity extends PathfinderMob {
     // ------------------------------------------------------------------
 
     /**
-     * The bot's current experience level. Mirrors Player.experienceLevel.
+     * The body's experience ledger (level/progress/total plus the
+     * vanilla add arithmetic). Direct accessor since the 2026-09-03
+     * delegate removal - callers read {@link ExperienceMirror}
+     * instead of one-line forwards on the carrier.
      *
-     * @return experience level; never negative
+     * @return the shared ledger object; never null
      */
-    public int getExperienceLevel() {
-        return experience.getLevel();
-    }
-
-    /**
-     * Progress toward the next level, 0.0..1.0. Mirrors
-     * Player.experienceProgress.
-     *
-     * @return progress fraction; 0.0..1.0
-     */
-    public float getExperienceProgress() {
-        return experience.getProgress();
-    }
-
-    /**
-     * Total experience points ever absorbed. Mirrors Player.totalExperience.
-     *
-     * @return total XP; never negative
-     */
-    public int getTotalExperience() {
-        return experience.getTotal();
-    }
-
-    /**
-     * XP required to go from the current level to the next. Verbatim
-     * vanilla formula (decompiled Player.java getXpNeededForNextLevel):
-     * level >= 30: 112 + (level-30)*9; level >= 15: 37 + (level-15)*5;
-     * else: 7 + level*2.
-     *
-     * @return XP points needed for the next level
-     */
-    public int getXpNeededForNextLevel() {
-        return experience.getXpNeededForNextLevel();
-    }
-
-    /**
-     * Add experience points, leveling up as needed. Mirrors
-     * Player.giveExperiencePoints (decompiled lines 1718-1743): clamps
-     * to int, adds to total, fills the progress bar, and rolls overflow
-     * into level-ups. Negative values subtract (used by anvil/enchant
-     * costs).
-     *
-     * @param points XP to add (or subtract if negative)
-     */
-    public void giveExperiencePoints(int points) {
-        experience.addPoints(points);
-    }
-
-    /**
-     * Add (or subtract) whole levels. Mirrors Player.giveExperienceLevels.
-     *
-     * @param levels levels to add (or subtract if negative)
-     */
-    public void giveExperienceLevels(int levels) {
-        experience.addLevels(levels);
+    public ExperienceMirror experience() {
+        return experience;
     }
 
     /**

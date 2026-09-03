@@ -329,9 +329,9 @@ public final class BotPlayerFacade extends Player {
      * sees the body's live level.
      */
     private void syncExperience() {
-        this.experienceLevel = body.getExperienceLevel();
-        this.experienceProgress = body.getExperienceProgress();
-        this.totalExperience = body.getTotalExperience();
+        this.experienceLevel = body.experience().getLevel();
+        this.experienceProgress = body.experience().getProgress();
+        this.totalExperience = body.experience().getTotal();
     }
 
     /**
@@ -345,7 +345,7 @@ public final class BotPlayerFacade extends Player {
      */
     @Override
     public void giveExperienceLevels(int levels) {
-        body.giveExperienceLevels(levels);
+        body.experience().addLevels(levels);
         syncExperience();
     }
 
@@ -358,7 +358,7 @@ public final class BotPlayerFacade extends Player {
      */
     @Override
     public void giveExperiencePoints(int points) {
-        body.giveExperiencePoints(points);
+        body.experience().addPoints(points);
         syncExperience();
     }
 

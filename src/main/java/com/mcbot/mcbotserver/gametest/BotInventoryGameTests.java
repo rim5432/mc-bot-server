@@ -616,7 +616,7 @@ public final class BotInventoryGameTests {
         helper.setBlock(anvilLocal, Blocks.ANVIL);
         BlockPos anvilAbs = helper.absolutePos(anvilLocal);
 
-        rig.body().giveExperienceLevels(5);
+        rig.body().experience().addLevels(5);
         rig.body().getInventory().container().setItem(0, new ItemStack(Items.IRON_SWORD));
 
         var tx = rig.actor().menuTransactions();
@@ -638,7 +638,7 @@ public final class BotInventoryGameTests {
         tx.menuClick(hotbar0, 0, MenuClick.PICKUP);
         tx.closeMenu();
 
-        checkEquals(4, rig.body().getExperienceLevel(), "the 1-level rename cost must be paid from the body's XP");
+        checkEquals(4, rig.body().experience().getLevel(), "the 1-level rename cost must be paid from the body's XP");
         checkEquals(
                 "Botblade",
                 rig.body().getInventory().container().getItem(0).getHoverName().getString(),
@@ -662,7 +662,7 @@ public final class BotInventoryGameTests {
         helper.setBlock(new BlockPos(9, GametestRig.WALK_Y + 1, 8), Blocks.BOOKSHELF);
         helper.setBlock(new BlockPos(8, GametestRig.WALK_Y + 1, 9), Blocks.BOOKSHELF);
 
-        rig.body().giveExperienceLevels(30);
+        rig.body().experience().addLevels(30);
         var container = rig.body().getInventory().container();
         container.setItem(0, new ItemStack(Items.IRON_SWORD));
         container.setItem(1, new ItemStack(Items.LAPIS_LAZULI, 8));
@@ -680,7 +680,7 @@ public final class BotInventoryGameTests {
         tx.menuButtonClick(0);
         var after = tx.menuSnapshot();
         checkEquals(7, after.slot(1).item().count(), "option 0 consumes exactly one lapis");
-        check(rig.body().getExperienceLevel() < 30, "the enchant must charge levels through the facade delegation");
+        check(rig.body().experience().getLevel() < 30, "the enchant must charge levels through the facade delegation");
         // The enchanted sword is proven by the consumed inputs: a failed
         // clickMenuButton consumes nothing.
         view = tx.menuClick(0, 0, MenuClick.QUICK_MOVE);
@@ -704,7 +704,7 @@ public final class BotInventoryGameTests {
         helper.setBlock(chestLocal, Blocks.CHEST);
         BlockPos chestAbs = helper.absolutePos(chestLocal);
 
-        rig.body().giveExperienceLevels(7);
+        rig.body().experience().addLevels(7);
         rig.body().getInventory().container().setItem(0, new ItemStack(Items.DIAMOND));
         var tx = rig.actor().menuTransactions();
 
@@ -716,7 +716,9 @@ public final class BotInventoryGameTests {
             tx.menuClick(hotbar0, 0, MenuClick.PICKUP);
             tx.closeMenu();
             checkEquals(
-                    7, rig.body().getExperienceLevel(), "menu cycle " + cycle + " must not create or destroy body XP");
+                    7,
+                    rig.body().experience().getLevel(),
+                    "menu cycle " + cycle + " must not create or destroy body XP");
         }
         checkEquals(1, countItems(rig, Items.DIAMOND), "the diamond round trip must be lossless");
         rig.body().discard();
@@ -749,11 +751,11 @@ public final class BotInventoryGameTests {
         helper.startSequence()
                 .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
-                    checkEquals(7, rig.body().getXpNeededForNextLevel(), "level 0 must need 7");
-                    rig.body().giveExperienceLevels(15);
-                    checkEquals(37, rig.body().getXpNeededForNextLevel(), "level 15 must need 37");
-                    rig.body().giveExperienceLevels(15);
-                    checkEquals(112, rig.body().getXpNeededForNextLevel(), "level 30 must need 112");
+                    checkEquals(7, rig.body().experience().getXpNeededForNextLevel(), "level 0 must need 7");
+                    rig.body().experience().addLevels(15);
+                    checkEquals(37, rig.body().experience().getXpNeededForNextLevel(), "level 15 must need 37");
+                    rig.body().experience().addLevels(15);
+                    checkEquals(112, rig.body().experience().getXpNeededForNextLevel(), "level 30 must need 112");
                     rig.body().discard();
                 })
                 .thenSucceed();

@@ -17,7 +17,7 @@ import net.minecraft.util.Mth;
  * (progress resets only on level LOSS - positive grants keep the
  * bar, so orb-earned progress precision survives level-ups).
  */
-final class ExperienceMirror {
+public final class ExperienceMirror {
 
     /**
      * Experience level (vanilla {@code Player.experienceLevel}
@@ -41,18 +41,30 @@ final class ExperienceMirror {
      */
     private int totalExperience;
 
-    /** The current level; never negative. */
-    int getLevel() {
+    /**
+     * Gets the current experience level.
+     *
+     * @return the current level; never negative
+     */
+    public int getLevel() {
         return experienceLevel;
     }
 
-    /** Gets progress toward the next level, 0.0..1.0. */
-    float getProgress() {
+    /**
+     * Gets progress toward the next level.
+     *
+     * @return the progress fraction, 0.0..1.0
+     */
+    public float getProgress() {
         return experienceProgress;
     }
 
-    /** Gets total experience points ever absorbed; never negative. */
-    int getTotal() {
+    /**
+     * Gets the total experience points ever absorbed.
+     *
+     * @return the total; never negative
+     */
+    public int getTotal() {
         return totalExperience;
     }
 
@@ -65,7 +77,7 @@ final class ExperienceMirror {
      *
      * @return XP points needed for the next level
      */
-    int getXpNeededForNextLevel() {
+    public int getXpNeededForNextLevel() {
         if (experienceLevel >= 30) {
             return 112 + (experienceLevel - 30) * 9;
         }
@@ -84,7 +96,7 @@ final class ExperienceMirror {
      *
      * @param points XP to add (or subtract if negative)
      */
-    void addPoints(int points) {
+    public void addPoints(int points) {
         if (points == 0) {
             return;
         }
@@ -119,7 +131,7 @@ final class ExperienceMirror {
      *
      * @param levels levels to add (or subtract if negative)
      */
-    void addLevels(int levels) {
+    public void addLevels(int levels) {
         experienceLevel = Math.max(0, experienceLevel + levels);
         // Vanilla resets the progress bar only on level LOSS (a menu
         // cost); positive grants (orbs, kills) keep the bar - zeroing

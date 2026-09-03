@@ -51,7 +51,7 @@ public final class BotAnvilGameTests {
         helper.setBlock(anvilLocal, Blocks.ANVIL);
         BlockPos anvilAbs = helper.absolutePos(anvilLocal);
 
-        rig.body().giveExperienceLevels(10);
+        rig.body().experience().addLevels(10);
         var sword = new ItemStack(Items.IRON_SWORD);
         var book = new ItemStack(Items.ENCHANTED_BOOK);
         net.minecraft.world.item.EnchantedBookItem.addEnchantment(
@@ -86,7 +86,7 @@ public final class BotAnvilGameTests {
         check(
                 result.getEnchantmentLevel(Enchantments.SHARPNESS) == 1,
                 "the result must carry sharpness I, got " + result.getEnchantmentLevel(Enchantments.SHARPNESS));
-        check(rig.body().getExperienceLevel() < 10, "the anvil operation must cost experience levels");
+        check(rig.body().experience().getLevel() < 10, "the anvil operation must cost experience levels");
         rig.body().discard();
         helper.succeed();
     }
@@ -105,7 +105,7 @@ public final class BotAnvilGameTests {
         helper.setBlock(anvilLocal, Blocks.ANVIL);
         BlockPos anvilAbs = helper.absolutePos(anvilLocal);
 
-        rig.body().giveExperienceLevels(10);
+        rig.body().experience().addLevels(10);
         var pickaxe = new ItemStack(Items.IRON_PICKAXE);
         pickaxe.setDamageValue(50); // damaged
         rig.body().getInventory().container().setItem(0, pickaxe);
@@ -157,7 +157,7 @@ public final class BotAnvilGameTests {
         helper.setBlock(anvilLocal, Blocks.ANVIL);
         BlockPos anvilAbs = helper.absolutePos(anvilLocal);
 
-        rig.body().giveExperienceLevels(30);
+        rig.body().experience().addLevels(30);
         // A damaged iron sword — repair will trigger RepairCost increase.
         var damagedSword = new ItemStack(Items.IRON_SWORD);
         damagedSword.setDamageValue(100);
@@ -177,7 +177,7 @@ public final class BotAnvilGameTests {
         view = tx.menuClick(2, 0, MenuClick.PICKUP);
         tx.menuClick(hotbar0, 0, MenuClick.PICKUP);
         tx.closeMenu();
-        int levelsAfterRepair = rig.body().getExperienceLevel();
+        int levelsAfterRepair = rig.body().experience().getLevel();
         var repaired = rig.body().getInventory().container().getItem(0);
         check(repaired.getBaseRepairCost() > 0, "repair must increase the item's RepairCost");
         check(levelsAfterRepair < 30, "repair must cost experience levels");
@@ -195,7 +195,7 @@ public final class BotAnvilGameTests {
         view2 = tx2.menuClick(2, 0, MenuClick.PICKUP);
         tx2.menuClick(hotbar0, 0, MenuClick.PICKUP);
         tx2.closeMenu();
-        int levelsAfterRename = rig.body().getExperienceLevel();
+        int levelsAfterRename = rig.body().experience().getLevel();
 
         int costRepair = 30 - levelsAfterRepair;
         int costRename = levelsAfterRepair - levelsAfterRename;
@@ -236,7 +236,7 @@ public final class BotAnvilGameTests {
         // which is what the scenario pins.
         sword.enchant(Enchantments.SHARPNESS, 5);
         rig.body().getInventory().container().setItem(0, sword);
-        int xpBefore = rig.body().getExperienceLevel();
+        int xpBefore = rig.body().experience().getLevel();
 
         var tx = rig.actor().menuTransactions();
         var view = tx.openMenu(GametestRig.cellOf(grindAbs));
@@ -272,15 +272,15 @@ public final class BotAnvilGameTests {
                     driveTick(rig);
                     rig.body().tick();
                     check(
-                            rig.body().getExperienceLevel() > xpBefore,
+                            rig.body().experience().getLevel() > xpBefore,
                             "waiting for grindstone XP pickup (level > " + xpBefore + ")");
                 })
                 .thenExecuteFor(3, driveOnly(rig))
                 .thenExecuteAfter(0, () -> {
                     check(
-                            rig.body().getExperienceLevel() > xpBefore,
+                            rig.body().experience().getLevel() > xpBefore,
                             "grindstone must return experience (level increased); xpBefore=" + xpBefore + " xpAfter="
-                                    + rig.body().getExperienceLevel());
+                                    + rig.body().experience().getLevel());
                     rig.body().discard();
                     helper.succeed();
                 })
