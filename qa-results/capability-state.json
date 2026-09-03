@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "exported_at": "2026-09-02T04:52:23",
+  "exported_at": "2026-09-03T16:39:31",
   "statuses": [
     {
       "id": "acquisition.hunt_game",
@@ -53,7 +53,7 @@
     {
       "id": "consumable.potion",
       "status": "shipped",
-      "verified_at": "2026-09-01",
+      "verified_at": "2026-09-03",
       "deviation": "Bot consumes in one rising-edge pass (no 32-tick nibble animation); PotionItem.finishUsingItem lines 60-75 are Player-only (no shrink, no glass bottle return, no inventory add) so the adapter implements consumeDrink to mirror vanilla container recovery. Splash/lingering detected via ThrowablePotionItem instanceof check BEFORE PotionItem (ThrowablePotionItem extends PotionItem) to route to throw instead of drink."
     },
     {
@@ -107,13 +107,13 @@
     {
       "id": "hunger.eat_chain",
       "status": "shipped",
-      "verified_at": "2026-08-29",
+      "verified_at": "2026-09-03",
       "deviation": ""
     },
     {
       "id": "hunger.eat_events",
       "status": "shipped",
-      "verified_at": "2026-09-01",
+      "verified_at": "2026-09-03",
       "deviation": "Bot-specific: vanilla eating is a silent 32-tick animation; the bot discloses the full lifecycle for harness observability so the harness learns WHY the mission was preempted and WHAT was eaten without polling status."
     },
     {
@@ -245,7 +245,7 @@
     {
       "id": "taming.chain",
       "status": "shipped",
-      "verified_at": "2026-09-02",
+      "verified_at": "2026-09-03",
       "deviation": ""
     },
     {
