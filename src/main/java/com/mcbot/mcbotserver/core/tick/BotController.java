@@ -26,6 +26,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
+import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 
@@ -137,8 +139,16 @@ public final class BotController {
 
     private long tickCounter;
     private final CrashLatch crashLatch;
-    private boolean inLethalFluid;
-    private int airSupply = ThreatBlackboard.MAX_AIR_SUPPLY;
+    /** Crashed-state lethal-fluid accessor; read by MinimalReflex only. */
+    private final BooleanSupplier lethalFluidSource;
+
+    /**
+     * Crashed-state air accessor; read by MinimalReflex only (the
+     * normal pipeline derives air through the reflex sensor). Defaults
+     * to full air so a rig that never wires it reads as breathing —
+     * missing data must not mint a crashed-state ascend.
+     */
+    private final IntSupplier airSupplySource;
 
     /** Reflex claim construction (aim-and-dig, eat select-and-use). */
     private final ReflexClaimInjector claimInjector;
@@ -152,11 +162,11 @@ public final class BotController {
     private int ticksSinceKeepalive;
 
     /**
-     * Current food level for EAT_STARTED disclosure. Defaults to 0 so
-     * an unwired rig emits a truthful "unknown" value rather than a
-     * phantom full-bar; the production wiring feeds the body's FoodData.
+     * Current food level for EAT_STARTED disclosure. Wired through
+     * {@link SurvivalInputs}; defaults to 0 so an unwired rig emits a
+     * truthful "unknown" value rather than a phantom full-bar.
      */
-    private java.util.function.IntSupplier foodLevelSource = () -> 0;
+    private final IntSupplier foodLevelSource;
 
     /**
      * How often the keepalive event fires. Matches
@@ -208,6 +218,7 @@ public final class BotController {
                 ToolCatalog.none(),
                 null,
                 null,
+                null,
                 null);
     }
 
@@ -236,6 +247,10 @@ public final class BotController {
      *                      (HungryProcess) per acquire-food reflex
      *                      submission; may be null - FORAGE then
      *                      degrades to the freeze hold
+     * @param survivalInputs body vitals the survival reflexes and the
+     *                      EAT_STARTED disclosure read; may be null for
+     *                      the safe-default {@link SurvivalInputs#unwired()}
+     *                      rig - missing data never mints a reflex
      */
     public BotController(
             SurvivalReflexLayer reflex,
@@ -250,7 +265,8 @@ public final class BotController {
             ToolCatalog toolCatalog,
             @Nullable Supplier<BotProcess> engageMissionFactory,
             @Nullable Supplier<BotProcess> rescueMissionFactory,
-            @Nullable Supplier<BotProcess> hungryMissionFactory) {
+            @Nullable Supplier<BotProcess> hungryMissionFactory,
+            @Nullable SurvivalInputs survivalInputs) {
         this.reflex = Objects.requireNonNull(reflex, "reflex");
         this.arbiter = Objects.requireNonNull(arbiter, "arbiter");
         this.behaviors = List.copyOf(behaviors);
@@ -268,6 +284,13 @@ public final class BotController {
         this.rescueSeat = new ReflexMissionSeat(arbiter, PATHING_RESUBMIT_COOLDOWN);
         this.hungrySeat = new ReflexMissionSeat(arbiter, PATHING_RESUBMIT_COOLDOWN);
         this.claimInjector = new ReflexClaimInjector(actor, positionSource::get);
+        SurvivalInputs inputs = survivalInputs == null ? SurvivalInputs.unwired() : survivalInputs;
+        this.lethalFluidSource = Objects.requireNonNull(inputs.inLethalFluid(), "inLethalFluid");
+        this.airSupplySource = Objects.requireNonNull(inputs.airSupply(), "airSupply");
+        this.foodLevelSource = Objects.requireNonNull(inputs.foodLevel(), "foodLevel");
+        this.claimInjector.setEatSlotSupplier(inputs.eatSlot());
+        this.claimInjector.setDrinkSlotSupplier(inputs.drinkSlot());
+        this.claimInjector.setMlgBucketSlotSupplier(inputs.mlgBucketSlot());
         this.toolSelector = new ToolSelector(Objects.requireNonNull(toolCatalog, "toolCatalog"));
         this.preemption = new ReflexPreemption(
                 this.arbiter,
@@ -277,77 +300,6 @@ public final class BotController {
                 List.of(this.engageSeat, this.rescueSeat, this.hungrySeat),
                 positionSource::get);
         this.crashLatch = new CrashLatch(events, crashReporter, clock, positionSource, this::activeName, this.actor);
-    }
-
-    /**
-     * Feed the lava flag for this tick; read by MinimalReflex only.
-     *
-     * @param value true while the body stands in lethal fluid
-     */
-    public void setInLethalFluid(boolean value) {
-        this.inLethalFluid = value;
-    }
-
-    /**
-     * Feed the air supply for this tick; read by MinimalReflex only
-     * (the normal pipeline derives air through the reflex sensor).
-     * Defaults to full air so a rig that never calls this reads as
-     * breathing — missing data must not mint a crashed-state ascend.
-     *
-     * @param value current body air supply (vanilla
-     *              {@code getAirSupply()}, 0..300)
-     */
-    public void setAirSupply(int value) {
-        this.airSupply = value;
-    }
-
-    /**
-     * Feed the eat reflex's execution slot: the hotbar slot holding
-     * the best food, or -1 when none. Defaults to -1 inside the
-     * claim injector, so an unwired rig degrades an EAT decision to
-     * the plain freeze hold - stale slot data must not mint a
-     * phantom bite.
-     *
-     * @param supplier best-food hotbar slot 0..8, or -1; never null
-     */
-    public void setEatSlotSupplier(java.util.function.IntSupplier supplier) {
-        this.claimInjector.setEatSlotSupplier(supplier);
-    }
-
-    /**
-     * Feed the current food level for EAT_STARTED disclosure (ledger 34
-     * extension). The production wiring reads the body's FoodData; rigs
-     * without it default to 0.
-     *
-     * @param supplier current food level 0..20; never null
-     */
-    public void setFoodLevelSource(java.util.function.IntSupplier supplier) {
-        this.foodLevelSource = java.util.Objects.requireNonNull(supplier, "supplier");
-    }
-
-    /**
-     * Feed the MLG reflex's execution slot: the water-bucket hotbar
-     * slot, or -1 when none. Same degradation contract as the eat
-     * slot - an unwired rig stays silent instead of placing phantom
-     * water.
-     *
-     * @param supplier water-bucket hotbar slot 0..8, or -1; never null
-     */
-    public void setMlgBucketSlotSupplier(java.util.function.IntSupplier supplier) {
-        this.claimInjector.setMlgBucketSlotSupplier(supplier);
-    }
-
-    /**
-     * Feed the drink reflex's execution slot: the hotbar slot holding
-     * the best healing potion, or -1 when none. Same degradation
-     * contract as the eat slot - an unwired rig degrades a DRINK
-     * decision to the plain freeze hold instead of minting a phantom
-     * sip.
-     *
-     * @param supplier best-potion hotbar slot 0..8, or -1; never null
-     */
-    public void setDrinkSlotSupplier(java.util.function.IntSupplier supplier) {
-        this.claimInjector.setDrinkSlotSupplier(supplier);
     }
 
     /**
@@ -441,7 +393,7 @@ public final class BotController {
             // invariant: see ADR-0005 D3 (MinimalReflex may throw too;
             // the same latch fires again and both channels re-report)
             try {
-                MinimalReflex.tick(inLethalFluid, airSupply, actor);
+                MinimalReflex.tick(lethalFluidSource.getAsBoolean(), airSupplySource.getAsInt(), actor);
                 actor.flush();
             } catch (RuntimeException e) {
                 crashLatch.latch(e, tickCounter);
@@ -718,5 +670,48 @@ public final class BotController {
         return current != null
                 ? current.displayName()
                 : (arbiter.paused() != null ? arbiter.paused().displayName() : "");
+    }
+
+    /**
+     * Body vitals the survival reflexes and disclosure read, wired once
+     * at assembly. Fluid/air feed the crashed-state MinimalReflex
+     * (ADR-0005 D3) that cannot depend on the sensor stack; foodLevel
+     * feeds EAT_STARTED disclosure; the three slots feed the reflex
+     * executors - production wiring passes the same best-food /
+     * best-potion / bucket rankings the sensors stamp, one source of
+     * truth for both ends. Every accessor is polled inside the tick, so
+     * the wiring stays live without per-tick setter pushes.
+     *
+     * @param inLethalFluid true while the body stands in lethal fluid;
+     *                      never null
+     * @param airSupply     vanilla {@code getAirSupply()}, 0..300; never
+     *                      null
+     * @param foodLevel     current food level 0..20; never null
+     * @param eatSlot       best-food hotbar slot 0..8, or -1; never null
+     * @param drinkSlot     best-potion hotbar slot 0..8, or -1; never
+     *                      null
+     * @param mlgBucketSlot water-bucket hotbar slot 0..8, or -1; never
+     *                      null
+     */
+    public record SurvivalInputs(
+            BooleanSupplier inLethalFluid,
+            IntSupplier airSupply,
+            IntSupplier foodLevel,
+            IntSupplier eatSlot,
+            IntSupplier drinkSlot,
+            IntSupplier mlgBucketSlot) {
+
+        /**
+         * Safe-default rig wiring: not-in-lava, full air, foodLevel 0
+         * (truthful "unknown"), slots -1 (an EAT/DRINK/MLG decision
+         * degrades to the plain freeze hold - stale slot data must not
+         * mint a phantom bite, sip, or water placement).
+         *
+         * @return the safe-default inputs; never null
+         */
+        public static SurvivalInputs unwired() {
+            return new SurvivalInputs(
+                    () -> false, () -> ThreatBlackboard.MAX_AIR_SUPPLY, () -> 0, () -> -1, () -> -1, () -> -1);
+        }
     }
 }

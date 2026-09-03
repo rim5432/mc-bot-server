@@ -44,6 +44,27 @@ final class TickGateFixtures {
             Behavior behavior,
             Actor actor,
             EventQueue events) {
+        return controller(health, layer, arbiter, behavior, actor, events, null);
+    }
+
+    /**
+     * Same wiring with explicit survival inputs: tests that exercise
+     * the reflex executor chain (eat/drink/mlg slots, crashed-state
+     * vitals) pass their polled suppliers here instead of poking a
+     * setter after construction.
+     *
+     * @param inputs body vitals for the reflex executors; null for the
+     *               safe-default unwired rig
+     * @return the wired controller, never null
+     */
+    static BotController controller(
+            float[] health,
+            SurvivalReflexLayer layer,
+            TaskArbiter arbiter,
+            Behavior behavior,
+            Actor actor,
+            EventQueue events,
+            BotController.SurvivalInputs inputs) {
         return new BotController(
                 layer,
                 arbiter,
@@ -63,7 +84,12 @@ final class TickGateFixtures {
                     }
                 },
                 events,
-                ctx -> {});
+                ctx -> {},
+                com.mcbot.mcbotserver.api.actor.ToolCatalog.none(),
+                null,
+                null,
+                null,
+                inputs);
     }
 
     /**

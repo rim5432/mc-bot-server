@@ -237,15 +237,14 @@ public final class BotAssembly {
                 new VanillaToolCatalog(),
                 engageFactory,
                 rescueFactory,
-                forageFactory);
-        // The eat reflex executes against the same best-food ranking
-        // the sensor stamps (one source of truth for both ends).
-        controller.setEatSlotSupplier(bestFoodSlot);
-        controller.setFoodLevelSource(() -> body.getFoodData().getFoodLevel());
-        controller.setMlgBucketSlotSupplier(waterBucketSlot);
-        // The drink reflex executes against the same best-potion ranking
-        // the sensor stamps (one source of truth for both ends).
-        controller.setDrinkSlotSupplier(bestPotionSlot);
+                forageFactory,
+                new BotController.SurvivalInputs(
+                        body::isInLava,
+                        body::getAirSupply,
+                        () -> body.getFoodData().getFoodLevel(),
+                        bestFoodSlot,
+                        bestPotionSlot,
+                        waterBucketSlot));
         CommandBus bus = new CommandBus(events);
         GotoCommandHandler gotoHandler = new GotoCommandHandler(
                 arbiter, events, () -> level.getDayTime() / 24000L, () -> level.getDayTime() % 24000L);
@@ -329,14 +328,6 @@ public final class BotAssembly {
         // onto the stream only when the snapshot actually moved, so a
         // per-tick drive cannot flood it.
         a.state().current();
-        // Feed the crashed-state vitals before the pipeline runs:
-        // MinimalReflex (ADR-0005 D3) reads these to decide whether to
-        // jump (lava or low air). The normal reflex layer derives
-        // fluid/air state from ThreatBlackboard sensors; these flags
-        // are the crashed-state parallel that cannot depend on the
-        // sensor stack.
-        a.controller().setInLethalFluid(a.body().isInLava());
-        a.controller().setAirSupply(a.body().getAirSupply());
         a.controller().onTick(a.view());
     }
 

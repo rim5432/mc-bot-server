@@ -8,6 +8,7 @@ import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.behavior.Behavior;
 import com.mcbot.mcbotserver.api.event.EventQueue;
+import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
 import com.mcbot.mcbotserver.api.world.WorldView;
 import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
@@ -51,11 +52,20 @@ class EatReflexIntegrationGateTest {
             }
             return com.mcbot.mcbotserver.api.process.ExecutionReport.running();
         };
-        BotController controller =
-                TickGateFixtures.controller(new float[] {20f}, layer, arbiter, idle, actor, (EventQueue) events);
-        // The rig wires the injector's eat slot (BotAssembly); the
-        // gate mirrors that wiring, mirroring the scenario under test.
-        controller.setEatSlotSupplier(bestFoodSlot::get);
+        BotController controller = TickGateFixtures.controller(
+                new float[] {20f},
+                layer,
+                arbiter,
+                idle,
+                actor,
+                (EventQueue) events,
+                new BotController.SurvivalInputs(
+                        () -> false,
+                        () -> ThreatBlackboard.MAX_AIR_SUPPLY,
+                        foodLevel::get,
+                        bestFoodSlot::get,
+                        () -> -1,
+                        () -> -1));
 
         WorldView world = new MockWorldView();
         controller.onTick(world);

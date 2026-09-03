@@ -207,6 +207,7 @@ class EngageReflexGateTest {
                     ToolCatalog.none(),
                     factory,
                     null,
+                    null,
                     null);
         }
 
