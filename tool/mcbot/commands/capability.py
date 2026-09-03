@@ -45,6 +45,7 @@ def cmd_capability(args) -> int:
         "status": cmd_cap_status,
         "set": cmd_cap_set,
         "gaps": cmd_cap_gaps,
+        "enginetests": cmd_cap_enginetests,
         "db-status": cmd_cap_db_status,
         "backfill": cmd_cap_backfill,
         "diff": cmd_cap_diff,
@@ -281,6 +282,41 @@ def cmd_cap_gaps(args) -> int:
     for cap in gaps:
         print(f"{cap.id:<32} {cap.implementation_status:<10} {cap.category:<14} {cap.name}")
     print(f"\n{len(gaps)} gap/deferred capabilities")
+    return 0
+
+
+def cmd_cap_enginetests(args) -> int:
+    """Resolve the engine gametest classes backing one face's linked
+    impl cases. The result is a WATCH LIST for the pooled engine run,
+    not a filter: the 1.20.1 Forge runGameTestServer task takes no
+    scenario selection (--tests is a JUnit Test-task option and fails
+    task configuration), so the full pool is the only run mode and
+    receipts are always full-pool. After a red pooled run, rerun and
+    compare against this list to attribute flake (green on rerun) vs
+    regression (same scenario red again)."""
+    with cap_db.get_connection() as conn:
+        rows = conn.execute(
+            "SELECT id FROM qa_test_cases WHERE capability_id = ? AND id LIKE 'GT-%' ORDER BY id",
+            (args.capability_id,),
+        ).fetchall()
+    if not rows:
+        print(f"[mcbot] no linked impl cases for {args.capability_id}")
+        print("  hint: `capability scan-gametest` links GT-* cases; `capability status <id>` shows anchors")
+        return 1
+    classes: dict = {}
+    for (case_id,) in rows:
+        # Case ids are GT-<ClassName>-<methodName>; java identifiers
+        # carry no dash, so the first dash splits the pair.
+        _, cls, method = case_id.split("-", 2)
+        classes.setdefault(cls, []).append(method)
+    print(f"=== enginetests: {args.capability_id} ===")
+    for cls, methods in sorted(classes.items()):
+        print(f"  {cls}  ({len(methods)} impl case(s))")
+        for m in methods:
+            print(f"    - {m}")
+    print("\n  run mode: FULL POOL only - runGameTestServer (1.20.1 Forge) has no")
+    print("  scenario filter, so watch these classes in the pooled receipt;")
+    print("  a scoped receipt cannot exist and face evidence reads full-pool runs.")
     return 0
 
 

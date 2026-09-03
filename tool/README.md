@@ -41,6 +41,15 @@ python tool/mcbot_tool.py build compile -- --info --stacktrace
 python tool/mcbot_tool.py test -- --tests "*ReflexChainGateTest*"
 ```
 
+Engine runs are FULL POOL only. `runGameTest` is the Forge
+`runGameTestServer` launch (a game process, not a JUnit `Test` task) —
+`--tests` fails task configuration, and 1.20.1 Forge has no scenario
+selection. Every engine receipt therefore covers the whole pool; to
+attribute a red pooled scenario, rerun the pool and watch the face's
+classes (`capability enginetests <face-id>` prints them): green on
+rerun = pool-perturbation flake (the entity-timing family, ledger
+63/57), same scenario red again = treat as a regression.
+
 ## Subcommand map
 
 | Command | What it does |

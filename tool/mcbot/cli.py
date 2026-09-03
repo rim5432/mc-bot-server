@@ -637,6 +637,9 @@ def main() -> int:
     p_cap_list.add_argument("--status", choices=sorted(VALID_STATUSES), help="filter by implementation status")
     p_cap_status = p_cap_sub.add_parser("status", help="show full details for one capability")
     p_cap_status.add_argument("capability_id", help="capability id, e.g. dig.pacing")
+    p_cap_eng = p_cap_sub.add_parser(
+        "enginetests", help="face -> engine gametest classes (watch list for the pooled run)")
+    p_cap_eng.add_argument("capability_id", help="capability id, e.g. taming.chain")
     p_cap_set = p_cap_sub.add_parser("set", help="update status / deviation for a capability")
     p_cap_set.add_argument("capability_id", help="capability id")
     p_cap_set.add_argument("--status", choices=sorted(VALID_STATUSES), help="new implementation status")
