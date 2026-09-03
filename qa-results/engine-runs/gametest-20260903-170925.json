@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "task": "runGameTest",
+  "log": "D:\\mc-bot-server\\tool\\.runtime\\build-runGameTest-20260903-170802.log",
+  "git_rev": "52a23a0",
+  "finished_at": "2026-09-03T17:09:25",
+  "scenarios_total": 145,
+  "failed_count": 1,
+  "failed": [
+    "huntscowandcollectsbeefyield"
+  ],
+  "optional_failed_count": 1,
+  "failed_optional": [
+    "climbsladdertoplatform"
+  ],
+  "green": false
+}
