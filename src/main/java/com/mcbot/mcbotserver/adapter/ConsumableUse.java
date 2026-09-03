@@ -88,7 +88,7 @@ final class ConsumableUse {
         String source = owner != null && owner.startsWith(ReflexAction.REFLEX_OWNER_PREFIX) ? "reflex" : "harness";
         ItemStack held = body.getInventory().container().getItem(body.selectedSlot);
         if (held.isEmpty() && isConsumableReflex) {
-            emitReflexFailure(isEatReflex, "SLOT_EMPTY", "", source);
+            emitReflexFailure(isEatReflex, "SLOT_EMPTY", "SLOT_EMPTY", "", source);
             return true;
         }
         if (tryEat(held, source)
@@ -104,6 +104,7 @@ final class ConsumableUse {
             emitReflexFailure(
                     isEatReflex,
                     "NOT_EDIBLE",
+                    "NO_POTION",
                     BuiltInRegistries.ITEM.getKey(held.getItem()).toString(),
                     source);
         }
@@ -113,19 +114,25 @@ final class ConsumableUse {
     /**
      * Routes one consumable-reflex failure to the family-matching
      * FAILED event: eat intent reports EAT_FAILED, drink intent
-     * reports DRINK_FAILED, under the same reason and item.
+     * reports DRINK_FAILED. The reasons are per-family parameters,
+     * not one shared string - the unequipped tail differs by intent
+     * (NOT_EDIBLE vs NO_POTION), the empty-slot pair coincides.
      *
      * @param isEatReflex true when the claim carried eat intent
-     * @param reason      typed failure reason; never null
+     * @param eatReason   typed failure reason on the eat path; never
+     *                    null
+     * @param drinkReason typed failure reason on the drink path;
+     *                    never null
      * @param itemId      held item id, or "" for an empty slot;
      *                    never null
      * @param source      wire attr for the emitted event; never null
      */
-    private void emitReflexFailure(boolean isEatReflex, String reason, String itemId, String source) {
+    private void emitReflexFailure(
+            boolean isEatReflex, String eatReason, String drinkReason, String itemId, String source) {
         if (isEatReflex) {
-            emitEatFailed(reason, body.selectedSlot, itemId, source);
+            emitEatFailed(eatReason, body.selectedSlot, itemId, source);
         } else {
-            emitDrinkFailed(reason, body.selectedSlot, itemId, source);
+            emitDrinkFailed(drinkReason, body.selectedSlot, itemId, source);
         }
     }
 
