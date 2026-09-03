@@ -31,6 +31,9 @@ import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
 import com.mcbot.mcbotserver.core.state.ChangeDetectingStateChannel;
 import com.mcbot.mcbotserver.core.tick.BotController;
 import com.mcbot.mcbotserver.core.tick.CrashReporter;
+import com.mcbot.mcbotserver.core.tick.DigClaimBehavior;
+import com.mcbot.mcbotserver.core.tick.ReflexClaimInjector;
+import com.mcbot.mcbotserver.core.tick.ToolSelector;
 import com.mcbot.mcbotserver.core.world.MapBlockTraitsRegistry;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -228,12 +231,9 @@ public final class BotAssembly {
         // the stage-3 behavior loop (issue 0013 R1 protocol); one
         // injector instance is shared with the controller's reflex
         // paths so the claim shapes have exactly one home.
-        com.mcbot.mcbotserver.core.tick.ReflexClaimInjector claimInjector =
-                new com.mcbot.mcbotserver.core.tick.ReflexClaimInjector(actor, () -> poseOf(body));
-        var digClaims = new com.mcbot.mcbotserver.core.tick.DigClaimBehavior(
-                arbiter::current,
-                new com.mcbot.mcbotserver.core.tick.ToolSelector(new VanillaToolCatalog()),
-                claimInjector);
+        ReflexClaimInjector claimInjector = new ReflexClaimInjector(actor, () -> poseOf(body));
+        var digClaims =
+                new DigClaimBehavior(arbiter::current, new ToolSelector(new VanillaToolCatalog()), claimInjector);
 
         BotController controller = new BotController(
                 reflex,
