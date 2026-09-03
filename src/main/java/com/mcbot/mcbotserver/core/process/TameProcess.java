@@ -1,5 +1,6 @@
 package com.mcbot.mcbotserver.core.process;
 
+import com.mcbot.mcbotserver.api.capability.Feature;
 import com.mcbot.mcbotserver.api.goal.GoalNear;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.ExecutionReport;
@@ -156,6 +157,15 @@ public final class TameProcess extends MissionShell {
         return targetId;
     }
 
+    @Feature(
+            id = "taming.chain.first_sight_verdicts",
+            face = "taming.chain",
+            description = "First-sight typed verdicts over the live view: a tameable, calm, item-backed animal"
+                    + " advances into the GoalNear chase, while ALREADY_TAMED / NOT_TAMEABLE / TARGET_ANGRY /"
+                    + " NO_TAME_ITEM sightings refuse NOW instead of budget-staring. The tamed flag is a dual"
+                    + " verdict - refusal at first sight, success only after our own presses landed - and"
+                    + " leash/grace target loss reuses the attack tracker's semantics (TARGET_ESCAPED).",
+            vanillaRef = "TamableAnimal.isTamed; Wolf.mobInteract anger guard (decompiled 1.20.1)")
     @Override
     public Directive onTick(WorldView world) {
         if (!live()) {
