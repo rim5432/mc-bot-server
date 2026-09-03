@@ -11,6 +11,7 @@ import static com.mcbot.mcbotserver.gametest.GametestRig.rig;
 import com.mcbot.mcbotserver.McBotServer;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.process.DigProcess;
+import com.mcbot.mcbotserver.core.process.MineProcess;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -305,6 +306,52 @@ public final class BotDiggingGameTests {
         return !helper.getLevel()
                 .getEntitiesOfClass(net.minecraft.world.entity.ExperienceOrb.class, box)
                 .isEmpty();
+    }
+
+    /**
+     * Scenario: the composite mine task clears a two-block compound
+     * target - the deferred issue-0013 live verification, minimal
+     * form. SEARCH must find both stone cells, then the
+     * MOVING/DIGGING/COLLECTING rotation must re-enter SEARCH between
+     * breaks with the controller's mission-dig claim path feeding
+     * each one; the mission succeeds on targetCount with two recorded
+     * breaks and both cells reading air. Single-block DigProcess
+     * scenarios cannot catch a broken phase rotation (a skip-set
+     * leak, a SEARCH re-entry wedge) because they never re-enter
+     * SEARCH - this is the smallest rung that can.
+     */
+    @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT + 400)
+    public static void compoundMineClearsTwoStoneBlocks(GameTestHelper helper) {
+        var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
+        rig.body().getInventory().container().setItem(0, new ItemStack(Items.IRON_PICKAXE));
+        BlockPos stoneA = new BlockPos(6, GametestRig.WALK_Y, 8);
+        BlockPos stoneB = new BlockPos(8, GametestRig.WALK_Y, 10);
+        helper.setBlock(stoneA, Blocks.STONE);
+        helper.setBlock(stoneB, Blocks.STONE);
+        var body = rig.body();
+        MineProcess mission = new MineProcess(
+                "gt-mine-compound-2",
+                "minecraft:stone",
+                2,
+                50,
+                GametestRig.MISSION_BUDGET + 600,
+                () -> new CellPos(body.getBlockX(), body.getBlockY(), body.getBlockZ()));
+        rig.arbiter().register(mission);
+        rig.arbiter().requestControl(mission);
+
+        helper.startSequence()
+                .thenWaitUntil(
+                        driveUntil(rig, () -> check(!mission.isActive(), "waiting for both breaks + collection")))
+                .thenExecuteFor(SETTLE_TICKS, driveOnly(rig))
+                .thenExecuteAfter(0, () -> {
+                    check(
+                            mission.missionSucceeded(),
+                            "the compound mine must succeed, failure=" + mission.failureReasonOrNull());
+                    check(helper.getBlockState(helper.absolutePos(stoneA)).isAir(), "first stone cell must read air");
+                    check(helper.getBlockState(helper.absolutePos(stoneB)).isAir(), "second stone cell must read air");
+                    rig.body().discard();
+                })
+                .thenSucceed();
     }
 
     /** Whether at least one of the item kind lies on the ground

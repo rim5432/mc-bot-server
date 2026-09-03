@@ -210,7 +210,8 @@ class GametestInventoryCheck {
                             "swordDigsAtDoubleWear",
                             "breakingBlocksBuildsExhaustion",
                             "toolSelectorPicksThePickaxeForStone",
-                            "toolSelectorPicksShearsForLeaves")),
+                            "toolSelectorPicksShearsForLeaves",
+                            "compoundMineClearsTwoStoneBlocks")),
             Map.entry(
                     "BotHungerGameTests",
                     Set.of(
