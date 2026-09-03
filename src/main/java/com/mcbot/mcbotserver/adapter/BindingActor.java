@@ -6,14 +6,12 @@ import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.capability.Feature;
-import com.mcbot.mcbotserver.api.event.BotEvent;
-import com.mcbot.mcbotserver.api.event.EventKind;
+import com.mcbot.mcbotserver.api.event.EventFacts;
 import com.mcbot.mcbotserver.api.event.EventQueue;
 import com.mcbot.mcbotserver.api.menu.MenuTransactions;
 import com.mcbot.mcbotserver.api.reflex.ReflexAction;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.actor.ChannelArbiter;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -461,8 +459,10 @@ public final class BindingActor implements Actor {
     }
 
     /**
-     * Push one EAT_COMPLETED event. Wrapped so a reporting failure never
-     * takes the tick pipeline down (same invariant as MissionReporter).
+     * Push one EAT_COMPLETED event. The wire shape is
+     * {@link EventFacts#eatCompleted}; this wrapper only stamps game
+     * time and isolates reporting failures (same invariant as
+     * MissionReporter).
      */
     private void emitEatCompleted(
             String itemId,
@@ -475,24 +475,18 @@ public final class BindingActor implements Actor {
             String containerType,
             String source) {
         try {
-            Map<String, String> attrs = new HashMap<>();
-            attrs.put("itemId", itemId);
-            attrs.put("slot", Integer.toString(slot));
-            attrs.put("nutrition", Integer.toString(nutrition));
-            attrs.put("saturationGained", Float.toString(satAfter - satBefore));
-            attrs.put("foodLevelBefore", Integer.toString(foodBefore));
-            attrs.put("foodLevelAfter", Integer.toString(foodAfter));
-            attrs.put("saturationBefore", Float.toString(satBefore));
-            attrs.put("saturationAfter", Float.toString(satAfter));
-            attrs.put("containerType", containerType);
-            attrs.put("source", source);
-            events.push(new BotEvent(
-                    EventKind.EAT_COMPLETED,
+            events.push(EventFacts.eatCompleted(
+                    itemId,
+                    slot,
+                    nutrition,
+                    satBefore,
+                    satAfter,
+                    foodBefore,
+                    foodAfter,
+                    containerType,
+                    source,
                     daySupplier.getAsLong(),
-                    todSupplier.getAsLong(),
-                    false,
-                    Map.copyOf(attrs),
-                    "ate " + itemId + " (" + nutrition + " nutrition, food " + foodBefore + "->" + foodAfter + ")"));
+                    todSupplier.getAsLong()));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down.
         }
@@ -504,18 +498,8 @@ public final class BindingActor implements Actor {
      */
     private void emitEatFailed(String reason, int slot, String itemId, String source) {
         try {
-            Map<String, String> attrs = new HashMap<>();
-            attrs.put("reason", reason);
-            attrs.put("slot", Integer.toString(slot));
-            attrs.put("itemId", itemId);
-            attrs.put("source", source);
-            events.push(new BotEvent(
-                    EventKind.EAT_FAILED,
-                    daySupplier.getAsLong(),
-                    todSupplier.getAsLong(),
-                    false,
-                    Map.copyOf(attrs),
-                    "eat failed: " + reason + " (slot " + slot + ", item " + itemId + ")"));
+            events.push(EventFacts.eatFailed(
+                    reason, slot, itemId, source, daySupplier.getAsLong(), todSupplier.getAsLong()));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down.
         }
@@ -546,98 +530,62 @@ public final class BindingActor implements Actor {
     }
 
     /**
-     * Push one DRINK_STARTED event. Wrapped so a reporting failure
-     * never takes the tick pipeline down.
+     * Push one DRINK_STARTED event. Same failure-isolation wrapper as
+     * {@link #emitEatCompleted}; wire shape in {@link EventFacts}.
      */
     private void emitDrinkStarted(String potionId, int slot, float health, String source) {
         try {
-            Map<String, String> attrs = new HashMap<>();
-            attrs.put("potionId", potionId);
-            attrs.put("slot", Integer.toString(slot));
-            attrs.put("health", Float.toString(health));
-            attrs.put("source", source);
-            events.push(new BotEvent(
-                    EventKind.DRINK_STARTED,
-                    daySupplier.getAsLong(),
-                    todSupplier.getAsLong(),
-                    true,
-                    Map.copyOf(attrs),
-                    "drink started: " + potionId + " (slot " + slot + ", health " + health + ")"));
+            events.push(EventFacts.drinkStarted(
+                    potionId, slot, health, source, daySupplier.getAsLong(), todSupplier.getAsLong()));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down.
         }
     }
 
     /**
-     * Push one DRINK_COMPLETED event. Wrapped so a reporting failure
-     * never takes the tick pipeline down.
+     * Push one DRINK_COMPLETED event. Same failure-isolation wrapper as
+     * {@link #emitEatCompleted}; wire shape in {@link EventFacts}.
      */
     private void emitDrinkCompleted(String potionId, int slot, String effects, String containerType, String source) {
         try {
-            Map<String, String> attrs = new HashMap<>();
-            attrs.put("potionId", potionId);
-            attrs.put("slot", Integer.toString(slot));
-            attrs.put("effects", effects);
-            attrs.put("containerType", containerType);
             // P2-d: whether the recovered container was dropped because
             // inventory was full (count>1 branch only; count=1 places the
             // container in the selected slot and this is always false).
-            attrs.put("containerDropped", Boolean.toString(body.wasLastContainerDropped()));
-            attrs.put("source", source);
-            events.push(new BotEvent(
-                    EventKind.DRINK_COMPLETED,
+            events.push(EventFacts.drinkCompleted(
+                    potionId,
+                    slot,
+                    effects,
+                    containerType,
+                    body.wasLastContainerDropped(),
+                    source,
                     daySupplier.getAsLong(),
-                    todSupplier.getAsLong(),
-                    false,
-                    Map.copyOf(attrs),
-                    "drank " + potionId + " (effects: " + effects + ")"));
+                    todSupplier.getAsLong()));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down.
         }
     }
 
     /**
-     * Push one DRINK_FAILED event. Wrapped so a reporting failure
-     * never takes the tick pipeline down.
+     * Push one DRINK_FAILED event. Same failure-isolation wrapper as
+     * {@link #emitEatCompleted}; wire shape in {@link EventFacts}.
      */
     private void emitDrinkFailed(String reason, int slot, String itemId, String source) {
         try {
-            Map<String, String> attrs = new HashMap<>();
-            attrs.put("reason", reason);
-            attrs.put("slot", Integer.toString(slot));
-            attrs.put("itemId", itemId);
-            attrs.put("source", source);
-            events.push(new BotEvent(
-                    EventKind.DRINK_FAILED,
-                    daySupplier.getAsLong(),
-                    todSupplier.getAsLong(),
-                    false,
-                    Map.copyOf(attrs),
-                    "drink failed: " + reason + " (slot " + slot + ", item " + itemId + ")"));
+            events.push(EventFacts.drinkFailed(
+                    reason, slot, itemId, source, daySupplier.getAsLong(), todSupplier.getAsLong()));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down.
         }
     }
 
     /**
-     * Push one POTION_THROWN event. Wrapped so a reporting failure
-     * never takes the tick pipeline down.
+     * Push one POTION_THROWN event. Same failure-isolation wrapper as
+     * {@link #emitEatCompleted}; wire shape in {@link EventFacts}.
      */
     private void emitPotionThrown(String potionId, int slot, String throwType, String effects, String source) {
         try {
-            Map<String, String> attrs = new HashMap<>();
-            attrs.put("potionId", potionId);
-            attrs.put("slot", Integer.toString(slot));
-            attrs.put("throwType", throwType);
-            attrs.put("effects", effects);
-            attrs.put("source", source);
-            events.push(new BotEvent(
-                    EventKind.POTION_THROWN,
-                    daySupplier.getAsLong(),
-                    todSupplier.getAsLong(),
-                    false,
-                    Map.copyOf(attrs),
-                    "threw " + throwType + " " + potionId + " (effects: " + effects + ")"));
+            events.push(EventFacts.potionThrown(
+                    potionId, slot, throwType, effects, source, daySupplier.getAsLong(), todSupplier.getAsLong()));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down.
         }

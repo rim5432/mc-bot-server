@@ -8,6 +8,7 @@ import com.mcbot.mcbotserver.api.command.BotCommand;
 import com.mcbot.mcbotserver.api.command.SubmitResult;
 import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventBatch;
+import com.mcbot.mcbotserver.api.event.EventFacts;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.state.BotState;
 import com.mcbot.mcbotserver.api.types.CellPos;
@@ -116,6 +117,7 @@ class WireVocabularyGateTest {
             "core/tick/CrashLatch.java",
             "core/tick/MissionReporter.java",
             "core/behavior/PathingBehavior.java",
+            "api/event/EventFacts.java",
             "adapter/BindingActor.java");
 
     /** Attr-key literal shapes used at push sites. */
@@ -201,6 +203,52 @@ class WireVocabularyGateTest {
                     + " (registered keys no producer stamps - retire "
                     + "the pin or restore the producer).");
         }
+    }
+
+    /**
+     * Runtime truth for the consume family: EventFacts is the single
+     * construction point for EAT_* / DRINK_* / POTION_THROWN, and its
+     * pure factories can be called offline. Each factory's emitted attr
+     * key set must EQUAL its KIND_ATTRS row - the literal scan above
+     * sees one key per {@code .put} line, this sees the event the wire
+     * actually carries.
+     */
+    @Test
+    void consumeFamilyFactoriesMatchTheirRegisteredShape() {
+        Map<String, Set<String>> emitted = new java.util.HashMap<>();
+        collect(EventFacts.eatStarted(0, 10, "EatWhenHungryRule", "reflex", 1, 6000), emitted);
+        collect(
+                EventFacts.eatCompleted("minecraft:bread", 0, 5, 0.5f, 6.0f, 10, 12, "none", "reflex", 1, 6000),
+                emitted);
+        collect(EventFacts.eatFailed("NOT_EDIBLE", 3, "minecraft:stick", "reflex", 1, 6000), emitted);
+        collect(EventFacts.drinkStarted("minecraft:potion", 2, 9.5f, "reflex", 1, 6000), emitted);
+        collect(
+                EventFacts.drinkCompleted(
+                        "minecraft:potion",
+                        2,
+                        "minecraft:instant_health:0:1",
+                        "glass_bottle",
+                        false,
+                        "reflex",
+                        1,
+                        6000),
+                emitted);
+        collect(EventFacts.drinkFailed("NO_POTION", 4, "minecraft:potion", "reflex", 1, 6000), emitted);
+        collect(
+                EventFacts.potionThrown(
+                        "minecraft:splash_potion", 5, "splash", "minecraft:poison:0:900", "reflex", 1, 6000),
+                emitted);
+        for (Map.Entry<String, Set<String>> row : emitted.entrySet()) {
+            assertEquals(
+                    KIND_ATTRS.get(row.getKey()),
+                    row.getValue(),
+                    "EventFacts." + row.getKey() + " wire shape drifted from KIND_ATTRS - fix whichever"
+                            + " side is wrong; the table IS the attr contract.");
+        }
+    }
+
+    private static void collect(BotEvent event, Map<String, Set<String>> into) {
+        into.put(event.kind(), event.attrs().keySet());
     }
 
     /** Fails when a wire-carrying record renames or reorders a

@@ -5,6 +5,7 @@ import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.actor.ToolCatalog;
 import com.mcbot.mcbotserver.api.behavior.Behavior;
 import com.mcbot.mcbotserver.api.event.BotEvent;
+import com.mcbot.mcbotserver.api.event.EventFacts;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.event.EventQueue;
 import com.mcbot.mcbotserver.api.goal.Goals;
@@ -22,7 +23,6 @@ import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.core.reflex.MinimalReflex;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer;
 import com.mcbot.mcbotserver.core.reflex.SurvivalReflexLayer.ReflexDecision;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -610,20 +610,13 @@ public final class BotController {
      */
     private void emitEatStarted(SurvivalReflexLayer.ReflexDecision decision, long day, long tod) {
         try {
-            Map<String, String> attrs = new HashMap<>();
-            attrs.put("foodLevel", Integer.toString(foodLevelSource.getAsInt()));
-            attrs.put("slot", Integer.toString(claimInjector.currentEatSlot()));
-            attrs.put("ruleName", decision.ruleName());
-            attrs.put("source", "reflex");
-            events.push(new BotEvent(
-                    EventKind.EAT_STARTED,
+            events.push(EventFacts.eatStarted(
+                    claimInjector.currentEatSlot(),
+                    foodLevelSource.getAsInt(),
+                    decision.ruleName(),
+                    "reflex",
                     day,
-                    tod,
-                    true,
-                    Map.copyOf(attrs),
-                    "eat started: foodLevel=" + foodLevelSource.getAsInt()
-                            + " slot=" + claimInjector.currentEatSlot()
-                            + " rule=" + decision.ruleName()));
+                    tod));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down.
         }
