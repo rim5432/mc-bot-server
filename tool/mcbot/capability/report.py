@@ -100,7 +100,8 @@ def harness_axis(db_path: Optional[Path] = None) -> dict:
     """The face -> boundary-D path axis, inverted for display, plus
     wire-surface evidence (boundary_d receipts + BD verdict counts).
 
-    Mapped faces carry curated paths (seed.HARNESS_PATHS); pathless
+    Mapped faces carry curated paths (faces.yaml harness_paths,
+    re-exported as seed.HARNESS_PATHS); pathless
     faces split nowhere automatically - internal reflex/sense faces
     are pathless by design, the rest are review candidates; the CLI
     lists them by category for that review."""
@@ -815,7 +816,7 @@ def action_queue(
                 "target": face_id,
                 "target_kind": "face",
                 "gap": "PATHLESS",
-                "action": "add harness_paths in seed.py HARNESS_PATHS, then `capability init`",
+                "action": "add harness_paths in faces.yaml, then `capability init`",
                 "detail": f"category={category}, status={cap.implementation_status if cap else '?'}",
             })
 
@@ -840,7 +841,7 @@ def action_queue(
                 "target": face_id,
                 "target_kind": "face",
                 "gap": "source-path-MISSING",
-                "action": "update seed.py SOURCE_PATHS (file moved/renamed), then `capability init`",
+                "action": "update faces.yaml source_paths (file moved/renamed), then `capability init`",
                 "detail": f"missing: {', '.join(d['missing'])}",
             })
         elif d["state"] == "drift":

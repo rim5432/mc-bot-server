@@ -72,7 +72,7 @@ parse committed text.
 
 | Fact class | Home (committed) | Collector |
 |---|---|---|
-| capability catalog + harness path axis | seed (from `player-behavior-RE.md` + `HARNESS_PATHS`) | `init` (refreshes catalog, never statuses) |
+| capability catalog + harness path axis | `mcbot/capability/faces.yaml` (data-driven) | `init` (refreshes catalog, never statuses) |
 | test SPECIFICATIONS (TC-*) + their links | `qa-results/ranged-survival/qa-test-cases-ranged-survival.csv` (10-col, explicit `capability_id`) | `qa-import` |
 | test IMPLEMENTATIONS (GT-*) | gametest source | `scan-gametest` (owns lifecycle incl. pruning) |
 | engine run evidence | `qa-results/engine-runs/*.json` (H-R5 currency) | auto-record + `backfill` |

@@ -210,7 +210,7 @@ def cmd_cap_status(args) -> int:
     elif is_internal_face(cap.id):
         print(f"    harness_paths : \u2713 (internal reflex/sense — pathless by design)")
     else:
-        print(f"    harness_paths : \u2717 PATHLESS — add boundary-D path in seed.py HARNESS_PATHS")
+        print(f"    harness_paths : \u2717 PATHLESS — add boundary-D path in faces.yaml harness_paths")
     # test anchors
     if ev["state"] == "untested":
         print(f"    test anchors  : \u2717 NO-IMPL — no automated test evidence")
