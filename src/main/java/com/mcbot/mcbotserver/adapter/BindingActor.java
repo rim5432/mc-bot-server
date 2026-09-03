@@ -6,33 +6,20 @@ import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
 import com.mcbot.mcbotserver.api.actor.Intent;
 import com.mcbot.mcbotserver.api.capability.Feature;
-import com.mcbot.mcbotserver.api.event.EventFacts;
 import com.mcbot.mcbotserver.api.event.EventQueue;
 import com.mcbot.mcbotserver.api.menu.MenuTransactions;
-import com.mcbot.mcbotserver.api.reflex.ReflexAction;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.actor.ChannelArbiter;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.LongSupplier;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.item.BowItem;
-import net.minecraft.world.item.BowlFoodItem;
 import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.FishingRodItem;
-import net.minecraft.world.item.HoneyBottleItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.LingeringPotionItem;
-import net.minecraft.world.item.MilkBucketItem;
-import net.minecraft.world.item.PotionItem;
 import net.minecraft.world.item.ShieldItem;
-import net.minecraft.world.item.SplashPotionItem;
-import net.minecraft.world.item.SuspiciousStewItem;
-import net.minecraft.world.item.alchemy.PotionUtils;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
@@ -71,6 +58,8 @@ public final class BindingActor implements Actor {
     private final InteractEntityExecutor entityInteract;
     /** One-shot directed melee strike on a named entity (hunt, defend). */
     private final StrikeEntityExecutor strike;
+    /** Consumable USE-edge dispatch: eat/drink/milk/throw + events. */
+    private final ConsumableUse consumable;
 
     /**
      * The one-shot place executor for the synchronous /bot place verb
@@ -206,6 +195,7 @@ public final class BindingActor implements Actor {
         this.entityInteract = new InteractEntityExecutor(body, facade);
         this.strike = new StrikeEntityExecutor(body, facade, melee);
         this.menuTx = new ActorMenuTransactions(facade);
+        this.consumable = new ConsumableUse(body, events, daySupplier, todSupplier);
         this.events = Objects.requireNonNull(events, "events");
         this.daySupplier = Objects.requireNonNull(daySupplier, "daySupplier");
         this.todSupplier = Objects.requireNonNull(todSupplier, "todSupplier");
@@ -339,113 +329,13 @@ public final class BindingActor implements Actor {
                     + " takes damage — the shield must be held on the body that actually receives the hurt call."
                     + "Verified by issue 0003: a facade-raised shield did nothing.")
     private void onUsePressEdge(String owner) {
-        String source = owner != null && owner.startsWith(ReflexAction.REFLEX_OWNER_PREFIX) ? "reflex" : "harness";
+        // Consumable dispatch first (eat/drink/milk/throw + reflex
+        // intent failures); the weapon tail below runs only when the
+        // held item is no consumable at all.
+        if (consumable.tryConsume(owner)) {
+            return;
+        }
         ItemStack held = body.getInventory().container().getItem(body.selectedSlot);
-        // Reflex intent detection (P2-d): EAT_*/DRINK_* reflex claims carry
-        // unambiguous consumable intent. For these, an empty slot or a
-        // non-consumable item is a FAILED action, not a silent melee.
-        // Generic harness USE claims are ambiguous (could be a weapon swing),
-        // so they fall through to the melee fallback without a FAILED event.
-        // Prefixes are shared constants in ReflexAction so a rule rename on
-        // the production side (ReflexClaimInjector) breaks the consumer side
-        // at compile time instead of silently degrading to melee.
-        boolean isEatReflex = owner != null && owner.startsWith(ReflexAction.REFLEX_EAT_OWNER_PREFIX);
-        boolean isDrinkReflex = owner != null && owner.startsWith(ReflexAction.REFLEX_DRINK_OWNER_PREFIX);
-        boolean isConsumableReflex = isEatReflex || isDrinkReflex;
-        if (held.isEmpty() && isConsumableReflex) {
-            if (isEatReflex) {
-                emitEatFailed("SLOT_EMPTY", body.selectedSlot, "", source);
-            } else {
-                emitDrinkFailed("SLOT_EMPTY", body.selectedSlot, "", source);
-            }
-            return;
-        }
-        var props = held.getFoodProperties(body);
-        if (props != null) {
-            int foodBefore = body.getFoodData().getFoodLevel();
-            float satBefore = body.getFoodData().getSaturationLevel();
-            int slot = body.selectedSlot;
-            String itemId = BuiltInRegistries.ITEM.getKey(held.getItem()).toString();
-            int nutrition = props.getNutrition();
-            float satModifier = props.getSaturationModifier();
-            // Container type for the EAT_COMPLETED attrs: bowl foods and
-            // honey bottles leave a container; normal foods and chorus fruit
-            // do not. Captured before eatHeldItem mutates the slot.
-            String containerType = containerTypeFor(held.getItem());
-            boolean consumed = body.eatHeldItem();
-            if (consumed) {
-                int foodAfter = body.getFoodData().getFoodLevel();
-                float satAfter = body.getFoodData().getSaturationLevel();
-                emitEatCompleted(
-                        itemId, slot, nutrition, satBefore, satAfter, foodBefore, foodAfter, containerType, source);
-                return;
-            }
-            // Food in hand but not consumed: needsFood() was false (full)
-            // or the stack was empty between props read and eatHeldItem.
-            emitEatFailed("NOT_HUNGRY", slot, itemId, source);
-            return;
-        }
-        // Splash/lingering potions MUST be checked before PotionItem:
-        // ThrowablePotionItem extends PotionItem, so a bare instanceof
-        // PotionItem would match them and attempt to drink (finishUsingItem
-        // applies nothing for throwable potions — the effects resolve on
-        // projectile impact instead).
-        if (held.getItem() instanceof SplashPotionItem || held.getItem() instanceof LingeringPotionItem) {
-            int slot = body.selectedSlot;
-            String potionId =
-                    BuiltInRegistries.POTION.getKey(PotionUtils.getPotion(held)).toString();
-            String effects = serializeEffects(PotionUtils.getMobEffects(held));
-            String throwType = held.getItem() instanceof LingeringPotionItem ? "lingering" : "splash";
-            boolean thrown = body.throwHeldPotion();
-            if (thrown) {
-                emitPotionThrown(potionId, slot, throwType, effects, source);
-            }
-            return;
-        }
-        if (held.getItem() instanceof PotionItem) {
-            int slot = body.selectedSlot;
-            String itemId = BuiltInRegistries.ITEM.getKey(held.getItem()).toString();
-            String potionId =
-                    BuiltInRegistries.POTION.getKey(PotionUtils.getPotion(held)).toString();
-            String effects = serializeEffects(PotionUtils.getMobEffects(held));
-            float health = body.getHealth();
-            emitDrinkStarted(potionId, slot, health, source);
-            boolean consumed = body.drinkHeldItem();
-            if (consumed) {
-                emitDrinkCompleted(potionId, slot, effects, "glass_bottle", source);
-            } else {
-                emitDrinkFailed("NOT_DRINKABLE", slot, itemId, source);
-            }
-            return;
-        }
-        if (held.getItem() instanceof MilkBucketItem) {
-            int slot = body.selectedSlot;
-            String itemId = BuiltInRegistries.ITEM.getKey(held.getItem()).toString();
-            // Milk cures all curable effects: capture the active effect list
-            // BEFORE drinking so DRINK_COMPLETED can report what was cleared.
-            String clearedEffects = serializeEffects(List.copyOf(body.getActiveEffects()));
-            float health = body.getHealth();
-            emitDrinkStarted("minecraft:milk", slot, health, source);
-            boolean consumed = body.drinkMilk();
-            if (consumed) {
-                emitDrinkCompleted("minecraft:milk", slot, clearedEffects, "bucket", source);
-            } else {
-                emitDrinkFailed("NOT_DRINKABLE", slot, itemId, source);
-            }
-            return;
-        }
-        // Consumable reflex reached here: the item is not food, not a
-        // drinkable potion, not milk, and not a throwable potion. Emit
-        // the precise failure reason instead of silently meleeing.
-        if (isConsumableReflex) {
-            String itemId = BuiltInRegistries.ITEM.getKey(held.getItem()).toString();
-            if (isEatReflex) {
-                emitEatFailed("NOT_EDIBLE", body.selectedSlot, itemId, source);
-            } else {
-                emitDrinkFailed("NO_POTION", body.selectedSlot, itemId, source);
-            }
-            return;
-        }
         Item heldItem = held.getItem();
         if (heldItem instanceof BowItem) {
             facade.startUsingItem(InteractionHand.MAIN_HAND);
@@ -456,158 +346,6 @@ public final class BindingActor implements Actor {
         } else {
             melee.onUsePress();
         }
-    }
-
-    /**
-     * Push one EAT_COMPLETED event. The wire shape is
-     * {@link EventFacts#eatCompleted}; this wrapper only stamps game
-     * time and isolates reporting failures (same invariant as
-     * MissionReporter).
-     */
-    private void emitEatCompleted(
-            String itemId,
-            int slot,
-            int nutrition,
-            float satBefore,
-            float satAfter,
-            int foodBefore,
-            int foodAfter,
-            String containerType,
-            String source) {
-        try {
-            events.push(EventFacts.eatCompleted(
-                    itemId,
-                    slot,
-                    nutrition,
-                    satBefore,
-                    satAfter,
-                    foodBefore,
-                    foodAfter,
-                    containerType,
-                    source,
-                    daySupplier.getAsLong(),
-                    todSupplier.getAsLong()));
-        } catch (RuntimeException ignored) {
-            // Reporting must never take the pipeline down.
-        }
-    }
-
-    /**
-     * Push one EAT_FAILED event. Same failure-isolation wrapper as
-     * {@link #emitEatCompleted}.
-     */
-    private void emitEatFailed(String reason, int slot, String itemId, String source) {
-        try {
-            events.push(EventFacts.eatFailed(
-                    reason, slot, itemId, source, daySupplier.getAsLong(), todSupplier.getAsLong()));
-        } catch (RuntimeException ignored) {
-            // Reporting must never take the pipeline down.
-        }
-    }
-
-    /**
-     * Serialize a potion's effect list into the DRINK_COMPLETED wire
-     * format: comma-separated "id:amplifier:duration" triples.
-     * Instantaneous effects (instant health, instant damage) carry
-     * duration 1 — vanilla Potions.HEALING registers
-     * MobEffectInstance(HEAL, 1, 0), not 0. An empty list yields ""
-     * (not null), so the attr is always present.
-     *
-     * @param effects the potion's effect instances; never null
-     * @return the serialized string, possibly empty
-     */
-    private static String serializeEffects(List<MobEffectInstance> effects) {
-        StringBuilder sb = new StringBuilder();
-        for (MobEffectInstance e : effects) {
-            if (!sb.isEmpty()) {
-                sb.append(',');
-            }
-            sb.append(BuiltInRegistries.MOB_EFFECT.getKey(e.getEffect()).toString());
-            sb.append(':').append(e.getAmplifier());
-            sb.append(':').append(e.getDuration());
-        }
-        return sb.toString();
-    }
-
-    /**
-     * Push one DRINK_STARTED event. Same failure-isolation wrapper as
-     * {@link #emitEatCompleted}; wire shape in {@link EventFacts}.
-     */
-    private void emitDrinkStarted(String potionId, int slot, float health, String source) {
-        try {
-            events.push(EventFacts.drinkStarted(
-                    potionId, slot, health, source, daySupplier.getAsLong(), todSupplier.getAsLong()));
-        } catch (RuntimeException ignored) {
-            // Reporting must never take the pipeline down.
-        }
-    }
-
-    /**
-     * Push one DRINK_COMPLETED event. Same failure-isolation wrapper as
-     * {@link #emitEatCompleted}; wire shape in {@link EventFacts}.
-     */
-    private void emitDrinkCompleted(String potionId, int slot, String effects, String containerType, String source) {
-        try {
-            // P2-d: whether the recovered container was dropped because
-            // inventory was full (count>1 branch only; count=1 places the
-            // container in the selected slot and this is always false).
-            events.push(EventFacts.drinkCompleted(
-                    potionId,
-                    slot,
-                    effects,
-                    containerType,
-                    body.wasLastContainerDropped(),
-                    source,
-                    daySupplier.getAsLong(),
-                    todSupplier.getAsLong()));
-        } catch (RuntimeException ignored) {
-            // Reporting must never take the pipeline down.
-        }
-    }
-
-    /**
-     * Push one DRINK_FAILED event. Same failure-isolation wrapper as
-     * {@link #emitEatCompleted}; wire shape in {@link EventFacts}.
-     */
-    private void emitDrinkFailed(String reason, int slot, String itemId, String source) {
-        try {
-            events.push(EventFacts.drinkFailed(
-                    reason, slot, itemId, source, daySupplier.getAsLong(), todSupplier.getAsLong()));
-        } catch (RuntimeException ignored) {
-            // Reporting must never take the pipeline down.
-        }
-    }
-
-    /**
-     * Push one POTION_THROWN event. Same failure-isolation wrapper as
-     * {@link #emitEatCompleted}; wire shape in {@link EventFacts}.
-     */
-    private void emitPotionThrown(String potionId, int slot, String throwType, String effects, String source) {
-        try {
-            events.push(EventFacts.potionThrown(
-                    potionId, slot, throwType, effects, source, daySupplier.getAsLong(), todSupplier.getAsLong()));
-        } catch (RuntimeException ignored) {
-            // Reporting must never take the pipeline down.
-        }
-    }
-
-    /**
-     * Resolve the container type string for EAT_COMPLETED attrs. Mirrors
-     * {@link BotBodyEntity#containerItemFor(Item)} but returns the wire
-     * string instead of the engine item. Kept in the actor because the
-     * event vocabulary is owned here; the body owns the physical mapping.
-     *
-     * @param item the food item; never null
-     * @return "bowl", "glass_bottle", or "none"
-     */
-    private static String containerTypeFor(Item item) {
-        if (item instanceof BowlFoodItem || item instanceof SuspiciousStewItem) {
-            return "bowl";
-        }
-        if (item instanceof HoneyBottleItem) {
-            return "glass_bottle";
-        }
-        return "none";
     }
 
     /** Releases every in-progress hold (facade draw, body shield). */
