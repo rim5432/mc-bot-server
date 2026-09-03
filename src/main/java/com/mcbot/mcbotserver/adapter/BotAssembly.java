@@ -34,6 +34,7 @@ import com.mcbot.mcbotserver.core.tick.CrashReporter;
 import com.mcbot.mcbotserver.core.world.MapBlockTraitsRegistry;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import net.minecraft.server.level.ServerLevel;
 
@@ -119,8 +120,8 @@ public final class BotAssembly {
         // every /botspawn draws a marker strictly beyond anything any
         // prior queue ever reported.
         var epochSource = EventEpochStore.of(level.getServer().overworld());
-        InMemoryEventQueue events = new InMemoryEventQueue(
-                () -> level.getDayTime() / 24000L, () -> level.getDayTime() % 24000L, epochSource::nextEpoch);
+        EventClock stamps = EventClock.of(level);
+        InMemoryEventQueue events = new InMemoryEventQueue(stamps.day(), stamps.tod(), epochSource::nextEpoch);
         TaskArbiter arbiter = new TaskArbiter();
         // Baseline trait annotations the swim vocabulary cannot work
         // without. Code-level floor for now; the datapack JSON pipeline
@@ -140,8 +141,7 @@ public final class BotAssembly {
                 .seal();
         BindingWorldView view =
                 new BindingWorldView(level, traits, () -> body.getInventory().snapshot());
-        BindingActor actor =
-                new BindingActor(body, events, () -> level.getDayTime() / 24000L, () -> level.getDayTime() % 24000L);
+        BindingActor actor = new BindingActor(body, events, stamps.day(), stamps.tod());
 
         // Best-food ranking (issue 0010 D5): highest nutrition wins,
         // ties keep the lower hotbar slot - cooked beats raw, raw
@@ -257,33 +257,18 @@ public final class BotAssembly {
                         bestPotionSlot,
                         waterBucketSlot));
         CommandBus bus = new CommandBus(events);
-        GotoCommandHandler gotoHandler = new GotoCommandHandler(
-                arbiter, events, () -> level.getDayTime() / 24000L, () -> level.getDayTime() % 24000L);
+        GotoCommandHandler gotoHandler = new GotoCommandHandler(arbiter, events, stamps.day(), stamps.tod());
         gotoHandler.attach(bus);
-        DigCommandHandler digHandler = new DigCommandHandler(
-                arbiter, events, () -> level.getDayTime() / 24000L, () -> level.getDayTime() % 24000L);
+        DigCommandHandler digHandler = new DigCommandHandler(arbiter, events, stamps.day(), stamps.tod());
         digHandler.attach(bus);
-        MineCommandHandler mineHandler = new MineCommandHandler(
-                arbiter,
-                events,
-                () -> level.getDayTime() / 24000L,
-                () -> level.getDayTime() % 24000L,
-                () -> poseOf(body));
+        MineCommandHandler mineHandler =
+                new MineCommandHandler(arbiter, events, stamps.day(), stamps.tod(), () -> poseOf(body));
         mineHandler.attach(bus);
         AttackCommandHandler attackHandler = new AttackCommandHandler(
-                arbiter,
-                events,
-                () -> level.getDayTime() / 24000L,
-                () -> level.getDayTime() % 24000L,
-                () -> poseOf(body),
-                weaponCatalog);
+                arbiter, events, stamps.day(), stamps.tod(), () -> poseOf(body), weaponCatalog);
         attackHandler.attach(bus);
-        TameCommandHandler tameHandler = new TameCommandHandler(
-                arbiter,
-                events,
-                () -> level.getDayTime() / 24000L,
-                () -> level.getDayTime() % 24000L,
-                () -> poseOf(body));
+        TameCommandHandler tameHandler =
+                new TameCommandHandler(arbiter, events, stamps.day(), stamps.tod(), () -> poseOf(body));
         tameHandler.attach(bus);
         List<VerbTaskHandler<?>> taskHandlers =
                 List.of(gotoHandler, digHandler, mineHandler, attackHandler, tameHandler);
@@ -297,10 +282,7 @@ public final class BotAssembly {
         });
 
         ChangeDetectingStateChannel state = new ChangeDetectingStateChannel(
-                () -> BotStateSnapshots.of(body, gotoHandler, level),
-                events,
-                () -> level.getDayTime() / 24000L,
-                () -> level.getDayTime() % 24000L);
+                () -> BotStateSnapshots.of(body, gotoHandler, level), events, stamps.day(), stamps.tod());
 
         var chunkTicket = new com.mcbot.mcbotserver.adapter.entity.BotChunkTicket(level);
         return new Assembled(
@@ -567,6 +549,21 @@ public final class BotAssembly {
      */
     private static com.mcbot.mcbotserver.api.types.Vec3 eyePoseOf(BotBodyEntity body) {
         return new com.mcbot.mcbotserver.api.types.Vec3(body.getX(), body.getY() + body.getEyeHeight(), body.getZ());
+    }
+
+    /**
+     * The day / time-of-day stamp pair every disclosure site shares -
+     * previously nine hand-copied lambda pairs over the same two level
+     * reads. Values stay live: each access re-reads the level clock.
+     *
+     * @param day in-game day counter; never null
+     * @param tod time-of-day ticks 0..23999; never null
+     */
+    private record EventClock(LongSupplier day, LongSupplier tod) {
+
+        private static EventClock of(ServerLevel level) {
+            return new EventClock(() -> level.getDayTime() / 24000L, () -> level.getDayTime() % 24000L);
+        }
     }
 
     private static BotController.GameClock clockOf(ServerLevel level) {
