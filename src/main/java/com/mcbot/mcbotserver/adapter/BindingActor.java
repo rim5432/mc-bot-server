@@ -164,15 +164,6 @@ public final class BindingActor implements Actor {
     private boolean lastInteractClaimed;
     private boolean lastEntityClaimed;
 
-    /** Boundary-D event sink for eat lifecycle disclosure (ledger 34). */
-    private final EventQueue events;
-
-    /** Game-day supplier for event stamps; never null. */
-    private final LongSupplier daySupplier;
-
-    /** Time-of-day ticks supplier for event stamps; never null. */
-    private final LongSupplier todSupplier;
-
     /**
      * Creates an actor bound to one body.
      *
@@ -196,9 +187,6 @@ public final class BindingActor implements Actor {
         this.strike = new StrikeEntityExecutor(body, facade, melee);
         this.menuTx = new ActorMenuTransactions(facade);
         this.consumable = new ConsumableUse(body, events, daySupplier, todSupplier);
-        this.events = Objects.requireNonNull(events, "events");
-        this.daySupplier = Objects.requireNonNull(daySupplier, "daySupplier");
-        this.todSupplier = Objects.requireNonNull(todSupplier, "todSupplier");
     }
 
     /**

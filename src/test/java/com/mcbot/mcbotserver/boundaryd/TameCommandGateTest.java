@@ -13,6 +13,7 @@ import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.EntitySnapshot;
 import com.mcbot.mcbotserver.core.command.CommandBus;
 import com.mcbot.mcbotserver.core.command.TameCommandHandler;
+import com.mcbot.mcbotserver.core.command.VerbWiring;
 import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.process.TameProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
@@ -47,7 +48,8 @@ class TameCommandGateTest {
         InMemoryEventQueue queue = new InMemoryEventQueue(() -> 1L, () -> 0L);
         CommandBus bus = new CommandBus(queue);
         TaskArbiter arbiter = new TaskArbiter();
-        TameCommandHandler handler = new TameCommandHandler(arbiter, queue, () -> 1L, () -> 0L, () -> BOT);
+        TameCommandHandler handler =
+                new TameCommandHandler(new VerbWiring(arbiter, queue, () -> 1L, () -> 0L), () -> BOT);
         handler.attach(bus);
         bus.setCancelListener(handler::onCancel);
 
@@ -83,7 +85,8 @@ class TameCommandGateTest {
         InMemoryEventQueue queue = new InMemoryEventQueue(() -> 1L, () -> 0L);
         CommandBus bus = new CommandBus(queue);
         TaskArbiter arbiter = new TaskArbiter();
-        TameCommandHandler handler = new TameCommandHandler(arbiter, queue, () -> 1L, () -> 0L, () -> BOT);
+        TameCommandHandler handler =
+                new TameCommandHandler(new VerbWiring(arbiter, queue, () -> 1L, () -> 0L), () -> BOT);
         handler.attach(bus);
         bus.setCancelListener(handler::onCancel);
 

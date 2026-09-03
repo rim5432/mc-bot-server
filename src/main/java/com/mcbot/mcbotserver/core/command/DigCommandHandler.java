@@ -3,14 +3,11 @@ package com.mcbot.mcbotserver.core.command;
 import com.mcbot.mcbotserver.api.command.BotCommand;
 import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
-import com.mcbot.mcbotserver.api.event.EventQueue;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.process.DigProcess;
-import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.LongSupplier;
 import javax.annotation.Nullable;
 
 /**
@@ -35,15 +32,10 @@ public final class DigCommandHandler extends VerbTaskHandler<DigProcess> {
     /**
      * Creates the handler over the task channel and event stream.
      *
-     * @param arbiter           mission selector; never null
-     * @param events            completion/cancellation stream;
-     *                          never null
-     * @param daySupplier       game-day stamp accessor; never null
-     * @param timeOfDaySupplier time-of-day stamp accessor; never null
+     * @param wiring the assembly's verb wiring bundle; never null
      */
-    public DigCommandHandler(
-            TaskArbiter arbiter, EventQueue events, LongSupplier daySupplier, LongSupplier timeOfDaySupplier) {
-        super(arbiter, events, daySupplier, timeOfDaySupplier);
+    public DigCommandHandler(VerbWiring wiring) {
+        super(wiring);
     }
 
     @Override

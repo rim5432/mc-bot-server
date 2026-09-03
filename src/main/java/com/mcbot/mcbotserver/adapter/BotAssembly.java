@@ -17,6 +17,7 @@ import com.mcbot.mcbotserver.core.command.GotoCommandHandler;
 import com.mcbot.mcbotserver.core.command.MineCommandHandler;
 import com.mcbot.mcbotserver.core.command.TameCommandHandler;
 import com.mcbot.mcbotserver.core.command.VerbTaskHandler;
+import com.mcbot.mcbotserver.core.command.VerbWiring;
 import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.process.DefendProcess;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
@@ -257,18 +258,16 @@ public final class BotAssembly {
                         bestPotionSlot,
                         waterBucketSlot));
         CommandBus bus = new CommandBus(events);
-        GotoCommandHandler gotoHandler = new GotoCommandHandler(arbiter, events, stamps.day(), stamps.tod());
+        VerbWiring verbWiring = new VerbWiring(arbiter, events, stamps.day(), stamps.tod());
+        GotoCommandHandler gotoHandler = new GotoCommandHandler(verbWiring);
         gotoHandler.attach(bus);
-        DigCommandHandler digHandler = new DigCommandHandler(arbiter, events, stamps.day(), stamps.tod());
+        DigCommandHandler digHandler = new DigCommandHandler(verbWiring);
         digHandler.attach(bus);
-        MineCommandHandler mineHandler =
-                new MineCommandHandler(arbiter, events, stamps.day(), stamps.tod(), () -> poseOf(body));
+        MineCommandHandler mineHandler = new MineCommandHandler(verbWiring, () -> poseOf(body));
         mineHandler.attach(bus);
-        AttackCommandHandler attackHandler = new AttackCommandHandler(
-                arbiter, events, stamps.day(), stamps.tod(), () -> poseOf(body), weaponCatalog);
+        AttackCommandHandler attackHandler = new AttackCommandHandler(verbWiring, () -> poseOf(body), weaponCatalog);
         attackHandler.attach(bus);
-        TameCommandHandler tameHandler =
-                new TameCommandHandler(arbiter, events, stamps.day(), stamps.tod(), () -> poseOf(body));
+        TameCommandHandler tameHandler = new TameCommandHandler(verbWiring, () -> poseOf(body));
         tameHandler.attach(bus);
         List<VerbTaskHandler<?>> taskHandlers =
                 List.of(gotoHandler, digHandler, mineHandler, attackHandler, tameHandler);

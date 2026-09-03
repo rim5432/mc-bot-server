@@ -12,6 +12,7 @@ import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.core.command.CommandBus;
 import com.mcbot.mcbotserver.core.command.GotoCommandHandler;
+import com.mcbot.mcbotserver.core.command.VerbWiring;
 import com.mcbot.mcbotserver.core.event.InMemoryEventQueue;
 import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
@@ -38,7 +39,7 @@ class GotoCommandGateTest {
         InMemoryEventQueue queue = new InMemoryEventQueue(() -> 1L, () -> 0L);
         CommandBus bus = new CommandBus(queue);
         TaskArbiter arbiter = new TaskArbiter();
-        GotoCommandHandler handler = new GotoCommandHandler(arbiter, queue, () -> 1L, () -> 0L);
+        GotoCommandHandler handler = new GotoCommandHandler(new VerbWiring(arbiter, queue, () -> 1L, () -> 0L));
         handler.attach(bus);
         // attach no longer self-registers: the composition root owns
         // the one cancel-listener slot; single-handler wirings too.
@@ -76,7 +77,7 @@ class GotoCommandGateTest {
         InMemoryEventQueue queue = new InMemoryEventQueue(() -> 3L, () -> 15000L);
         CommandBus bus = new CommandBus(queue);
         TaskArbiter arbiter = new TaskArbiter();
-        GotoCommandHandler handler = new GotoCommandHandler(arbiter, queue, () -> 3L, () -> 15000L);
+        GotoCommandHandler handler = new GotoCommandHandler(new VerbWiring(arbiter, queue, () -> 3L, () -> 15000L));
         handler.attach(bus);
         bus.setCancelListener(handler::onCancel);
 

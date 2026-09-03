@@ -1,14 +1,11 @@
 package com.mcbot.mcbotserver.core.command;
 
 import com.mcbot.mcbotserver.api.command.BotCommand;
-import com.mcbot.mcbotserver.api.event.EventQueue;
 import com.mcbot.mcbotserver.api.inventory.WeaponCatalog;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.process.AttackProcess;
-import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 
@@ -37,46 +34,27 @@ public final class AttackCommandHandler extends VerbTaskHandler<AttackProcess> {
      * Creates the handler over the task channel and event stream,
      * read without a weapon catalog (bow carriers always stand off).
      *
-     * @param arbiter           mission selector; never null
-     * @param events            completion/cancellation stream; never
-     *                          null
-     * @param daySupplier       game-day stamp accessor; never null
-     * @param timeOfDaySupplier time-of-day stamp accessor; never
-     *                          null
-     * @param positionSource    body cell accessor feeding the scan
-     *                          center; never null
+     * @param wiring        the assembly's verb wiring bundle; never
+     *                       null
+     * @param positionSource body cell accessor feeding the scan
+     *                       center; never null
      */
-    public AttackCommandHandler(
-            TaskArbiter arbiter,
-            EventQueue events,
-            LongSupplier daySupplier,
-            LongSupplier timeOfDaySupplier,
-            Supplier<CellPos> positionSource) {
-        this(arbiter, events, daySupplier, timeOfDaySupplier, positionSource, WeaponCatalog.none());
+    public AttackCommandHandler(VerbWiring wiring, Supplier<CellPos> positionSource) {
+        this(wiring, positionSource, WeaponCatalog.none());
     }
 
     /**
      * Creates the handler over the task channel and event stream.
      *
-     * @param arbiter           mission selector; never null
-     * @param events            completion/cancellation stream; never
-     *                          null
-     * @param daySupplier       game-day stamp accessor; never null
-     * @param timeOfDaySupplier time-of-day stamp accessor; never
-     *                          null
-     * @param positionSource    body cell accessor feeding the scan
-     *                          center; never null
-     * @param weapons           per-hit melee damage ranking feeding
-     *                          the standoff decision; never null
+     * @param wiring        the assembly's verb wiring bundle; never
+     *                       null
+     * @param positionSource body cell accessor feeding the scan
+     *                       center; never null
+     * @param weapons        per-hit melee damage ranking feeding
+     *                       the standoff decision; never null
      */
-    public AttackCommandHandler(
-            TaskArbiter arbiter,
-            EventQueue events,
-            LongSupplier daySupplier,
-            LongSupplier timeOfDaySupplier,
-            Supplier<CellPos> positionSource,
-            WeaponCatalog weapons) {
-        super(arbiter, events, daySupplier, timeOfDaySupplier);
+    public AttackCommandHandler(VerbWiring wiring, Supplier<CellPos> positionSource, WeaponCatalog weapons) {
+        super(wiring);
         this.positionSource = Objects.requireNonNull(positionSource, "positionSource");
         this.weapons = Objects.requireNonNull(weapons, "weapons");
     }

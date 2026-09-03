@@ -5,7 +5,6 @@ import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.event.EventQueue;
 import com.mcbot.mcbotserver.core.process.MissionShell;
-import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,10 +32,7 @@ import javax.annotation.Nullable;
 // contract: see boundaries.md decision 18 (task verbs ride CommandBus)
 public abstract class VerbTaskHandler<P extends MissionShell> {
 
-    private final TaskArbiter arbiter;
-    private final EventQueue events;
-    private final LongSupplier daySupplier;
-    private final LongSupplier timeOfDaySupplier;
+    private final VerbWiring wiring;
     private final Map<String, P> missions = new HashMap<>();
     // Set in attach(); the lifecycle sweep needs the bus to close
     // dedupe windows for deaths announced outside it.
@@ -44,20 +40,13 @@ public abstract class VerbTaskHandler<P extends MissionShell> {
     private CommandBus bus;
 
     /**
-     * Creates the handler over the task channel and event stream.
+     * Creates the handler over the shared task-verb wiring.
      *
-     * @param arbiter           mission selector; never null
-     * @param events            completion/cancellation stream; never null
-     * @param daySupplier       game-day stamp accessor; never null
-     * @param timeOfDaySupplier time-of-day stamp accessor; never null
+     * @param wiring the assembly's verb wiring bundle; never null
      */
-    protected VerbTaskHandler(
-            TaskArbiter arbiter, EventQueue events, LongSupplier daySupplier, LongSupplier timeOfDaySupplier) {
-        CommandHandlerGuards.requireNonNullArgs(arbiter, events, daySupplier, timeOfDaySupplier);
-        this.arbiter = arbiter;
-        this.events = events;
-        this.daySupplier = daySupplier;
-        this.timeOfDaySupplier = timeOfDaySupplier;
+    protected VerbTaskHandler(VerbWiring wiring) {
+        CommandHandlerGuards.requireNonNullArgs(wiring.arbiter(), wiring.events(), wiring.day(), wiring.tod());
+        this.wiring = wiring;
     }
 
     /**
@@ -107,8 +96,8 @@ public abstract class VerbTaskHandler<P extends MissionShell> {
             public void execute(BotCommand command, String taskId) {
                 P mission = createMission(taskId, command);
                 missions.put(taskId, mission);
-                arbiter.register(mission);
-                arbiter.requestControl(mission);
+                wiring.arbiter().register(mission);
+                wiring.arbiter().requestControl(mission);
             }
         });
     }
@@ -167,13 +156,14 @@ public abstract class VerbTaskHandler<P extends MissionShell> {
         }
         mission.abort();
         try {
-            events.push(new BotEvent(
-                    EventKind.TASK_CANCELLED,
-                    daySupplier.getAsLong(),
-                    timeOfDaySupplier.getAsLong(),
-                    false,
-                    Map.of("task", mission.displayName(), "taskId", mission.missionTaskId()),
-                    mission.displayName() + ": cancelled by harness"));
+            wiring.events()
+                    .push(new BotEvent(
+                            EventKind.TASK_CANCELLED,
+                            wiring.day().getAsLong(),
+                            wiring.tod().getAsLong(),
+                            false,
+                            Map.of("task", mission.displayName(), "taskId", mission.missionTaskId()),
+                            mission.displayName() + ": cancelled by harness"));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down with it.
         }
@@ -232,7 +222,7 @@ public abstract class VerbTaskHandler<P extends MissionShell> {
      * @return the wired event queue; never null
      */
     protected final EventQueue events() {
-        return events;
+        return wiring.events();
     }
 
     /**
@@ -241,7 +231,7 @@ public abstract class VerbTaskHandler<P extends MissionShell> {
      * @return the wired day supplier; never null
      */
     protected final LongSupplier daySupplier() {
-        return daySupplier;
+        return wiring.day();
     }
 
     /**
@@ -250,6 +240,6 @@ public abstract class VerbTaskHandler<P extends MissionShell> {
      * @return the wired time-of-day supplier; never null
      */
     protected final LongSupplier timeOfDaySupplier() {
-        return timeOfDaySupplier;
+        return wiring.tod();
     }
 }

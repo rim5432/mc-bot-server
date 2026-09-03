@@ -3,14 +3,11 @@ package com.mcbot.mcbotserver.core.command;
 import com.mcbot.mcbotserver.api.command.BotCommand;
 import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventKind;
-import com.mcbot.mcbotserver.api.event.EventQueue;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.process.MineProcess;
-import com.mcbot.mcbotserver.core.process.TaskArbiter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 
@@ -36,21 +33,13 @@ public final class MineCommandHandler extends VerbTaskHandler<MineProcess> {
     /**
      * Creates the handler over the task channel and event stream.
      *
-     * @param arbiter           mission selector; never null
-     * @param events            completion/cancellation stream; never null
-     * @param daySupplier       game-day stamp accessor; never null
-     * @param timeOfDaySupplier time-of-day stamp accessor; never null
-     * @param botPosition       live body-position accessor passed into
-     *                          every mission as the search center;
-     *                          never null
+     * @param wiring     the assembly's verb wiring bundle; never null
+     * @param botPosition live body-position accessor passed into
+     *                    every mission as the search center;
+     *                    never null
      */
-    public MineCommandHandler(
-            TaskArbiter arbiter,
-            EventQueue events,
-            LongSupplier daySupplier,
-            LongSupplier timeOfDaySupplier,
-            Supplier<CellPos> botPosition) {
-        super(arbiter, events, daySupplier, timeOfDaySupplier);
+    public MineCommandHandler(VerbWiring wiring, Supplier<CellPos> botPosition) {
+        super(wiring);
         this.botPosition = Objects.requireNonNull(botPosition, "botPosition");
     }
 
