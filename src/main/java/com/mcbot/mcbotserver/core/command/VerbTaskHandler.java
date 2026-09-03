@@ -1,8 +1,7 @@
 package com.mcbot.mcbotserver.core.command;
 
 import com.mcbot.mcbotserver.api.command.BotCommand;
-import com.mcbot.mcbotserver.api.event.BotEvent;
-import com.mcbot.mcbotserver.api.event.EventKind;
+import com.mcbot.mcbotserver.api.event.EventFacts;
 import com.mcbot.mcbotserver.api.event.EventQueue;
 import com.mcbot.mcbotserver.core.process.MissionShell;
 import java.util.HashMap;
@@ -157,13 +156,11 @@ public abstract class VerbTaskHandler<P extends MissionShell> {
         mission.abort();
         try {
             wiring.events()
-                    .push(new BotEvent(
-                            EventKind.TASK_CANCELLED,
+                    .push(EventFacts.taskCancelled(
+                            mission.displayName(),
+                            mission.missionTaskId(),
                             wiring.day().getAsLong(),
-                            wiring.tod().getAsLong(),
-                            false,
-                            Map.of("task", mission.displayName(), "taskId", mission.missionTaskId()),
-                            mission.displayName() + ": cancelled by harness"));
+                            wiring.tod().getAsLong()));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down with it.
         }

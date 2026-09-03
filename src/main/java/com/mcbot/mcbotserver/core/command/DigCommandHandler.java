@@ -1,11 +1,9 @@
 package com.mcbot.mcbotserver.core.command;
 
 import com.mcbot.mcbotserver.api.command.BotCommand;
-import com.mcbot.mcbotserver.api.event.BotEvent;
-import com.mcbot.mcbotserver.api.event.EventKind;
+import com.mcbot.mcbotserver.api.event.EventFacts;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.process.DigProcess;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -73,19 +71,14 @@ public final class DigCommandHandler extends VerbTaskHandler<DigProcess> {
 
     private void pushBlockBroken(DigProcess mission) {
         try {
-            var attrs = new HashMap<String, String>();
-            attrs.put("taskId", mission.missionTaskId());
-            attrs.put("posX", String.valueOf(mission.target().x()));
-            attrs.put("posY", String.valueOf(mission.target().y()));
-            attrs.put("posZ", String.valueOf(mission.target().z()));
-            attrs.put("blockId", String.valueOf(mission.initialBlockId()));
-            events().push(new BotEvent(
-                    EventKind.BLOCK_BROKEN,
+            events().push(EventFacts.blockBroken(
+                    mission.missionTaskId(),
+                    mission.target().x(),
+                    mission.target().y(),
+                    mission.target().z(),
+                    String.valueOf(mission.initialBlockId()),
                     daySupplier().getAsLong(),
-                    timeOfDaySupplier().getAsLong(),
-                    false,
-                    Map.copyOf(attrs),
-                    mission.missionTaskId() + ": broke " + mission.initialBlockId()));
+                    timeOfDaySupplier().getAsLong()));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down with it.
         }

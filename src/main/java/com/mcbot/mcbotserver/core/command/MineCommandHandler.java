@@ -1,11 +1,9 @@
 package com.mcbot.mcbotserver.core.command;
 
 import com.mcbot.mcbotserver.api.command.BotCommand;
-import com.mcbot.mcbotserver.api.event.BotEvent;
-import com.mcbot.mcbotserver.api.event.EventKind;
+import com.mcbot.mcbotserver.api.event.EventFacts;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.core.process.MineProcess;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -79,19 +77,14 @@ public final class MineCommandHandler extends VerbTaskHandler<MineProcess> {
 
     private void pushBlockBroken(String taskId, MineProcess.BlockBreak pending) {
         try {
-            var attrs = new HashMap<String, String>();
-            attrs.put("taskId", taskId);
-            attrs.put("posX", String.valueOf(pending.pos().x()));
-            attrs.put("posY", String.valueOf(pending.pos().y()));
-            attrs.put("posZ", String.valueOf(pending.pos().z()));
-            attrs.put("blockId", pending.blockId());
-            events().push(new BotEvent(
-                    EventKind.BLOCK_BROKEN,
+            events().push(EventFacts.blockBroken(
+                    taskId,
+                    pending.pos().x(),
+                    pending.pos().y(),
+                    pending.pos().z(),
+                    pending.blockId(),
                     daySupplier().getAsLong(),
-                    timeOfDaySupplier().getAsLong(),
-                    false,
-                    Map.copyOf(attrs),
-                    taskId + ": broke " + pending.blockId()));
+                    timeOfDaySupplier().getAsLong()));
         } catch (RuntimeException ignored) {
             // Reporting must never take the pipeline down with it.
         }

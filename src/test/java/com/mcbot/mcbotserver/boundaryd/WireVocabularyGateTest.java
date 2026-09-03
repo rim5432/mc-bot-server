@@ -206,8 +206,9 @@ class WireVocabularyGateTest {
     }
 
     /**
-     * Runtime truth for the consume family: EventFacts is the single
-     * construction point for EAT_* / DRINK_* / POTION_THROWN, and its
+     * Runtime truth for the fixed-shape family: EventFacts is the single
+     * construction point for EAT_* / DRINK_* / POTION_THROWN /
+     * TASK_CANCELLED / BLOCK_BROKEN / BOT_CRASHED, and its
      * pure factories can be called offline. Each factory's emitted attr
      * key set must EQUAL its KIND_ATTRS row - the literal scan above
      * sees one key per {@code .put} line, this sees the event the wire
@@ -238,6 +239,9 @@ class WireVocabularyGateTest {
                 EventFacts.potionThrown(
                         "minecraft:splash_potion", 5, "splash", "minecraft:poison:0:900", "reflex", 1, 6000),
                 emitted);
+        collect(EventFacts.taskCancelled("dig:task-1", "task-1", 1, 6000), emitted);
+        collect(EventFacts.blockBroken("task-1", 10, 64, -3, "minecraft:stone", 1, 6000), emitted);
+        collect(EventFacts.botCrashed("NullPointerException at BotController.onTick", 1, 6000), emitted);
         for (Map.Entry<String, Set<String>> row : emitted.entrySet()) {
             assertEquals(
                     KIND_ATTRS.get(row.getKey()),

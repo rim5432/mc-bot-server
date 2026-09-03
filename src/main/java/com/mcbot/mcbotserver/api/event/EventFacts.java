@@ -4,7 +4,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Single construction point for the consume-family boundary-D events:
+ * Single construction point for the fixed-shape boundary-D events
+ * (the consume family, task cancellation, block-break disclosure,
+ * crash disclosure):
  * plain values in, a validated {@link BotEvent} out. No MC types, no
  * side effects - the factory is pure, so the wire shape is offline-
  * testable. Emission itself - the push and its failure isolation -
@@ -258,5 +260,60 @@ public final class EventFacts {
                 false,
                 Map.copyOf(attrs),
                 "threw " + throwType + " " + potionId + " (effects: " + effects + ")");
+    }
+    /**
+     * Builds a TASK_CANCELLED event (harness cancellation of one task
+     * verb; not urgent - the cancel is the harness's own action).
+     *
+     * @param task     display name of the cancelled mission; never null
+     * @param taskId   boundary-D task id; never null
+     * @param day      game day at emission
+     * @param tod      time-of-day ticks at emission
+     * @return the validated event; never null
+     */
+    public static BotEvent taskCancelled(String task, String taskId, long day, long tod) {
+        Map<String, String> attrs = new HashMap<>();
+        attrs.put("task", task);
+        attrs.put("taskId", taskId);
+        return new BotEvent(
+                EventKind.TASK_CANCELLED, day, tod, false, Map.copyOf(attrs), task + ": cancelled by harness");
+    }
+
+    /**
+     * Builds a BLOCK_BROKEN event (dig/mine disclosure; not urgent -
+     * the harness polls yields, it does not preempt on them).
+     *
+     * @param taskId  owning mission's boundary-D task id; never null
+     * @param x       broken block cell x
+     * @param y       broken block cell y
+     * @param z       broken block cell z
+     * @param blockId registry id of the broken block; never null
+     * @param day     game day at emission
+     * @param tod     time-of-day ticks at emission
+     * @return the validated event; never null
+     */
+    public static BotEvent blockBroken(String taskId, int x, int y, int z, String blockId, long day, long tod) {
+        Map<String, String> attrs = new HashMap<>();
+        attrs.put("taskId", taskId);
+        attrs.put("posX", String.valueOf(x));
+        attrs.put("posY", String.valueOf(y));
+        attrs.put("posZ", String.valueOf(z));
+        attrs.put("blockId", blockId);
+        return new BotEvent(EventKind.BLOCK_BROKEN, day, tod, false, Map.copyOf(attrs), taskId + ": broke " + blockId);
+    }
+
+    /**
+     * Builds a BOT_CRASHED event (urgent: the crash latch froze the
+     * pipeline - the harness must learn before its next poll).
+     *
+     * @param causeSummary one-line crash cause summary; never null
+     * @param day          game day at emission
+     * @param tod          time-of-day ticks at emission
+     * @return the validated event; never null
+     */
+    public static BotEvent botCrashed(String causeSummary, long day, long tod) {
+        Map<String, String> attrs = new HashMap<>();
+        attrs.put("cause", causeSummary);
+        return new BotEvent(EventKind.BOT_CRASHED, day, tod, true, Map.copyOf(attrs), "bot crashed: " + causeSummary);
     }
 }

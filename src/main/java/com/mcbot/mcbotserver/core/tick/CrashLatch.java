@@ -1,14 +1,12 @@
 package com.mcbot.mcbotserver.core.tick;
 
 import com.mcbot.mcbotserver.api.actor.Actor;
-import com.mcbot.mcbotserver.api.event.BotEvent;
-import com.mcbot.mcbotserver.api.event.EventKind;
+import com.mcbot.mcbotserver.api.event.EventFacts;
 import com.mcbot.mcbotserver.api.event.EventQueue;
 import com.mcbot.mcbotserver.api.process.InterruptionContext;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
 
@@ -150,13 +148,7 @@ public final class CrashLatch {
 
     private void reportPrimary(InterruptionContext ctx) {
         try {
-            events.push(new BotEvent(
-                    EventKind.BOT_CRASHED,
-                    clock.day(),
-                    clock.timeOfDayTicks(),
-                    true,
-                    Map.of("cause", ctx.causeSummary()),
-                    "bot crashed: " + ctx.causeSummary()));
+            events.push(EventFacts.botCrashed(ctx.causeSummary(), clock.day(), clock.timeOfDayTicks()));
         } catch (RuntimeException ignored) {
             // Best-effort; the fallback channel still fires below.
         }
