@@ -14,7 +14,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
@@ -119,14 +118,14 @@ public final class MineProcess extends MissionShell implements DigMission {
      */
     public MineProcess(
             String taskId,
-            @Nullable String blockType,
+            String blockType,
             int targetCount,
             int priority,
             long timeoutTicks,
             Supplier<CellPos> botPosition) {
         super(taskId, priority, timeoutTicks);
         requireValid(blockType, targetCount, botPosition);
-        this.blockType = Objects.requireNonNull(blockType, "blockType");
+        this.blockType = blockType;
         this.targetCount = targetCount;
         this.searchRadius = DEFAULT_SEARCH_RADIUS;
         this.perTargetMoveBudget = DEFAULT_PER_TARGET_MOVE_BUDGET;
@@ -137,13 +136,13 @@ public final class MineProcess extends MissionShell implements DigMission {
     }
 
     /** Rejects constructor arguments before any field is assigned. */
-    private static void requireValid(@Nullable String blockType, int targetCount, Supplier<CellPos> botPosition) {
+    private static void requireValid(String blockType, int targetCount, Supplier<CellPos> botPosition) {
         requireText(blockType, "blockType");
         requirePositive(targetCount, "targetCount");
         requireNonNullPosition(botPosition);
     }
 
-    private static void requireText(@Nullable String value, String name) {
+    private static void requireText(String value, String name) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(name + " must not be null or blank");
         }

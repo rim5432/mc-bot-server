@@ -26,6 +26,11 @@
        injection, not representation exposure: the bus and queue are
        container-owned, the holder never hands them back out. Both holders
        are in core/; EventQueue (api/) is the correct dependency direction.
+       DigClaimBehavior (2026-09-03) stores the ReflexClaimInjector for the
+       same reason: BotAssembly builds ONE injector shared by the reflex
+       paths and the dig-claim behavior, and its mutable slot suppliers are
+       the wiring seam by design — a defensive copy would fork the claim
+       shapes the two paths must agree on.
        STATUS: permanent — DI pattern; composition root owns the shared
        instances and intends them to be shared. -->
   <Match>
@@ -33,6 +38,7 @@
     <Or>
       <Class name="com.mcbot.mcbotserver.core.command.CommandBus"/>
       <Class name="com.mcbot.mcbotserver.core.command.VerbTaskHandler"/>
+      <Class name="com.mcbot.mcbotserver.core.tick.DigClaimBehavior"/>
     </Or>
   </Match>
 
