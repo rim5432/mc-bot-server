@@ -1200,3 +1200,35 @@ Amendment chains recorded so far (both sides annotated):
     (decision 60 discipline unchanged); the one prose collision
     (BasicMoves "Executor:" Javadoc heading) reworded rather than
     exempted.
+
+    65. 2026-09-03 Deep-construction refactor round (user-authorized
+    aggressive): the CPD paydown's three duplication axes were paid
+    down as structure, not suppression - lint posture ends the day
+    at PMD 0 / SpotBugs 0 / ErrorProne 0 / CPD 0 with the CI lint
+    axis green. (1) Gametest skeleton: GametestRig gains the
+    assertion family (eventOf/assertAttr/assertSlot, split out as
+    GametestAsserts when the Rig crossed GodClass) plus the
+    giveBowAndArrows/primeFood opening rigs; BotHungerGameTests
+    splits its 13 eating scenarios into BotEatingGameTests; a
+    scenario-budget trend gate pins suites at 18 scenarios max.
+    (2) Event emission: EventFacts absorbs the fixed-shape
+    taskCancelled/blockBroken/botCrashed factories (wire shapes
+    byte-identical, runtime-pinned by the WireVocabularyGate factory
+    test); the generic parameterized emitters (MissionReporter,
+    CommandBus, ChangeDetectingStateChannel, keepalive) deliberately
+    stay - a factory over caller-computed attrs is ceremony. (3)
+    Parameter trains: VerbWiring(arbiter, events, day, tod) replaces
+    the four-arg train on every task-verb handler (SurvivalInputs
+    precedent, second application); BindingActor's dead
+    events/day/tod fields (EventClock residue) go. Riding along:
+    BotProcess.onLostControl gains a default no-op (all seven
+    implementations were the identical empty body - the doctrine
+    lives in the interface once, same ratification shape as the
+    existing onExecutionReport default; boundary B semantics
+    unchanged, the arbiter still delivers the callback);
+    MissionShell owns the shared named-target absence adjudication
+    the attack/tame pair duplicated; BotBodyEntity completes the
+    ExperienceMirror/ConsumptionMechanics extractions (accessors
+    replace 11 delegates); the scan-driven onTicks get stage
+    methods. Scenario count 145 unchanged; engine receipt follows
+    the pooled rerun.
