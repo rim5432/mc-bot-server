@@ -332,7 +332,7 @@ public final class BasicMoves {
      * is the support, exactly as vanilla {@code Entity.onClimbable}
      * does not demand ground contact.
      *
-     * <p>Executor: vanilla {@code LivingEntity.travel()} climbs
+     * <p>Vanilla executor: {@code LivingEntity.travel()} climbs
      * automatically when {@code onClimbable()} is true and horizontal
      * drive is present; {@code PathingBehavior} supplies {@code forward
      * >= ARRIVE_MIN_DRIVE} on every steer tick, so a pure-vertical

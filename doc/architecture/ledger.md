@@ -1178,3 +1178,25 @@ Amendment chains recorded so far (both sides annotated):
     intermediate versions caught the layering: the fixed 20-tick
     wait red through 042250, a bare driveUntil poll green once then
     timeout-red at 043922/044055).
+
+    64. 2026-09-03 Concurrency story alignment: the gate's stated
+    policy ("core is single-threaded") and its enforcement regex were
+    both narrower than reality. The CONCURRENCY_PRIMITIVE anchor
+    (synchronized|volatile|java.util.concurrent.atomic|locks|Concurrent)
+    never matched ExecutorService / Executors / new Thread, so
+    core/pathing/PlanWorker's single-thread plan-worker pool - the
+    async A* worker anticipated by entry 17's ViewMode reservation -
+    lived outside the gate entirely while the Javadoc claimed
+    everything runs on the tick thread. Policy of record restated:
+    the tick thread owns all bot state; exactly ONE thread-bearing
+    file is registered in core/ (PlanWorker, handoffs via completed
+    futures read on the tick thread). Enforcement: the gate gains a
+    second scan (Executor/ExecutorService/Executors/new
+    Thread/Thread.currentThread forms; lowercase prose does not
+    match) asserting the thread-bearing FILE SET equals
+    {PlanWorker.java} - a second worker fails as an unregistered
+    thread, an empty set fails as a moved-or-dead registration; both
+    re-register through a ledger entry. EXEMPT_FILES stays empty
+    (decision 60 discipline unchanged); the one prose collision
+    (BasicMoves "Executor:" Javadoc heading) reworded rather than
+    exempted.

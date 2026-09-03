@@ -14,9 +14,9 @@ package com.mcbot.mcbotserver.core;
  *       commented-out imports (commented code is banned, AGENTS.md 1.4)</li>
  *   <li>getderef — simple-arg chained get-deref; proves the basic form
  *       matches</li>
- *   <li>concurrency — commented thread-coordination block; proves
- *       ConcurrencyPrimitiveGate catches concurrency keyword mentions in
- *       core/ (single-threaded by policy)</li>
+ *   <li>concurrency — commented block; proves ConcurrencyPrimitiveGate
+ *       catches concurrency keyword mentions (tick thread owns all bot
+ *       state; sole registered worker thread = PlanWorker, ledger 64)</li>
  * </ul>
  * Must-not-match (gate must NOT flag — pinned blind spots; a change that
  * starts matching them forces boundary re-registration):

@@ -14,12 +14,16 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * Offline gate over concurrency primitives in core/: the core layer is
- * single-threaded by policy (everything runs on the tick thread; the
- * adapter layer owns all cross-thread handoffs at boundary A). A
- * {@code synchronized}, {@code volatile}, {@code java.util.concurrent.atomic.*},
+ * Offline gate over concurrency primitives in core/: the policy of
+ * record is that the tick thread owns all bot state (the adapter layer
+ * owns cross-thread handoffs at boundary A), with ONE registered
+ * exception: core/pathing/PlanWorker, the single-thread async A* worker
+ * anticipated by ledger entry 17's ViewMode reservation, which hands
+ * results back via completed futures read on the tick thread
+ * (ledger 64). A {@code synchronized}, {@code volatile},
+ * {@code java.util.concurrent.atomic.*},
  * {@code java.util.concurrent.locks.*}, or {@code java.util.concurrent.Concurrent*}
- * reference in core/ is a signal that the single-threaded premise is being
+ * reference in core/ is a signal that the single-writer premise is being
  * questioned — either the code is paper (unnecessary atomicity under a
  * single-threaded invariant) or the thread model quietly changed (which
  * should trigger the InMemoryEventQueue AT_NONATOMIC exemption re-audit,
@@ -42,6 +46,11 @@ import org.junit.jupiter.api.Test;
  *       on the tick thread). This is registered in decision 59.</li>
  * </ul>
  *
+ * <p>A second scan ({@link #planWorkerIsTheSoleThreadBearingFile}) covers
+ * the construction forms the primitive pattern never anchored on —
+ * {@code ExecutorService}/{@code Executors}/{@code new Thread} — and pins
+ * the thread-bearing file set to exactly PlanWorker (ledger 64).
+ *
  * <p>Task path: runs in the default {@code test} task (no {@code -Plint}
  * required), alongside GetDerefGateTest and EnglishOnlyScan.
  *
@@ -49,8 +58,9 @@ import org.junit.jupiter.api.Test;
  * adapter/ owns the real cross-thread boundaries (netty handlers, MC tick
  * callbacks) and is excluded by design.
  *
- * <p>Contract: see ledger entry 60 (core single-threaded policy; the
- * InMemoryEventQueue AT_NONATOMIC exemption group and its trigger condition).
+ * <p>Contract: see ledger entries 60 (core single-writer policy; the
+ * InMemoryEventQueue AT_NONATOMIC exemption group and its trigger condition)
+ * and 64 (PlanWorker registration; thread-bearing scan).
  */
 class ConcurrencyPrimitiveGateTest {
 
@@ -62,6 +72,18 @@ class ConcurrencyPrimitiveGateTest {
      */
     private static final Pattern CONCURRENCY_PRIMITIVE =
             Pattern.compile("\\b(synchronized|volatile)\\b|java\\.util\\.concurrent\\.(atomic|locks|Concurrent)");
+
+    /**
+     * Thread-bearing primitive pattern: executor and thread construction
+     * forms. Wider than {@link #CONCURRENCY_PRIMITIVE}, whose anchor on
+     * the atomic/locks/Concurrent subpackages never matched
+     * {@code ExecutorService}/{@code Executors}/{@code new Thread} — the
+     * gap that let PlanWorker's pool live outside the gate unregistered
+     * (ledger 64). Comment mentions count, same as the primitive scan;
+     * lowercase prose ("executor", "tick thread") does not match.
+     */
+    private static final Pattern THREAD_BEARING =
+            Pattern.compile("\\bExecutor(Service)?s?\\b|\\bnew Thread\\b|\\bThread\\.currentThread\\b");
 
     /**
      * Exempted files, as repo-relative POSIX paths. Empty at launch: the
@@ -81,31 +103,58 @@ class ConcurrencyPrimitiveGateTest {
             List.of("src/main/java/com/mcbot/mcbotserver/core/CanaryNotes.java:33: "
                     + "// canary(concurrency): synchronized (lock) {");
 
+    /**
+     * The one registered thread-bearing file in core/: PlanWorker, the
+     * single-thread async A* worker (ledger 64). Identified by file set,
+     * not line pins - the file may evolve freely, but a SECOND
+     * thread-bearing file, or PlanWorker's disappearance, both fail.
+     */
+    private static final Set<String> EXPECTED_THREAD_BEARING_FILES =
+            Set.of("src/main/java/com/mcbot/mcbotserver/core/pathing/PlanWorker.java");
+
     /** Fails when the violation set drifts from the canary set. */
     @Test
     void coreHasZeroConcurrencyPrimitives() throws IOException {
-        Path root = RepoRoot.find();
-        Path coreDir = root.resolve("src/main/java/com/mcbot/mcbotserver/core");
-        List<String> violations = new ArrayList<>();
-        scanTree(coreDir, root, violations);
+        List<String> violations = scanCore(CONCURRENCY_PRIMITIVE);
         assertEquals(
                 EXPECTED_CANARY_VIOLATIONS,
                 violations,
                 "concurrency primitive gate drift (missing canary = blind, extra = policy breach):\n"
                         + "expected: " + EXPECTED_CANARY_VIOLATIONS + "\n"
                         + "actual:   " + violations
-                        + "\ncore/ is single-threaded by policy (decision 60). Remove the primitive or"
+                        + "\ncore/ is single-writer by policy (decision 60). Remove the primitive or"
                         + " register it in EXEMPT_FILES with a reason and re-audit the InMemoryEventQueue"
                         + " AT_NONATOMIC trigger (decision 59).");
     }
 
-    private void scanTree(Path root, Path repoRoot, List<String> violations) throws IOException {
-        try (Stream<Path> paths = Files.walk(root)) {
-            paths.filter(p -> p.toString().endsWith(".java")).forEach(p -> scanFile(p, repoRoot, violations));
-        }
+    /** Fails when core/ grows a second thread-bearing file, or loses the registered one. */
+    @Test
+    void planWorkerIsTheSoleThreadBearingFile() throws IOException {
+        List<String> violations = scanCore(THREAD_BEARING);
+        Set<String> files = violations.stream()
+                .map(v -> v.substring(0, v.indexOf(':')))
+                .collect(java.util.stream.Collectors.toSet());
+        assertEquals(
+                EXPECTED_THREAD_BEARING_FILES,
+                files,
+                "thread-bearing file drift (ledger 64):\n"
+                        + "expected: " + EXPECTED_THREAD_BEARING_FILES + "\n"
+                        + "actual:   " + files + "\nviolations: " + violations
+                        + "\nAn extra file = an unregistered thread in core/; an empty set = PlanWorker"
+                        + " moved or died. Re-register either way with a ledger entry.");
     }
 
-    private void scanFile(Path file, Path repoRoot, List<String> violations) {
+    private List<String> scanCore(Pattern pattern) throws IOException {
+        Path root = RepoRoot.find();
+        Path coreDir = root.resolve("src/main/java/com/mcbot/mcbotserver/core");
+        List<String> violations = new ArrayList<>();
+        try (Stream<Path> paths = Files.walk(coreDir)) {
+            paths.filter(p -> p.toString().endsWith(".java")).forEach(p -> scanFile(p, root, violations, pattern));
+        }
+        return violations;
+    }
+
+    private void scanFile(Path file, Path repoRoot, List<String> violations, Pattern pattern) {
         String relative = repoRoot.relativize(file).toString().replace('\\', '/');
         if (EXEMPT_FILES.contains(relative)) {
             return;
@@ -118,7 +167,7 @@ class ConcurrencyPrimitiveGateTest {
             return;
         }
         for (int i = 0; i < lines.size(); i++) {
-            if (CONCURRENCY_PRIMITIVE.matcher(lines.get(i)).find()) {
+            if (pattern.matcher(lines.get(i)).find()) {
                 violations.add(relative + ":" + (i + 1) + ": " + lines.get(i).trim());
             }
         }
