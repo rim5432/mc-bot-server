@@ -28,7 +28,6 @@ import org.junit.jupiter.api.Test;
 class DigOnSuffocationRuleTest {
 
     private static final WorldView WORLD = new MockWorldView();
-    private static final CellPos POS = new CellPos(0, 64, 0);
     private static final CellPos EYE_BLOCK = new CellPos(0, 65, 0);
 
     private static ThreatBlackboard boardAt(boolean inWall, CellPos eyeBlock) {

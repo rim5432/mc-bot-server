@@ -22,6 +22,7 @@ import net.minecraft.gametest.framework.GameTestAssertException;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -388,6 +389,88 @@ final class GametestRig {
     static void assertEventSeen(InMemoryEventQueue events, String kind) {
         List<String> kinds = eventKinds(events);
         check(kinds.contains(kind), "expected " + kind + " in stream, got " + kinds);
+    }
+
+    /**
+     * Finds the FIRST event of the given kind on the rig's stream -
+     * the one-lifecycle-event-per-kind lookup most scenarios need.
+     * Fails with the full kind list when absent, so a missing event
+     * names its siblings instead of a bare NoSuchElementException.
+     *
+     * @param events the rig's event stream; never null
+     * @param kind   registered event-kind string; never null
+     * @return the first matching event; never null
+     */
+    static BotEvent eventOf(InMemoryEventQueue events, String kind) {
+        return eventsOf(events).stream()
+                .filter(e -> kind.equals(e.kind()))
+                .findFirst()
+                .orElseThrow(
+                        () -> new IllegalStateException("expected " + kind + " in stream, got " + eventKinds(events)));
+    }
+
+    /**
+     * Asserts one wire attr equals the expected string - the attr-side
+     * twin of {@link #checkEquals}; the failure message carries the
+     * event kind, the key, and the actual value, replacing the
+     * hand-built message concat every scenario repeated.
+     *
+     * @param event    the event whose attrs are read; never null
+     * @param key      wire attr key; never null
+     * @param expected expected attr value; never null
+     */
+    static void assertAttr(BotEvent event, String key, String expected) {
+        check(
+                expected.equals(event.attrs().get(key)),
+                event.kind() + " attr " + key + " must be " + expected + ", got "
+                        + event.attrs().get(key));
+    }
+
+    /**
+     * Asserts a container slot holds exactly the expected item and
+     * count - the slot-side twin of {@link #checkEquals} for the
+     * post-action inventory reads.
+     *
+     * @param container the body container; never null
+     * @param slot      slot index; 0-based
+     * @param expected  the required item identity; never null
+     * @param count     the required stack count; positive
+     */
+    static void assertSlot(net.minecraft.world.SimpleContainer container, int slot, Item expected, int count) {
+        ItemStack stack = container.getItem(slot);
+        check(stack.is(expected), "slot " + slot + " must hold " + expected + "; got " + stack);
+        check(stack.getCount() == count, "slot " + slot + " count must be " + count + "; got " + stack.getCount());
+    }
+
+    /**
+     * Rigs the ranged loadout into the body's hotbar: bow in slot 0,
+     * 64 arrows in slot 1 - the shared opening rig of the standoff
+     * and ranged-routing scenarios.
+     *
+     * @param rig the wired rig; never null
+     */
+    static void giveBowAndArrows(Rig rig) {
+        var container = rig.body().getInventory().container();
+        container.setItem(0, new ItemStack(net.minecraft.world.item.Items.BOW));
+        container.setItem(1, new ItemStack(net.minecraft.world.item.Items.ARROW, 64));
+    }
+    /**
+     * Primes the body's FoodData to an exact scenario state: food
+     * level, saturation, and optional pre-charged exhaustion - the
+     * shared opening rig of every hunger/eating scenario.
+     *
+     * @param body       the body under test; never null
+     * @param foodLevel  target food level, 0..20
+     * @param saturation target saturation, 0..foodLevel
+     * @param exhaustion exhaustion to pre-charge; 0 to skip
+     */
+    static void primeFood(BotBodyEntity body, int foodLevel, float saturation, float exhaustion) {
+        net.minecraft.world.food.FoodData food = body.getFoodData();
+        food.setFoodLevel(foodLevel);
+        food.setSaturation(saturation);
+        if (exhaustion > 0.0f) {
+            food.addExhaustion(exhaustion);
+        }
     }
 
     /**

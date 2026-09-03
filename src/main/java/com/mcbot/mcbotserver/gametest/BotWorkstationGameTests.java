@@ -62,7 +62,6 @@ public final class BotWorkstationGameTests {
         tx.menuButtonClick(0);
         view = tx.menuSnapshot();
         check(!view.slot(1).isEmpty(), "the stonecutter output must yield a result after recipe selection");
-        String resultId = view.slot(1).item().itemId();
 
         // QUICK_MOVE the output directly into the player inventory (more
         // reliable than PICKUP + cursor placement).
@@ -148,7 +147,7 @@ public final class BotWorkstationGameTests {
         checkEquals("smithing_table", view.type(), "menu type must be smithing_table");
 
         int hotbar0 = firstHotbarSlot(view);
-        view = tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
+        tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
         view = tx.menuClick(hotbar0 + 1, 0, MenuClick.QUICK_MOVE);
         view = tx.menuClick(hotbar0 + 2, 0, MenuClick.QUICK_MOVE);
 
@@ -209,7 +208,7 @@ public final class BotWorkstationGameTests {
         checkEquals("loom", view.type(), "menu type must be loom");
 
         int hotbar0 = firstHotbarSlot(view);
-        view = tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
+        tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
         view = tx.menuClick(hotbar0 + 1, 0, MenuClick.QUICK_MOVE);
         view = tx.menuClick(hotbar0 + 2, 0, MenuClick.QUICK_MOVE);
 

@@ -221,7 +221,10 @@ class GametestInventoryCheck {
                             "slowRegenFiresAtFoodLevelEighteen",
                             "starvationDealsDamageAtZeroFood",
                             "walkAccumulatesExhaustionAtDeviatedRate",
-                            "sprintAccumulatesExhaustionAtVanillaRate",
+                            "sprintAccumulatesExhaustionAtVanillaRate")),
+            Map.entry(
+                    "BotEatingGameTests",
+                    Set.of(
                             "eatReflexEmitsStartedAndCompletedEvents",
                             "eatReflexEmptySlotEmitsSlotEmpty",
                             "eatReflexNonFoodEmitsNotEdible",

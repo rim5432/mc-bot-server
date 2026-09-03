@@ -85,7 +85,7 @@ public final class BotBeaconGameTests {
 
         // Place the iron ingot in slot 0 (the payment slot).
         int hotbar0 = firstHotbarSlot(view);
-        view = tx.menuClick(hotbar0, 0, MenuClick.PICKUP);
+        tx.menuClick(hotbar0, 0, MenuClick.PICKUP);
         view = tx.menuClick(0, 0, MenuClick.PICKUP);
         check(!view.slot(0).isEmpty(), "payment must be in slot 0 after deposit");
 
@@ -168,7 +168,7 @@ public final class BotBeaconGameTests {
         // rejects it via mayPlace, so the dirt stays in carried and the
         // slot remains empty.
         int hotbar0 = firstHotbarSlot(view);
-        view = tx.menuClick(hotbar0, 0, MenuClick.PICKUP);
+        tx.menuClick(hotbar0, 0, MenuClick.PICKUP);
         view = tx.menuClick(0, 0, MenuClick.PICKUP);
         check(view.slot(0).isEmpty(), "payment slot must reject dirt (non-payment item)");
 

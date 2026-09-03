@@ -32,7 +32,6 @@ class DefendProcessTest {
     private static final CellPos BOT = new CellPos(0, 64, 0);
     private static final String ZOMBIE = "minecraft:zombie";
     private static final String SKELETON = "minecraft:skeleton";
-    private static final String SWORD = "minecraft:iron_sword";
     private static final Set<String> HOSTILES = Set.of(ZOMBIE);
     private static final InterruptionContext CTX =
             new InterruptionContext(1L, BOT, "defend:t1", "reflex-preempt:test", "");

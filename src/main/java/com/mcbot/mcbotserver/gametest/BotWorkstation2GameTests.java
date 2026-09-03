@@ -224,7 +224,7 @@ public final class BotWorkstation2GameTests {
         checkEquals(27, containerSlotsOf(view), "trapped chest exposes 27 container slots");
 
         int hotbar0 = firstHotbarSlot(view);
-        view = tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
+        tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
         tx.closeMenu();
 
         view = tx.openMenu(cellOf(chestAbs));
@@ -273,7 +273,7 @@ public final class BotWorkstation2GameTests {
         checkEquals(27, containerSlotsOf(view), "ender chest exposes 27 container slots");
 
         int hotbar0 = firstHotbarSlot(view);
-        view = tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
+        tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
         tx.closeMenu();
 
         // Reopen: ender chest inventory is per-player (per-facade), persists.

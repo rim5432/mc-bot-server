@@ -66,7 +66,7 @@ public final class BotAnvilGameTests {
 
         int hotbar0 = firstHotbarSlot(view);
         // Sword in left input (slot 0), book in right input (slot 1).
-        view = tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
+        tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
         view = tx.menuClick(hotbar0 + 1, 0, MenuClick.QUICK_MOVE);
         check(!view.slot(0).isEmpty(), "sword must land in anvil left input slot 0");
         check(!view.slot(1).isEmpty(), "book must land in anvil right input slot 1");
@@ -116,7 +116,7 @@ public final class BotAnvilGameTests {
         check(view != null, "opening the anvil must succeed");
 
         int hotbar0 = firstHotbarSlot(view);
-        view = tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
+        tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
         view = tx.menuClick(hotbar0 + 1, 0, MenuClick.QUICK_MOVE);
 
         view = tx.menuClick(2, 0, MenuClick.PICKUP);
@@ -170,7 +170,7 @@ public final class BotAnvilGameTests {
 
         int hotbar0 = firstHotbarSlot(view);
         // First operation: repair the damaged sword.
-        view = tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
+        tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
         view = tx.menuClick(hotbar0 + 1, 0, MenuClick.QUICK_MOVE);
         view = tx.menuSnapshot();
         check(!view.slot(2).isEmpty(), "the repair result must be available");
@@ -188,7 +188,7 @@ public final class BotAnvilGameTests {
         var tx2 = rig.actor().menuTransactions();
         var view2 = tx2.openMenu(GametestRig.cellOf(anvilAbs));
         check(view2 != null, "reopening the anvil must succeed");
-        view2 = tx2.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
+        tx2.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
         tx2.setAnvilName("Renamed");
         view2 = tx2.menuSnapshot();
         check(!view2.slot(2).isEmpty(), "the rename result must be available");
@@ -313,7 +313,7 @@ public final class BotAnvilGameTests {
         check(view != null, "opening the grindstone must succeed");
 
         int hotbar0 = firstHotbarSlot(view);
-        view = tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
+        tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
         view = tx.menuClick(hotbar0 + 1, 0, MenuClick.QUICK_MOVE);
 
         view = tx.menuClick(2, 0, MenuClick.PICKUP);

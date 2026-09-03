@@ -673,7 +673,7 @@ public final class BotInventoryGameTests {
 
         int hotbar0 = firstSlotWithRole(view, SlotRole.HOTBAR);
         int hotbar1 = hotbar0 + 1;
-        view = tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
+        tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
         view = tx.menuClick(hotbar1, 0, MenuClick.QUICK_MOVE);
         check(!view.slot(1).isEmpty(), "the lapis must land in the enchanting fuel slot");
 

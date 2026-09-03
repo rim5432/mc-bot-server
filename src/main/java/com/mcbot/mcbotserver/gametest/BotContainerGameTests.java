@@ -78,7 +78,7 @@ public final class BotContainerGameTests {
         checkEquals(16, view.slot(foundSlot).item().count(), "deposited stack count must be 16");
 
         // Retrieve: PICKUP the stack back to the cursor, then into hotbar.
-        view = tx.menuClick(foundSlot, 0, MenuClick.PICKUP);
+        tx.menuClick(foundSlot, 0, MenuClick.PICKUP);
         view = tx.menuClick(hotbar0, 0, MenuClick.PICKUP);
         check(!view.slot(hotbar0).isEmpty(), "hotbar must hold the retrieved stack");
         check(view.slot(foundSlot).isEmpty(), "barrel slot must be empty after retrieval");
@@ -114,7 +114,7 @@ public final class BotContainerGameTests {
         checkEquals(27, containerSlotsOf(view), "shulker box exposes 27 container slots");
 
         int hotbar0 = firstHotbarSlot(view);
-        view = tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
+        tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
         tx.closeMenu();
 
         view = tx.openMenu(cellOf(shulkerAbs));
@@ -162,7 +162,7 @@ public final class BotContainerGameTests {
         rig.body().getInventory().container().setItem(0, new ItemStack(Items.WHEAT, 32));
         view = tx.openMenu(cellOf(hopperAbs));
         int hotbar0 = firstHotbarSlot(view);
-        view = tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
+        tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
         tx.closeMenu();
 
         view = tx.openMenu(cellOf(hopperAbs));
@@ -210,7 +210,7 @@ public final class BotContainerGameTests {
         rig.body().getInventory().container().setItem(0, new ItemStack(Items.ARROW, 16));
         view = tx.openMenu(cellOf(dispenserAbs));
         int hotbar0 = firstHotbarSlot(view);
-        view = tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
+        tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
         tx.closeMenu();
 
         view = tx.openMenu(cellOf(dispenserAbs));

@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.mcbot.mcbotserver.api.reflex.ReflexAction;
 import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
-import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.WorldView;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
 import org.junit.jupiter.api.Test;
@@ -31,7 +30,6 @@ import org.junit.jupiter.api.Test;
 class EscapeLavaRuleTest {
 
     private static final WorldView WORLD = new MockWorldView();
-    private static final CellPos POS = new CellPos(0, 64, 0);
 
     private static ThreatBlackboard boardAt(boolean inLava) {
         var board = new ThreatBlackboard();

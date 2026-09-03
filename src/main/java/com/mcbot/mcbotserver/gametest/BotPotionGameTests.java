@@ -218,10 +218,7 @@ public final class BotPotionGameTests {
                     var events = GametestRig.eventsOf(rig.events());
                     // DRINK_STARTED: urgent, pre-consumption, carries
                     // potionId, slot, health at decision time, source.
-                    BotEvent started = events.stream()
-                            .filter(e -> EventKind.DRINK_STARTED.equals(e.kind()))
-                            .findFirst()
-                            .orElseThrow();
+                    BotEvent started = GametestRig.eventOf(rig.events(), EventKind.DRINK_STARTED);
                     check(started.urgent(), "DRINK_STARTED must be urgent (pre-consumption decision)");
                     check(
                             "minecraft:healing".equals(started.attrs().get("potionId")),
@@ -241,10 +238,7 @@ public final class BotPotionGameTests {
                                     + started.attrs().get("source"));
                     // DRINK_COMPLETED: non-urgent, carries potionId, slot,
                     // serialized effects, containerType, source.
-                    BotEvent completed = events.stream()
-                            .filter(e -> EventKind.DRINK_COMPLETED.equals(e.kind()))
-                            .findFirst()
-                            .orElseThrow();
+                    BotEvent completed = GametestRig.eventOf(rig.events(), EventKind.DRINK_COMPLETED);
                     check(!completed.urgent(), "DRINK_COMPLETED must be non-urgent");
                     check(
                             "minecraft:healing".equals(completed.attrs().get("potionId")),
@@ -322,10 +316,7 @@ public final class BotPotionGameTests {
                     var events = GametestRig.eventsOf(rig.events());
                     // DRINK_STARTED: urgent, pre-consumption, source=reflex
                     // (the claim owner is "reflex:DRINK_ON_LOW_HEALTH").
-                    BotEvent started = events.stream()
-                            .filter(e -> EventKind.DRINK_STARTED.equals(e.kind()))
-                            .findFirst()
-                            .orElseThrow();
+                    BotEvent started = GametestRig.eventOf(rig.events(), EventKind.DRINK_STARTED);
                     check(started.urgent(), "DRINK_STARTED must be urgent (reflex preempts mission)");
                     check(
                             "minecraft:healing".equals(started.attrs().get("potionId")),
@@ -345,10 +336,7 @@ public final class BotPotionGameTests {
                                     + started.attrs().get("source"));
                     // DRINK_COMPLETED: non-urgent, source=reflex, effects,
                     // containerType=glass_bottle.
-                    BotEvent completed = events.stream()
-                            .filter(e -> EventKind.DRINK_COMPLETED.equals(e.kind()))
-                            .findFirst()
-                            .orElseThrow();
+                    BotEvent completed = GametestRig.eventOf(rig.events(), EventKind.DRINK_COMPLETED);
                     check(!completed.urgent(), "DRINK_COMPLETED must be non-urgent");
                     check(
                             "minecraft:healing".equals(completed.attrs().get("potionId")),
@@ -425,13 +413,9 @@ public final class BotPotionGameTests {
                     GametestRig.assertEventSeen(rig.events(), EventKind.POTION_THROWN);
                 }))
                 .thenExecuteAfter(0, () -> {
-                    var events = GametestRig.eventsOf(rig.events());
                     // POTION_THROWN: non-urgent (one-shot, no preemption),
                     // carries potionId, slot, throwType, effects, source.
-                    BotEvent thrown = events.stream()
-                            .filter(e -> EventKind.POTION_THROWN.equals(e.kind()))
-                            .findFirst()
-                            .orElseThrow();
+                    BotEvent thrown = GametestRig.eventOf(rig.events(), EventKind.POTION_THROWN);
                     check(!thrown.urgent(), "POTION_THROWN must be non-urgent (one-shot throw)");
                     check(
                             "minecraft:poison".equals(thrown.attrs().get("potionId")),
@@ -499,11 +483,7 @@ public final class BotPotionGameTests {
                     GametestRig.assertEventSeen(rig.events(), EventKind.DRINK_FAILED);
                 }))
                 .thenExecuteAfter(0, () -> {
-                    var events = GametestRig.eventsOf(rig.events());
-                    BotEvent failed = events.stream()
-                            .filter(e -> EventKind.DRINK_FAILED.equals(e.kind()))
-                            .findFirst()
-                            .orElseThrow();
+                    BotEvent failed = GametestRig.eventOf(rig.events(), EventKind.DRINK_FAILED);
                     check(
                             "SLOT_EMPTY".equals(failed.attrs().get("reason")),
                             "DRINK_FAILED reason must be SLOT_EMPTY, got "
@@ -542,11 +522,7 @@ public final class BotPotionGameTests {
                     GametestRig.assertEventSeen(rig.events(), EventKind.DRINK_FAILED);
                 }))
                 .thenExecuteAfter(0, () -> {
-                    var events = GametestRig.eventsOf(rig.events());
-                    BotEvent failed = events.stream()
-                            .filter(e -> EventKind.DRINK_FAILED.equals(e.kind()))
-                            .findFirst()
-                            .orElseThrow();
+                    BotEvent failed = GametestRig.eventOf(rig.events(), EventKind.DRINK_FAILED);
                     check(
                             "NO_POTION".equals(failed.attrs().get("reason")),
                             "DRINK_FAILED reason must be NO_POTION, got "
@@ -611,23 +587,11 @@ public final class BotPotionGameTests {
                     GametestRig.assertEventSeen(rig.events(), EventKind.DRINK_COMPLETED);
                 }))
                 .thenExecuteAfter(0, () -> {
-                    var events = GametestRig.eventsOf(rig.events());
-                    BotEvent completed = events.stream()
-                            .filter(e -> EventKind.DRINK_COMPLETED.equals(e.kind()))
-                            .findFirst()
-                            .orElseThrow();
-                    check(
-                            "true".equals(completed.attrs().get("containerDropped")),
-                            "DRINK_COMPLETED containerDropped must be true (inventory full), got "
-                                    + completed.attrs().get("containerDropped"));
-                    check(
-                            "glass_bottle".equals(completed.attrs().get("containerType")),
-                            "DRINK_COMPLETED containerType must be glass_bottle, got "
-                                    + completed.attrs().get("containerType"));
+                    BotEvent completed = GametestRig.eventOf(rig.events(), EventKind.DRINK_COMPLETED);
+                    GametestRig.assertAttr(completed, "containerDropped", "true");
+                    GametestRig.assertAttr(completed, "containerType", "glass_bottle");
                     // Slot 0 keeps the shrunk potion stack (count 1).
-                    ItemStack slot0 = body.getInventory().container().getItem(0);
-                    check(slot0.is(Items.POTION), "slot 0 must keep the remaining potion; got " + slot0);
-                    check(slot0.getCount() == 1, "slot 0 potion count must be 1; got " + slot0.getCount());
+                    GametestRig.assertSlot(body.getInventory().container(), 0, Items.POTION, 1);
                     body.discard();
                 })
                 .thenSucceed();
@@ -660,25 +624,12 @@ public final class BotPotionGameTests {
                     GametestRig.assertEventSeen(rig.events(), EventKind.DRINK_COMPLETED);
                 }))
                 .thenExecuteAfter(0, () -> {
-                    var events = GametestRig.eventsOf(rig.events());
-                    BotEvent completed = events.stream()
-                            .filter(e -> EventKind.DRINK_COMPLETED.equals(e.kind()))
-                            .findFirst()
-                            .orElseThrow();
-                    check(
-                            "false".equals(completed.attrs().get("containerDropped")),
-                            "DRINK_COMPLETED containerDropped must be false (merged into existing stack), got "
-                                    + completed.attrs().get("containerDropped"));
-                    // Slot 0 keeps the shrunk potion (count 1).
-                    ItemStack slot0 = body.getInventory().container().getItem(0);
-                    check(slot0.is(Items.POTION), "slot 0 must keep the remaining potion; got " + slot0);
-                    check(slot0.getCount() == 1, "slot 0 potion count must be 1; got " + slot0.getCount());
-                    // Slot 1: the glass bottle merged in (count 1 → 2).
-                    ItemStack slot1 = body.getInventory().container().getItem(1);
-                    check(slot1.is(Items.GLASS_BOTTLE), "slot 1 must hold glass bottles; got " + slot1);
-                    check(
-                            slot1.getCount() == 2,
-                            "slot 1 glass bottle count must be 2 (merged); got " + slot1.getCount());
+                    BotEvent completed = GametestRig.eventOf(rig.events(), EventKind.DRINK_COMPLETED);
+                    GametestRig.assertAttr(completed, "containerDropped", "false");
+                    // Slot 0 keeps the shrunk potion (count 1); slot 1's
+                    // glass bottle merged in (count 1 → 2).
+                    GametestRig.assertSlot(body.getInventory().container(), 0, Items.POTION, 1);
+                    GametestRig.assertSlot(body.getInventory().container(), 1, Items.GLASS_BOTTLE, 2);
                     body.discard();
                 })
                 .thenSucceed();
@@ -717,7 +668,7 @@ public final class BotPotionGameTests {
         checkEquals("brewing_stand", view.type(), "menu type must be brewing_stand");
 
         int hotbar0 = firstHotbarSlot(view);
-        view = tx.menuClick(hotbar0, 0, com.mcbot.mcbotserver.api.menu.MenuClick.QUICK_MOVE);
+        tx.menuClick(hotbar0, 0, com.mcbot.mcbotserver.api.menu.MenuClick.QUICK_MOVE);
         view = tx.menuClick(hotbar0 + 1, 0, com.mcbot.mcbotserver.api.menu.MenuClick.QUICK_MOVE);
         view = tx.menuClick(hotbar0 + 2, 0, com.mcbot.mcbotserver.api.menu.MenuClick.QUICK_MOVE);
 

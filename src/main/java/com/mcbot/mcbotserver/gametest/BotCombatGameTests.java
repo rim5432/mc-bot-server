@@ -821,9 +821,8 @@ public final class BotCombatGameTests {
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void bowChargedShotDamagesDistantTarget(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(5, GametestRig.WALK_Y, 2));
+        GametestRig.giveBowAndArrows(rig);
         var container = rig.body().getInventory().container();
-        container.setItem(0, new ItemStack(Items.BOW));
-        container.setItem(1, new ItemStack(Items.ARROW, 64));
         // The production ranged engagement: no hand-pumped claims -
         // the defend mission and the ranged loadout own the draw
         // pacing, exactly what a harness /entities attack rides.
@@ -864,9 +863,8 @@ public final class BotCombatGameTests {
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void arrowsRunOutMidFightReroutesToMelee(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
+        GametestRig.giveBowAndArrows(rig);
         var container = rig.body().getInventory().container();
-        container.setItem(0, new ItemStack(Items.BOW));
-        container.setItem(1, new ItemStack(Items.ARROW, 64));
         Zombie zombie = spawnHostile(helper, EntityType.ZOMBIE, new BlockPos(8, GametestRig.WALK_Y, 8));
         zombie.setNoAi(true);
         zombie.setInvulnerable(true);
@@ -921,9 +919,8 @@ public final class BotCombatGameTests {
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT)
     public static void rangedBotBacksAwayWhenTargetClosesInsideMin(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(3, GametestRig.WALK_Y, 8));
+        GametestRig.giveBowAndArrows(rig);
         var container = rig.body().getInventory().container();
-        container.setItem(0, new ItemStack(Items.BOW));
-        container.setItem(1, new ItemStack(Items.ARROW, 64));
 
         // Distance 5: x 3 -> 8, same z. Inside reflex trigger (6) and
         // inside GoalRange min (8), so the predicate fails from tick one.
@@ -1046,9 +1043,8 @@ public final class BotCombatGameTests {
     @GameTest(template = "empty16x8x16", timeoutTicks = GametestRig.TIMEOUT + 100)
     public static void bowTapShotDealsWeakDamage(GameTestHelper helper) {
         var rig = rig(helper, new BlockPos(4, GametestRig.WALK_Y, 2));
+        GametestRig.giveBowAndArrows(rig);
         var container = rig.body().getInventory().container();
-        container.setItem(0, new ItemStack(Items.BOW));
-        container.setItem(1, new ItemStack(Items.ARROW, 64));
         // ONE target straight south, both shots down the same column:
         // a second target at an angle sends stray tap arrows out of
         // the structure into neighbouring pooled scenarios (the lava

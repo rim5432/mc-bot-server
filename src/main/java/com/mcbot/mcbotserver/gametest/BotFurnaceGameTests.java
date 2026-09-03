@@ -57,7 +57,7 @@ public final class BotFurnaceGameTests {
         checkEquals("furnace", view.type(), "menu type must be furnace");
 
         int hotbar0 = firstHotbarSlot(view);
-        view = tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
+        tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
         view = tx.menuClick(hotbar0 + 1, 0, MenuClick.QUICK_MOVE);
 
         check(!view.slot(0).isEmpty(), "iron ore must land in input slot 0");
@@ -103,7 +103,7 @@ public final class BotFurnaceGameTests {
         checkEquals("blast_furnace", view.type(), "menu type must be blast_furnace");
 
         int hotbar0 = firstHotbarSlot(view);
-        view = tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
+        tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
         view = tx.menuClick(hotbar0 + 1, 0, MenuClick.QUICK_MOVE);
         tx.closeMenu();
 
@@ -143,7 +143,7 @@ public final class BotFurnaceGameTests {
         checkEquals("smoker", view.type(), "menu type must be smoker");
 
         int hotbar0 = firstHotbarSlot(view);
-        view = tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
+        tx.menuClick(hotbar0, 0, MenuClick.QUICK_MOVE);
         view = tx.menuClick(hotbar0 + 1, 0, MenuClick.QUICK_MOVE);
         tx.closeMenu();
 

@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.mcbot.mcbotserver.api.reflex.ReflexRule;
 import com.mcbot.mcbotserver.api.reflex.ThreatBlackboard;
-import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.WorldView;
 import com.mcbot.mcbotserver.core.world.MockWorldView;
 import java.util.List;
@@ -21,7 +20,6 @@ import org.junit.jupiter.api.Test;
 class ReflexHysteresisGateTest {
 
     private static final WorldView WORLD = new MockWorldView();
-    private static final CellPos POS = new CellPos(0, 64, 0);
 
     private static SurvivalReflexLayer layerWith(float[] health) {
         SurvivalReflexLayer layer = new SurvivalReflexLayer((world, board) -> board.botHealth = health[0]);

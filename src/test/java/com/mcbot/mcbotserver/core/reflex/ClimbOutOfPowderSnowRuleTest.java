@@ -27,7 +27,6 @@ import org.junit.jupiter.api.Test;
 class ClimbOutOfPowderSnowRuleTest {
 
     private static final WorldView WORLD = new MockWorldView();
-    private static final CellPos POS = new CellPos(0, 64, 0);
 
     private static ThreatBlackboard boardAt(int freezeTicks) {
         var board = new ThreatBlackboard();
