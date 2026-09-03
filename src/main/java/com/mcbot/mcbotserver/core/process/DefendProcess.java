@@ -7,7 +7,6 @@ import com.mcbot.mcbotserver.api.goal.GoalRange;
 import com.mcbot.mcbotserver.api.inventory.WeaponCatalog;
 import com.mcbot.mcbotserver.api.process.Attack;
 import com.mcbot.mcbotserver.api.process.Directive;
-import com.mcbot.mcbotserver.api.process.ExecutionReport;
 import com.mcbot.mcbotserver.api.process.InterruptionContext;
 import com.mcbot.mcbotserver.api.process.Overrides;
 import com.mcbot.mcbotserver.api.types.CellPos;
@@ -143,7 +142,7 @@ public final class DefendProcess extends MissionShell {
      * one re-scan; a false SUCCESS costs a missed threat. See issue
      * 0006 for the scan-radius / leash gap that motivated this.
      */
-    public static final String REASON_ESCAPED = "TARGET_ESCAPED";
+    public static final String REASON_ESCAPED = MissionShell.REASON_ESCAPED;
 
     private final Supplier<CellPos> positionSource;
     private final Set<String> hostileTypes;
@@ -264,43 +263,71 @@ public final class DefendProcess extends MissionShell {
 
         CellPos position = positionSource.get();
         if (!engaged()) {
-            EntitySnapshot nearest = nearestHostile(world, position);
-            if (nearest == null) {
-                // Nothing to defend against: the mission's purpose is
-                // already fulfilled.
-                succeed();
+            return acquireDirective(world, position);
+        }
+        return pursueDirective(world, position);
+    }
+
+    /**
+     * Pre-engagement stage: the nearest hostile inside the detection
+     * envelope either completes the mission (nothing to defend
+     * against), is refused (ranged tactics, no bow to answer with),
+     * or is engaged - melee-charged or standoff-opened per the
+     * loadout ranking.
+     *
+     * @param world    read-only world; never null
+     * @param position the body cell; never null
+     * @return this tick's directive; never null
+     */
+    private Directive acquireDirective(WorldView world, CellPos position) {
+        EntitySnapshot nearest = nearestHostile(world, position);
+        if (nearest == null) {
+            // Nothing to defend against: the mission's purpose is
+            // already fulfilled.
+            succeed();
+            return lastDirective;
+        }
+        if (rangedTypes.contains(nearest.type())) {
+            // A kiting skeleton is only unwinnable WITHOUT a bow:
+            // armed, the fight is answered at standoff - the mover
+            // closes to RANGED_STANDOFF, the combat behavior draws
+            // inside the bow band, and melee still takes over if
+            // the target closes in. Unarmed, refusing NOW beats
+            // bleeding to leash or timeout - the harness sees the
+            // refusal (with the threat type) and decides.
+            if (RangedLoadouts.hotbarBowSlot(world) < 0) {
+                lastRefusedType = nearest.type();
+                fail(REASON_REFUSED);
                 return lastDirective;
             }
-            if (rangedTypes.contains(nearest.type())) {
-                // A kiting skeleton is only unwinnable WITHOUT a bow:
-                // armed, the fight is answered at standoff - the mover
-                // closes to RANGED_STANDOFF, the combat behavior draws
-                // inside the bow band, and melee still takes over if
-                // the target closes in. Unarmed, refusing NOW beats
-                // bleeding to leash or timeout - the harness sees the
-                // refusal (with the threat type) and decides.
-                if (RangedLoadouts.hotbarBowSlot(world) < 0) {
-                    lastRefusedType = nearest.type();
-                    fail(REASON_REFUSED);
-                    return lastDirective;
-                }
-                engageRanged(nearest);
-                return directiveFor();
-            }
-            // Melee-typed target: charge the swing rim only when the
-            // hotbar answers melee better than the bow. A bow-only
-            // carrier that closes to 2 trades full-draw arrows for
-            // bow clubbing, so it opens at the standoff rim and fires
-            // while the target closes; the behavior tier keeps the
-            // bow answering point-blank when the target arrives.
-            if (RangedLoadouts.hotbarBowSlot(world) >= 0 && !RangedLoadouts.meleeWeaponBeatsBow(world, weapons)) {
-                engageRanged(nearest);
-                return directiveFor();
-            }
-            engage(nearest);
+            engageRanged(nearest);
             return directiveFor();
         }
+        // Melee-typed target: charge the swing rim only when the
+        // hotbar answers melee better than the bow. A bow-only
+        // carrier that closes to 2 trades full-draw arrows for
+        // bow clubbing, so it opens at the standoff rim and fires
+        // while the target closes; the behavior tier keeps the
+        // bow answering point-blank when the target arrives.
+        if (RangedLoadouts.hotbarBowSlot(world) >= 0 && !RangedLoadouts.meleeWeaponBeatsBow(world, weapons)) {
+            engageRanged(nearest);
+            return directiveFor();
+        }
+        engage(nearest);
+        return directiveFor();
+    }
 
+    /**
+     * Engaged stage: refresh the locked target, leash-check it, re-
+     * route the stance on loadout changes, and keep steering; a
+     * genuinely absent target spends the grace window before
+     * TARGET_ESCAPED.
+     *
+     * @param world    read-only world; never null
+     * @param position the body cell; never null
+     * @return this tick's directive; never null
+     */
+    private Directive pursueDirective(WorldView world, CellPos position) {
         EntitySnapshot current = findTarget(world, position, targetId);
         if (current != null) {
             // Target still in the hostile scan: refresh, leash-check,
@@ -341,34 +368,6 @@ public final class DefendProcess extends MissionShell {
             return lastDirective;
         }
         return directiveFor();
-    }
-
-    @Override
-    public void onExecutionReport(ExecutionReport report) {
-        if (!live()) {
-            // Terminal state is sticky, mirroring GotoProcess: late
-            // reports must never flip a decided outcome.
-            return;
-        }
-        // Every report status is execution weather here - RUNNING,
-        // STUCK, SUCCESS, FAILED alike; the scans decide.
-        //
-        // Deliberately NO success case: a SUCCEEDED report means the
-        // chase locomotion reached its GoalNear - standing next to
-        // the enemy is where the FIGHT starts, never the verdict.
-        // Only this process's own scans declare victory.
-        //
-        // Deliberately NO failure case either: a locomotion FAILED
-        // describes the CHASE, not the FIGHT - a blocked path or a
-        // fuse trip while closing distance must not abort the
-        // engagement (the body may already be within swing range).
-        // Terminal authority belongs to scans, leash, and timeout.
-    }
-
-    @Override
-    public void onLostControl(InterruptionContext c) {
-        // Reflex supremacy (decision 9): being parked does not end the
-        // fight by itself; resume() decides whether it may continue.
     }
 
     @Feature(

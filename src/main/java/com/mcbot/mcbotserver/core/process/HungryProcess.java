@@ -331,12 +331,6 @@ public final class HungryProcess extends MissionShell implements DigMission {
     }
 
     @Override
-    public void onLostControl(InterruptionContext context) {
-        // Parked mid-acquisition: state stays intact; the per-tick
-        // food check and budget own the verdict (ADR-0003 section 3).
-    }
-
-    @Override
     public boolean resume(InterruptionContext context) {
         // Revalidate: prey and bush may be gone while parked - the
         // scans re-derive both; a stale target must not mint a ghost

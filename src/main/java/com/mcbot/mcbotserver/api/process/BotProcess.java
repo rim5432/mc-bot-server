@@ -60,9 +60,18 @@ public interface BotProcess {
      * the plan is what makes resume possible; release nothing here that
      * resume would need.
      *
+     * <p>Default no-op because parking itself is never a verdict (reflex
+     * supremacy, decision 9): scan-driven missions keep every field and
+     * let {@link #resume} re-adjudicate on the next tick. A mission that
+     * holds a releasable resource through ticks (a crack, a menu) is the
+     * exception that overrides this. Ratified alongside the
+     * {@link #onExecutionReport} default: every mission in the tree
+     * shipped the identical empty body, so the doctrine lives here once
+     * instead of as seven comment-only overrides.
+     *
      * @param context snapshot of the interruption moment; never null
      */
-    void onLostControl(InterruptionContext context);
+    default void onLostControl(InterruptionContext context) {}
 
     /**
      * Reflex released control; revalidate the world assumptions from

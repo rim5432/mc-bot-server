@@ -6,7 +6,6 @@ import com.mcbot.mcbotserver.api.goal.GoalRange;
 import com.mcbot.mcbotserver.api.inventory.WeaponCatalog;
 import com.mcbot.mcbotserver.api.process.Attack;
 import com.mcbot.mcbotserver.api.process.Directive;
-import com.mcbot.mcbotserver.api.process.ExecutionReport;
 import com.mcbot.mcbotserver.api.process.InterruptionContext;
 import com.mcbot.mcbotserver.api.process.Overrides;
 import com.mcbot.mcbotserver.api.types.CellPos;
@@ -78,7 +77,7 @@ public final class AttackProcess extends MissionShell {
     public static final int GOAL_RANGE = 2;
 
     /** Failure reason: the target id never appeared in any scan. */
-    public static final String REASON_NO_TARGET = "NO_SUCH_ENTITY";
+    public static final String REASON_NO_TARGET = MissionShell.REASON_NO_TARGET;
 
     /** Failure reason: engaged target left the leash radius. */
     public static final String REASON_LOST = "LOST_TARGET";
@@ -94,7 +93,7 @@ public final class AttackProcess extends MissionShell {
      * the grace window - dead or fled, the bot cannot tell which
      * (see the class doc for why the conservative verdict wins).
      */
-    public static final String REASON_ESCAPED = "TARGET_ESCAPED";
+    public static final String REASON_ESCAPED = MissionShell.REASON_ESCAPED;
 
     private final String targetId;
     private final Supplier<CellPos> positionSource;
@@ -178,7 +177,11 @@ public final class AttackProcess extends MissionShell {
 
         CellPos position = positionSource.get();
         EntitySnapshot target = findNamedEntity(world, position, SCAN_RADIUS, targetId);
-        if (target != null && target.health() <= 0f) {
+        if (target == null) {
+            adjudicateAbsentTarget(tracker);
+            return lastDirective;
+        }
+        if (target.health() <= 0f) {
             // The corpse sighting IS the kill verdict: health rides
             // the snapshot and dead entities are not filtered, so
             // waiting for absence would misreport a clean kill as an
@@ -186,25 +189,19 @@ public final class AttackProcess extends MissionShell {
             succeed();
             return lastDirective;
         }
-        if (target == null) {
-            if (!tracker.engaged()) {
-                // The id the harness named has never been in the
-                // scan: refuse NOW instead of budget-staring. A
-                // despawn between ls and submit is
-                // indistinguishable from a typo - both deserve the
-                // same fast, honest no.
-                fail(REASON_NO_TARGET);
-                return lastDirective;
-            }
-            // The tracker freezes the sighting-before-absence order
-            // (class doc); resume() spends the grace as instant
-            // adjudication.
-            if (tracker.graceSpent()) {
-                fail(REASON_ESCAPED);
-            }
-            return lastDirective;
-        }
+        return engageTick(world, target, position);
+    }
 
+    /**
+     * Sighted-target stage: leash adjudication, the engage-time range
+     * freeze, and this tick's directive.
+     *
+     * @param world    read-only world for the loadout reads; never null
+     * @param target   the sighted target snapshot; never null
+     * @param position the body cell; never null
+     * @return the directive for this tick; never null
+     */
+    private Directive engageTick(WorldView world, EntitySnapshot target, CellPos position) {
         // Engage-time range freeze, the defend symmetry: the first
         // sighting decides chase-versus-standoff for the whole fight.
         boolean firstSighting = !tracker.engaged();
@@ -248,20 +245,6 @@ public final class AttackProcess extends MissionShell {
      */
     private void fail(String reason) {
         recordStickyFailure(reason);
-    }
-
-    @Override
-    public void onExecutionReport(ExecutionReport report) {
-        // Execution weather, exactly as in defend: a SUCCEEDED chase
-        // report means the body is next to the target - where the
-        // FIGHT starts, not a verdict. Scans, leash, and timeout own
-        // every terminal decision.
-    }
-
-    @Override
-    public void onLostControl(InterruptionContext c) {
-        // Reflex supremacy (decision 9): parking does not end the
-        // fight; resume() adjudicates on the next scan.
     }
 
     @Override

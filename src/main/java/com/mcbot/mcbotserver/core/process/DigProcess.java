@@ -148,14 +148,6 @@ public final class DigProcess extends MissionShell implements DigMission {
     }
 
     @Override
-    public void onLostControl(InterruptionContext ctx) {
-        // Keep every logical field intact (boundary B resume
-        // contract): the interruption is recorded by the reflex
-        // paths; the mission revalidates nothing that a fresh tick
-        // does not re-read anyway.
-    }
-
-    @Override
     public boolean resume(InterruptionContext ctx) {
         // A single-block dig has no perishable world assumptions
         // beyond the target cell; onTick re-reads it every tick and

@@ -3,7 +3,6 @@ package com.mcbot.mcbotserver.core.process;
 import com.mcbot.mcbotserver.api.capability.Feature;
 import com.mcbot.mcbotserver.api.goal.GoalNear;
 import com.mcbot.mcbotserver.api.process.Directive;
-import com.mcbot.mcbotserver.api.process.ExecutionReport;
 import com.mcbot.mcbotserver.api.process.InterruptionContext;
 import com.mcbot.mcbotserver.api.process.Overrides;
 import com.mcbot.mcbotserver.api.process.Tame;
@@ -69,7 +68,7 @@ public final class TameProcess extends MissionShell {
     public static final int GOAL_RANGE = 2;
 
     /** Failure reason: the target id never appeared in any scan. */
-    public static final String REASON_NO_TARGET = "NO_SUCH_ENTITY";
+    public static final String REASON_NO_TARGET = MissionShell.REASON_NO_TARGET;
 
     /** Failure reason: engaged target left the leash radius. */
     public static final String REASON_LOST = "LOST_TARGET";
@@ -84,7 +83,7 @@ public final class TameProcess extends MissionShell {
      * Failure reason: the target stayed absent from the scan past
      * the grace window - fled or removed, the bot cannot tell which.
      */
-    public static final String REASON_ESCAPED = "TARGET_ESCAPED";
+    public static final String REASON_ESCAPED = MissionShell.REASON_ESCAPED;
 
     /** Failure reason: the named species is not an item-tameable animal. */
     public static final String REASON_NOT_TAMEABLE = "NOT_TAMEABLE";
@@ -173,18 +172,7 @@ public final class TameProcess extends MissionShell {
         CellPos position = positionSource.get();
         EntitySnapshot target = findNamedEntity(world, position, SCAN_RADIUS, targetId);
         if (target == null) {
-            if (!tracker.engaged()) {
-                // The id the harness named has never been in the
-                // scan: refuse NOW instead of budget-staring. A
-                // despawn between ls and submit is
-                // indistinguishable from a typo - both deserve the
-                // same fast, honest no.
-                fail(REASON_NO_TARGET);
-                return lastDirective;
-            }
-            if (tracker.graceSpent()) {
-                fail(REASON_ESCAPED);
-            }
+            adjudicateAbsentTarget(tracker);
             return lastDirective;
         }
         if (target.health() <= 0f) {
@@ -210,24 +198,8 @@ public final class TameProcess extends MissionShell {
             fail(REASON_LOST);
             return lastDirective;
         }
-        if (firstSighting) {
-            if (!TameFoodCatalog.isTameable(target.type())) {
-                fail(REASON_NOT_TAMEABLE);
-                return lastDirective;
-            }
-            if (target.angry()) {
-                // An angry wolf's mobInteract falls through the bone
-                // branch (Wolf.java:377 guards on !isAngry()), so every
-                // press is a silent no-op - refuse now instead of
-                // budget-staring. Only the wolf carries an anger gate in
-                // 1.20.1; the snapshot bit is false for every other type.
-                fail(REASON_TARGET_ANGRY);
-                return lastDirective;
-            }
-            if (TameFoodCatalog.hotbarTameItemSlot(world.getInventory(), target.type()) < 0) {
-                fail(REASON_NO_TAME_ITEM);
-                return lastDirective;
-            }
+        if (firstSighting && !firstSightGatesPass(world, target)) {
+            return lastDirective;
         }
         CellPos targetCell = tracker.targetCell();
         if (targetCell == null) {
@@ -237,6 +209,37 @@ public final class TameProcess extends MissionShell {
         lastDirective = new Directive(
                 new GoalNear(targetCell, GOAL_RANGE), new Overrides(null, null, new Tame(targetId, target.type())));
         return lastDirective;
+    }
+
+    /**
+     * First-sighting typed refusals the tame task can make that a
+     * fight cannot: the species gate, the anger gate, and the
+     * equipment gate - each refusing NOW instead of budget-staring
+     * at a task that can never land.
+     *
+     * @param world  read-only world for the hotbar read; never null
+     * @param target the first-sighted animal; never null
+     * @return true when every gate passes and the chase may start
+     */
+    private boolean firstSightGatesPass(WorldView world, EntitySnapshot target) {
+        if (!TameFoodCatalog.isTameable(target.type())) {
+            fail(REASON_NOT_TAMEABLE);
+            return false;
+        }
+        if (target.angry()) {
+            // An angry wolf's mobInteract falls through the bone
+            // branch (Wolf.java:377 guards on !isAngry()), so every
+            // press is a silent no-op - refuse now instead of
+            // budget-staring. Only the wolf carries an anger gate in
+            // 1.20.1; the snapshot bit is false for every other type.
+            fail(REASON_TARGET_ANGRY);
+            return false;
+        }
+        if (TameFoodCatalog.hotbarTameItemSlot(world.getInventory(), target.type()) < 0) {
+            fail(REASON_NO_TAME_ITEM);
+            return false;
+        }
+        return true;
     }
 
     private void succeed() {
@@ -252,20 +255,6 @@ public final class TameProcess extends MissionShell {
      */
     private void fail(String reason) {
         recordStickyFailure(reason);
-    }
-
-    @Override
-    public void onExecutionReport(ExecutionReport report) {
-        // Execution weather, exactly as in attack: a SUCCEEDED chase
-        // report means the body is next to the animal - where the
-        // FEEDING starts, not a verdict. Scans, leash, and timeout
-        // own every terminal decision.
-    }
-
-    @Override
-    public void onLostControl(InterruptionContext c) {
-        // Reflex supremacy (decision 9): parking does not end the
-        // tame; resume() adjudicates on the next scan.
     }
 
     @Override

@@ -20,6 +20,15 @@ import javax.annotation.Nullable;
  * boundaries.md section B. Subclasses own onTick, report handling and
  * the resume/revalidate policy; the shell pins what never varies.
  *
+ * <p>Scan-driven missions (defend/attack/tame) treat every
+ * ExecutionReport as execution weather - RUNNING, STUCK, SUCCESS,
+ * FAILED alike: a SUCCEEDED chase report means the body reached its
+ * goal cell, which is where the fight or feeding starts, never a
+ * verdict; a FAILED chase describes the chase, not the fight. Only
+ * the mission's own scans, leash, and budget own terminal decisions,
+ * which is why those subclasses ship no onExecutionReport override
+ * and inherit the interface no-op.
+ *
  * <p>Implementation note: runs on the server tick thread only.
  */
 public abstract class MissionShell implements BotProcess, TerminalMission {
@@ -64,27 +73,29 @@ public abstract class MissionShell implements BotProcess, TerminalMission {
         return taskId;
     }
 
-    /**
-     * Resolve a named entity inside the shared scan envelope: a
-     * LIVE-mode entity scan centered on the body cell, matched by the
-     * harness-assigned id. The scan shapes agree across the directed
-     * missions (attack/tame) - only their verdict policies differ.
-     *
-     * @param world      read-only world; never null
-     * @param position   scan center (the body cell); never null
-     * @param scanRadius scan radius in blocks; positive
-     * @param targetId   the entity id to resolve; never null
-     * @return the snapshot, or null when absent from the scan
-     */
     // Sticky verdict state for the opt-in defend-guard shape
     // (AttackProcess/TameProcess): once a verdict is recorded, later
     // lifecycle callbacks must not overwrite it. Unconditional-record
-    // shapes (DigProcess) keep their own local fields on purpose.
+    // shapes (DigProcess, MineProcess) keep their own local fields on
+    // purpose.
 
     private boolean stickySucceededFlag;
 
     @Nullable
     private String stickyFailure;
+
+    /**
+     * Failure reason shared by the directed missions (attack/tame): the
+     * harness-handed target id never appeared in any scan.
+     */
+    public static final String REASON_NO_TARGET = "NO_SUCH_ENTITY";
+
+    /**
+     * Failure reason shared by the directed missions (attack/tame,
+     * mirrored by defend's scanner): an engaged target stayed absent
+     * from the scan past the grace window.
+     */
+    public static final String REASON_ESCAPED = "TARGET_ESCAPED";
 
     /**
      * Records success and deactivates, sticky-guarded as a pair with
@@ -120,6 +131,18 @@ public abstract class MissionShell implements BotProcess, TerminalMission {
         return live() ? null : stickyFailure;
     }
 
+    /**
+     * Resolve a named entity inside the shared scan envelope: a
+     * LIVE-mode entity scan centered on the body cell, matched by the
+     * harness-assigned id. The scan shapes agree across the directed
+     * missions (attack/tame) - only their verdict policies differ.
+     *
+     * @param world      read-only world; never null
+     * @param position   scan center (the body cell); never null
+     * @param scanRadius scan radius in blocks; positive
+     * @param targetId   the entity id to resolve; never null
+     * @return the snapshot, or null when absent from the scan
+     */
     protected static @Nullable EntitySnapshot findNamedEntity(
             WorldView world, CellPos position, double scanRadius, String targetId) {
         for (EntitySnapshot e : world.getEntities(position, scanRadius, ViewMode.LIVE)) {
@@ -128,6 +151,29 @@ public abstract class MissionShell implements BotProcess, TerminalMission {
             }
         }
         return null;
+    }
+
+    /**
+     * Named-target absence adjudication shared by the directed
+     * missions: a never-engaged tracker means the harness-handed id
+     * never appeared in any scan - refuse NOW as NO_SUCH_ENTITY
+     * instead of budget-staring (a despawn between ls and submit is
+     * indistinguishable from a typo; both deserve the same fast, honest
+     * no). An engaged-then-absent target spends the tracker's grace
+     * window before TARGET_ESCAPED is recorded - dead or fled, the bot
+     * cannot tell which; the harness re-scans. Verdicts are sticky via
+     * {@link #recordStickyFailure(String)}.
+     *
+     * @param tracker the mission's sighting tracker; never null
+     */
+    protected final void adjudicateAbsentTarget(TargetTracker tracker) {
+        if (!tracker.engaged()) {
+            recordStickyFailure(REASON_NO_TARGET);
+            return;
+        }
+        if (tracker.graceSpent()) {
+            recordStickyFailure(REASON_ESCAPED);
+        }
     }
 
     /**

@@ -85,11 +85,6 @@ public final class GotoProcess extends MissionShell {
     }
 
     @Override
-    public void onLostControl(InterruptionContext context) {
-        // Keep everything; resume revalidates through the goal itself.
-    }
-
-    @Override
     public boolean resume(InterruptionContext context) {
         // A walk-to goal has no perishable world assumptions beyond the
         // goal cell existing; Stage 1 keeps this trivially true.

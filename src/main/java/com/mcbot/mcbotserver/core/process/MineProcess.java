@@ -354,12 +354,6 @@ public final class MineProcess extends MissionShell implements DigMission {
     }
 
     @Override
-    public void onLostControl(InterruptionContext ctx) {
-        // Keep state; resume revalidates through world reads (boundary
-        // B resume contract - same shape as DigProcess).
-    }
-
-    @Override
     public boolean resume(InterruptionContext ctx) {
         // Break progress resetting on eviction is vanilla-parity; the
         // target cell is re-read every tick, so a mid-dig world change
