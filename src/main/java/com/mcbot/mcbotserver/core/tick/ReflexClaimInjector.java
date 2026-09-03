@@ -21,7 +21,7 @@ import java.util.function.Supplier;
  * routing; the controller decides WHEN, this class decides the
  * claim shapes.
  */
-final class ReflexClaimInjector {
+public final class ReflexClaimInjector {
 
     private final Actor actor;
 
@@ -45,7 +45,7 @@ final class ReflexClaimInjector {
      * @param actor claim surface; never null
      * @param pose  body cell supplier for aim geometry; never null
      */
-    ReflexClaimInjector(Actor actor, Supplier<CellPos> pose) {
+    public ReflexClaimInjector(Actor actor, Supplier<CellPos> pose) {
         this.actor = java.util.Objects.requireNonNull(actor, "actor");
         this.pose = java.util.Objects.requireNonNull(pose, "pose");
     }

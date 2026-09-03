@@ -9,7 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.mcbot.mcbotserver.api.actor.Actor;
 import com.mcbot.mcbotserver.api.actor.Channel;
 import com.mcbot.mcbotserver.api.actor.Claim;
-import com.mcbot.mcbotserver.api.actor.ToolCatalog;
 import com.mcbot.mcbotserver.api.behavior.Behavior;
 import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.goal.GoalBlock;
@@ -204,7 +203,7 @@ class EngageReflexGateTest {
                     },
                     events,
                     ctx -> {},
-                    ToolCatalog.none(),
+                    null,
                     factory,
                     null,
                     null,

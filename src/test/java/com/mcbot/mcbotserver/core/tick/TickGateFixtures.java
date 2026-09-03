@@ -85,7 +85,7 @@ final class TickGateFixtures {
                 },
                 events,
                 ctx -> {},
-                com.mcbot.mcbotserver.api.actor.ToolCatalog.none(),
+                null,
                 null,
                 null,
                 null,

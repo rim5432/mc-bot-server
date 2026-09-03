@@ -29,7 +29,7 @@ import java.util.Objects;
  * step on purpose - an emergency dig must not spend a SLOT claim
  * that could collide with the EAT reflex's select-and-use pair.
  */
-final class ToolSelector {
+public final class ToolSelector {
 
     private static final float BASELINE = 1.0f;
 
@@ -40,7 +40,7 @@ final class ToolSelector {
      *
      * @param tools dig-speed seam; never null
      */
-    ToolSelector(ToolCatalog tools) {
+    public ToolSelector(ToolCatalog tools) {
         this.tools = Objects.requireNonNull(tools, "tools");
     }
 

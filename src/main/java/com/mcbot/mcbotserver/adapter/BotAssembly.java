@@ -224,17 +224,28 @@ public final class BotAssembly {
                         new VanillaFoodCatalog(),
                         PASSIVE_FOOD_TYPES);
 
+        // The seated dig-family missions' per-tick aim+dig claims ride
+        // the stage-3 behavior loop (issue 0013 R1 protocol); one
+        // injector instance is shared with the controller's reflex
+        // paths so the claim shapes have exactly one home.
+        com.mcbot.mcbotserver.core.tick.ReflexClaimInjector claimInjector =
+                new com.mcbot.mcbotserver.core.tick.ReflexClaimInjector(actor, () -> poseOf(body));
+        var digClaims = new com.mcbot.mcbotserver.core.tick.DigClaimBehavior(
+                arbiter::current,
+                new com.mcbot.mcbotserver.core.tick.ToolSelector(new VanillaToolCatalog()),
+                claimInjector);
+
         BotController controller = new BotController(
                 reflex,
                 arbiter,
-                List.of(mover, combat, fisher, tamer),
+                List.of(mover, combat, fisher, tamer, digClaims),
                 actor,
                 () -> poseOf(body),
                 body::getHealth,
                 clockOf(level),
                 events,
                 CrashReporter.consoleFallback(),
-                new VanillaToolCatalog(),
+                claimInjector,
                 engageFactory,
                 rescueFactory,
                 forageFactory,

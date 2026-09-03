@@ -71,6 +71,22 @@ class BotControllerSurfaceGateTest {
                         + " was removed without re-registering this gate.");
     }
 
+    /**
+     * Fails when the orchestrator grows mission-type knowledge again:
+     * the per-tick dig-claim duty lives in {@code DigClaimBehavior} (a
+     * plain behaviors-list member); a {@code DigMission} reference back
+     * in BotController means the mid-pipeline instanceof block has
+     * regrown.
+     */
+    @Test
+    void controllerStaysMissionTypeAgnostic() throws IOException {
+        List<String> lines = readController();
+        assertTrue(
+                lines.stream().noneMatch(l -> l.contains("DigMission")),
+                "BotController references DigMission again - the dig-claim protocol belongs"
+                        + " in DigClaimBehavior; the orchestrator must not learn mission types.");
+    }
+
     private List<String> readController() throws IOException {
         Path root = RepoRoot.find();
         Path controller = root.resolve("src/main/java/com/mcbot/mcbotserver/core/tick/BotController.java");

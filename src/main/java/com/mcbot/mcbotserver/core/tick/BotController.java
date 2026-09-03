@@ -2,7 +2,6 @@ package com.mcbot.mcbotserver.core.tick;
 
 import com.mcbot.mcbotserver.api.actor.Actor;
 import com.mcbot.mcbotserver.api.actor.Intent;
-import com.mcbot.mcbotserver.api.actor.ToolCatalog;
 import com.mcbot.mcbotserver.api.behavior.Behavior;
 import com.mcbot.mcbotserver.api.event.BotEvent;
 import com.mcbot.mcbotserver.api.event.EventFacts;
@@ -10,7 +9,6 @@ import com.mcbot.mcbotserver.api.event.EventKind;
 import com.mcbot.mcbotserver.api.event.EventQueue;
 import com.mcbot.mcbotserver.api.goal.Goals;
 import com.mcbot.mcbotserver.api.process.BotProcess;
-import com.mcbot.mcbotserver.api.process.DigMission;
 import com.mcbot.mcbotserver.api.process.Directive;
 import com.mcbot.mcbotserver.api.process.ExecutionReport;
 import com.mcbot.mcbotserver.api.reflex.ReflexAction;
@@ -153,9 +151,6 @@ public final class BotController {
     /** Reflex claim construction (aim-and-dig, eat select-and-use). */
     private final ReflexClaimInjector claimInjector;
 
-    /** Mission dig tool auto-selection (hotbar scan + SLOT claim). */
-    private final ToolSelector toolSelector;
-
     /** Reflex park/resume choreography (boundaries.md §C machinery). */
     private final ReflexPreemption preemption;
 
@@ -215,7 +210,7 @@ public final class BotController {
                 clock,
                 events,
                 crashReporter,
-                ToolCatalog.none(),
+                null,
                 null,
                 null,
                 null,
@@ -237,8 +232,10 @@ public final class BotController {
      * @param events        event stream for the primary crash channel;
      *                      never null
      * @param crashReporter fallback reporter; never null
-     * @param toolCatalog dig-speed seam for mission tool selection;
-     *                      never null
+     * @param claimInjector claim construction shared by the reflex
+     *                      paths and the seated {@link DigClaimBehavior};
+     *                      may be null to let the controller build its
+     *                      own over this actor and position source
      * @param engageMissionFactory supplies one fresh defend mission
      *                      per reflex engage submission; may be null
      * @param rescueMissionFactory supplies one fresh rescue mission
@@ -262,7 +259,7 @@ public final class BotController {
             GameClock clock,
             EventQueue events,
             CrashReporter crashReporter,
-            ToolCatalog toolCatalog,
+            @Nullable ReflexClaimInjector claimInjector,
             @Nullable Supplier<BotProcess> engageMissionFactory,
             @Nullable Supplier<BotProcess> rescueMissionFactory,
             @Nullable Supplier<BotProcess> hungryMissionFactory,
@@ -283,7 +280,8 @@ public final class BotController {
         this.engageSeat = new ReflexMissionSeat(arbiter, ENGAGE_RESUBMIT_COOLDOWN);
         this.rescueSeat = new ReflexMissionSeat(arbiter, PATHING_RESUBMIT_COOLDOWN);
         this.hungrySeat = new ReflexMissionSeat(arbiter, PATHING_RESUBMIT_COOLDOWN);
-        this.claimInjector = new ReflexClaimInjector(actor, positionSource::get);
+        this.claimInjector =
+                claimInjector != null ? claimInjector : new ReflexClaimInjector(actor, positionSource::get);
         SurvivalInputs inputs = survivalInputs == null ? SurvivalInputs.unwired() : survivalInputs;
         this.lethalFluidSource = Objects.requireNonNull(inputs.inLethalFluid(), "inLethalFluid");
         this.airSupplySource = Objects.requireNonNull(inputs.airSupply(), "airSupply");
@@ -291,7 +289,6 @@ public final class BotController {
         this.claimInjector.setEatSlotSupplier(inputs.eatSlot());
         this.claimInjector.setDrinkSlotSupplier(inputs.drinkSlot());
         this.claimInjector.setMlgBucketSlotSupplier(inputs.mlgBucketSlot());
-        this.toolSelector = new ToolSelector(Objects.requireNonNull(toolCatalog, "toolCatalog"));
         this.preemption = new ReflexPreemption(
                 this.arbiter,
                 this.missions,
@@ -464,13 +461,10 @@ public final class BotController {
      * <li>resume guard: three-way dispatch on who holds the paused
      *     slot (reflex fight / reflex rescue / original mission)
      * <li>arbiter.tick - winner selection (Stage 2)
-     * <li>{@code DigMission} claim injection: per-tick aim+dig
-     *     claims for seated dig-family missions (issue 0013 R1,
-     *     generalized 0014; see code-health's abstraction-status
-     *     table for the next promotion trigger)
-     * <li>behaviors.tick + ExecutionReport feedback (Stage 3)
+     * <li>behaviors.tick + ExecutionReport feedback (Stage 3) - the
+     *     seated dig-family missions' per-tick aim+dig claims ride
+     *     here as {@link DigClaimBehavior}, a plain list member
      * <li>actor.flush - contest resolution, claim expiry, intents
-     *     (Stage 4)
      * <li>missions.announceTransition - TASK_* disclosure
      * <li>keepalive emission every {@code KEEPALIVE_INTERVAL} ticks
      *     (Stage 5, observability; issue 0001 fix 2)
@@ -511,19 +505,10 @@ public final class BotController {
         arbiter.tick(world);
         Directive directive = arbiter.lastDirective();
 
-        // Mission-dig claim path (issue 0013 R1, generalized by 0014
-        // DigMission): while any DigMission process is seated and reports
-        // isDigging(), re-issue the aim + dig claims every tick (see
-        // submitAimAndDig for why silence resets progress). Reflex
-        // preemption still wins because the reflex layer runs first
-        // and parks missions.
-        if (arbiter.current() instanceof DigMission dm && dm.isDigging()) {
-            toolSelector.select(world, actor, dm.priority(), "mission:dig:" + dm.missionTaskId(), dm.digTarget());
-            claimInjector.aimAndDig(dm.priority(), "mission:dig:" + dm.missionTaskId(), dm.digTarget());
-        }
-
         // Stage 3: behaviors claim channels per directive; reports flow
-        // back into the running mission (boundary B response half).
+        // back into the running mission (boundary B response half). The
+        // seated dig-family missions' per-tick aim+dig claims ride the
+        // DigClaimBehavior list member.
         for (Behavior behavior : behaviors) {
             ExecutionReport report = behavior.tick(world, directive, actor);
             BotProcess running = arbiter.current();
