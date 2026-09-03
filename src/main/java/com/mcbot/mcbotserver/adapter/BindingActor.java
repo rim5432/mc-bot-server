@@ -370,11 +370,19 @@ public final class BindingActor implements Actor {
     }
 
     private void applyInteract(Claim interact) {
-        if (interact != null && interact.intent() instanceof Intent.Dig d) {
+        if (interact == null) {
+            // A dig no longer held must clear its crack broadcast the
+            // same tick; vanilla's stop path does, and a stale crack
+            // would lie to every observer.
+            resetOneShotEdges();
+            return;
+        }
+        Intent intent = interact.intent();
+        if (intent instanceof Intent.Dig d) {
             dig.dig(d.target());
             lastDropClaimed = false;
             lastInteractClaimed = false;
-        } else if (interact != null && interact.intent() instanceof Intent.DropSelected ds) {
+        } else if (intent instanceof Intent.DropSelected ds) {
             // Drop is one-shot: fire on the rising edge only. A held
             // DropSelected claim across ticks must not drop twice — the
             // same rising-edge gate USE uses for melee swings. Any stale
@@ -387,7 +395,7 @@ public final class BindingActor implements Actor {
             }
             lastDropClaimed = true;
             lastInteractClaimed = false;
-        } else if (interact != null && interact.intent() instanceof Intent.InteractBlock ib) {
+        } else if (intent instanceof Intent.InteractBlock ib) {
             // Place is one-shot: fire on the rising edge only. A held
             // InteractBlock claim across ticks must not place repeatedly
             // — same rising-edge gate as DropSelected and USE melee.
@@ -400,7 +408,7 @@ public final class BindingActor implements Actor {
             lastInteractClaimed = true;
             lastDropClaimed = false;
             lastEntityClaimed = false;
-        } else if (interact != null && interact.intent() instanceof Intent.InteractEntity ie) {
+        } else if (intent instanceof Intent.InteractEntity ie) {
             // Entity use is one-shot: fire on the rising edge only. A
             // held InteractEntity claim across ticks must not press
             // repeatedly - same rising-edge gate as InteractBlock and
@@ -414,14 +422,16 @@ public final class BindingActor implements Actor {
             lastDropClaimed = false;
             lastInteractClaimed = false;
         } else {
-            // A dig no longer held must clear its crack broadcast the
-            // same tick; vanilla's stop path does, and a stale crack
-            // would lie to every observer.
-            dig.release();
-            lastDropClaimed = false;
-            lastInteractClaimed = false;
-            lastEntityClaimed = false;
+            resetOneShotEdges();
         }
+    }
+
+    /** Clears every one-shot edge plus any held dig crack. */
+    private void resetOneShotEdges() {
+        dig.release();
+        lastDropClaimed = false;
+        lastInteractClaimed = false;
+        lastEntityClaimed = false;
     }
 
     @Override
@@ -429,10 +439,7 @@ public final class BindingActor implements Actor {
         delegate.clearAllIntents();
         body.setDrive(0f, 0f, false);
         body.setSprinting(false);
-        dig.release();
-        lastDropClaimed = false;
-        lastInteractClaimed = false;
-        lastEntityClaimed = false;
+        resetOneShotEdges();
         lastStrikeClaim = null;
     }
 

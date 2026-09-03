@@ -112,43 +112,15 @@ public final class MenuOpener {
         // EnderChestBlock has no getMenuProvider — vanilla opens it directly
         // in EnderChestBlock.use() via SimpleMenuProvider, so the generic
         // fallback returns null and the bot could never open an ender chest.
-        // Replicate vanilla: threeRows ChestMenu backed by the facade's
-        // PlayerEnderChestContainer. Blocked if the block above is a redstone
-        // conductor (vanilla parity — EnderChestBlock.use checks this).
         if (block instanceof EnderChestBlock) {
-            BlockPos above = pos.above();
-            if (level.getBlockState(above).isRedstoneConductor(level, above)) {
-                return Optional.empty();
-            }
-            var enderInventory = facade.getEnderChestInventory();
-            var blockEntity = level.getBlockEntity(pos);
-            if (enderInventory != null && blockEntity instanceof EnderChestBlockEntity enderBe) {
-                enderInventory.setActiveChest(enderBe);
-                facade.syncPosition();
-                var enderMenu = ChestMenu.threeRows(NEXT_ID.getAndIncrement(), facade.getInventory(), enderInventory);
-                facade.containerMenu = enderMenu;
-                return Optional.of(new BindingMenu(enderMenu, facade, "ender_chest", toCellPos(pos)));
-            }
-            return Optional.empty();
+            return openEnderChest(pos, level);
         }
-
         // SmithingTableBlock extends CraftingTableBlock, so it must be
-        // checked first — otherwise the instanceof below routes it to
-        // openCraftingTable and the snapshot type comes out "crafting_table"
-        // instead of "smithing_table". The smithing table carries its own
-        // MenuProvider that returns a proper SmithingMenu.
+        // checked first — otherwise the CraftingTable branch below routes
+        // it to openCraftingTable and the snapshot type comes out
+        // "crafting_table" instead of "smithing_table".
         if (block instanceof SmithingTableBlock) {
-            MenuProvider smithingProvider = state.getMenuProvider(level, pos);
-            if (smithingProvider != null) {
-                facade.syncPosition();
-                var smithingMenu =
-                        smithingProvider.createMenu(NEXT_ID.getAndIncrement(), facade.getInventory(), facade);
-                if (smithingMenu != null) {
-                    facade.containerMenu = smithingMenu;
-                    return Optional.of(new BindingMenu(smithingMenu, facade, "smithing_table", toCellPos(pos)));
-                }
-            }
-            return Optional.empty();
+            return openViaProvider("smithing_table", state, level, pos);
         }
         if (block instanceof CraftingTableBlock) {
             return Optional.of(openCraftingTable(pos));
@@ -163,18 +135,62 @@ public final class MenuOpener {
         // registry key tail ("furnace", "blast_furnace", ...), which
         // is also the harness's station-path vocabulary. Blocks with
         // no UI return a null provider and stay unsupported.
-        MenuProvider provider = state.getMenuProvider(level, pos);
-        if (provider != null) {
+        return openViaProvider(BuiltInRegistries.BLOCK.getKey(block).getPath(), state, level, pos);
+    }
+
+    /**
+     * Ender-chest open, the one container with no MenuProvider: threeRows
+     * ChestMenu backed by the facade's PlayerEnderChestContainer, blocked
+     * when the block above is a redstone conductor (vanilla parity —
+     * EnderChestBlock.use checks both).
+     *
+     * @param pos   the chest position; never null
+     * @param level the owning level; never null
+     * @return the opened binding, or empty when blocked or detached
+     */
+    private Optional<BindingMenu> openEnderChest(BlockPos pos, Level level) {
+        BlockPos above = pos.above();
+        if (level.getBlockState(above).isRedstoneConductor(level, above)) {
+            return Optional.empty();
+        }
+        var enderInventory = facade.getEnderChestInventory();
+        var blockEntity = level.getBlockEntity(pos);
+        if (enderInventory != null && blockEntity instanceof EnderChestBlockEntity enderBe) {
+            enderInventory.setActiveChest(enderBe);
             facade.syncPosition();
-            var menu = provider.createMenu(NEXT_ID.getAndIncrement(), facade.getInventory(), facade);
-            if (menu != null) {
-                facade.containerMenu = menu;
-                String type = String.valueOf(BuiltInRegistries.BLOCK.getKey(block));
-                return Optional.of(
-                        new BindingMenu(menu, facade, type.substring(type.indexOf(':') + 1), toCellPos(pos)));
-            }
+            var enderMenu = ChestMenu.threeRows(NEXT_ID.getAndIncrement(), facade.getInventory(), enderInventory);
+            facade.containerMenu = enderMenu;
+            return Optional.of(new BindingMenu(enderMenu, facade, "ender_chest", toCellPos(pos)));
         }
         return Optional.empty();
+    }
+
+    /**
+     * Provider-backed open shared by the smithing special case and the
+     * generic fallback: create the menu through the block's own
+     * MenuProvider and bind it under the given snapshot type.
+     *
+     * @param snapshotType the menu-type string for the wire snapshot;
+     *                     never null
+     * @param state        the block state carrying the provider; never
+     *                     null
+     * @param level        the owning level; never null
+     * @param pos          the target position; never null
+     * @return the opened binding, or empty when the block exposes no
+     *         menu
+     */
+    private Optional<BindingMenu> openViaProvider(String snapshotType, BlockState state, Level level, BlockPos pos) {
+        MenuProvider provider = state.getMenuProvider(level, pos);
+        if (provider == null) {
+            return Optional.empty();
+        }
+        facade.syncPosition();
+        var menu = provider.createMenu(NEXT_ID.getAndIncrement(), facade.getInventory(), facade);
+        if (menu == null) {
+            return Optional.empty();
+        }
+        facade.containerMenu = menu;
+        return Optional.of(new BindingMenu(menu, facade, snapshotType, toCellPos(pos)));
     }
 
     /**
