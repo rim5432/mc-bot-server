@@ -189,8 +189,9 @@ where are we and what next without reading four other tools.
   (`core.api` is illegal).
 - Layers: `api/` = pure interfaces + DTOs, zero MC imports (the
   layer a non-JVM harness could bind to); `core/` = implementations,
-  still zero MC imports; ONLY `adapter/` (and mixin-only code under
-  `mixin/`) may import `net.minecraft.*` / `net.minecraftforge.*`.
+  still zero MC imports; ONLY `adapter/`, `client/` (Dist.CLIENT-only
+  render registration, e.g. `BotBodyRenderers`), and mixin-only code
+  under `mixin/` may import `net.minecraft.*` / `net.minecraftforge.*`.
 - Class names describe behavior (`BotController`), not pattern
   (`BotControllerImpl` banned unless the strategy IS the contract -
   `LoadedOnlyView` vs `CachedNavView`). Mixin packages match the
