@@ -74,8 +74,6 @@ final class ConsumableUse {
      * @return true when the press was consumed by a consumable path
      */
     boolean tryConsume(String owner) {
-        String source = owner != null && owner.startsWith(ReflexAction.REFLEX_OWNER_PREFIX) ? "reflex" : "harness";
-        ItemStack held = body.getInventory().container().getItem(body.selectedSlot);
         // Reflex intent detection (P2-d): EAT_*/DRINK_* reflex claims carry
         // unambiguous consumable intent. For these, an empty slot or a
         // non-consumable item is a FAILED action, not a silent melee.
@@ -87,6 +85,8 @@ final class ConsumableUse {
         boolean isEatReflex = owner != null && owner.startsWith(ReflexAction.REFLEX_EAT_OWNER_PREFIX);
         boolean isDrinkReflex = owner != null && owner.startsWith(ReflexAction.REFLEX_DRINK_OWNER_PREFIX);
         boolean isConsumableReflex = isEatReflex || isDrinkReflex;
+        String source = owner != null && owner.startsWith(ReflexAction.REFLEX_OWNER_PREFIX) ? "reflex" : "harness";
+        ItemStack held = body.getInventory().container().getItem(body.selectedSlot);
         if (held.isEmpty() && isConsumableReflex) {
             if (isEatReflex) {
                 emitEatFailed("SLOT_EMPTY", body.selectedSlot, "", source);
@@ -95,69 +95,10 @@ final class ConsumableUse {
             }
             return true;
         }
-        var props = held.getFoodProperties(body);
-        if (props != null) {
-            int foodBefore = body.getFoodData().getFoodLevel();
-            float satBefore = body.getFoodData().getSaturationLevel();
-            int slot = body.selectedSlot;
-            String itemId = BuiltInRegistries.ITEM.getKey(held.getItem()).toString();
-            int nutrition = props.getNutrition();
-            // Container type for the EAT_COMPLETED attrs: bowl foods and
-            // honey bottles leave a container; normal foods and chorus fruit
-            // do not. Captured before eatHeldItem mutates the slot.
-            String containerType = containerTypeFor(held.getItem());
-            boolean consumed = body.eatHeldItem();
-            if (consumed) {
-                int foodAfter = body.getFoodData().getFoodLevel();
-                float satAfter = body.getFoodData().getSaturationLevel();
-                emitEatCompleted(
-                        itemId, slot, nutrition, satBefore, satAfter, foodBefore, foodAfter, containerType, source);
-                return true;
-            }
-            // Food in hand but not consumed: needsFood() was false (full)
-            // or the stack was empty between props read and eatHeldItem.
-            emitEatFailed("NOT_HUNGRY", slot, itemId, source);
-            return true;
-        }
-        if (held.getItem() instanceof SplashPotionItem || held.getItem() instanceof LingeringPotionItem) {
-            int slot = body.selectedSlot;
-            String potionId =
-                    BuiltInRegistries.POTION.getKey(PotionUtils.getPotion(held)).toString();
-            String effects = serializeEffects(PotionUtils.getMobEffects(held));
-            String throwType = held.getItem() instanceof LingeringPotionItem ? "lingering" : "splash";
-            if (body.throwHeldPotion()) {
-                emitPotionThrown(potionId, slot, throwType, effects, source);
-            }
-            return true;
-        }
-        if (held.getItem() instanceof PotionItem) {
-            int slot = body.selectedSlot;
-            String itemId = BuiltInRegistries.ITEM.getKey(held.getItem()).toString();
-            String potionId =
-                    BuiltInRegistries.POTION.getKey(PotionUtils.getPotion(held)).toString();
-            String effects = serializeEffects(PotionUtils.getMobEffects(held));
-            float health = body.getHealth();
-            emitDrinkStarted(potionId, slot, health, source);
-            if (body.drinkHeldItem()) {
-                emitDrinkCompleted(potionId, slot, effects, "glass_bottle", source);
-            } else {
-                emitDrinkFailed("NOT_DRINKABLE", slot, itemId, source);
-            }
-            return true;
-        }
-        if (held.getItem() instanceof MilkBucketItem) {
-            int slot = body.selectedSlot;
-            String itemId = BuiltInRegistries.ITEM.getKey(held.getItem()).toString();
-            // Milk cures all curable effects: capture the active effect list
-            // BEFORE drinking so DRINK_COMPLETED can report what was cleared.
-            String clearedEffects = serializeEffects(List.copyOf(body.getActiveEffects()));
-            float health = body.getHealth();
-            emitDrinkStarted("minecraft:milk", slot, health, source);
-            if (body.drinkMilk()) {
-                emitDrinkCompleted("minecraft:milk", slot, clearedEffects, "bucket", source);
-            } else {
-                emitDrinkFailed("NOT_DRINKABLE", slot, itemId, source);
-            }
+        if (tryEat(held, source)
+                || tryThrowPotion(held, source)
+                || tryDrinkPotion(held, source)
+                || tryDrinkMilk(held, source)) {
             return true;
         }
         // Consumable reflex reached here: the item is not food, not a
@@ -173,6 +114,126 @@ final class ConsumableUse {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Food branch of the dispatch: an edible held item is eaten and
+     * the EAT lifecycle emitted; a food refused by the body (full, or
+     * the stack drained between reads) still consumes the press -
+     * vanilla right-click semantics.
+     *
+     * @param held   the held stack; never null, may be non-food
+     * @param source wire attr for the emitted events; never null
+     * @return true when the held item was food and the press is
+     *         consumed
+     */
+    private boolean tryEat(ItemStack held, String source) {
+        var props = held.getFoodProperties(body);
+        if (props == null) {
+            return false;
+        }
+        int foodBefore = body.getFoodData().getFoodLevel();
+        float satBefore = body.getFoodData().getSaturationLevel();
+        int slot = body.selectedSlot;
+        String itemId = BuiltInRegistries.ITEM.getKey(held.getItem()).toString();
+        int nutrition = props.getNutrition();
+        // Container type for the EAT_COMPLETED attrs: bowl foods and
+        // honey bottles leave a container; normal foods and chorus fruit
+        // do not. Captured before eatHeldItem mutates the slot.
+        String containerType = containerTypeFor(held.getItem());
+        boolean consumed = body.eatHeldItem();
+        if (consumed) {
+            int foodAfter = body.getFoodData().getFoodLevel();
+            float satAfter = body.getFoodData().getSaturationLevel();
+            emitEatCompleted(
+                    itemId, slot, nutrition, satBefore, satAfter, foodBefore, foodAfter, containerType, source);
+            return true;
+        }
+        // Food in hand but not consumed: needsFood() was false (full)
+        // or the stack was empty between props read and eatHeldItem.
+        emitEatFailed("NOT_HUNGRY", slot, itemId, source);
+        return true;
+    }
+
+    /**
+     * Throwable-potion branch. Dispatch order is load-bearing:
+     * splash/lingering MUST be checked before the plain
+     * {@link PotionItem} branch because {@code ThrowablePotionItem
+     * extends PotionItem} - a bare instanceof would attempt to drink a
+     * throwable potion whose effects only resolve on projectile
+     * impact.
+     *
+     * @param held   the held stack; never null
+     * @param source wire attr for the emitted event; never null
+     * @return true when the held item was a throwable potion
+     */
+    private boolean tryThrowPotion(ItemStack held, String source) {
+        if (!(held.getItem() instanceof SplashPotionItem || held.getItem() instanceof LingeringPotionItem)) {
+            return false;
+        }
+        int slot = body.selectedSlot;
+        String potionId =
+                BuiltInRegistries.POTION.getKey(PotionUtils.getPotion(held)).toString();
+        String effects = serializeEffects(PotionUtils.getMobEffects(held));
+        String throwType = held.getItem() instanceof LingeringPotionItem ? "lingering" : "splash";
+        if (body.throwHeldPotion()) {
+            emitPotionThrown(potionId, slot, throwType, effects, source);
+        }
+        return true;
+    }
+
+    /**
+     * Drinkable-potion branch: DRINK_STARTED, then COMPLETED or the
+     * NOT_DRINKABLE failure when the body refuses the drink.
+     *
+     * @param held   the held stack; never null
+     * @param source wire attr for the emitted events; never null
+     * @return true when the held item was a drinkable potion
+     */
+    private boolean tryDrinkPotion(ItemStack held, String source) {
+        if (!(held.getItem() instanceof PotionItem)) {
+            return false;
+        }
+        int slot = body.selectedSlot;
+        String itemId = BuiltInRegistries.ITEM.getKey(held.getItem()).toString();
+        String potionId =
+                BuiltInRegistries.POTION.getKey(PotionUtils.getPotion(held)).toString();
+        String effects = serializeEffects(PotionUtils.getMobEffects(held));
+        float health = body.getHealth();
+        emitDrinkStarted(potionId, slot, health, source);
+        if (body.drinkHeldItem()) {
+            emitDrinkCompleted(potionId, slot, effects, "glass_bottle", source);
+        } else {
+            emitDrinkFailed("NOT_DRINKABLE", slot, itemId, source);
+        }
+        return true;
+    }
+
+    /**
+     * Milk branch: the active effect list is captured BEFORE drinking
+     * so DRINK_COMPLETED can report what was cured.
+     *
+     * @param held   the held stack; never null
+     * @param source wire attr for the emitted events; never null
+     * @return true when the held item was a milk bucket
+     */
+    private boolean tryDrinkMilk(ItemStack held, String source) {
+        if (!(held.getItem() instanceof MilkBucketItem)) {
+            return false;
+        }
+        int slot = body.selectedSlot;
+        String itemId = BuiltInRegistries.ITEM.getKey(held.getItem()).toString();
+        // Milk cures all curable effects: capture the active effect list
+        // BEFORE drinking so DRINK_COMPLETED can report what was cleared.
+        String clearedEffects = serializeEffects(List.copyOf(body.getActiveEffects()));
+        float health = body.getHealth();
+        emitDrinkStarted("minecraft:milk", slot, health, source);
+        if (body.drinkMilk()) {
+            emitDrinkCompleted("minecraft:milk", slot, clearedEffects, "bucket", source);
+        } else {
+            emitDrinkFailed("NOT_DRINKABLE", slot, itemId, source);
+        }
+        return true;
     }
 
     /**
@@ -301,9 +362,11 @@ final class ConsumableUse {
             if (!sb.isEmpty()) {
                 sb.append(',');
             }
-            sb.append(BuiltInRegistries.MOB_EFFECT.getKey(e.getEffect()).toString());
-            sb.append(':').append(e.getAmplifier());
-            sb.append(':').append(e.getDuration());
+            sb.append(BuiltInRegistries.MOB_EFFECT.getKey(e.getEffect()))
+                    .append(':')
+                    .append(e.getAmplifier())
+                    .append(':')
+                    .append(e.getDuration());
         }
         return sb.toString();
     }
