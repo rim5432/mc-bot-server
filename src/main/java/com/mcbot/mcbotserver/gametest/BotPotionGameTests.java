@@ -568,6 +568,25 @@ public final class BotPotionGameTests {
     }
 
     /**
+     * Fill slots {@code fillFrom}..40 with cobblestone and place a
+     * count-2 healing potion in slot 0 - the full-inventory fixture the
+     * count-2 drink scenarios share (no empty slots; the only non-cobble
+     * items are whatever the caller placed below {@code fillFrom}).
+     *
+     * @param rig      the wired rig; never null
+     * @param fillFrom first slot to fill with cobblestone; 1..40
+     */
+    private static void fillInventoryAroundCountTwoPotion(GametestRig.Rig rig, int fillFrom) {
+        var body = rig.body();
+        for (int i = fillFrom; i < com.mcbot.mcbotserver.adapter.inventory.BindingInventory.CONTAINER_SIZE; i++) {
+            body.getInventory().container().setItem(i, new ItemStack(Items.COBBLESTONE));
+        }
+        body.getInventory()
+                .container()
+                .setItem(0, PotionUtils.setPotion(new ItemStack(Items.POTION, 2), Potions.HEALING));
+    }
+
+    /**
      * Scenario (P2-d): drinking from a count-2 potion stack while the
      * entire inventory (slots 1-40, all non-selected) is full — the
      * glass bottle cannot fit and is dropped at the body's location.
@@ -584,14 +603,7 @@ public final class BotPotionGameTests {
         body.setHealth(10.0f);
         // Fill every non-selected slot (1 through 40 = main + armor + offhand)
         // so addOrDrop has nowhere to put the glass bottle.
-        for (int i = 1; i < com.mcbot.mcbotserver.adapter.inventory.BindingInventory.CONTAINER_SIZE; i++) {
-            body.getInventory().container().setItem(i, new ItemStack(Items.COBBLESTONE));
-        }
-        // Count-2 healing potion in slot 0: after drinking, count 1 remains
-        // and the glass bottle must go somewhere — but inventory is full.
-        body.getInventory()
-                .container()
-                .setItem(0, PotionUtils.setPotion(new ItemStack(Items.POTION, 2), Potions.HEALING));
+        fillInventoryAroundCountTwoPotion(rig, 1);
 
         helper.startSequence()
                 .thenWaitUntil(GametestRig.driveUntil(rig, () -> {
@@ -640,13 +652,7 @@ public final class BotPotionGameTests {
         body.getInventory().container().setItem(1, new ItemStack(Items.GLASS_BOTTLE));
         // Fill slots 2 through 40 (main remainder + armor + offhand) with
         // cobblestone so there are no empty slots and no other merge targets.
-        for (int i = 2; i < com.mcbot.mcbotserver.adapter.inventory.BindingInventory.CONTAINER_SIZE; i++) {
-            body.getInventory().container().setItem(i, new ItemStack(Items.COBBLESTONE));
-        }
-        // Count-2 healing potion in slot 0.
-        body.getInventory()
-                .container()
-                .setItem(0, PotionUtils.setPotion(new ItemStack(Items.POTION, 2), Potions.HEALING));
+        fillInventoryAroundCountTwoPotion(rig, 2);
 
         helper.startSequence()
                 .thenWaitUntil(GametestRig.driveUntil(rig, () -> {

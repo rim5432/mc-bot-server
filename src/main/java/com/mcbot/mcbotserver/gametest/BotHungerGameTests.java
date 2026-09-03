@@ -424,6 +424,19 @@ public final class BotHungerGameTests {
      * @param saturation target saturation (0..20)
      * @param exhaustion exhaustion to add (>=0; FoodData has no setter)
      */
+    /**
+     * The shared count-2 eat pin: slot 0 keeps the remaining stew
+     * (count 1) - never the bowl, never an empty slot.
+     *
+     * @param slot0 the post-eat contents of slot 0; never null
+     */
+    private static void assertSlotKeepsOneStew(ItemStack slot0) {
+        check(
+                slot0.is(Items.MUSHROOM_STEW),
+                "slot 0 must keep remaining stew, got " + BuiltInRegistries.ITEM.getKey(slot0.getItem()));
+        check(slot0.getCount() == 1, "stew count must be 1 (2-1), got " + slot0.getCount());
+    }
+
     private static void primeFood(BotBodyEntity body, int foodLevel, float saturation, float exhaustion) {
         FoodData food = body.getFoodData();
         food.setFoodLevel(foodLevel);
@@ -719,10 +732,7 @@ public final class BotHungerGameTests {
                                 "waiting for eat (food=" + body.getFoodData().getFoodLevel() + ")")))
                 .thenExecuteAfter(0, () -> {
                     ItemStack slot0 = body.getInventory().container().getItem(0);
-                    check(
-                            slot0.is(Items.MUSHROOM_STEW),
-                            "slot 0 must keep remaining stew, got " + BuiltInRegistries.ITEM.getKey(slot0.getItem()));
-                    check(slot0.getCount() == 1, "stew count must be 1 (2-1), got " + slot0.getCount());
+                    assertSlotKeepsOneStew(slot0);
                     // Bowl must be somewhere in the main inventory (not slot 0).
                     boolean bowlFound = false;
                     for (int i = 1; i < 36; i++) {
@@ -1045,10 +1055,7 @@ public final class BotHungerGameTests {
                     // Slot 0 must keep the remaining stew (count 1), not be
                     // replaced by the bowl (inventory-full path).
                     ItemStack slot0 = body.getInventory().container().getItem(0);
-                    check(
-                            slot0.is(Items.MUSHROOM_STEW),
-                            "slot 0 must keep remaining stew, got " + BuiltInRegistries.ITEM.getKey(slot0.getItem()));
-                    check(slot0.getCount() == 1, "stew count must be 1 (2-1), got " + slot0.getCount());
+                    assertSlotKeepsOneStew(slot0);
                     // No bowl in any main inventory slot (1-35 were full, 0
                     // has stew). The bowl was dropped via spawnAtLocation.
                     boolean bowlInInventory = false;

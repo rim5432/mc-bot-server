@@ -2,6 +2,11 @@ package com.mcbot.mcbotserver.core.process;
 
 import com.mcbot.mcbotserver.api.process.BotProcess;
 import com.mcbot.mcbotserver.api.process.ExecutionReport;
+import com.mcbot.mcbotserver.api.types.CellPos;
+import com.mcbot.mcbotserver.api.world.EntitySnapshot;
+import com.mcbot.mcbotserver.api.world.ViewMode;
+import com.mcbot.mcbotserver.api.world.WorldView;
+import javax.annotation.Nullable;
 
 /**
  * Shared mission scaffold for the process family: task identity, seat
@@ -57,6 +62,72 @@ public abstract class MissionShell implements BotProcess, TerminalMission {
     @Override
     public final String missionTaskId() {
         return taskId;
+    }
+
+    /**
+     * Resolve a named entity inside the shared scan envelope: a
+     * LIVE-mode entity scan centered on the body cell, matched by the
+     * harness-assigned id. The scan shapes agree across the directed
+     * missions (attack/tame) - only their verdict policies differ.
+     *
+     * @param world      read-only world; never null
+     * @param position   scan center (the body cell); never null
+     * @param scanRadius scan radius in blocks; positive
+     * @param targetId   the entity id to resolve; never null
+     * @return the snapshot, or null when absent from the scan
+     */
+    // Sticky verdict state for the opt-in defend-guard shape
+    // (AttackProcess/TameProcess): once a verdict is recorded, later
+    // lifecycle callbacks must not overwrite it. Unconditional-record
+    // shapes (DigProcess) keep their own local fields on purpose.
+
+    private boolean stickySucceededFlag;
+
+    @Nullable
+    private String stickyFailure;
+
+    /**
+     * Records success and deactivates, sticky-guarded as a pair with
+     * {@link #recordStickyFailure(String)}.
+     */
+    protected final void recordStickySuccess() {
+        deactivate();
+        stickySucceededFlag = true;
+    }
+
+    /**
+     * Sticky termination - the defend guard: once a verdict is
+     * recorded, later lifecycle callbacks (preemption after a harness
+     * cancel) must not overwrite it.
+     *
+     * @param reason the machine-readable failure reason
+     */
+    protected final void recordStickyFailure(String reason) {
+        if (active) {
+            deactivate();
+            stickySucceededFlag = false;
+            stickyFailure = reason;
+        }
+    }
+
+    /** Reads the sticky success flag recorded by this subclass. */
+    protected final boolean stickySucceeded() {
+        return stickySucceededFlag;
+    }
+
+    /** Reads the sticky failure reason; null while the mission lives. */
+    protected final @Nullable String stickyFailureOrNull() {
+        return live() ? null : stickyFailure;
+    }
+
+    protected static @Nullable EntitySnapshot findNamedEntity(
+            WorldView world, CellPos position, double scanRadius, String targetId) {
+        for (EntitySnapshot e : world.getEntities(position, scanRadius, ViewMode.LIVE)) {
+            if (e.id().equals(targetId)) {
+                return e;
+            }
+        }
+        return null;
     }
 
     /**

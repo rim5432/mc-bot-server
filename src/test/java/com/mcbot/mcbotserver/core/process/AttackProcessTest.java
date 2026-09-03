@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.mcbot.mcbotserver.api.inventory.InventoryView;
-import com.mcbot.mcbotserver.api.inventory.ItemView;
 import com.mcbot.mcbotserver.api.inventory.WeaponCatalog;
 import com.mcbot.mcbotserver.api.process.Attack;
 import com.mcbot.mcbotserver.api.process.Directive;
@@ -87,41 +86,12 @@ class AttackProcessTest {
         assertEquals(AttackProcess.GOAL_RANGE, goal.range(), "a real melee weapon charges the swing rim");
     }
 
-    /**
-     * An own-inventory snapshot carrying a bow in slot 0 and arrows in
-     * the backpack - the minimal ranged loadout.
-     *
-     * @return the inventory view; never null
-     */
     private static InventoryView inventoryWithBow() {
-        java.util.List<ItemView> main =
-                new java.util.ArrayList<>(java.util.Collections.nCopies(InventoryView.MAIN_SIZE, ItemView.EMPTY));
-        main.set(0, new ItemView("minecraft:bow", 1));
-        main.set(InventoryView.HOTBAR_SIZE, new ItemView("minecraft:arrow", 32));
-        return new InventoryView(
-                main,
-                0,
-                java.util.List.copyOf(java.util.Collections.nCopies(InventoryView.ARMOR_SIZE, ItemView.EMPTY)),
-                ItemView.EMPTY);
+        return RangedLoadoutFixtures.inventoryWithBow();
     }
 
-    /**
-     * The bow-plus-sword loadout: a ranged loadout that must NOT
-     * trigger the standoff opening.
-     *
-     * @return the inventory view; never null
-     */
     private static InventoryView inventoryWithBowAndSword() {
-        java.util.List<ItemView> main =
-                new java.util.ArrayList<>(java.util.Collections.nCopies(InventoryView.MAIN_SIZE, ItemView.EMPTY));
-        main.set(0, new ItemView("minecraft:bow", 1));
-        main.set(1, new ItemView("minecraft:iron_sword", 1));
-        main.set(InventoryView.HOTBAR_SIZE, new ItemView("minecraft:arrow", 32));
-        return new InventoryView(
-                main,
-                0,
-                java.util.List.copyOf(java.util.Collections.nCopies(InventoryView.ARMOR_SIZE, ItemView.EMPTY)),
-                ItemView.EMPTY);
+        return RangedLoadoutFixtures.inventoryWithBowAndSword();
     }
 
     @Test

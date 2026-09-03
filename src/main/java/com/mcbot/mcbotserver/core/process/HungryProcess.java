@@ -141,6 +141,7 @@ public final class HungryProcess extends MissionShell implements DigMission {
     }
 
     @Override
+    @Nullable
     public Directive onTick(WorldView world) {
         if (!live()) {
             // Terminal hold stays null - a ctor- or last-emission-

@@ -11,10 +11,8 @@ import com.mcbot.mcbotserver.api.process.InterruptionContext;
 import com.mcbot.mcbotserver.api.process.Overrides;
 import com.mcbot.mcbotserver.api.types.CellPos;
 import com.mcbot.mcbotserver.api.world.EntitySnapshot;
-import com.mcbot.mcbotserver.api.world.ViewMode;
 import com.mcbot.mcbotserver.api.world.WorldView;
 import com.mcbot.mcbotserver.core.combat.RangedLoadouts;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -102,12 +100,8 @@ public final class AttackProcess extends MissionShell {
     private final Supplier<CellPos> positionSource;
     private final WeaponCatalog weapons;
 
-    private boolean succeeded;
-
-    @Nullable
-    private String failure;
-
     private boolean standoffOpening;
+
     private final TargetTracker tracker = new TargetTracker();
     private Directive lastDirective;
 
@@ -183,7 +177,7 @@ public final class AttackProcess extends MissionShell {
         }
 
         CellPos position = positionSource.get();
-        EntitySnapshot target = findById(world, position);
+        EntitySnapshot target = findNamedEntity(world, position, SCAN_RADIUS, targetId);
         if (target != null && target.health() <= 0f) {
             // The corpse sighting IS the kill verdict: health rides
             // the snapshot and dead entities are not filtered, so
@@ -241,27 +235,8 @@ public final class AttackProcess extends MissionShell {
         return lastDirective;
     }
 
-    /**
-     * Resolve the named entity inside the shared scan envelope.
-     *
-     * @param world    read-only world; never null
-     * @param position scan center (the body cell); never null
-     * @return the snapshot, or null when absent from the scan
-     */
-    @Nullable
-    private EntitySnapshot findById(WorldView world, CellPos position) {
-        List<EntitySnapshot> found = world.getEntities(position, SCAN_RADIUS, ViewMode.LIVE);
-        for (EntitySnapshot e : found) {
-            if (e.id().equals(targetId)) {
-                return e;
-            }
-        }
-        return null;
-    }
-
     private void succeed() {
-        deactivate();
-        succeeded = true;
+        recordStickySuccess();
     }
 
     /**
@@ -272,11 +247,7 @@ public final class AttackProcess extends MissionShell {
      * @param reason the machine-readable failure reason
      */
     private void fail(String reason) {
-        if (live()) {
-            deactivate();
-            succeeded = false;
-            failure = reason;
-        }
+        recordStickyFailure(reason);
     }
 
     @Override
@@ -322,13 +293,13 @@ public final class AttackProcess extends MissionShell {
 
     @Override
     public boolean missionSucceeded() {
-        return succeeded;
+        return stickySucceeded();
     }
 
     @Override
     @Nullable
     public String failureReasonOrNull() {
-        return live() ? null : failure;
+        return stickyFailureOrNull();
     }
 
     @Override
