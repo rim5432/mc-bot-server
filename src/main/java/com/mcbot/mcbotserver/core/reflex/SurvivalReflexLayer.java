@@ -176,8 +176,9 @@ public final class SurvivalReflexLayer {
      * (current state dictates which threshold applies) and a
      * per-rule hold window.
      *
-     * <p>Returns the live state object so the caller can read
-     * {@code lastPriority} without a second map lookup — the
+     * <p>Returns the live state object so the caller can read the
+     * state's recorded priority ({@link HysteresisState#lastPriority})
+     * without a second map lookup — the
      * computeIfAbsent here IS the non-null guarantee, and returning
      * the state turns a temporal invariant (call order) into a
      * data dependency (the caller consumes what this method returns).

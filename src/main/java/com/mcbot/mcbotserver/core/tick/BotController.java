@@ -101,7 +101,6 @@ public final class BotController {
     private final HealthSource healthSource;
     private final GameClock clock;
     private final EventQueue events;
-    private final CrashReporter crashReporter;
     /**
      * Reflex-owned engage mission factory; null degrades ENGAGE
      * decisions to the freeze hold (rigs without combat wiring park
@@ -272,7 +271,6 @@ public final class BotController {
         this.healthSource = Objects.requireNonNull(healthSource, "healthSource");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.events = Objects.requireNonNull(events, "events");
-        this.crashReporter = Objects.requireNonNull(crashReporter, "crashReporter");
         this.engageMissionFactory = engageMissionFactory;
         this.rescueMissionFactory = rescueMissionFactory;
         this.hungryMissionFactory = hungryMissionFactory;
@@ -338,7 +336,7 @@ public final class BotController {
      * again.
      *
      * <p>Mirrors the latch + clear + dual-channel report of
-     * {@link #handleCrash} so outside-the-pipeline failures and
+     * {@link CrashLatch#latch} so outside-the-pipeline failures and
      * in-pipeline failures reach the same observable state. The
      * try-catch in {@link #onTick} is still the primary defense;
      * this is the last-ditch seam for everything between the

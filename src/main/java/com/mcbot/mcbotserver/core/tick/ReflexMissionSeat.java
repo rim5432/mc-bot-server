@@ -69,6 +69,8 @@ final class ReflexMissionSeat {
     }
 
     /**
+     * Reports whether the seat may take a fresh mission submission.
+     *
      * @return true when no mission is live and the resubmit cooldown
      *         has elapsed
      */

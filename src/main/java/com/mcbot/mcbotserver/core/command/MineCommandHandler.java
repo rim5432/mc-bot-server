@@ -68,7 +68,10 @@ public final class MineCommandHandler extends VerbTaskHandler<MineProcess> {
     @Override
     protected MineProcess createMission(String taskId, BotCommand command) {
         Map<String, String> args = command.args();
-        String blockType = args.get("blockType");
+        // validate() proved blockType non-null and non-blank; the
+        // requireNonNull makes that proof visible to NullAway across
+        // the helper-call boundary.
+        String blockType = Objects.requireNonNull(args.get("blockType"), "blockType");
         int count = Integer.parseInt(args.get("count"));
         long timeout =
                 args.containsKey("timeoutTicks") ? Long.parseLong(args.get("timeoutTicks")) : DEFAULT_TIMEOUT_TICKS;
