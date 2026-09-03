@@ -1,6 +1,6 @@
 ---
 title: Combat/Pathing coordination channel (maintained range)
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 covers:
   - doc/architecture/boundaries.md
   - src/main/java/com/mcbot/mcbotserver/core/behavior/CombatBehavior.java

@@ -1,6 +1,6 @@
 ---
 title: Block capability axis - dig first, pulled forward by the suffocation escape
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 covers:
   - doc/architecture/boundaries.md
   - src/main/java/com/mcbot/mcbotserver/api/actor/Channel.java

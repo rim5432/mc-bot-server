@@ -1,6 +1,6 @@
 ---
 title: Harness Interaction Model - the canonical architecture of the bot's command surface
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 covers:
   - doc/architecture/boundaries.md
   - tool/harness/mc.py

@@ -1,6 +1,6 @@
 ---
 title: Horse / ride-back temper taming (mount-and-steer capability)
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 covers:
   - doc/architecture/player-behavior-RE.md
   - src/main/java/com/mcbot/mcbotserver/core/tame/TameFoodCatalog.java

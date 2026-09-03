@@ -1,6 +1,6 @@
 ---
 title: World interaction layer - perception reads, dig task, place verb, health field
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 covers:
   - doc/architecture/boundaries.md
   - src/main/java/com/mcbot/mcbotserver/adapter/WorldCommands.java
